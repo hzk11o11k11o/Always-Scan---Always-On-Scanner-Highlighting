@@ -1350,7 +1350,8 @@ namespace SAS
 			if (!a_ref || !IsReadable(a_ref, 8)) {
 				return out;
 			}
-			const auto vptr = *reinterpret_cast<void** const*>(a_ref);
+			// 引用虚函数表（TESObjectREFR 的第一个成员就是 vptr）
+			void** vptr = *reinterpret_cast<void***>(a_ref);
 			if (!IsPlausiblePointer(reinterpret_cast<std::uint64_t>(vptr))) {
 				return out;
 			}
