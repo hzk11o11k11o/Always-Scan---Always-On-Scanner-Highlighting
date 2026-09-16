@@ -813,6 +813,21 @@ namespace SAS
 			if (!a_base) {
 				return false;
 			}
+			// ★ v3.0：引导光带的珠子**自己不能被高亮**。
+			//   珠子形态是原版 MSTT「Glow*」家族（脚本侧默认 0x00098106 GlowBall10x10，
+			//   候选见 SAS_Bridge.psc 的 CfgGuideMarkerFormID()）——它们是环境装饰用的
+			//   自发光体，本来就不该出现在扫描高亮里；而且 20 颗珠子会白占 MaxTargets
+			//   配额，每次开关光带还会带来一批挂/摘描边的 churn。
+			//   这几条 FormID 全在 Starfield.esm（高 8 位是 load order index，所以不会误伤）。
+			switch (a_base->GetFormID()) {
+			case 0x00098105u:  // MSTT GlowCube10x10
+			case 0x00098106u:  // MSTT GlowBall10x10  <- 当前使用的形态
+			case 0x0009811Cu:  // MSTT GlowDisc10x10
+			case 0x0001760Fu:  // MSTT GlowLightCone36
+				return false;
+			default:
+				break;
+			}
 			switch (a_base->GetFormType()) {
 			// 可拾取
 			case RE::FormType::kMISC:
