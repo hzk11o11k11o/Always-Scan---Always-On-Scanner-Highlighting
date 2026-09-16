@@ -31,10 +31,15 @@ unit SAS_BuildPlugin;
 //    0x808  GLOB SAS_GuideState        (v2.2: script -> DLL guide spell state)
 //    0x809  GLOB SAS_On                (v2.4: DLL -> script, F8 on/off state)
 //    0x80A  GLOB SAS_GuideMarkers      (v2.4: script -> DLL, breadcrumb path)
+//    0x80B  FLST SAS_DoorBases         (v2.6: EVERY door base of the master; the
+//                                       breadcrumb fallback uses it to find the
+//                                       teleport door that leads to a target which
+//                                       lives in another cell)
 //
 //  VMAD (bound on the quest):
 //    OpList / OpCursor / StopList / StopCursor / Epoch / ShaderPrimary /
-//    GuideHb / GuideState   (v2.2) / SASOn / GuideMarkers   (v2.4)
+//    GuideHb / GuideState   (v2.2) / SASOn / GuideMarkers   (v2.4) /
+//    DoorBases   (v2.6)
 //
 // ---------------------------------------------------------------------------
 //  Known traps:
@@ -66,6 +71,7 @@ var
   globOpCur, globStopCur, globEpoch: IInterface;
   globGuideHb, globGuideState: IInterface;
   globSASOn, globGuideMarkers: IInterface;
+  flstDoors: IInterface;
 
 procedure Log(s: string);
 begin
@@ -191,6 +197,66 @@ begin
     RemoveByIndex(entries, 0, True);
 
   Log('FLST ok: ' + edid + ' entries=' + IntToStr(ElementCount(entries))
+    + ' ' + IntToHex(GetLoadOrderFormID(rec), 8));
+  Result := rec;
+end;
+
+// v2.6: recursive walker -- a record group may contain nested GRUPs.
+procedure CollectDoorEntries(g: IInterface; entries: IInterface; var n: Integer);
+var
+  i: Integer;
+  r, e: IInterface;
+begin
+  for i := 0 to Pred(ElementCount(g)) do begin
+    r := ElementByIndex(g, i);
+    if Signature(r) = 'GRUP' then
+      CollectDoorEntries(r, entries, n)
+    else if Signature(r) = 'DOOR' then begin
+      e := ElementAssign(entries, HighInteger, nil, False);
+      if Assigned(e) then begin
+        SetEditValue(e, Name(r));   // trap #3: entries only resolve via Name()
+        Inc(n);
+      end;
+    end;
+  end;
+end;
+
+// v2.6: FLST holding EVERY door base of the master. The Papyrus side feeds it to
+// ObjectReference.FindAllReferencesOfType (its comment reads "objects in the
+// given list", so a FormList is accepted) to find teleport doors around the
+// player -- Papyrus has NO way to enumerate a cell by itself, and doors are
+// exactly what the breadcrumb needs when the quest target lives elsewhere.
+function MakeDoorFLST(newFile: IwbFile; edid: string): IInterface;
+var
+  tpl, rec, entries, g: IInterface;
+  n: Integer;
+begin
+  Result := nil;
+  tpl := FindByEdid(srcFile, 'FLST', 'HelpManualPC');
+  if not Assigned(tpl) then begin
+    Log('ERR: FLST template missing');
+    Exit;
+  end;
+  AddRequiredElementMasters(tpl, newFile, False);
+  rec := wbCopyElementToFile(tpl, newFile, True, True);
+  if not Assigned(rec) then begin
+    Log('ERR: FLST copy failed');
+    Exit;
+  end;
+  SetElementEditValues(rec, 'EDID', edid);
+
+  entries := ElementByName(rec, 'FormIDs');
+  if not Assigned(entries) then
+    entries := Add(rec, 'FormIDs', True);
+  while ElementCount(entries) > 0 do
+    RemoveByIndex(entries, 0, True);
+
+  n := 0;
+  g := TopGroup(srcFile, 'DOOR');
+  if Assigned(g) then
+    CollectDoorEntries(g, entries, n);
+
+  Log('FLST ok: ' + edid + ' doors=' + IntToStr(n) + '/' + IntToStr(ElementCount(entries))
     + ' ' + IntToHex(GetLoadOrderFormID(rec), 8));
   Result := rec;
 end;
@@ -369,6 +435,13 @@ begin
   globGuideMarkers := MakeGlobal(newFile, 'SAS_GuideMarkers', globTpl, 0.0);
   Flush('07c_on_markers');
 
+  // ------- 0x80B -------
+  // v2.6: every door base of the master. Used by the breadcrumb fallback when the
+  // quest target is in another cell (point at the door that leads there).
+  // MUST stay last so the low-24 ids of 0x800..0x80A never shift.
+  flstDoors := MakeDoorFLST(newFile, 'SAS_DoorBases');
+  Flush('07d_doors');
+
   // VMAD properties: added only after all target records exist.
   AddQuestProp(questRec, 'OpList', flstOp);
   AddQuestProp(questRec, 'OpCursor', globOpCur);
@@ -380,6 +453,7 @@ begin
   AddQuestProp(questRec, 'GuideState', globGuideState);
   AddQuestProp(questRec, 'SASOn', globSASOn);
   AddQuestProp(questRec, 'GuideMarkers', globGuideMarkers);
+  AddQuestProp(questRec, 'DoorBases', flstDoors);
   Flush('08_vmad');
 
   try
@@ -416,6 +490,8 @@ begin
   Log('  0x808 SAS_GuideState      ' + IntToHex(GetLoadOrderFormID(globGuideState) and $FFFFFF, 6));
   Log('  0x809 SAS_On              ' + IntToHex(GetLoadOrderFormID(globSASOn) and $FFFFFF, 6));
   Log('  0x80A SAS_GuideMarkers    ' + IntToHex(GetLoadOrderFormID(globGuideMarkers) and $FFFFFF, 6));
+  Log('  0x80B SAS_DoorBases       ' + IntToHex(GetLoadOrderFormID(flstDoors) and $FFFFFF, 6));
+  Log('        door entries = ' + IntToStr(ElementCount(ElementByName(flstDoors, 'FormIDs'))));
 
   Log('=== Always Scan build done ===');
   Flush('99_done');

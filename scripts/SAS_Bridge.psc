@@ -66,6 +66,12 @@ GlobalVariable Property SASOn Auto Const Mandatory
 GlobalVariable Property GuideMarkers Auto Const Mandatory
 	{ 回报给 DLL 的「当前点亮了几个面包屑」：-1 = 开着但找不到引导目标 }
 
+FormList Property DoorBases Auto Const Mandatory
+	{ ★ v2.6：master 里**所有** DOOR 基础记录（构建时离线打包，339 项）。
+	  用途见下面的 FindGuideDoor —— 目标在别的 cell 时，把面包屑指向「通往它的门」。
+	  为什么能这么用：`ObjectReference.FindAllReferencesOfType(Form akObjectOrList, float)`
+	  的注释原文是 "objects in the given list" ⇒ 接受 FormList。 }
+
 EffectShader Property ShaderPrimary Auto Const Mandatory
 	{ SAS_HighlightFXS }
 
@@ -230,6 +236,7 @@ ObjectReference GuideOtherCellTarget = None
 Float GuideOtherCellDist = 0.0
 Float GuideDiagAt = 0.0
 Float GuidePaintDiagAt = 0.0
+Bool  GuideTargetIsProxy = False
 
 Int Function CfgGuideMarkerCount()
 	{ 面包屑个数。8 个 x 5 米 ≈ 覆盖身前 40 米 }
@@ -274,6 +281,11 @@ EndFunction
 Int Function CfgGuideMarkerFormID()
 	{ 面包屑形态：原版 LIGH GenPointFlare1（点光源） }
 	Return 0x00012E5A
+EndFunction
+
+Float Function CfgGuideDoorRadius()
+	{ ★ v2.6：找「通往目标 cell 的门」时在玩家周围搜多大（游戏单位）。60 米 }
+	Return 60.0 * 3.4286
 EndFunction
 
 ; ★ v2.5 诊断开关。True 时把「目标检索」的每一步写进 Papyrus 日志
@@ -431,6 +443,76 @@ ObjectReference Function FindGuideTarget(Actor p, Float px, Float py, Float pz)
 	Return None
 EndFunction
 
+; ============================================================================
+; ★ v2.6：目标在别的 cell ⇒ 指向「通往它的门」
+; ----------------------------------------------------------------------------
+; 为什么需要：Papyrus 拿到的目标引用如果不在玩家所在的坐标空间（实测最常见的是
+; **飞船内部** —— 主线 MQ305「一大步」的目标「在你的飞船上建造天体仪」就是
+; `FF01E9CB @ cell FF01D4DE`、d=605m，两个 interior cell 的局部坐标根本不可比），
+; 那光靠坐标一个点都画不出来。
+;
+; 兜底逻辑（分级，越靠前越准）：
+;   ① 门的目标 cell == 任务目标的 cell      ⇒ 精确（比如飞船的舱门）
+;   ② 任意「通往 exterior 的门」           ⇒ 方向对（先出门；出门后玩家换了 cell，
+;      下一轮重新算，于是自然形成「多跳指引」）
+;
+; 用 FindAllReferencesOfType + 离线打包的 SAS_DoorBases（master 里全部 339 个
+; DOOR base）实现 —— Papyrus **没有**「遍历 cell 引用」的 API，这是唯一能拿到门的办法。
+; ============================================================================
+ObjectReference Function FindGuideDoor(Actor p, Float px, Float py, Float pz, Cell targetCell)
+	ObjectReference best = None
+	ObjectReference bestOut = None
+	Float bestD = 0.0
+	Float bestOutD = 0.0
+	If targetCell == None || DoorBases == None
+		Return None
+	EndIf
+	Cell myCell = p.GetParentCell()
+
+	; ★ ① 先试「上一层引用」：目标 cell 若是飞船/载具内部，`Cell.GetParentRef()` 就是
+	;   它在世界里的那个引用（B 社注释原文：the ship if this is a ship interior cell）。
+	;   玩家与它在同一个坐标空间时（比如都在阿基拉城的室外），直接指过去最准。
+	ObjectReference pr = targetCell.GetParentRef()
+	If pr != None && SameSpace(pr.GetParentCell(), myCell)
+		Return pr
+	EndIf
+
+	; ★ ② 其次找「通往目标 cell 的门」（比如飞船的登机舱门）
+	; ★ ③ 兜底：任意「通往室外」的门 —— 只在玩家自己就在室内时才有意义
+	;   （否则会指向城市里另一个无关的门外）。
+	ObjectReference[] doors = p.FindAllReferencesOfType(DoorBases, CfgGuideDoorRadius())
+	Bool iAmIndoor = (myCell != None) && myCell.IsInterior()
+	Int i = 0
+	While i < doors.Length
+		ObjectReference d = doors[i]
+		If d != None
+			Cell tc = d.GetTeleportCell()
+			If tc != None
+				Float dx = d.GetPositionX() - px
+				Float dy = d.GetPositionY() - py
+				Float dz = d.GetPositionZ() - pz
+				Float dist = Math.sqrt(dx * dx + dy * dy + dz * dz)
+				If tc == targetCell
+					If best == None || dist < bestD
+						best = d
+						bestD = dist
+					EndIf
+				ElseIf !tc.IsInterior() && iAmIndoor
+					If bestOut == None || dist < bestOutD
+						bestOut = d
+						bestOutD = dist
+					EndIf
+				EndIf
+			EndIf
+		EndIf
+		i = i + 1
+	EndWhile
+	If best != None
+		Return best
+	EndIf
+	Return bestOut
+EndFunction
+
 Function UpdateGuidePath()
 	Actor p = Game.GetPlayer()
 	If p == None
@@ -487,12 +569,28 @@ Function UpdateGuidePath()
 	If needSearch
 		GuideTarget = FindGuideTarget(p, px, py, pz)
 		GuideTargetAt = now
+		GuideTargetIsProxy = False
+	EndIf
+
+	; ★ v2.6：目标在别的 cell ⇒ 退而指向「通往它的门」（见 FindGuideDoor 的说明）
+	; 注意：变量名不能叫 door —— "Door" 是 Papyrus 已知的类型名，编译器直接拒绝。
+	If GuideTarget == None && GuideOtherCellTarget != None && DoorBases != None
+		ObjectReference dr = FindGuideDoor(p, px, py, pz, GuideOtherCellTarget.GetParentCell())
+		If dr != None
+			GuideTarget = dr
+			GuideTargetAt = now
+			GuideTargetIsProxy = True
+			If CfgGuideDebug() && ((now - GuidePaintDiagAt) >= 5.0)
+				GuidePaintDiagAt = now
+				Debug.Trace("[SAS] guide: 目标在别的 cell ⇒ 指向门 " + FormHex(dr) + " -> " + FormHex(dr.GetTeleportCell()))
+			EndIf
+		EndIf
 	EndIf
 
 	If GuideTarget == None
 		HideGuideMarkers()
 		If GuideOtherCellTarget != None
-			; 找到了目标，但它在别的 cell（跨 cell 画不了 —— 见 docs/99 待办）
+			; 找到了目标，但它在别的 cell 且找不到能指的门
 			GuideMarkers.SetValueInt(-2)
 		Else
 			GuideMarkers.SetValueInt(-1)
@@ -556,8 +654,8 @@ Function UpdateGuidePath()
 		EndWhile
 		GuideMarkers.SetValueInt(shown)
 		If CfgGuideDebug() && ((now - GuidePaintDiagAt) >= 5.0)
-		GuidePaintDiagAt = now
-		Debug.Trace("[SAS] guide: target=" + FormHex(GuideTarget) + " d=" + Math.Floor(dist / 3.4286) + "m markers=" + shown + "/" + GuideMarkerRefs.Length)
+			GuidePaintDiagAt = now
+			Debug.Trace("[SAS] guide: target=" + FormHex(GuideTarget) + " isProxy=" + GuideTargetIsProxy + " d=" + Math.Floor(dist / 3.4286) + "m markers=" + shown + "/" + GuideMarkerRefs.Length)
 		EndIf
 		EndFunction
 

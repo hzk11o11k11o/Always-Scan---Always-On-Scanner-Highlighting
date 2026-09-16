@@ -133,6 +133,7 @@ if (-not $SkipPluginBuild) {
             '0x808' = 'SAS_GuideState'
             '0x809' = 'SAS_On'
             '0x80A' = 'SAS_GuideMarkers'
+            '0x80B' = 'SAS_DoorBases'
         }
         $lines = Get-Content -LiteralPath $mapFile
         foreach ($id in $expect.Keys | Sort-Object) {
