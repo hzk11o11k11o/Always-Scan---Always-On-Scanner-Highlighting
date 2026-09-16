@@ -1237,8 +1237,13 @@ namespace SAS
 			TickRetired(now);
 			PollHotkey(now);
 
-			if (!g_state.bound && !BindForms()) {
-				return;
+			// 原生模式下视觉完全在引擎里，**不需要** ESM / FLST 信箱 / Papyrus 桥，
+			// 所以绑定失败也照跑（少一个能坏的地方）；旧方案必须有信箱。
+			const bool legacy = (g_cfg.highlightMode != 1);
+			if (!g_state.bound) {
+				if (!BindForms() && legacy) {
+					return;
+				}
 			}
 
 			// 读档自愈：脚本把 Epoch +1，这里看到变化就整批重置
@@ -1259,16 +1264,22 @@ namespace SAS
 				}
 			}
 
-			// 清表（两个信箱都只在桥消费完之后清）
-			MaybeClear(g_state.opList, g_state.opCursor);
-			ReleaseSatisfiedStops(MaybeClear(g_state.stopList, g_state.stopCursor));
+			// 清表（两个信箱都只在桥消费完之后清）—— 原生模式下没有信箱
+			if (legacy) {
+				MaybeClear(g_state.opList, g_state.opCursor);
+				ReleaseSatisfiedStops(MaybeClear(g_state.stopList, g_state.stopCursor));
+			}
 
 			if (!g_state.on) {
-				PumpPendingStop();
+				if (legacy) {
+					PumpPendingStop();
+				}
 				return;
 			}
 
-			PumpPendingStop();
+			if (legacy) {
+				PumpPendingStop();
+			}
 
 			// 扫描节流
 			if (now - g_state.lastScanMs < static_cast<std::uint64_t>(g_cfg.scanIntervalMs)) {
@@ -1319,10 +1330,10 @@ namespace SAS
 					CountLiveManagers(),
 					g_state.playedCount,
 					g_state.stoppedCount,
-					g_state.opList->arrayOfForms.size(),
-					g_state.opCursor->value,
-					g_state.stopList->arrayOfForms.size(),
-					g_state.stopCursor->value,
+					g_state.opList ? g_state.opList->arrayOfForms.size() : 0,
+					g_state.opCursor ? g_state.opCursor->value : 0.0f,
+					g_state.stopList ? g_state.stopList->arrayOfForms.size() : 0,
+					g_state.stopCursor ? g_state.stopCursor->value : 0.0f,
 					g_state.tokens,
 					g_state.backpressure,
 					g_state.refsRejected,
