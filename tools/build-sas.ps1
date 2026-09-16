@@ -50,6 +50,34 @@ $sw = [System.Diagnostics.Stopwatch]::StartNew()
 
 New-Item -ItemType Directory -Force -Path $tmpOut, $tmpPex, $tmpSrc | Out-Null
 
+# ------------------------------------------------- 0. vendored header offsets
+# ★ commonlibsf 原版有两个真实的偏移错误，本项目已就地修正（见 docs/99）：
+#     BGSListForm::arrayOfForms  0x30 -> 0x38
+#     TESGlobal::value           0x40 -> 0x48
+#   依据：TESForm 的数据在 0x31 结束、按 8 字节对齐补到 0x38；派生类的第一个成员
+#   若含指针（对齐 8）就只能从 0x38 开始，绝不可能落在尾部填充里。
+#   如果这两处被「重新解包 commonlibsf」覆盖回去，DLL 会往错误偏移写数据
+#   （把 FLST 的表单头写坏）—— 而且是运行期才炸。所以这里做**构建期硬校验**。
+Write-Host '[0/5] Verifying vendored commonlibsf header offsets...' -ForegroundColor Yellow
+$hf = @(
+    @{ Path = (Join-Path $root 'tools\commonlibsf-main\include\RE\B\BGSListForm.h'); Marker = 'offsetof(BGSListForm, arrayOfForms) == 0x38' },
+    @{ Path = (Join-Path $root 'tools\commonlibsf-main\include\RE\T\TESGlobal.h');      Marker = 'offsetof(TESGlobal, value) == 0x48' }
+)
+foreach ($h in $hf) {
+    if (-not (Test-Path -LiteralPath $h.Path)) { throw "vendored header missing: $($h.Path)" }
+    if (-not (Select-String -LiteralPath $h.Path -SimpleMatch $h.Marker -Quiet)) {
+        throw @"
+vendored header offset fix is missing: $($h.Path)
+  expected marker: $($h.Marker)
+  commonlibsf 原版把 BGSListForm::arrayOfForms 写成 0x30、TESGlobal::value 写成 0x40，
+  正确值是 0x38 / 0x48（TESForm 的数据在 0x31 结束、按 8 字节对齐补到 0x38）。
+  请按 docs/99-当前项目进度.md 里的说明把这两处偏移改回来再构建。
+"@
+    }
+    Write-Host ("      OK  {0}" -f (Split-Path -Leaf $h.Path)) -ForegroundColor DarkGray
+}
+
+
 # ---------------------------------------------------------------- 1. plugin
 if (-not $SkipPluginBuild) {
     Write-Host '[1/5] Building plugin via headless xEdit (slow, ~4 min)...' -ForegroundColor Yellow
