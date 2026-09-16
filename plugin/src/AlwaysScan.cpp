@@ -40,7 +40,6 @@
 #include "AlwaysScan.h"
 
 #include "RE/B/BGSListForm.h"
-#include "RE/B/BSContainer.h"
 #include "RE/F/FormTypes.h"
 #include "RE/N/NiPoint.h"
 #include "RE/N/NiSmartPointer.h"
@@ -88,6 +87,71 @@ namespace SAS
 
 		// 换 cell / 读档时把已点亮的引用继续保活这么久再释放（见文件头坑②）
 		constexpr std::uint64_t kRetireKeepAliveMs = 2500;
+
+		// ================================================================
+		// ★★★ 绝不能信 commonlibsf 声明的 TESObjectCELL 成员偏移 ★★★
+		//
+		// 2026-09-16 实锤（转储 Starfield_09-16-09-54.dmp）：
+		//   载入存档后第一次扫描 → 崩在 SAS_AlwaysScan.dll+0x10E20，
+		//   符号化成 AlwaysScan.cpp:515 = `cell->ForEachReference(...)`，
+		//   异常码 0xC0000005、访问地址 0x0。
+		//
+		//   反汇编这条指令流（就是 ForEachReference 的内联展开）：
+		//       lea rbx, [rdi + 0x128]          ; BSAutoReadLock(lock)
+		//       mov rsi, [rdi + 0x90]           ; references._data
+		//       mov eax, [rdi + 0x88]           ; references._size
+		//       lea rdi, [rax*8 + rsi]
+		//       cmp qword ptr [rsi], 0          ; ← 这里读 [nullptr] 崩
+		//   也就是说**编译器算出来的**偏移是 references@0x88 / lock@0x128，
+		//   而**真实游戏**是 references@0x80 / lock@0x120（上一代项目 v20/v22/v27/v33
+		//   反复实测；本文件遇到的坏值 size=0x467E0000 也正是一个「指针低 32 位」，
+		//   与上一代 v20 记录的 size=0x1EDE0000 是同一现象）。
+		//
+		//   根因：TESObjectCELL 里 cellFlags 用的 REX::TEnumSet<> 在声明中占的尺寸
+		//   与引擎里不同，导致它**之后的所有成员整体位移 +8**
+		//   （sizeof(TESObjectCELL)==0x150 仍然成立，所以 static_assert 抓不到）。
+		//   这与本项目已修过的 BGSListForm::arrayOfForms(0x30→0x38)、
+		//   TESGlobal::value(0x40→0x48) 是**同一类**问题。
+		//
+		//   ⇒ 规则：TESObjectCELL 的成员一律**按下面的实测偏移手工读**，
+		//     永不调用 cell->ForEachReference() / cell->IsAttached()。
+		// ================================================================
+		// 候选偏移（按优先级）：
+		//   0x80 = 上一代项目 v21~v38 反复实测的真实值（他们的 mod 长期跑这个值）；
+		//   0x88 = commonlibsf 声明算出来的值（本轮已用 static_assert 钉死）。
+		// 只用「形状校验」说话：谁通过就用谁，都不过就这一轮不扫描。
+		constexpr std::size_t kCellRefsOffCandidates[] = { 0x80, 0x88 };
+		// 形状校验的抽查样本数（每个样本一次 VirtualQuery，只在候选试探时用）
+		constexpr std::uint32_t kRefsShapeSamples = 4;
+
+		// BSTArray 内部布局：_size@+0 / _capacity@+4 / _data@+8（见 commonlibsf BSTArray.h）
+		constexpr std::size_t kOffArraySize     = 0x00;
+		constexpr std::size_t kOffArrayCapacity = 0x04;
+		constexpr std::size_t kOffArrayData     = 0x08;
+
+		// TESForm 基类内的偏移（这部分已被上一代实测确认是对的，不受上面那 +8 影响）
+		constexpr std::size_t  kOffFormType  = 0x2E;
+		constexpr std::uint8_t kFormTypeREFR = static_cast<std::uint8_t>(RE::FormType::kREFR);
+		constexpr std::uint8_t kFormTypeACHR = static_cast<std::uint8_t>(RE::FormType::kACHR);
+
+		// ---- 偏移探针 ----
+		// 这两个 static_assert 记录的是「commonlibsf 声明算出来的值」，它们和真实值
+		// **差 8 字节**，正是本 bug 的根源（TESObjectCELL 的基类 TESHandleForm 在声明
+		// 里比真实大 8 字节，导致其后所有成员整体后移）。
+		// 哪天有人把 TESHandleForm 的声明修对了，这里会编译失败 —— 那是好事，
+		// 提醒我们重新核对 kOffCellRefs，届时就可以恢复用头文件成员访问了。
+		static_assert(offsetof(RE::TESObjectCELL, references) == 0x80 + 0x08,
+			"commonlibsf 的 TESObjectCELL 偏移又变了：请重新核对 kOffCellRefs（真实应为 0x80）");
+		static_assert(offsetof(RE::TESObjectCELL, lock) == 0x120 + 0x08,
+			"commonlibsf 的 TESObjectCELL 偏移又变了：请重新核对（真实 lock 应为 0x120）");
+
+		// 合理性上限：一个 cell 的引用数不可能超过这个数（落到这里就是读到垃圾了）
+		constexpr std::uint32_t kMaxRefsSanity = 200000;
+
+		// 换 cell / 读档后先静置这么久再开始扫描（引擎此时还在重建世界）
+		constexpr std::uint64_t kSettleAfterSceneChangeMs = 2000;
+		// 引用数组长度连续两轮一致才认（长度突变 = 加载线程还在往数组里塞）
+		constexpr std::uint32_t kRefsStableRounds = 2;
 
 		constexpr std::uint64_t kStatsLogIntervalMs = 5000;
 		constexpr std::uint64_t kBindWarnIntervalMs = 5000;
@@ -170,6 +234,13 @@ namespace SAS
 			RE::TESObjectCELL* lastCell    = nullptr;
 			std::uint32_t      lastEpoch   = 0;
 			bool               epochSeen   = false;
+
+			// --- cell 引用数组的稳定性判据（见 Rescan 顶部）---
+			std::size_t   cellRefsOff   = 0;  // 形状校验通过的偏移（0 = 还没定）
+			std::uint32_t lastRefsSize  = 0;  // 上一轮看到的引用数
+			std::uint32_t stableRounds  = 0;  // 长度连续相同的轮数
+			std::uint64_t settleUntilMs = 0;  // 在此之前不扫描（换场景/读档后的静置期）
+			std::uint64_t refsRejected  = 0;  // 引用数组校验不通过而跳过的次数
 		};
 
 		Config               g_cfg;
@@ -186,6 +257,92 @@ namespace SAS
 			using namespace std::chrono;
 			return static_cast<std::uint64_t>(
 				duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count());
+		}
+
+		// ----------------------------------------------------------------
+		// 内存安全小工具
+		// 凡是「按实测偏移读出来的指针 / 容器」，用之前一律先用它们验证；
+		// 不通过就放弃（宁可这一轮不扫描，绝不乱读内存）。
+		// ----------------------------------------------------------------
+		bool IsPlausiblePointer(std::uint64_t a_ptr)
+		{
+			return a_ptr > 0x10000ULL && a_ptr < 0x7FFFFFFFFFFFULL;
+		}
+
+		bool IsReadable(const void* a_ptr, std::size_t a_len)
+		{
+			if (!IsPlausiblePointer(reinterpret_cast<std::uint64_t>(a_ptr))) {
+				return false;
+			}
+			MEMORY_BASIC_INFORMATION mbi{};
+			if (::VirtualQuery(a_ptr, &mbi, sizeof(mbi)) == 0) {
+				return false;
+			}
+			if (mbi.State != MEM_COMMIT) {
+				return false;
+			}
+			if (mbi.Protect == PAGE_NOACCESS || (mbi.Protect & PAGE_GUARD)) {
+				return false;
+			}
+			const auto start = reinterpret_cast<std::uintptr_t>(a_ptr);
+			const auto base  = reinterpret_cast<std::uintptr_t>(mbi.BaseAddress);
+			return (start + a_len) <= (base + mbi.RegionSize);
+		}
+
+		// 一个「BSTArray 风格」的原始视图（size@+0 / capacity@+4 / data@+8）
+		struct RawArray
+		{
+			std::uint32_t size{ 0 };
+			std::uint32_t capacity{ 0 };
+			std::uint64_t data{ 0 };
+
+			[[nodiscard]] bool valid() const
+			{
+				if (size == 0) {
+					return false;  // 空数组对调用方没意义，直接当「还不能扫」
+				}
+				if (size > kMaxRefsSanity || capacity < size || capacity > (1u << 20)) {
+					return false;  // 形状明显不自洽 = 读到垃圾了
+				}
+				return IsReadable(reinterpret_cast<const void*>(data), 8);
+			}
+		};
+
+		RawArray ReadRawArray(const void* a_base, std::size_t a_off)
+		{
+			const auto* p = static_cast<const std::uint8_t*>(a_base) + a_off;
+			RawArray    a;
+			a.size     = *reinterpret_cast<const std::uint32_t*>(p + kOffArraySize);
+			a.capacity = *reinterpret_cast<const std::uint32_t*>(p + kOffArrayCapacity);
+			a.data     = *reinterpret_cast<const std::uint64_t*>(p + kOffArrayData);
+			return a;
+		}
+
+		// 「这个偏移上真的是 cell 的引用数组吗？」
+		// 判据（都不依赖任何固定成员偏移，所以两种偏移假设下都成立）：
+		//   ① BSTArray 头形状自洽（size/capacity 关系合理、data 可读）；
+		//   ② 抽查前 kRefsShapeSamples 个元素：[元素可读]
+		//      且 [element->formType(+0x2E) ∈ {REFR, ACHR}]。
+		//      formType 在 TESForm 基类里，不受 TESObjectCELL 那 +8 位移影响。
+		// 两条都过才认 —— 垃圾内存同时满足这两条的几率可以忽略。
+		bool ValidateCellRefs(const RawArray& a_arr, std::uint32_t a_samples)
+		{
+			if (!a_arr.valid() || !IsReadable(reinterpret_cast<const void*>(a_arr.data), 32)) {
+				return false;
+			}
+			auto* const*        list = reinterpret_cast<const void* const*>(a_arr.data);
+			const std::uint32_t n    = std::min<std::uint32_t>(a_arr.size, a_samples);
+			for (std::uint32_t i = 0; i < n; ++i) {
+				const auto* elem = static_cast<const std::uint8_t*>(list[i]);
+				if (!IsReadable(elem, 0x100)) {
+					return false;
+				}
+				const auto ft = *reinterpret_cast<const std::uint8_t*>(elem + kOffFormType);
+				if (ft != kFormTypeREFR && ft != kFormTypeACHR) {
+					return false;
+				}
+			}
+			return true;
 		}
 
 		std::string ModuleDir()
@@ -500,7 +657,48 @@ namespace SAS
 		void Rescan(std::uint64_t a_nowMs, RE::PlayerCharacter* a_player)
 		{
 			auto* cell = a_player->parentCell;
-			if (!cell || !cell->IsAttached()) {
+			if (!cell) {
+				return;
+			}
+			// cell 指针本身也必须可读：下面的 ReadRawArray 会直接解引用 cell+off，
+			// 这一条几乎零成本，专门挡「parentCell 偏移万一也不对」的极端情况。
+			if (!IsReadable(cell, 0x90)) {
+				++g_state.refsRejected;
+				return;
+			}
+
+			// ★ 绝不调 cell->IsAttached() / cell->ForEachReference()：
+			//   两者都按 commonlibsf 的「声明偏移」访问 TESObjectCELL 成员，而那套偏移
+			//   **整体比真实大 8 字节**（见 kCellRefsOffCandidates 上方的完整说明）。
+			//   用 ForEachReference 就是 2026-09-16 那次崩溃（读到垃圾 BSTArray）。
+			//
+			// ★ 也不靠「猜一个偏移」：对候选偏移逐个做**形状校验**
+			//   （BSTArray 头自洽 + 抽查元素确实是 REFR/ACHR），谁通过就用谁。
+			//   一个都不过 = 读到垃圾 / 数组还没建好 → 这一轮不扫描。
+			RawArray    arr{};
+			std::size_t usedOff = 0;
+			for (const auto off : kCellRefsOffCandidates) {
+				const auto cand = ReadRawArray(cell, off);
+				if (ValidateCellRefs(cand, kRefsShapeSamples)) {
+					arr     = cand;
+					usedOff = off;
+					break;
+				}
+			}
+			if (usedOff == 0) {
+				++g_state.refsRejected;
+				g_state.stableRounds = 0;
+				return;
+			}
+			// 长度突变（或换了个偏移）= 加载线程还在往数组里塞引用 → 本轮先不动
+			if (arr.size != g_state.lastRefsSize || usedOff != g_state.cellRefsOff) {
+				g_state.lastRefsSize = arr.size;
+				g_state.cellRefsOff  = usedOff;
+				g_state.stableRounds = 0;
+				return;
+			}
+			// 长度连续稳定若干轮才认为世界已经稳定下来
+			if (++g_state.stableRounds < kRefsStableRounds) {
 				return;
 			}
 
@@ -512,24 +710,27 @@ namespace SAS
 			cands.clear();
 			cands.reserve(512);
 
-			cell->ForEachReference([&](const RE::NiPointer<RE::TESObjectREFR>& a_refPtr) {
-				auto* ref = a_refPtr.get();
-				if (!ref) {
-					return RE::BSContainer::ForEachResult::kContinue;
+			auto* const*        list  = reinterpret_cast<RE::TESObjectREFR* const*>(arr.data);
+			const std::uint32_t count = std::min<std::uint32_t>(arr.size, kMaxRefsSanity);
+
+			for (std::uint32_t i = 0; i < count; ++i) {
+				auto* ref = list[i];
+				// 全部是纯内存读，零引擎调用
+				if (!ref || !IsPlausiblePointer(reinterpret_cast<std::uint64_t>(ref))) {
+					continue;
 				}
-				// 纯内存读，零引擎调用
-				if (ref->IsDeleted() || ref->IsDisabled() || ref->IsPlayerRef()) {
-					return RE::BSContainer::ForEachResult::kContinue;
+				if (ref == a_player || ref->IsDeleted() || ref->IsDisabled() || ref->IsPlayerRef()) {
+					continue;
 				}
 				if (ref->parentCell != cell) {
-					return RE::BSContainer::ForEachResult::kContinue;
+					continue;
 				}
 				if (!IsHighlightableBase(ref->data.objectReference.get())) {
-					return RE::BSContainer::ForEachResult::kContinue;
+					continue;
 				}
 				const float d2 = origin.GetSquaredDistance(ref->data.location);
 				if (d2 > radius2) {
-					return RE::BSContainer::ForEachResult::kContinue;
+					continue;
 				}
 
 				Candidate c;
@@ -542,8 +743,7 @@ namespace SAS
 				// 走动时近的新目标仍然能顶掉远的旧目标。
 				c.key = c.lit ? d2 * 0.5f : d2;
 				cands.push_back(c);
-				return RE::BSContainer::ForEachResult::kContinue;
-			});
+			}
 
 			g_state.candCount = cands.size();
 			if (cands.empty()) {
@@ -672,6 +872,11 @@ namespace SAS
 					g_state.lastEpoch = cur;
 				} else if (cur != g_state.lastEpoch) {
 					g_state.lastEpoch = cur;
+					// 读档：引用数组此刻正在被重建，重置稳定性判据并静置
+					g_state.cellRefsOff   = 0;
+					g_state.lastRefsSize  = 0;
+					g_state.stableRounds  = 0;
+					g_state.settleUntilMs = now + kSettleAfterSceneChangeMs;
 					ResetForNewScene(now, "epoch changed (load game)");
 				}
 			}
@@ -705,7 +910,17 @@ namespace SAS
 			if (cell != g_state.lastCell) {
 				const bool first = (g_state.lastCell == nullptr);
 				g_state.lastCell = cell;
+				// 换 cell / 第一次进入世界：重置引用数组稳定性判据，并静置一段
+				// 时间 —— 引擎此刻正在重建 3D 和引用数组，parentCell 是半初始化状态
+				// （上一代项目 v18 就是在这里崩的）。
+				g_state.cellRefsOff   = 0;
+				g_state.lastRefsSize  = 0;
+				g_state.stableRounds  = 0;
+				g_state.settleUntilMs = now + kSettleAfterSceneChangeMs;
 				ResetForNewScene(now, first ? "first cell" : "cell changed");
+			}
+			if (now < g_state.settleUntilMs) {
+				return;  // 静置期内不扫描
 			}
 
 			Rescan(now, player);
@@ -713,9 +928,11 @@ namespace SAS
 
 			if (g_cfg.logStats && now - g_state.lastStatsMs > kStatsLogIntervalMs) {
 				g_state.lastStatsMs = now;
-				REX::INFO("scan#{} cell={:08X} cand={} sel={} lit={} played={} stopped={} play={}/{} stop={}/{} tok={:.1f} bp={} on={} retired={}",
+				REX::INFO("scan#{} cell={:08X} off=0x{:X} refs={} cand={} sel={} lit={} played={} stopped={} play={}/{} stop={}/{} tok={:.1f} bp={} rej={} on={} retired={}",
 					g_state.scanCount,
 					cell->GetFormID(),
+					g_state.cellRefsOff,
+					g_state.lastRefsSize,
 					g_state.candCount,
 					g_state.selCount,
 					g_state.glowing.size(),
@@ -727,6 +944,7 @@ namespace SAS
 					g_state.stopCursor->value,
 					g_state.tokens,
 					g_state.backpressure,
+					g_state.refsRejected,
 					g_state.on ? 1 : 0,
 					g_state.retired.size());
 			}
