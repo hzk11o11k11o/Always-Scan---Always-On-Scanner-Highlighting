@@ -48,6 +48,13 @@ GlobalVariable Property StopCursor Auto Const Mandatory
 GlobalVariable Property Epoch Auto Const Mandatory
 	{ 读档计数器：变化 = 让 DLL 全部重放 }
 
+; ---- v2.2：把脚本自己的状态回报给 DLL（DLL 打在主日志里，不用翻 Papyrus 日志）----
+GlobalVariable Property GuideHb Auto Const Mandatory
+	{ 心跳：SyncGuideSpell 每跑一次 +1。DLL 看它涨不涨就知道脚本活没活 }
+
+GlobalVariable Property GuideState Auto Const Mandatory
+	{ 引导法术状态：1=取不到法术形态 2=法术在但效果没生效(已尝试 Cast) 3=法术+效果都生效 }
+
 EffectShader Property ShaderPrimary Auto Const Mandatory
 	{ SAS_HighlightFXS }
 
@@ -71,8 +78,17 @@ Bool  LoadEventRegistered = False
 ;
 ; 与 F8 开关的关系：目前**无关**（F8 只管描边）。要联动需要让 DLL 输出一个状态 GLOB，
 ; 见 docs/04 的 TODO。
+;
+; ★ v2.2 的两次尝试（对应 docs/04 里「加上法术了但地上还是没线」的排查）：
+;   ① 实测发现 `AddSpell` 之后 `HasMagicEffect` 为假 —— 这条 SPEL 的 ODTY=0
+;      （是「Spell」不是「Ability」）、EFIT 的 duration 非 0，属于「发射即忘」型：
+;      原版 `Spell.psc` 对这类法术的用法是 `Spell.Cast(施法者, 目标)`，
+;      `AddSpell` 只会把它记进法术书、效果不会生效。所以补一次 Cast。
+;   ② 加了心跳（GuideHb）与状态（GuideState）两个 GLOB，由 DLL 打到自己的日志里，
+;      这样「脚本有没有在跑 / 法术装上了没有 / 效果生效了没有」三件事一次就能看清。
 ; ============================================================================
-Bool GuideApplied = False
+Bool  GuideApplied = False
+Float GuideLastCastAt = 0.0
 
 Int Function CfgGuideSpellFormID()
 	{ 原版 SpellScannerGuide（含 ScannerGuideEffect） }
@@ -89,25 +105,50 @@ Function SyncGuideSpell()
 	if p == None
 		return
 	endif
+
+	; 心跳：DLL 读这个值，涨 = 脚本在跑（不涨 = 脚本没绑上 / 计时器没起来）
+	GuideHb.SetValueInt(GuideHb.GetValueInt() + 1)
+
 	Spell s = Game.GetForm(CfgGuideSpellFormID()) as Spell
 	if s == None
+		GuideState.SetValueInt(1)
 		return
 	endif
 
-	if p.HasSpell(s)
-		; 法术在、效果没了 = 它是个「发射即忘」型（有持续时间）→ 摘掉重加一次。
-		; 如果是 Ability 型，HasMagicEffect 恒为真，永远不会走到这里。
-		MagicEffect mgef = Game.GetForm(CfgGuideEffectFormID()) as MagicEffect
-		if mgef != None && !p.HasMagicEffect(mgef)
-			p.RemoveSpell(s)
-			p.AddSpell(s, false)
-		endif
+	MagicEffect mgef = Game.GetForm(CfgGuideEffectFormID()) as MagicEffect
+	Bool hasSpell = p.HasSpell(s)
+	Bool hasEffect = False
+	if mgef != None
+		hasEffect = p.HasMagicEffect(mgef)
+	endif
+
+	if hasEffect
 		GuideApplied = True
+		GuideState.SetValueInt(3)
 		return
 	endif
 
-	p.AddSpell(s, false)
+	; ---- 到这里：法术没在玩家身上，或者效果没生效 ----
+	if !hasSpell
+		p.AddSpell(s, false)
+		; Ability 型的话，AddSpell 完效果立刻就该在
+		if mgef != None && p.HasMagicEffect(mgef)
+			GuideApplied = True
+			GuideState.SetValueInt(3)
+			Debug.Trace("[SAS] guide: AddSpell 生效（Ability 型）")
+			return
+		endif
+	endif
+
+	; 法术在（或刚加完）但效果没生效 ⇒ 属于「发射即忘」型，必须真的 Cast 一次。
+	; ★ 限频：Cast 是真的施法，别每 0.25 秒来一次。
 	GuideApplied = True
+	GuideState.SetValueInt(2)
+	if (Utility.GetCurrentRealTime() - GuideLastCastAt) >= CfgReapplySecs()
+		GuideLastCastAt = Utility.GetCurrentRealTime()
+		s.Cast(p, p)
+		Debug.Trace("[SAS] guide: 调用了 Spell.Cast(player, player)")
+	endif
 EndFunction
 
 ; ============================================================================
@@ -129,6 +170,11 @@ EndFunction
 
 Float Function CfgStallSecs()
 	Return 5.0
+EndFunction
+
+Float Function CfgReapplySecs()
+	{ 引导法术「发射即忘」型时的重施间隔（秒）。小于效果时长即可保持不断 }
+	Return 4.0
 EndFunction
 
 ; ============================================================================

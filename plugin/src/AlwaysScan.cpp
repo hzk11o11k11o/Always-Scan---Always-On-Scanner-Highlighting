@@ -45,6 +45,7 @@
 #include "RE/N/NiSmartPointer.h"
 #include "RE/P/PlayerCharacter.h"
 #include "RE/T/TESForm.h"
+#include "RE/U/UI.h"
 #include "RE/T/TESGlobal.h"
 #include "RE/T/TESObjectCELL.h"
 #include "RE/T/TESObjectREFR.h"
@@ -52,10 +53,12 @@
 #include <Windows.h>
 
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>
 #include <mutex>
 #include <string>
@@ -80,6 +83,12 @@ namespace SAS
 		constexpr std::uint32_t kLocalStopList   = 0x803;
 		constexpr std::uint32_t kLocalStopCursor = 0x804;
 		constexpr std::uint32_t kLocalEpoch      = 0x805;
+		// ★ v2.2 新增：Papyrus 侧的诊断通道（见 docs/04「任务引导路径」）。
+		//   原生模式下两个信箱是空闲的，所以借它们让脚本把自己的状态回报给 DLL，
+		//   由 DLL 统一打在主日志里 —— 这样「脚本有没有跑 / 引导法术装上了没有」
+		//   就不用去翻 Papyrus 日志了。
+		constexpr std::uint32_t kLocalGuideHb    = 0x807;  // 心跳计数（脚本每 0.25s +1）
+		constexpr std::uint32_t kLocalGuideState = 0x808;  // 0=脚本没跑 2=法术在但效果没生效 3=法术+效果都在
 
 		constexpr const char* kBindQuestEdid = "SAS_AlwaysScanQuest";
 
@@ -194,6 +203,19 @@ namespace SAS
 			// 1 = 引擎的 12 个 HighlightManager 不存在时，自己调用引擎的
 			//     「重建管理器」函数把它们建出来（不开扫描仪时引擎就不会建）。
 			bool          autoEnsureManagers = true;
+
+			// --- ★ v2.2：治「轻微卡顿」的两个闸门 ---
+			// 「掉队」宽限期（毫秒）：一个目标掉出选中集合后，先留着高亮这么久，
+			// 到期还没回到集合里才真正摘掉。
+			//   ★ 为什么需要它：走过去/转身时目标会在集合边缘反复进出，没有宽限期
+			//     就是每 200ms 一轮的 Set/Remove 抖动，主线程被这些小调用磨出
+			//     hitch（实测日志里 rmMiss 每秒涨 ~20 就是这个抖动）。
+			//   期间如果它又回到集合里就什么都不用做（零引擎调用）。
+			int           unhighlightGraceMs = 1500;
+			// 单轮扫描最多向引擎发多少条「挂/摘」调用（0 = 不限）。
+			// 换场景 / 读档一次会积压几百条待办，一口气做完就是一个长卡顿
+			// （实测日志里出现过 18 秒的空档），这里摊到后面几轮里慢慢做。
+			int           maxOutlineOpsPerScan = 64;
 		};
 
 		// ====================================================================
@@ -216,6 +238,9 @@ namespace SAS
 		{
 			RE::NiPointer<RE::TESObjectREFR> ref;
 			std::uint64_t                    reassertMs = 0;
+			// 0 = 还在选中集合里；非 0 = 掉队时刻（到这个时刻之后才真正摘除）。
+			// 见 Config::unhighlightGraceMs 的说明。
+			std::uint64_t                    dropAt     = 0;
 		};
 
 		struct State
@@ -228,6 +253,11 @@ namespace SAS
 			RE::BGSListForm* stopList   = nullptr;
 			RE::TESGlobal*   stopCursor = nullptr;
 			RE::TESGlobal*   epoch      = nullptr;
+			// v2.2：Papyrus 侧自报状态（见 kLocalGuideHb / kLocalGuideState）
+			RE::TESGlobal*   guideHb    = nullptr;
+			RE::TESGlobal*   guideState = nullptr;
+			double           lastGuideHb    = -1.0;
+			double           lastGuideState = -1.0;
 
 			// --- 开关 ---
 			bool on      = true;
@@ -249,6 +279,7 @@ namespace SAS
 			bool          nativeRemoveReady = false;
 			std::uint64_t outlineRemoved   = 0;      // 成功摘除次数（诊断）
 			std::uint64_t outlineRemoveMiss = 0;     // 调了 Remove 但一个管理器里都没有（诊断）
+			std::uint64_t outlineUnhighlightMiss = 0; // 引擎的 0x653F60 也没动到任何管理器（诊断）
 			std::uint64_t lastOutlineErrMs = 0;
 
 			// --- 关掉开关时要熄灭的那批（分批喂给 StopList，避免一次性灌爆）---
@@ -265,6 +296,7 @@ namespace SAS
 			std::uint64_t lastOpMs      = 0;
 			std::uint64_t lastStatsMs   = 0;
 			std::uint64_t lastBindWarnMs = 0;
+			std::uint64_t lastMapDiagMs = 0;
 			double        tokens        = 0.0;
 			std::uint64_t scanCount     = 0;
 			std::uint64_t playedCount   = 0;
@@ -278,7 +310,18 @@ namespace SAS
 			//   统计窗口 = 两条统计日志之间，打完之后清空。
 			//   用途：如果游戏里发现「某个东西该亮却没亮」，看这条日志就知道它的
 			//   formType 是多少，再决定要不要加进 IsHighlightableBase 的白名单。
-			std::unordered_map<std::uint8_t, std::uint32_t> rejectTypes;
+			//   ★ v2.2：从 unordered_map 换成定长数组 —— 这段代码对**每个被拒的
+			//   引用**都要执行一次，密集场景里每秒 2 万次哈希表操作，纯属白烧主线程。
+			//   现在下标就是 formType，一次自增完事。
+			std::array<std::uint32_t, 256> rejectTypes{};
+
+			// --- v2.2：耗时统计（每次统计日志之间重置，用来定位卡顿）---
+			std::uint64_t scanMsTotal     = 0;  // 窗口内 Sum(每轮 Rescan 耗时)
+			std::uint64_t scanMsMax       = 0;  // 窗口内最大单轮耗时（这才是卡顿的感觉来源）
+			std::uint32_t scanMsSamples   = 0;
+			std::uint64_t opsThisScan     = 0;  // 最近一轮实际发出的引擎调用数
+			std::uint64_t opsDeferred     = 0;  // 因为预算不够而推迟到下一轮的调用数
+			bool          loadingNow      = false;
 
 			// --- 场景跟踪 ---
 			RE::TESObjectCELL* lastCell    = nullptr;
@@ -299,8 +342,9 @@ namespace SAS
 		std::atomic_uint32_t g_mainThreadId{ 0 };
 		std::string          g_iniPath;
 
-		// 前置声明：定义在后面的「原生 outline」小节里（SetOn 要先用到）
+		// 前置声明：定义在后面的「原生 outline」小节里（SetOn / ResetForNewScene 要先用到）
 		void ClearAllNativeOutline();
+		void MarkAllForRemoval(std::uint64_t a_deadlineMs);
 
 		// ====================================================================
 		// 小工具
@@ -424,6 +468,25 @@ namespace SAS
 			return pid == ::GetCurrentProcessId();
 		}
 
+		// ----------------------------------------------------------------
+		// 「现在是不是卡在载入画面」
+		// ----------------------------------------------------------------
+		// ★ v2.2 新增。实测日志里出现过 18 秒的空档，正好落在换区域的时候：
+		//   主线程在跑加载，我们这时候去调引擎（LookupOrAdd / Remove）每条都被拖慢
+		//   几十毫秒，几百条叠起来就是一个长卡顿。载入期间**什么都不做**最省事。
+		// 菜单名用 FO4/Skyrim 那一套（Starfield 沿用）：LoadingMenu / FaderMenu。
+		// 菜单没注册时 IsMenuOpen 返回 false，所以不会误判。
+		bool IsLoadingScreenUp()
+		{
+			static const RE::BSFixedString kLoadingMenu{ "LoadingMenu" };
+			static const RE::BSFixedString kFaderMenu{ "FaderMenu" };
+			auto*                           ui = RE::UI::GetSingleton();
+			if (!ui) {
+				return false;
+			}
+			return ui->IsMenuOpen(kLoadingMenu) || ui->IsMenuOpen(kFaderMenu);
+		}
+
 		void LoadConfig()
 		{
 			g_iniPath          = ModuleDir() + "\\SAS_AlwaysScan.ini";
@@ -462,6 +525,8 @@ namespace SAS
 			g_cfg.frontFovDeg   = std::clamp(getFloat("FrontFovDeg", 110.0f), 20.0f, 360.0f);
 			g_cfg.reassertMs    = std::clamp(getInt("ReassertMs", 0), 0, 60000);  // 0 = 不重申
 			g_cfg.autoEnsureManagers = getInt("AutoEnsureManagers", 1) != 0;
+			g_cfg.unhighlightGraceMs = std::clamp(getInt("UnhighlightGraceMs", 1500), 0, 60000);
+			g_cfg.maxOutlineOpsPerScan = std::clamp(getInt("MaxOutlineOpsPerScan", 64), 0, 4096);
 
 			REX::INFO("config: radius={:.1f}m duration={:.0f}s targets={} hotkeyVK=0x{:X} startEnabled={}",
 				g_cfg.radiusMeters, g_cfg.glowDurationSec, g_cfg.maxTargets,
@@ -471,6 +536,8 @@ namespace SAS
 				g_cfg.outlineState, g_cfg.onlyInFront, g_cfg.frontFovDeg,
 				g_cfg.reassertMs ? std::to_string(g_cfg.reassertMs) + "ms" : std::string{ "off" },
 				g_cfg.autoEnsureManagers);
+			REX::INFO("config: unhighlightGrace={}ms maxOutlineOpsPerScan={}",
+				g_cfg.unhighlightGraceMs, g_cfg.maxOutlineOpsPerScan);
 		}
 
 		// ====================================================================
@@ -497,6 +564,9 @@ namespace SAS
 			auto*               stopList   = RE::TESForm::LookupByID<RE::BGSListForm>(prefix | kLocalStopList);
 			auto*               stopCursor = RE::TESForm::LookupByID<RE::TESGlobal>(prefix | kLocalStopCursor);
 			auto*               epoch      = RE::TESForm::LookupByID<RE::TESGlobal>(prefix | kLocalEpoch);
+			// v2.2 诊断通道（可选）：老版本 ESM 里没有它们，只用警告提醒，不阻断绑定。
+			auto*               guideHb    = RE::TESForm::LookupByID<RE::TESGlobal>(prefix | kLocalGuideHb);
+			auto*               guideState = RE::TESForm::LookupByID<RE::TESGlobal>(prefix | kLocalGuideState);
 
 			if (!opList || !opCursor || !stopList || !stopCursor || !epoch) {
 				REX::WARN("BindForms: incomplete (prefix={:08X} play={} cur={} stop={} stopcur={} epoch={})",
@@ -511,7 +581,13 @@ namespace SAS
 			g_state.stopList   = stopList;
 			g_state.stopCursor = stopCursor;
 			g_state.epoch      = epoch;
+			g_state.guideHb    = guideHb;
+			g_state.guideState = guideState;
 			g_state.bound      = true;
+			if (!guideHb || !guideState) {
+				REX::WARN("BindForms: guide 诊断 GLOB 缺失（{} / {}）—— 请重新构建 ESM（v2.2 起新增 0x807/0x808）",
+					kLocalGuideHb, kLocalGuideState);
+			}
 
 			REX::INFO("forms bound: prefix={:08X} quest={:08X} arrayOfForms@0x{:X} (checked against sizeof(TESForm)=0x38)",
 				prefix, quest->GetFormID(),
@@ -666,13 +742,14 @@ namespace SAS
 			g_state.pendingStopSent = 0;
 			RetireGlowTable(a_nowMs);
 
-			// 换场景 / 读档：把这批引用从引擎的高亮表里**真正摘掉**再丢账。
-			// ★ v2.1 起必须逐个摘：管理器的哈希表会一直留着这个 id（旧的「只写状态 12」
-			//   从来没能删掉任何东西），换几次场景就会攒一堆垃圾 id 把表和渲染器占满
-			//   —— 这也是「有些东西死活不亮」的一个可疑来源。
-			//   这里存的都是 NiPointer（引用保活），所以逐个反查是安全的。
-			ClearAllNativeOutline();
-			g_state.outlined.clear();
+			// 换场景 / 读档：把这批引用从引擎的高亮表里摘掉。
+			// ★ v2.2 改成**不立刻动手**：这一步原本会在一帧里发出 200~300 条引擎调用，
+			//   实测日志里出现过 18 秒的空档（正好卡在载入新区域时，主线程在加载，
+			//   每条调用都被拖慢）。现在只打「待摘」时间戳，真正的摘除由
+			//   SyncNativeOutline 按每轮预算慢慢做完（见 Config::maxOutlineOpsPerScan）。
+			//   这里存的都是 NiPointer（引用保活），所以晚一点摘也是安全的。
+			const auto deadline = std::max(g_state.settleUntilMs, a_nowMs) + 500;
+			MarkAllForRemoval(deadline);
 		}
 
 		// ====================================================================
@@ -795,6 +872,35 @@ namespace SAS
 		constexpr std::uintptr_t kRvaOutlineRemove     = 0x6535B0;
 		constexpr std::uintptr_t kRvaOutlineDeactivate = 0x653040;
 
+		// ================================================================
+		// ★★★ v2.2：改用**引擎自己的**「摘掉一个引用」包装函数 0x653F60 ★★★
+		//
+		// 实测反馈：v2.1 上线后日志里 `rmOk=0 rmMiss=6332` —— 我们自己拼的
+		// `Remove(map, &FormID)` **一次都没命中过**。也就是说那个管理器哈希表里的
+		// 键**不是** `TESForm::GetFormID()`（我们一直在拿一个错的 id 去删）。
+		//
+		// 0x653F60 的 id 是它自己取的，不依赖我们对 id 的任何猜测：
+		//
+		//   00653F60  void Unhighlight(ctx, TESObjectREFR* ref)
+		//     push rdi / sub rsp,0x20
+		//     rax = [rdx]                      ; rdx = ref → 取 vtable
+		//     rcx = rdx                        ; this = ref
+		//     call [rax + 0x50]                ; 引擎自己的一层间接（返回内部对象）
+		//     if (!rax) return                 ; ← 它自己会处理「取不到」的情况
+		//     id  = [rax + 0x1F0]              ; ★ id 由引擎自己算，不经我们的手
+		//     rax = [rdi + 8]                  ; rdi = ctx
+		//     rcx = [rax]                      ; ★ *(ctx+8) 必须指向「管理器指针」本身
+		//     rcx += 0x18                      ; 内嵌哈希表
+		//     if (Remove(rcx, &id)) Deactivate(id)
+		//
+		// 所以只要我们给的 ctx 满足 `*(ctx+8) == 管理器指针的地址`，它就等价于引擎
+		// 正常摘除。我们直接传 `&g_outlineManagers[state]`（那个槽本身就是管理器指针）。
+		// ★ 唯一的要求：那个槽非空（为空时它会去读 +0x18 那一带 → 崩）。
+		constexpr std::uintptr_t kRvaOutlineUnhighlight    = 0x653F60;
+		constexpr std::uint8_t   kSigOutlineUnhighlight[16] = {
+			0x40, 0x57, 0x48, 0x83, 0xEC, 0x20, 0x48, 0x8B, 0x02, 0x48, 0x8B, 0xF9, 0x48, 0x8B, 0xCA, 0xFF
+		};
+
 		// HighlightManager(0x48 B) 内嵌哈希表对象的偏移。两处交叉确认：
 		//   ctor 0x6532F0：`lea rax,[rdi+0x10]; lea rbx,[rax+8]` → rbx=manager+0x18，
 		//                  随后 [rbx+8]=data / [rbx+0x10]=capacity / [rbx+0x18]=count；
@@ -836,19 +942,25 @@ namespace SAS
 		using OutlineEnsure_t      = void (*)(void*);
 		using OutlineRemove_t      = bool (*)(void*, std::uint32_t*);
 		using OutlineDeactivate_t  = void (*)(std::uint32_t);
+		// void Unhighlight(ctx, TESObjectREFR* ref)；ctx 布局见上面的长注释
+		using OutlineUnhighlight_t = void (*)(void*, RE::TESObjectREFR*);
 
-		OutlineLookupOrAdd_t g_outlineLookupOrAdd  = nullptr;
-		OutlineSet_t         g_outlineSet          = nullptr;
-		OutlineClear_t       g_outlineClear        = nullptr;
-		OutlineEnsure_t      g_outlineEnsure       = nullptr;
-		OutlineRemove_t      g_outlineRemove       = nullptr;
-		OutlineDeactivate_t  g_outlineDeactivate   = nullptr;
-		std::uintptr_t       g_outlineManagerArray = 0;
+		OutlineLookupOrAdd_t  g_outlineLookupOrAdd  = nullptr;
+		OutlineSet_t          g_outlineSet          = nullptr;
+		OutlineClear_t        g_outlineClear        = nullptr;
+		OutlineEnsure_t       g_outlineEnsure       = nullptr;
+		OutlineRemove_t       g_outlineRemove       = nullptr;
+		OutlineDeactivate_t   g_outlineDeactivate   = nullptr;
+		OutlineUnhighlight_t  g_outlineUnhighlight  = nullptr;
+		bool                  g_outlineUnhighlightReady = false;
+		std::uintptr_t        g_outlineManagerArray = 0;
 
 		// 前置声明（定义在 ResolveNativeOutline 之后）
 		std::uintptr_t OutlineManagerFor(std::uint32_t a_state);
 		void           LogManagerDiagnostics(const char* a_tag);
+		void           LogManagerMapDiag(const char* a_tag, std::uint32_t a_state);
 		bool           EnsureManagerFor(std::uint32_t a_state);
+		bool           OutlineUnhighlightRef(RE::TESObjectREFR* a_ref, std::uint32_t a_state);
 
 		std::uintptr_t ModuleBase()
 		{
@@ -923,7 +1035,20 @@ namespace SAS
 			REX::INFO("native outline remove: remove=+0x{:X} deactivate=+0x{:X} managers[{}].map=+0x{:X} -> {}",
 				kRvaOutlineRemove, kRvaOutlineDeactivate, kOutlineManagerUsed, kOffManagerMap,
 				g_state.nativeRemoveReady ? "ok" : "UNAVAILABLE(将只能写状态 12)");
+
+			// ★ v2.2：引擎自己的摘除包装函数（首选路径；拿不到就退回自己拼的那条）
+			const auto addrUnhighlight = base + kRvaOutlineUnhighlight;
+			if (SigMatches(addrUnhighlight, kSigOutlineUnhighlight)) {
+				g_outlineUnhighlight      = reinterpret_cast<OutlineUnhighlight_t>(addrUnhighlight);
+				g_outlineUnhighlightReady = true;
+				REX::INFO("native outline unhighlight: +0x{:X} (sig verified) -> 摘除走引擎自己的路径（id 由引擎算）",
+					kRvaOutlineUnhighlight);
+			} else {
+				REX::WARN("native outline unhighlight: +0x{:X} 签名不匹配（游戏版本变了？）-> 退回自己拼的 Remove(FormID)",
+					kRvaOutlineUnhighlight);
+			}
 			LogManagerDiagnostics("install");
+			LogManagerMapDiag("install", static_cast<std::uint32_t>(g_cfg.outlineState));
 		}
 
 		// 读「第 a_state 个 HighlightManager」指针；0 = 现在不存在
@@ -955,6 +1080,95 @@ namespace SAS
 			REX::INFO("native outline managers[{}] = {}/{} alive (state {} -> {})",
 				a_tag, CountLiveManagers(), kOutlineManagerUsed,
 				g_cfg.outlineState, OutlineManagerFor(static_cast<std::uint32_t>(g_cfg.outlineState)) ? "ok" : "NULL");
+		}
+
+		// --------------------------------------------------------------------
+		// ★ v2.2 诊断：把某个管理器内嵌哈希表的「家底」打出来
+		// --------------------------------------------------------------------
+		// 目的：v2.1 的 `rmOk=0 rmMiss=6332` 说明我们拿去删的 id 根本不是表里的键。
+		// 这一行会告诉我们表里到底有哪些键（以及表有多大），从此不用再猜 ——
+		// 如果里面的键是 0x04xxxxxx 这种 FormID，就说明键确实是 FormID，问题在别处；
+		// 如果是别的形态，就说明要按那种形态去删。
+		// 哈希表布局（ctor 0x6532F0 + Remove 0x6535B0 交叉确认）：
+		//   元素 12 字节 = { key(u32), next(u32), prev(u32) }，+4 == 0xFFFFFFFF 表示空槽。
+		// --------------------------------------------------------------------
+		void LogManagerMapDiag(const char* a_tag, std::uint32_t a_state)
+		{
+			const auto mgr = OutlineManagerFor(a_state);
+			if (!mgr) {
+				REX::INFO("manager map[{}] state={} : 管理器不存在", a_tag, a_state);
+				return;
+			}
+			const auto* head = reinterpret_cast<const std::uint32_t*>(mgr + kOffManagerMap);
+			if (!IsReadable(head, kSizeManagerMap)) {
+				REX::INFO("manager map[{}] state={} : 表头不可读", a_tag, a_state);
+				return;
+			}
+			const std::uint32_t cap   = head[0x10 / 4];
+			const std::uint32_t c18   = head[0x18 / 4];
+			const std::uint32_t c20   = head[0x20 / 4];
+			const auto          data  = reinterpret_cast<std::uintptr_t>(head) + 8;
+			const auto          dataP = *reinterpret_cast<const std::uint64_t*>(data);
+
+			REX::INFO("manager map[{}] state={} : mgr={:#x} cap={} count18={} count20={} data={:#x}",
+				a_tag, a_state, mgr, cap, c18, c20, dataP);
+
+			if (!cap || cap > (1u << 16) || !IsReadable(reinterpret_cast<const void*>(dataP), 12)) {
+				return;
+			}
+			const std::uint32_t slots = std::min<std::uint32_t>(cap, 4096);
+			if (!IsReadable(reinterpret_cast<const void*>(dataP), static_cast<std::size_t>(slots) * 12)) {
+				return;
+			}
+			const auto* elems = reinterpret_cast<const std::uint32_t*>(dataP);
+			char        tmp[48]{};
+			std::string keys;
+			std::uint32_t found = 0;
+			for (std::uint32_t i = 0; i < slots && found < 8; ++i) {
+				const std::uint32_t key  = elems[i * 3 + 0];
+				const std::uint32_t next = elems[i * 3 + 1];
+				if (next == 0xFFFFFFFFu && key == 0xFFFFFFFFu) {
+					continue;  // 空槽
+				}
+				std::snprintf(tmp, sizeof(tmp), "%s0x%08X", keys.empty() ? "" : ", ", key);
+				keys += tmp;
+				++found;
+			}
+			REX::INFO("manager map[{}] state={} : 前 {} 个非空键 = [{}]", a_tag, a_state, found, keys);
+		}
+
+		// 管理器内嵌哈希表当前的「元素数」字段（诊断用，不作为逻辑判据）。
+		std::uint32_t ManagerMapCount(std::uintptr_t a_mgr)
+		{
+			if (!a_mgr) {
+				return 0;
+			}
+			const auto* p = reinterpret_cast<const std::uint32_t*>(a_mgr + kOffManagerMap + 0x18);
+			return IsReadable(p, sizeof(std::uint32_t)) ? *p : 0;
+		}
+
+		// 用引擎自己的 0x653F60 把一个引用从 state 对应的管理器里摘掉。
+		// 返回「看起来真的动过」（表元素数变了）—— 这个函数本身没有返回值，
+		// 所以只能这样旁证；旁证失败也只是让我们多试几个状态，不影响正确性。
+		bool OutlineUnhighlightRef(RE::TESObjectREFR* a_ref, std::uint32_t a_state)
+		{
+			if (!g_outlineUnhighlight || !a_ref || a_state >= kOutlineManagerUsed) {
+				return false;
+			}
+			// ctx 只需要 `*(ctx+8) == 管理器指针所在的槽`，所以直接指向管理器数组的槽。
+			// ★ 槽为空时绝不能调：0x653F60 会把 0x18 当成表头去读。
+			auto* const slot = reinterpret_cast<void**>(g_outlineManagerArray + a_state * sizeof(std::uintptr_t));
+			if (!IsReadable(slot, sizeof(void*)) || !*slot) {
+				return false;
+			}
+			const auto before = ManagerMapCount(reinterpret_cast<std::uintptr_t>(*slot));
+			struct Ctx
+			{
+				void*   unused;
+				void**  managerSlot;
+			} ctx{ nullptr, slot };
+			g_outlineUnhighlight(&ctx, a_ref);
+			return ManagerMapCount(reinterpret_cast<std::uintptr_t>(*slot)) != before;
 		}
 
 		// 确保目标状态的管理器存在。不存在就调用引擎自己的「重建管理器」函数
@@ -1001,15 +1215,18 @@ namespace SAS
 		}
 
 		// --------------------------------------------------------------------
-		// 摘掉原生 outline
+		// 摘掉原生 outline（v2.2 重写）
 		// --------------------------------------------------------------------
-		// ★ 只把状态写回 12 是**摘不掉的**（id 还在管理器哈希表里，渲染器照画）。
-		//   正确顺序（与引擎自己的 0x653F60 完全一致）：
-		//       1) 从状态表里读出当前状态（= 在哪个管理器里）
-		//       2) Remove(managers[state] + 0x18, &id) —— 成功说明确实删到了
-		//       3) Deactivate(id) —— 通知渲染器注销这个 id
-		//       4) 状态写回 12
-		//   拿不到 Remove/Deactivate（签名不符）时退化成只做第 4 步。
+		// 三条路，按可靠性从高到低：
+		//   ① **引擎自己的 0x653F60**（`OutlineUnhighlightRef`）：id 由引擎自己算，
+		//      不依赖我们对「哈希表的键是什么」的猜测 —— 这是 v2.2 的主要改动，
+		//      因为 v2.1 用 FormID 去删实测**一次都没命中**（rmOk=0）。
+		//   ② 回退：自己按 FormID 调 `Remove(map,&id)` → `Deactivate(id)`。
+		//   ③ 无论如何把状态写回 12（让引擎下一轮刷新不再往管理器里塞这个引用）。
+		//
+		// ★ 状态候选顺序：状态表里记的（最可信，是我们写进去的）→ 配置里的 → 其余全部。
+		//   只有前两个都没「动过东西」时才会一路扫完 11 个（每秒几十次的摘除量下，
+		//   这个代价是可以接受的；而且走到那一步本身就说明我们的假设错了）。
 		// --------------------------------------------------------------------
 		bool RemoveOutlineIdFromManager(std::uint32_t a_state, std::uint32_t* a_id)
 		{
@@ -1041,26 +1258,72 @@ namespace SAS
 			RE::TESObjectREFR* slot = a_ref;
 			auto*              p    = g_outlineLookupOrAdd(nullptr, &slot);
 			const bool         pOk  = p && IsReadable(p, sizeof(std::uint32_t));
+			const std::uint32_t stateInTable = (pOk && *p < kOutlineManagerUsed)
+			                                     ? *p
+			                                     : kOutlineStateNone;
 
+			// ---- ① 引擎自己的摘除（首选）----
+			if (g_outlineUnhighlightReady) {
+				std::uint32_t tried[kOutlineManagerUsed]{};
+				std::uint32_t nTried = 0;
+				auto tryState = [&](std::uint32_t a_state) -> bool {
+					if (a_state >= kOutlineManagerUsed) {
+						return false;
+					}
+					for (std::uint32_t i = 0; i < nTried; ++i) {
+						if (tried[i] == a_state) {
+							return false;  // 已经试过
+						}
+					}
+					tried[nTried++] = a_state;
+					return OutlineUnhighlightRef(a_ref, a_state);
+				};
+
+				if (tryState(stateInTable)) {
+					++g_state.outlineRemoved;
+					if (pOk) {
+						*p = kOutlineStateNone;
+					}
+					return;
+				}
+				if (tryState(static_cast<std::uint32_t>(g_cfg.outlineState))) {
+					++g_state.outlineRemoved;
+					if (pOk) {
+						*p = kOutlineStateNone;
+					}
+					return;
+				}
+				// 兜底：状态表和实际所在管理器对不上（重申 / 多状态残留）时全扫一遍
+				for (std::uint32_t s = 0; s < kOutlineManagerUsed; ++s) {
+					if (tryState(s)) {
+						++g_state.outlineRemoved;
+						if (pOk) {
+							*p = kOutlineStateNone;
+						}
+						return;
+					}
+				}
+				++g_state.outlineUnhighlightMiss;
+			}
+
+			// ---- ② 回退：自己按 FormID 删（v2.1 的老路，实测基本删不到）----
 			if (g_state.nativeRemoveReady) {
-				// 管理器哈希表的键就是 24/32 位 FormID（TESForm::formID @ +0x28，
-				// 与 commonlibsf 的声明一致，见 TESForm.h 的 static_assert(sizeof==0x38)）。
 				const std::uint32_t id = a_ref->GetFormID();
 				if (id != 0 && id != 0xFFFFFF) {
-					std::uint32_t tmp       = id;
-					bool          removed   = false;
-					// 快路径：状态表里记的就是它所在的管理器
+					std::uint32_t tmp     = id;
+					bool          removed = false;
 					if (pOk && *p < kOutlineManagerUsed) {
 						removed = RemoveOutlineIdFromManager(*p, &tmp);
 					}
-					// 兜底：状态表和实际所在管理器万一不一致（重申/多状态残留），全扫一遍。
 					for (std::uint32_t s = 0; !removed && s < kOutlineManagerUsed; ++s) {
 						removed = RemoveOutlineIdFromManager(s, &tmp);
 					}
 					if (removed) {
 						++g_state.outlineRemoved;
-					} else {
-						++g_state.outlineRemoveMiss;
+						if (pOk) {
+							*p = kOutlineStateNone;
+						}
+						return;
 					}
 				}
 			} else if (g_outlineClear) {
@@ -1068,8 +1331,10 @@ namespace SAS
 				g_outlineClear(nullptr, &slot);
 			}
 
+			// ---- ③ 什么都没删到：至少把状态写回 12 ----
+			++g_state.outlineRemoveMiss;
 			if (pOk) {
-				*p = kOutlineStateNone;  // 12 = 无高亮：引擎的 Set 看到它就不会再往管理器里塞
+				*p = kOutlineStateNone;
 			}
 		}
 
@@ -1090,23 +1355,59 @@ namespace SAS
 				chosenSet[c->ref] = true;
 			}
 
-			// 掉队的：摘掉
-			for (auto it = g_state.outlined.begin(); it != g_state.outlined.end();) {
-				if (chosenSet.find(it->first) == chosenSet.end()) {
-					UnoutlineRef(it->second.ref.get());
-					it = g_state.outlined.erase(it);
-				} else {
-					++it;
+			// 单轮的引擎调用预算（0 = 不限）。换场景会积压几百条待办，
+			// 一口气做完就是一个可见的长卡顿，所以摊到后面几轮里慢慢做。
+			const auto budgetLimit = g_cfg.maxOutlineOpsPerScan > 0
+			                           ? static_cast<std::uint32_t>(g_cfg.maxOutlineOpsPerScan)
+			                           : 0xFFFFFFFFu;
+			std::uint32_t budget = budgetLimit;
+			g_state.opsThisScan  = 0;
+			g_state.opsDeferred  = 0;
+
+			// ---- 1) 标记 / 取消标记「掉队」----
+			// ★ v2.2 的宽限期：目标掉出集合后**先只打一个时间戳**，到点还没回来才真正摘。
+			//   走过去时目标会在集合边缘反复进出，没有这一步就是每 200ms 一轮的
+			//   Set/Remove 抖动（主线程被这些调用磨出 hitch）；有了它，绝大多数
+			//   「进出」都只是改一个时间戳，**零引擎调用**。
+			const auto grace = static_cast<std::uint64_t>(g_cfg.unhighlightGraceMs);
+			for (auto& [ref, e] : g_state.outlined) {
+				if (chosenSet.find(ref) != chosenSet.end()) {
+					e.dropAt = 0;  // 又回来了：什么都不用做
+				} else if (e.dropAt == 0) {
+					e.dropAt = a_nowMs + grace;
 				}
 			}
 
-			// 新目标 / 到重申时刻的
+			// ---- 2) 到期的摘除（受预算限制）----
+			for (auto it = g_state.outlined.begin(); it != g_state.outlined.end();) {
+				if (it->second.dropAt == 0 || a_nowMs < it->second.dropAt) {
+					++it;
+					continue;
+				}
+				if (budget == 0) {
+					++g_state.opsDeferred;  // 预算用完，下一轮继续
+					++it;
+					continue;
+				}
+				--budget;
+				++g_state.opsThisScan;
+				UnoutlineRef(it->second.ref.get());
+				it = g_state.outlined.erase(it);
+			}
+
+			// ---- 3) 新目标 / 到重申时刻的（同样受预算限制）----
 			const auto wantState = static_cast<std::uint32_t>(g_cfg.outlineState);
 			const auto reassert  = static_cast<std::uint64_t>(g_cfg.reassertMs);
 			const auto nextMs    = reassert ? a_nowMs + reassert : UINT64_MAX;
 			for (auto* c : a_chosen) {
 				auto it = g_state.outlined.find(c->ref);
 				if (it == g_state.outlined.end()) {
+					if (budget == 0) {
+						++g_state.opsDeferred;
+						continue;
+					}
+					--budget;
+					++g_state.opsThisScan;
 					if (OutlineRef(c->ref, wantState)) {
 						OutlineEntry e;
 						e.ref        = RE::NiPointer<RE::TESObjectREFR>{ c->ref };
@@ -1114,6 +1415,12 @@ namespace SAS
 						g_state.outlined[c->ref] = std::move(e);
 					}
 				} else if (a_nowMs >= it->second.reassertMs) {
+					if (budget == 0) {
+						++g_state.opsDeferred;
+						continue;
+					}
+					--budget;
+					++g_state.opsThisScan;
 					if (OutlineRef(c->ref, wantState)) {
 						it->second.reassertMs = nextMs;
 					} else {
@@ -1124,24 +1431,45 @@ namespace SAS
 			}
 		}
 
-		// 把当前所有已挂高亮的引用全部摘掉（关开关 / 换场景）
+		// 把当前所有已挂高亮的引用全部摘掉。
+		// ★ 只给「用户按热键关掉」用（要的就是立刻全灭，卡一下也认）。
+		//   换场景 / 读档**不要**走这里 —— 那是几百条调用的突发，会卡；
+		//   那条路走 MarkAllForRemoval()，摊到后面几轮慢慢摘。
 		void ClearAllNativeOutline()
 		{
 			if (g_state.outlined.empty()) {
 				return;
 			}
-			const auto n          = g_state.outlined.size();
-			const auto removedWas = g_state.outlineRemoved;
-			const auto missWas    = g_state.outlineRemoveMiss;
+			const auto n         = g_state.outlined.size();
+			const auto okWas     = g_state.outlineRemoved;
+			const auto missWas   = g_state.outlineRemoveMiss;
+			const auto uhMissWas = g_state.outlineUnhighlightMiss;
 			for (auto& [key, entry] : g_state.outlined) {
 				UnoutlineRef(entry.ref.get());
 			}
 			g_state.outlined.clear();
-			REX::INFO("native outline cleared (n={} removeOk={} removeMiss={} totalRemoved={})",
+			REX::INFO("native outline cleared (n={} ok={} unhMiss={} removeMiss={} totalOk={})",
 				n,
-				g_state.outlineRemoved - removedWas,
+				g_state.outlineRemoved - okWas,
+				g_state.outlineUnhighlightMiss - uhMissWas,
 				g_state.outlineRemoveMiss - missWas,
 				g_state.outlineRemoved);
+		}
+
+		// 换场景 / 读档用：**不立刻动手**，只把每个已挂高亮的引用标上「到这个时刻才摘」。
+		// 真正的摘除由 SyncNativeOutline 按每轮预算慢慢做完。
+		void MarkAllForRemoval(std::uint64_t a_deadlineMs)
+		{
+			if (g_state.outlined.empty()) {
+				return;
+			}
+			for (auto& [key, entry] : g_state.outlined) {
+				entry.dropAt = a_deadlineMs;
+			}
+			REX::INFO("native outline: {} 个已挂高亮转入「待摘」（deadline=+{}ms，按每轮 {} 条的预算慢慢摘）",
+				g_state.outlined.size(),
+				a_deadlineMs > NowMs() ? a_deadlineMs - NowMs() : 0,
+				g_cfg.maxOutlineOpsPerScan);
 		}
 
 		// ====================================================================
@@ -1239,7 +1567,7 @@ namespace SAS
 				if (!IsHighlightableBase(base)) {
 					// 诊断：半径内、类型不在白名单 → 记一笔类型直方图（见统计日志 rejTypes=）
 					if (base) {
-						++g_state.rejectTypes[static_cast<std::uint8_t>(base->GetFormType())];
+						++g_state.rejectTypes[static_cast<std::uint8_t>(base->GetFormType()) & 0xFF];
 					}
 					continue;
 				}
@@ -1445,6 +1773,14 @@ namespace SAS
 			}
 			g_state.lastScanMs = now;
 
+			// ★ v2.2：载入画面期间不做任何引擎调用（哪怕只是「摘掉上一批」）。
+			//   载入时主线程在跑加载，我们每条调用都会被拖慢几十毫秒，
+			//   几百条叠起来就是实测日志里那个 18 秒的空档。
+			g_state.loadingNow = IsLoadingScreenUp();
+			if (g_state.loadingNow) {
+				return;
+			}
+
 			auto* player = RE::PlayerCharacter::GetSingleton();
 			if (!player) {
 				return;
@@ -1470,7 +1806,14 @@ namespace SAS
 				return;  // 静置期内不扫描
 			}
 
+			const auto scanT0 = NowMs();
 			Rescan(now, player);
+			const auto scanDt = NowMs() - scanT0;
+			g_state.scanMsTotal += scanDt;
+			if (scanDt > g_state.scanMsMax) {
+				g_state.scanMsMax = scanDt;
+			}
+			++g_state.scanMsSamples;
 			++g_state.scanCount;
 
 			if (g_cfg.logStats && now - g_state.lastStatsMs > kStatsLogIntervalMs) {
@@ -1498,34 +1841,62 @@ namespace SAS
 					g_state.on ? 1 : 0,
 					g_state.retired.size());
 
-				// 摘除计数（诊断「F8 关不掉」）：rmOk 应随 sel/outline 变化一起增长，
-				// rmMiss 长期增长 = 引擎那边根本没有这个 id（说明 RVA/键值对不上）。
-				REX::INFO("  outline remove: rmOk={} rmMiss={} removeReady={}",
-					g_state.outlineRemoved, g_state.outlineRemoveMiss,
-					g_state.nativeRemoveReady ? 1 : 0);
+				// 摘除计数（诊断）：rmOk 应随 sel/outline 变化一起增长，
+				// unhMiss 长期增长 = 连引擎自己的摘除函数都没动到管理器里的东西。
+				REX::INFO("  outline remove: rmOk={} unhMiss={} removeMiss={} removeReady={} unhighlightReady={}",
+					g_state.outlineRemoved, g_state.outlineUnhighlightMiss,
+					g_state.outlineRemoveMiss,
+					g_state.nativeRemoveReady ? 1 : 0,
+					g_outlineUnhighlightReady ? 1 : 0);
+
+				// 性能窗口：每轮扫描耗时（max 才是「卡顿」的感觉来源）与单轮引擎调用数。
+				REX::INFO("  timing: scan avg={}ms max={}ms ops={} deferred={} loading={}",
+					g_state.scanMsSamples ? g_state.scanMsTotal / g_state.scanMsSamples : 0,
+					g_state.scanMsMax,
+					g_state.opsThisScan,
+					g_state.opsDeferred,
+					g_state.loadingNow ? 1 : 0);
+				g_state.scanMsTotal   = 0;
+				g_state.scanMsMax     = 0;
+				g_state.scanMsSamples = 0;
+
+				// Papyrus 侧自报状态：guideHb 不再增长 = 脚本没跑；
+				// guideState 0/2/3 的含义见 SAS_Bridge.psc 的说明。
+				REX::INFO("  papyrus: guideHb={} guideState={}",
+					g_state.guideHb ? static_cast<int>(g_state.guideHb->value) : -1,
+					g_state.guideState ? static_cast<int>(g_state.guideState->value) : -1);
 
 				// 半径内、base 类型不在白名单的分布（上个统计窗口）。
 				// 用途：发现「某个东西该亮却没亮」时，看它的 formType 是多少。
-				if (!g_state.rejectTypes.empty()) {
+				{
 					std::vector<std::pair<std::uint32_t, std::uint8_t>> hist;
-					hist.reserve(g_state.rejectTypes.size());
-					for (const auto& [ft, n] : g_state.rejectTypes) {
-						hist.emplace_back(n, ft);
-					}
-					std::sort(hist.begin(), hist.end(),
-						[](const auto& a, const auto& b) { return a.first > b.first; });
-
-					std::string s;
-					const auto  topN = std::min<std::size_t>(hist.size(), 8);
-					for (std::size_t i = 0; i < topN; ++i) {
-						if (i) {
-							s += ", ";
+					for (std::uint32_t ft = 0; ft < g_state.rejectTypes.size(); ++ft) {
+						if (g_state.rejectTypes[ft]) {
+							hist.emplace_back(g_state.rejectTypes[ft], static_cast<std::uint8_t>(ft));
 						}
-						s += "ft=" + std::to_string(static_cast<unsigned>(hist[i].second)) +
-						     "x" + std::to_string(hist[i].first);
 					}
-					REX::INFO("  rejTypes (半径内但类型不在白名单，formType x 次数): {}", s);
-					g_state.rejectTypes.clear();
+					if (!hist.empty()) {
+						std::sort(hist.begin(), hist.end(),
+							[](const auto& a, const auto& b) { return a.first > b.first; });
+
+						std::string s;
+						const auto  topN = std::min<std::size_t>(hist.size(), 8);
+						for (std::size_t i = 0; i < topN; ++i) {
+							if (i) {
+								s += ", ";
+							}
+							s += "ft=" + std::to_string(static_cast<unsigned>(hist[i].second)) +
+							     "x" + std::to_string(hist[i].first);
+						}
+						REX::INFO("  rejTypes (半径内但类型不在白名单，formType x 次数): {}", s);
+					}
+					g_state.rejectTypes.fill(0);
+				}
+
+				// 管理器哈希表的家底（每 30 秒一次就够，用于确认「键到底是什么」）。
+				if (now - g_state.lastMapDiagMs > 30000) {
+					g_state.lastMapDiagMs = now;
+					LogManagerMapDiag("runtime", static_cast<std::uint32_t>(g_cfg.outlineState));
 				}
 			}
 		}

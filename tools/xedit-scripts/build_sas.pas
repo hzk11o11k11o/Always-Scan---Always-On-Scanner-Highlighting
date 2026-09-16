@@ -27,9 +27,12 @@ unit SAS_BuildPlugin;
 //    0x804  GLOB SAS_StopCursor
 //    0x805  GLOB SAS_Epoch
 //    0x806  QUST SAS_AlwaysScanQuest   (Start Game Enabled + Starts Enabled)
+//    0x807  GLOB SAS_GuideHb           (v2.2: script -> DLL heartbeat)
+//    0x808  GLOB SAS_GuideState        (v2.2: script -> DLL guide spell state)
 //
 //  VMAD (bound on the quest):
-//    OpList / OpCursor / StopList / StopCursor / Epoch / ShaderPrimary
+//    OpList / OpCursor / StopList / StopCursor / Epoch / ShaderPrimary /
+//    GuideHb / GuideState   (v2.2)
 //
 // ---------------------------------------------------------------------------
 //  Known traps:
@@ -59,6 +62,7 @@ var
   questRec: IInterface;
   esmShader, flstOp, flstStop: IInterface;
   globOpCur, globStopCur, globEpoch: IInterface;
+  globGuideHb, globGuideState: IInterface;
 
 procedure Log(s: string);
 begin
@@ -346,6 +350,14 @@ begin
   questRec := MakeQuestSkeleton(newFile, 'SAS_AlwaysScanQuest', ScriptBridge);
   Flush('07_quest');
 
+  // ------- 0x807 / 0x808 -------
+  // v2.2: script -> DLL diagnostic channel (heartbeat / guide spell state), see
+  // SAS_Bridge.psc header. Order matters: must be created AFTER QUST(0x806),
+  // otherwise the low 24 bits shift and the DLL would write to the wrong forms.
+  globGuideHb := MakeGlobal(newFile, 'SAS_GuideHb', globTpl, 0.0);
+  globGuideState := MakeGlobal(newFile, 'SAS_GuideState', globTpl, 0.0);
+  Flush('07b_guideglob');
+
   // VMAD properties: added only after all target records exist.
   AddQuestProp(questRec, 'OpList', flstOp);
   AddQuestProp(questRec, 'OpCursor', globOpCur);
@@ -353,6 +365,8 @@ begin
   AddQuestProp(questRec, 'StopCursor', globStopCur);
   AddQuestProp(questRec, 'Epoch', globEpoch);
   AddQuestProp(questRec, 'ShaderPrimary', esmShader);
+  AddQuestProp(questRec, 'GuideHb', globGuideHb);
+  AddQuestProp(questRec, 'GuideState', globGuideState);
   Flush('08_vmad');
 
   try
@@ -385,6 +399,8 @@ begin
   Log('  0x804 SAS_StopCursor      ' + IntToHex(GetLoadOrderFormID(globStopCur) and $FFFFFF, 6));
   Log('  0x805 SAS_Epoch           ' + IntToHex(GetLoadOrderFormID(globEpoch) and $FFFFFF, 6));
   Log('  0x806 SAS_AlwaysScanQuest ' + IntToHex(GetLoadOrderFormID(questRec) and $FFFFFF, 6));
+  Log('  0x807 SAS_GuideHb         ' + IntToHex(GetLoadOrderFormID(globGuideHb) and $FFFFFF, 6));
+  Log('  0x808 SAS_GuideState      ' + IntToHex(GetLoadOrderFormID(globGuideState) and $FFFFFF, 6));
 
   Log('=== Always Scan build done ===');
   Flush('99_done');

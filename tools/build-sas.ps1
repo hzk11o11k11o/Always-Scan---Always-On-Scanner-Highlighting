@@ -129,6 +129,8 @@ if (-not $SkipPluginBuild) {
             '0x804' = 'SAS_StopCursor'
             '0x805' = 'SAS_Epoch'
             '0x806' = 'SAS_AlwaysScanQuest'
+            '0x807' = 'SAS_GuideHb'
+            '0x808' = 'SAS_GuideState'
         }
         $lines = Get-Content -LiteralPath $mapFile
         foreach ($id in $expect.Keys | Sort-Object) {
@@ -190,7 +192,12 @@ if (-not $SkipDllBuild) {
 if (-not $SkipDeploy) {
     Write-Host '[4/5] Deploying to MO2...' -ForegroundColor Yellow
     $modRoot = Join-Path $modsDir $modName
-    if (Test-Path -LiteralPath $modRoot) { Remove-Item -LiteralPath $modRoot -Recurse -Force }
+    # ★ 注意：**不要**对 $modRoot 做递归删除。
+    #   一是这一步在安全删除包装器下会失败（genie-trash 拒绝整目录），
+    #   二是本 mod 的产物集合是固定的（esm / pex / dll / pdb / ini / meta.ini），
+    #   下面全是 Copy-Item -Force 覆盖写，本来就不需要先清空。
+    #   真要清空的话手删即可（或只删 $pluginsDir 里的 dll/pdb）。
+    New-Item -ItemType Directory -Force -Path $modRoot | Out-Null
 
     $pluginsDir   = Join-Path $modRoot 'SFSE\Plugins'
     $scriptsDir   = Join-Path $modRoot 'Scripts'
@@ -211,6 +218,21 @@ if (-not $SkipDeploy) {
         Write-Host '      config ini installed (default).' -ForegroundColor DarkGray
     } elseif (Test-Path -LiteralPath $iniDst) {
         Write-Host '      config ini kept (already exists, not overwritten).' -ForegroundColor DarkGray
+        # 但如果新版 INI 里有旧版没有的键（新增配置项），提示一下 —— 否则用户永远
+        # 不会知道新功能有开关存在（DLL 用的是内置默认值，行为没问题）。
+        if (Test-Path -LiteralPath $iniSrc) {
+            $newKeys = (Select-String -LiteralPath $iniSrc -Pattern '^([A-Za-z][A-Za-z0-9_]*)\s*=' |
+                        ForEach-Object { $_.Matches[0].Groups[1].Value }) | Select-Object -Unique
+            $oldKeys = (Select-String -LiteralPath $iniDst -Pattern '^([A-Za-z][A-Za-z0-9_]*)\s*=' |
+                        ForEach-Object { $_.Matches[0].Groups[1].Value }) | Select-Object -Unique
+            $missing = $newKeys | Where-Object { $oldKeys -notcontains $_ }
+            if ($missing) {
+                Write-Host ("      WARN: deployed ini lacks new key(s): {0}" -f ($missing -join ', ')) -ForegroundColor Yellow
+                $newIni = "$iniDst.new"
+                Copy-Item -LiteralPath $iniSrc -Destination $newIni -Force
+                Write-Host ("      new default written to {0} (diff it, then merge what you want)" -f (Split-Path -Leaf $newIni)) -ForegroundColor Yellow
+            }
+        }
     }
     if (Test-Path -LiteralPath (Join-Path $tmpPex "$bridgeScript.pex")) {
         Copy-Item -LiteralPath (Join-Path $tmpPex "$bridgeScript.pex") -Destination (Join-Path $scriptsDir "$bridgeScript.pex") -Force

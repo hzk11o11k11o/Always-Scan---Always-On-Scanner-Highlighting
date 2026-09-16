@@ -266,3 +266,99 @@ v2 里以为 `0x17D4F10` 是 Clear，所以「关开关」的流程是：写状�
       查 `0x17D4CD0` 里那个经由 `0x24181E0` 调用的 functor（vtbl 0x4B2F9F0）是不是
       异步/限流的请求通道。
 
+---
+
+## 十、v2.2 第三次逆向（2026-09-16）—— 「摘除」的 id 根本不是 FormID
+
+### 10.1 实测数据（v2.1 的日志）
+
+```
+scan#1331 ... outline=256/1/11 ...
+  outline remove: rmOk=0 rmMiss=4965 removeReady=1
+...
+native outline cleared (n=256 removeOk=0 removeMiss=256 totalRemoved=0)
+```
+
+`rmOk` **恒为 0**：我们自己拼的 `Remove(map, &FormID) → Deactivate(FormID)` 一次都没命中。
+说明**管理器哈希表里的键不是 `TESForm::GetFormID()`**，我们一直在拿一个错的 id 去删。
+
+顺便看出一条更重要的线索（同一份日志）：
+
+```
+[20:21:41.619] reset (first cell) ... outline=256
+[20:21:59.713] native outline cleared (n=256 ...)      ← 相隔 18.1 秒！
+```
+
+这 18 秒里一行日志都没有 —— 也就是说 `ClearAllNativeOutline()` 那个「一帧里发 256×12 条
+引擎调用」的循环**卡住了 18 秒**（正好落在换区域/载入的时候，主线程在跑加载，
+每条调用都被拖慢到几十毫秒）。这就是「轻微卡顿」的大头。
+
+### 10.2 ★ 引擎自己的摘除函数 `0x653F60`
+
+顺着 `Remove(0x6535B0)` 的调用者往回找，**全镜像只有一处**调用它（`Deactivate 0x653040`
+也一样）——就是 `0x653F60`，而且它**没有任何直接调用者**（是虚函数/函数指针表里的）：
+
+```
+00653F60  push rdi / sub rsp,0x20
+00653F66  mov rax,[rdx]          ; rdx = ref → vtable
+00653F69  mov rdi,rcx            ; rdi = ctx
+00653F6C  mov rcx,rdx            ; this = ref
+00653F6F  call [rax+0x50]        ; 引擎自己的一层间接（取内部对象）
+00653F72  test rax,rax / je ret
+00653F81  mov ebx,[rax+0x1F0]    ; ★ id 由引擎自己算 —— 我们不碰
+00653F87  mov rax,[rdi+8]        ; ctx+8
+00653F8F  mov rcx,[rax]          ; ★ *(ctx+8) 必须指向「管理器指针」本身
+00653F92  add rcx,0x18           ; 内嵌哈希表
+00653F96  call 0x6535B0          ; Remove(map, &id)
+00653F9B  test al,al
+00653FA1  call 0x653040          ; Deactivate(id)
+```
+
+⇒ **我们根本不需要知道「键是什么」**：只要造一个
+`ctx = { unused, &g_outlineManagers[state] }`（即 `*(ctx+8)` 就是管理器指针），
+调 `0x653F60(ctx, ref)` 就等于引擎自己摘一次高亮。v2.2 就是这么做的。
+
+### 10.3 哈希表布局（复核，和 v2.1 的结论一致）
+
+`Remove(0x6535B0)` 的反汇编（`rcx` = map）：
+
+```
+mov r10,[rcx+0x10]        ; capacity（2 的幂，用 and (cap-1) 取槽）
+mov rdx,[r11+8]           ; data
+mov ebx,[rdx]             ; ★ 键 = 32 位，直接从 id 指针里读
+... CRC32 查表哈希（表在 rip+0x470579e）
+cmp [data + slot*12 + 4], -1   ; 空槽
+cmp [data + slot*12], ebx      ; 键比较
+```
+元素仍是 12 字节 `{ key(u32), next(u32), prev(u32) }`。
+另外 `0x6530A0`（批量把 32 字节高亮参数写进渲染器 StorageTable）里的 id 是
+**`0x7CB120(&id)` 现算的**，也不是 FormID —— 这进一步说明「键 ≠ FormID」。
+
+同时 `0x653850` 把 id `& 0xFFFFFF` 当作**下标**去索引 `[renderer+0x2c8]` 的数组，
+再写 `[renderer+0x3c8] + idx*0x20` 的 32 字节参数 —— 也就是「本地 FormID 索引表」，
+但**这张表用的 id 和「管理器哈希表的键」不是同一个来源**，所以不要用 FormID 去猜管理器。
+
+### 10.4 v2.2 的改动
+
+| 问题 | 改法 |
+| --- | --- |
+| `rmOk=0`（摘不掉 → 渲染器里攒垃圾 id → 越玩越卡） | 优先调**引擎自己的 `0x653F60`**（带首 16 字节签名校验）；失败才退回旧的 FormID 路径；最后无论如何把状态写回 12 |
+| 目标在集合边缘反复进出 → 每 200ms 一波 Set/Remove | **宽限期**（`UnhighlightGraceMs`，默认 1500ms）：掉队先只打时间戳，到点还没回来才真摘 |
+| 换场景一帧发 3000 条调用（实测卡 18 秒） | **单轮预算**（`MaxOutlineOpsPerScan`，默认 64），换场景改成「标待摘 + 分几轮慢慢摘」，并且**载入画面期间完全不动作**（`LoadingMenu`/`FaderMenu`） |
+| 每轮对每个被拒引用做一次哈希表自增（每秒 2 万次） | `rejectTypes` 换成 `std::array<uint32_t,256>` |
+| 「到底卡在哪」说不清 | 统计日志新增 `timing: scan avg=…ms max=…ms ops=… deferred=… loading=…`，以及每 30 秒一次的 `manager map[…] cap=… count18=… 前 N 个非空键=[…]`（这一行会直接把「键到底是什么」摊开） |
+
+### 10.5 下次实测要看什么
+
+```
+  outline remove: rmOk=NN unhMiss=NN removeMiss=NN removeReady=1 unhighlightReady=1
+  timing: scan avg=Nms max=Nms ops=N deferred=N loading=0
+manager map[runtime] state=0 : mgr=0x… cap=… count18=… count20=… data=0x…
+manager map[runtime] state=0 : 前 N 个非空键 = [0x…, …]
+```
+
+- `unhighlightReady=1`：`0x653F60` 签名校验通过（=0 会打 `signature mismatch` 警告）；
+- `rmOk` 开始增长、`unhMiss` 停止增长 ⇒ 摘除终于真的生效了；
+- `max` 应是个位数毫秒；`ops` 稳态应接近 0（站着不动时宽限期把抖动全吃掉了）；
+- `前 N 个非空键` 直接把管理器哈希表的真实键贴出来 —— 这一步之后不用再猜 id 了。
+
