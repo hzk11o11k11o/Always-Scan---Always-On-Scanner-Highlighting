@@ -84,17 +84,11 @@ namespace SAS
 		constexpr std::uint32_t kLocalStopList   = 0x803;
 		constexpr std::uint32_t kLocalStopCursor = 0x804;
 		constexpr std::uint32_t kLocalEpoch      = 0x805;
-		// ★ v2.2 新增：Papyrus 侧的诊断通道（见 docs/04「任务引导路径」）。
-		//   原生模式下两个信箱是空闲的，所以借它们让脚本把自己的状态回报给 DLL，
-		//   由 DLL 统一打在主日志里 —— 这样「脚本有没有跑 / 引导法术装上了没有」
-		//   就不用去翻 Papyrus 日志了。
-		constexpr std::uint32_t kLocalGuideHb    = 0x807;  // 心跳计数（脚本每 0.25s +1）
-		constexpr std::uint32_t kLocalGuideState = 0x808;  // 0=脚本没跑 2=法术在但效果没生效 3=法术+效果都在
-		// ★ v2.4 新增（面包屑引导路径，见 docs/04 第九节）：
-		//   SAS_On            DLL → 脚本：F8 开关状态（1/0）。脚本据此决定画不画面包屑。
-		//   SAS_GuideMarkers  脚本 → DLL：当前点亮的路径标记数（-1 = 开着但找不到引导目标）。
-		constexpr std::uint32_t kLocalSASOn        = 0x809;
-		constexpr std::uint32_t kLocalGuideMarkers = 0x80A;
+		// ★ v3.1：任务引导线功能已整体移除，为它加过的记录全部从 ESM 里去掉：
+		//   0x807 SAS_GuideHb / 0x808 SAS_GuideState（原版引导法术的观测通道）、
+		//   0x809 SAS_On / 0x80A SAS_GuideMarkers（自制面包屑）、
+		//   0x80B SAS_DoorBases（找门用的门基础列表）。
+		//   它们原本都是最后创建的一批，删掉不会让 0x800..0x806 的低 24 位位移。
 
 		constexpr const char* kBindQuestEdid = "SAS_AlwaysScanQuest";
 
@@ -264,14 +258,6 @@ namespace SAS
 			RE::BGSListForm* stopList   = nullptr;
 			RE::TESGlobal*   stopCursor = nullptr;
 			RE::TESGlobal*   epoch      = nullptr;
-			// v2.2：Papyrus 侧自报状态（见 kLocalGuideHb / kLocalGuideState）
-			RE::TESGlobal*   guideHb    = nullptr;
-			RE::TESGlobal*   guideState = nullptr;
-			// v2.4：面包屑引导路径（SAS_On 由本 DLL 写，GuideMarkers 由脚本写）
-			RE::TESGlobal*   sasOn        = nullptr;
-			RE::TESGlobal*   guideMarkers = nullptr;
-			double           lastGuideHb    = -1.0;
-			double           lastGuideState = -1.0;
 
 			// --- 开关 ---
 			bool on      = true;
@@ -657,22 +643,6 @@ namespace SAS
 		}
 
 		// ====================================================================
-		// ★ v2.4：把 F8 开关状态发布给 Papyrus 桥
-		// ====================================================================
-		// 脚本据此决定画不画「面包屑引导路径」（见 docs/04 第九节）。
-		// 为什么走 GLOB：脚本侧**没有任何**「高亮开关是否打开」的查询接口 ——
-		// 连「扫描仪是否举着」都得靠 RegisterForMenuOpenCloseEvent("MonocleMenu")
-		// 自己记（B 社脚本注释原话：we'll need a way to check if you have the
-		// scanner up or not）。所以最省事、最可靠的办法就是在 DLL 里写一个 GLOB。
-		void PublishSASOn()
-		{
-			if (!g_state.sasOn) {
-				return;
-			}
-			g_state.sasOn->value = g_state.on ? 1.0f : 0.0f;
-		}
-
-		// ====================================================================
 		// 表单绑定
 		// ====================================================================
 		// 只用一条通道：先按 EDID 拿 quest（上一代实测「QUST 的 EDID 能查到」），
@@ -696,12 +666,6 @@ namespace SAS
 			auto*               stopList   = RE::TESForm::LookupByID<RE::BGSListForm>(prefix | kLocalStopList);
 			auto*               stopCursor = RE::TESForm::LookupByID<RE::TESGlobal>(prefix | kLocalStopCursor);
 			auto*               epoch      = RE::TESForm::LookupByID<RE::TESGlobal>(prefix | kLocalEpoch);
-			// v2.2 诊断通道（可选）：老版本 ESM 里没有它们，只用警告提醒，不阻断绑定。
-			auto*               guideHb    = RE::TESForm::LookupByID<RE::TESGlobal>(prefix | kLocalGuideHb);
-			auto*               guideState = RE::TESForm::LookupByID<RE::TESGlobal>(prefix | kLocalGuideState);
-			// v2.4 面包屑引导路径（可选，同上：老 ESM 里没有也不阻断）
-			auto*               sasOn         = RE::TESForm::LookupByID<RE::TESGlobal>(prefix | kLocalSASOn);
-			auto*               guideMarkers  = RE::TESForm::LookupByID<RE::TESGlobal>(prefix | kLocalGuideMarkers);
 
 			if (!opList || !opCursor || !stopList || !stopCursor || !epoch) {
 				REX::WARN("BindForms: incomplete (prefix={:08X} play={} cur={} stop={} stopcur={} epoch={})",
@@ -716,21 +680,7 @@ namespace SAS
 			g_state.stopList   = stopList;
 			g_state.stopCursor = stopCursor;
 			g_state.epoch      = epoch;
-			g_state.guideHb    = guideHb;
-			g_state.guideState = guideState;
-			g_state.sasOn      = sasOn;
-			g_state.guideMarkers = guideMarkers;
 			g_state.bound      = true;
-			if (!guideHb || !guideState) {
-				REX::WARN("BindForms: guide 诊断 GLOB 缺失（{} / {}）—— 请重新构建 ESM（v2.2 起新增 0x807/0x808）",
-					kLocalGuideHb, kLocalGuideState);
-			}
-			if (!sasOn || !guideMarkers) {
-				REX::WARN("BindForms: 引导路径 GLOB 缺失（{} / {}）—— 请重新构建 ESM（v2.4 起新增 0x809/0x80A）",
-					kLocalSASOn, kLocalGuideMarkers);
-			}
-			// 首次绑定就把开关状态发布给脚本（否则脚本读到的是 pex 默认值 1）
-			PublishSASOn();
 
 			REX::INFO("forms bound: prefix={:08X} quest={:08X} arrayOfForms@0x{:X} (checked against sizeof(TESForm)=0x38)",
 				prefix, quest->GetFormID(),
@@ -813,11 +763,11 @@ namespace SAS
 			if (!a_base) {
 				return false;
 			}
-			// ★ v3.0：引导光带的珠子**自己不能被高亮**。
-			//   珠子形态是原版 MSTT「Glow*」家族（脚本侧默认 0x00098106 GlowBall10x10，
-			//   候选见 SAS_Bridge.psc 的 CfgGuideMarkerFormID()）——它们是环境装饰用的
-			//   自发光体，本来就不该出现在扫描高亮里；而且 20 颗珠子会白占 MaxTargets
-			//   配额，每次开关光带还会带来一批挂/摘描边的 churn。
+			// ★「Glow*」家族（原版 MSTT 自发光网格）一律不高亮。
+			//   它们本来是环境装饰用的自发光体（球 / 方块 / 圆盘 / 光锥），不是拾取物；
+			//   另外 v2.4~v3.0 的自制面包屑珠子用的正是这几个形态 ——
+			//   老存档里可能还留着几颗（v3.1 起脚本会做一次性清理，见 SAS_Bridge.psc），
+			//   这里排除掉就不会把它们描上一圈。
 			//   这几条 FormID 全在 Starfield.esm（高 8 位是 load order index，所以不会误伤）。
 			switch (a_base->GetFormID()) {
 			case 0x00098105u:  // MSTT GlowCube10x10
@@ -920,9 +870,6 @@ namespace SAS
 			}
 			g_state.on = a_on;
 			REX::INFO("AlwaysScan {} (hotkey)", a_on ? "ON" : "OFF");
-
-			// 面包屑引导路径跟着开关走（脚本读这个 GLOB）
-			PublishSASOn();
 
 			if (!a_on && g_cfg.highlightMode == 1) {
 				// 原生 outline：把这批引用从引擎的高亮表里**真正摘掉**
@@ -2173,12 +2120,9 @@ namespace SAS
 				g_state.tUnhMs        = 0;
 				g_state.tAddMs        = 0;
 
-				// Papyrus 侧自报状态：guideHb 不再增长 = 脚本没跑；
-				// guideState 0/2/3 的含义见 SAS_Bridge.psc 的说明。
-				REX::INFO("  papyrus: guideHb={} guideState={} guideMarkers={}",
-					g_state.guideHb ? static_cast<int>(g_state.guideHb->value) : -1,
-					g_state.guideState ? static_cast<int>(g_state.guideState->value) : -1,
-					g_state.guideMarkers ? static_cast<int>(g_state.guideMarkers->value) : -1);
+				// ★ v3.1：原来这里打的是 Papyrus 侧自报的引导线状态
+				//   （guideHb / guideState / guideMarkers），引导线功能已整体移除，
+				//   对应的 GLOB 与这段日志也一起删掉。
 
 				// 半径内、base 类型不在白名单的分布（上个统计窗口）。
 				// 用途：发现「某个东西该亮却没亮」时，看它的 formType 是多少。
