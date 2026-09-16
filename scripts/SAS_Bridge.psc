@@ -32,6 +32,10 @@ Scriptname SAS_Bridge extends Quest
 ;
 ; 另外：配置项全部写成**函数**而不是 Auto 属性 —— Auto 属性会被存档持久化，
 ; 改 pex 里的默认值对老存档无效（上一代踩过这个坑）。
+;
+; ★ v2.4：本脚本现在还负责「面包屑引导路径」（见下面的 UpdateGuidePath）——
+;   原版那条地上的线是扫描仪 HUD 画的，不举扫描仪就永远画不出来（docs/04 第八节），
+;   所以改成自己沿「玩家 → 引导目标」铺一串地面光点。
 ; ============================================================================
 
 FormList Property OpList Auto Const Mandatory
@@ -54,6 +58,13 @@ GlobalVariable Property GuideHb Auto Const Mandatory
 
 GlobalVariable Property GuideState Auto Const Mandatory
 	{ 引导法术状态：1=取不到法术形态 2=法术在但效果没生效(已尝试 Cast) 3=法术+效果都生效 }
+
+; ---- v2.4：面包屑引导路径 ----
+GlobalVariable Property SASOn Auto Const Mandatory
+	{ DLL 写的 F8 开关状态（1/0）。0 = 连面包屑也一起收掉 }
+
+GlobalVariable Property GuideMarkers Auto Const Mandatory
+	{ 回报给 DLL 的「当前点亮了几个面包屑」：-1 = 开着但找不到引导目标 }
 
 EffectShader Property ShaderPrimary Auto Const Mandatory
 	{ SAS_HighlightFXS }
@@ -178,21 +189,290 @@ Float Function CfgReapplySecs()
 EndFunction
 
 ; ============================================================================
+; 面包屑引导路径（v2.4 自己画，详见 docs/04 第七/八/九节）
+; ----------------------------------------------------------------------------
+; 为什么必须自己画：
+;   原版地上那条线是**扫描仪 HUD（MonocleMenu）**画的。B 社自己的
+;   ScanTempleScript.psc 就是 RegisterForMenuOpenCloseEvent("MonocleMenu")
+;   + abOpening 来记「玩家是否举着扫描仪」（注释原话：this isn't going to work
+;   for real - we'll need a way to check if you have the scanner up or not），
+;   而 ScannerGuideEffect 只是把路径状态广播给那个 UI。
+;   ⇒ 不举扫描仪 = 那个 HUD 根本不存在 = 线永远画不出来（不是没找对 API）。
+;
+; 这里的做法：沿「玩家 → 引导目标」铺一串**地面光点**。
+;   1) 标注形态用原版 LIGH（默认 00012E5A GenPointFlare1，一个点光源）：
+;      不用自造网格，放在地上就是一摊光 —— 和原版那条线一样是「发光的路标」。
+;      想换观感只改 CfgGuideMarkerFormID()，不用动代码。
+;   2) 贴地用 ObjectReference.MoveToNearestNavmeshLocation()：B 社自己的
+;      TestNPCArenaScript.psc 就是把路径标记这样放上 navmesh 的，**不需要射线**。
+;   3) 只在「间隔到点 且 玩家真的动了」时才重算（那是 navmesh 查询，别每帧跑）。
+;   4) 每个标记 BlockActivation(true,true) —— 绝不抢玩家的交互（AGENTS.md 红线）。
+;
+; 局限（如实记录，不假装）：
+;   Papyrus **没有**「玩家正在追踪哪一个目标」的查询接口，所以这里用的是
+;   「所有 active quest 的当前阶段目标里、同一 cell 内最近的那个」。
+;   要精确到「追踪中的那一个」需要 hooks/RE，留作后续。
+; ============================================================================
+ObjectReference[] GuideMarkerRefs
+Bool  GuideArrayReady = False
+ObjectReference GuideTarget = None
+Float GuideTargetAt = 0.0
+Float GuideLastUpdateAt = 0.0
+Float GuideLastPX = 0.0
+Float GuideLastPY = 0.0
+Float GuideLastPZ = 0.0
+Bool  ScannerUp = False
+
+Int Function CfgGuideMarkerCount()
+	{ 面包屑个数。8 个 x 5 米 ≈ 覆盖身前 40 米 }
+	Return 8
+EndFunction
+
+Float Function CfgGuideSpacing()
+	{ 相邻两个面包屑的间距（游戏单位）。5 米 x 3.4286 }
+	Return 5.0 * 3.4286
+EndFunction
+
+Float Function CfgGuideStartDist()
+	{ 第一个面包屑离玩家多远（游戏单位）。太近会糊在脚下 }
+	Return 3.0 * 3.4286
+EndFunction
+
+Float Function CfgGuideHeight()
+	{ 标记先放到玩家脚底上方这么高，再由 MoveToNearestNavmeshLocation 贴地 }
+	Return 2.0 * 3.4286
+EndFunction
+
+Float Function CfgGuideMaxDist()
+	{ 超过这个距离的引导目标就不画（游戏单位）。120 米 }
+	Return 120.0 * 3.4286
+EndFunction
+
+Float Function CfgGuideInterval()
+	{ 引导路径最短重算间隔（秒） }
+	Return 0.5
+EndFunction
+
+Float Function CfgGuideMoveThreshold()
+	{ 玩家相对上次重算移动超过这个距离才重算（游戏单位）。1.5 米 }
+	Return 1.5 * 3.4286
+EndFunction
+
+Float Function CfgGuideTargetRefresh()
+	{ 引导目标重新检索间隔（秒）。检索要遍历所有 active quest，别太频 }
+	Return 2.0
+EndFunction
+
+Int Function CfgGuideMarkerFormID()
+	{ 面包屑形态：原版 LIGH GenPointFlare1（点光源） }
+	Return 0x00012E5A
+EndFunction
+
+Function EnsureGuideArray()
+	If !GuideArrayReady
+		GuideMarkerRefs = new ObjectReference[CfgGuideMarkerCount()]
+		GuideArrayReady = True
+	EndIf
+EndFunction
+
+Function HideGuideMarkers()
+	If !GuideArrayReady
+		Return
+	EndIf
+	Int i = 0
+	While i < GuideMarkerRefs.Length
+		ObjectReference m = GuideMarkerRefs[i]
+		If m != None
+			m.Disable()
+		EndIf
+		i = i + 1
+	EndWhile
+EndFunction
+
+ObjectReference Function CreateGuideMarker(Actor p)
+	Form f = Game.GetForm(CfgGuideMarkerFormID())
+	If f == None
+		Return None
+	EndIf
+	; abForcePersist=True / abInitiallyDisabled=True / abDeleteWhenAble=False
+	ObjectReference m = p.PlaceAtMe(f, 1, True, True, False)
+	If m == None
+		Return None
+	EndIf
+	m.BlockActivation(True, True)
+	Return m
+EndFunction
+
+; 引导目标：所有 active quest 的「当前阶段目标」里，同一 cell 内最近的那个
+ObjectReference Function FindGuideTarget(Actor p, Float px, Float py, Float pz)
+	ObjectReference best = None
+	Float bestD = CfgGuideMaxDist()
+	Cell myCell = p.GetParentCell()
+	Quest[] qs = Game.GetPlayerActiveQuests()
+	Int qi = 0
+	While qi < qs.Length
+		Quest q = qs[qi]
+		If q != None
+			ObjectReference[] ts = q.GetCurrentStageTargets()
+			Int ti = 0
+			While ti < ts.Length
+				ObjectReference t = ts[ti]
+				If t != None
+					If !t.IsDeleted() && !t.IsDisabled() && t.GetParentCell() == myCell
+						Float ddx = t.GetPositionX() - px
+						Float ddy = t.GetPositionY() - py
+						Float ddz = t.GetPositionZ() - pz
+						Float d2 = ddx * ddx + ddy * ddy + ddz * ddz
+						If d2 < bestD * bestD
+							bestD = Math.sqrt(d2)
+							best = t
+						EndIf
+					EndIf
+				EndIf
+				ti = ti + 1
+			EndWhile
+		EndIf
+		qi = qi + 1
+	EndWhile
+	Return best
+EndFunction
+
+Function UpdateGuidePath()
+	Actor p = Game.GetPlayer()
+	If p == None
+		Return
+	EndIf
+	EnsureGuideArray()
+
+	; F8 关掉时，面包屑一起收掉
+	If SASOn.GetValueInt() == 0
+		HideGuideMarkers()
+		GuideMarkers.SetValueInt(0)
+		Return
+	EndIf
+
+	; 玩家自己举着扫描仪时原版会画，别画两条
+	If ScannerUp
+		HideGuideMarkers()
+		GuideMarkers.SetValueInt(0)
+		Return
+	EndIf
+
+	Float now = Utility.GetCurrentRealTime()
+	If GuideLastUpdateAt > 0.0 && (now - GuideLastUpdateAt) < CfgGuideInterval()
+		Return
+	EndIf
+
+	Float px = p.GetPositionX()
+	Float py = p.GetPositionY()
+	Float pz = p.GetPositionZ()
+
+	; 玩家没怎么动 + 刚算过 ⇒ 什么都不用做
+	If GuideLastUpdateAt > 0.0
+		Float mvx = px - GuideLastPX
+		Float mvy = py - GuideLastPY
+		Float mvz = pz - GuideLastPZ
+		Float thr = CfgGuideMoveThreshold()
+		If (mvx * mvx + mvy * mvy + mvz * mvz) < thr * thr
+			Return
+		EndIf
+	EndIf
+
+	GuideLastUpdateAt = now
+	GuideLastPX = px
+	GuideLastPY = py
+	GuideLastPZ = pz
+
+	; 目标检索：缓存 2 秒，失效（被打掉/关掉/换 cell）立刻重查
+	Bool needSearch = (GuideTarget == None) || ((now - GuideTargetAt) > CfgGuideTargetRefresh())
+	If !needSearch
+		If GuideTarget.IsDeleted() || GuideTarget.IsDisabled() || GuideTarget.GetParentCell() != p.GetParentCell()
+			needSearch = True
+		EndIf
+	EndIf
+	If needSearch
+		GuideTarget = FindGuideTarget(p, px, py, pz)
+		GuideTargetAt = now
+	EndIf
+
+	If GuideTarget == None
+		HideGuideMarkers()
+		GuideMarkers.SetValueInt(-1)
+		Return
+	EndIf
+
+	Float dx = GuideTarget.GetPositionX() - px
+	Float dy = GuideTarget.GetPositionY() - py
+	Float dist = Math.sqrt(dx * dx + dy * dy)
+	Float start = CfgGuideStartDist()
+	Float spacing = CfgGuideSpacing()
+	If dist <= (start + spacing)
+		HideGuideMarkers()
+		GuideMarkers.SetValueInt(0)
+		Return
+	EndIf
+
+	Float ux = dx / dist
+	Float uy = dy / dist
+	Float reach = dist - spacing * 0.4
+	Cell  myCell = p.GetParentCell()
+
+	Int shown = 0
+	Int i = 0
+	While i < GuideMarkerRefs.Length
+		Float d = start + spacing * i
+		ObjectReference m = GuideMarkerRefs[i]
+		If d > reach
+			If m != None
+				m.Disable()
+			EndIf
+		Else
+			If m == None
+				m = CreateGuideMarker(p)
+				GuideMarkerRefs[i] = m
+			EndIf
+			If m != None
+				If m.GetParentCell() != myCell
+					m.MoveTo(p)
+				EndIf
+				m.Enable()
+				m.SetPosition(px + ux * d, py + uy * d, pz + CfgGuideHeight())
+				m.MoveToNearestNavmeshLocation()
+				shown = shown + 1
+			EndIf
+		EndIf
+		i = i + 1
+	EndWhile
+	GuideMarkers.SetValueInt(shown)
+EndFunction
+
+; ============================================================================
 ; 事件
 ; ============================================================================
 Event OnInit()
 	StartTimer(CfgInterval(), 1)
+	RegisterForMenuOpenCloseEvent("MonocleMenu")
 EndEvent
 
 Event OnQuestInit()
 	StartTimer(CfgInterval(), 1)
 	RegisterLoadEvent()
+	RegisterForMenuOpenCloseEvent("MonocleMenu")
+EndEvent
+
+; 原版扫描仪 HUD 的开关状态。B 社自己的脚本就是这么判断「有没有举着扫描仪」的
+; （见 docs/04 8.1）。举着的时候由原版画线，我们收掉自己的面包屑，免得两条重叠。
+Event OnMenuOpenCloseEvent(string asMenuName, bool abOpening)
+	If asMenuName == "MonocleMenu"
+		ScannerUp = abOpening
+	EndIf
 EndEvent
 
 Event OnTimer(int aiTimerID)
 	StartTimer(CfgInterval(), 1)
 	DrainGuarded()
 	SyncGuideSpell()
+	UpdateGuidePath()
 EndEvent
 
 ; 读档自愈：Quest 自身没有 OnPlayerLoadGame，必须用远事件订阅（上一代验证过）
@@ -213,6 +493,11 @@ Event Actor.OnPlayerLoadGame(Actor akSender)
 	StopCursor.SetValueInt(0)
 	LoadEventRegistered = False
 	RegisterLoadEvent()
+	; 面包屑：读档后位置全变了，强制重算一次并忘掉旧目标
+	GuideTarget = None
+	GuideTargetAt = 0.0
+	GuideLastUpdateAt = 0.0
+	ScannerUp = False
 EndEvent
 
 ; ============================================================================

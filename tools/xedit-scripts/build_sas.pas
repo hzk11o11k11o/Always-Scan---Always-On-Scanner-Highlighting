@@ -29,10 +29,12 @@ unit SAS_BuildPlugin;
 //    0x806  QUST SAS_AlwaysScanQuest   (Start Game Enabled + Starts Enabled)
 //    0x807  GLOB SAS_GuideHb           (v2.2: script -> DLL heartbeat)
 //    0x808  GLOB SAS_GuideState        (v2.2: script -> DLL guide spell state)
+//    0x809  GLOB SAS_On                (v2.4: DLL -> script, F8 on/off state)
+//    0x80A  GLOB SAS_GuideMarkers      (v2.4: script -> DLL, breadcrumb path)
 //
 //  VMAD (bound on the quest):
 //    OpList / OpCursor / StopList / StopCursor / Epoch / ShaderPrimary /
-//    GuideHb / GuideState   (v2.2)
+//    GuideHb / GuideState   (v2.2) / SASOn / GuideMarkers   (v2.4)
 //
 // ---------------------------------------------------------------------------
 //  Known traps:
@@ -63,6 +65,7 @@ var
   esmShader, flstOp, flstStop: IInterface;
   globOpCur, globStopCur, globEpoch: IInterface;
   globGuideHb, globGuideState: IInterface;
+  globSASOn, globGuideMarkers: IInterface;
 
 procedure Log(s: string);
 begin
@@ -358,6 +361,14 @@ begin
   globGuideState := MakeGlobal(newFile, 'SAS_GuideState', globTpl, 0.0);
   Flush('07b_guideglob');
 
+  // ------- 0x809 / 0x80A -------
+  // v2.4: breadcrumb guide path. SAS_On is written by the DLL (F8 state) and read
+  // by the script; SAS_GuideMarkers is the script's report back to the DLL log.
+  // Order matters the same way as above: they MUST be created after 0x808.
+  globSASOn := MakeGlobal(newFile, 'SAS_On', globTpl, 1.0);
+  globGuideMarkers := MakeGlobal(newFile, 'SAS_GuideMarkers', globTpl, 0.0);
+  Flush('07c_on_markers');
+
   // VMAD properties: added only after all target records exist.
   AddQuestProp(questRec, 'OpList', flstOp);
   AddQuestProp(questRec, 'OpCursor', globOpCur);
@@ -367,6 +378,8 @@ begin
   AddQuestProp(questRec, 'ShaderPrimary', esmShader);
   AddQuestProp(questRec, 'GuideHb', globGuideHb);
   AddQuestProp(questRec, 'GuideState', globGuideState);
+  AddQuestProp(questRec, 'SASOn', globSASOn);
+  AddQuestProp(questRec, 'GuideMarkers', globGuideMarkers);
   Flush('08_vmad');
 
   try
@@ -401,6 +414,8 @@ begin
   Log('  0x806 SAS_AlwaysScanQuest ' + IntToHex(GetLoadOrderFormID(questRec) and $FFFFFF, 6));
   Log('  0x807 SAS_GuideHb         ' + IntToHex(GetLoadOrderFormID(globGuideHb) and $FFFFFF, 6));
   Log('  0x808 SAS_GuideState      ' + IntToHex(GetLoadOrderFormID(globGuideState) and $FFFFFF, 6));
+  Log('  0x809 SAS_On              ' + IntToHex(GetLoadOrderFormID(globSASOn) and $FFFFFF, 6));
+  Log('  0x80A SAS_GuideMarkers    ' + IntToHex(GetLoadOrderFormID(globGuideMarkers) and $FFFFFF, 6));
 
   Log('=== Always Scan build done ===');
   Flush('99_done');
