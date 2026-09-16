@@ -236,6 +236,7 @@ ObjectReference GuideOtherCellTarget = None
 Float GuideOtherCellDist = 0.0
 Float GuideDiagAt = 0.0
 Float GuidePaintDiagAt = 0.0
+Float GuideDoorDiagAt = 0.0
 Bool  GuideTargetIsProxy = False
 
 Int Function CfgGuideMarkerCount()
@@ -244,13 +245,14 @@ Int Function CfgGuideMarkerCount()
 EndFunction
 
 Float Function CfgGuideSpacing()
-	{ 相邻两个面包屑的间距（游戏单位）。5 米 x 3.4286 }
-	Return 5.0 * 3.4286
+	{ 相邻两个面包屑的间距（游戏单位）。★ v2.7：5m → 3m
+	  （代理目标是门时距离往往只有几米，5m 间距会把整段路遮没） }
+	Return 3.0 * 3.4286
 EndFunction
 
 Float Function CfgGuideStartDist()
-	{ 第一个面包屑离玩家多远（游戏单位）。太近会糊在脚下 }
-	Return 3.0 * 3.4286
+	{ 第一个面包屑离玩家多远（游戏单位）。★ v2.7：3m → 1.5m }
+	Return 1.5 * 3.4286
 EndFunction
 
 Float Function CfgGuideHeight()
@@ -286,6 +288,16 @@ EndFunction
 Float Function CfgGuideDoorRadius()
 	{ ★ v2.6：找「通往目标 cell 的门」时在玩家周围搜多大（游戏单位）。60 米 }
 	Return 60.0 * 3.4286
+EndFunction
+
+Int Function CfgLoadDoorKeywordFormID()
+	{ ★ v2.7：`IsLoadDoor` 关键字（KYWD 0x002CF614）。
+	  离线证据（tools/xedit-scripts/dump_ref_paths.pas 跑出来的 XTEL 结构）：
+	  The Rock 里的储物柜门 / 冰柜门和「真正的传送门」是同一个 DOOR 大类的
+	  不同 base，唯一区别就是 load door 的 base 带这个关键字
+	  （AK_Ext_Bld_WallA_DoorC_Load_02 的 KWDA = [AK_Door_Swap_key, IsLoadDoor]）。
+	  所以找到门之后用 HasKeyword 再筛一道，就能把「储物柜门」全排除掉。 }
+	Return 0x002CF614
 EndFunction
 
 ; ★ v2.5 诊断开关。True 时把「目标检索」的每一步写进 Papyrus 日志
@@ -462,12 +474,22 @@ EndFunction
 ObjectReference Function FindGuideDoor(Actor p, Float px, Float py, Float pz, Cell targetCell)
 	ObjectReference best = None
 	ObjectReference bestOut = None
+	ObjectReference bestLoad = None
 	Float bestD = 0.0
 	Float bestOutD = 0.0
+	Float bestLoadD = 0.0
 	If targetCell == None || DoorBases == None
 		Return None
 	EndIf
 	Cell myCell = p.GetParentCell()
+	Bool iAmIndoor = (myCell != None) && myCell.IsInterior()
+	Float radius = CfgGuideDoorRadius()
+
+	Bool dbg = CfgGuideDebug() && ((Utility.GetCurrentRealTime() - GuideDoorDiagAt) >= 5.0)
+	If dbg
+		GuideDoorDiagAt = Utility.GetCurrentRealTime()
+		Debug.Trace("[SAS] door/diag: myCell=" + FormHex(myCell) + " indoor=" + iAmIndoor + " target=" + FormHex(targetCell) + " pRef=" + FormHex(targetCell.GetParentRef()) + " r=" + Math.Floor(radius / 3.4286) + "m doorsList=" + FormHex(DoorBases))
+	EndIf
 
 	; ★ ① 先试「上一层引用」：目标 cell 若是飞船/载具内部，`Cell.GetParentRef()` 就是
 	;   它在世界里的那个引用（B 社注释原文：the ship if this is a ship interior cell）。
@@ -477,21 +499,67 @@ ObjectReference Function FindGuideDoor(Actor p, Float px, Float py, Float pz, Ce
 		Return pr
 	EndIf
 
-	; ★ ② 其次找「通往目标 cell 的门」（比如飞船的登机舱门）
-	; ★ ③ 兜底：任意「通往室外」的门 —— 只在玩家自己就在室内时才有意义
-	;   （否则会指向城市里另一个无关的门外）。
-	ObjectReference[] doors = p.FindAllReferencesOfType(DoorBases, CfgGuideDoorRadius())
-	Bool iAmIndoor = (myCell != None) && myCell.IsInterior()
+	; ★ v2.7：找门改成「三个 API 依次降级」（v2.6 只有一个，而它什么都没找到 ——
+	;   下面这些日志就是用来一次性钉死「到底哪个 API 好使」的）：
+	;     api1 = ObjectReference.FindAllReferencesOfType(FormList, r)（最理想：一次拿全部）
+	;     api2 = Game.FindClosestReferenceOfAnyTypeInListFromRef(FormList, ref, r)
+	;            （签名就是 FormList，一定能接受列表；只给最近的一个）
+	;     api3 = ObjectReference.FindAllReferencesWithKeyword(Keyword, r)
+	Int api = 0
+	ObjectReference[] doors = p.FindAllReferencesOfType(DoorBases, radius)
+	If doors.Length > 0
+		api = 1
+	EndIf
+	If dbg
+		Debug.Trace("[SAS] door/diag:  api1 FindAllReferencesOfType(List,r) -> " + doors.Length)
+	EndIf
+	If api == 0
+		ObjectReference one = Game.FindClosestReferenceOfAnyTypeInListFromRef(DoorBases, p, radius)
+		If one != None
+			doors = new ObjectReference[1]
+			doors[0] = one
+			api = 2
+		EndIf
+		If dbg
+			Debug.Trace("[SAS] door/diag:  api2 FindClosestRefOfAnyTypeInListFromRef -> " + FormHex(one))
+		EndIf
+	EndIf
+	Keyword lkw = Game.GetForm(CfgLoadDoorKeywordFormID()) as Keyword
+	If api == 0 && lkw != None
+		ObjectReference[] kwDoors = p.FindAllReferencesWithKeyword(lkw, radius)
+		If kwDoors.Length > 0
+			doors = kwDoors
+			api = 3
+		EndIf
+		If dbg
+			Debug.Trace("[SAS] door/diag:  api3 FindAllReferencesWithKeyword(IsLoadDoor,r) -> " + kwDoors.Length)
+		EndIf
+	EndIf
+
+	; ★ ② 优先级：通往目标 cell 的门 > 通往室外的门（玩家在室内时）> 最近的 load door
+	;   - 前两条依赖 `GetTeleportCell()`；
+	;   - 最后一条不依赖它（用 IsLoadDoor 关键字认定），是「Papyrus 门系统跟我们想的不一样」时的
+	;     硬兜底：在室内指向一扇能出去的门总是比什么都不画强。
 	Int i = 0
 	While i < doors.Length
 		ObjectReference d = doors[i]
 		If d != None
+			Float dx = d.GetPositionX() - px
+			Float dy = d.GetPositionY() - py
+			Float dz = d.GetPositionZ() - pz
+			Float dist = Math.sqrt(dx * dx + dy * dy + dz * dz)
 			Cell tc = d.GetTeleportCell()
+			Bool isLoad = (lkw != None) && d.HasKeyword(lkw)
+			If dbg && i < 8
+				Debug.Trace("[SAS] door/diag:    d=" + FormHex(d) + " base=" + FormHex(d.GetBaseObject()) + " load=" + isLoad + " tc=" + FormHex(tc) + " tcell=" + FormHex(d.GetTransitionCell()) + " dist=" + Math.Floor(dist / 3.4286) + "m")
+			EndIf
+			If isLoad
+				If bestLoad == None || dist < bestLoadD
+					bestLoad = d
+					bestLoadD = dist
+				EndIf
+			EndIf
 			If tc != None
-				Float dx = d.GetPositionX() - px
-				Float dy = d.GetPositionY() - py
-				Float dz = d.GetPositionZ() - pz
-				Float dist = Math.sqrt(dx * dx + dy * dy + dz * dz)
 				If tc == targetCell
 					If best == None || dist < bestD
 						best = d
@@ -507,10 +575,16 @@ ObjectReference Function FindGuideDoor(Actor p, Float px, Float py, Float pz, Ce
 		EndIf
 		i = i + 1
 	EndWhile
+	If dbg
+		Debug.Trace("[SAS] door/diag:  -> api=" + api + " doors=" + doors.Length + " best=" + FormHex(best) + " bestOut=" + FormHex(bestOut) + " bestLoad=" + FormHex(bestLoad))
+	EndIf
 	If best != None
 		Return best
 	EndIf
-	Return bestOut
+	If bestOut != None
+		Return bestOut
+	EndIf
+	Return bestLoad
 EndFunction
 
 Function UpdateGuidePath()
@@ -607,7 +681,9 @@ Function UpdateGuidePath()
 	Float dist = Math.sqrt(dx * dx + dy * dy)
 	Float start = CfgGuideStartDist()
 	Float spacing = CfgGuideSpacing()
-	If dist <= (start + spacing)
+	; ★ v2.7：v2.6 这里用的是 start+spacing（8 米），而代理目标（门）常在 5~6 米内
+	;   ⇒ 刚找到门就被「太近」挡掉、地上依然看不到东西。改成 start + 半个间距（3 米）。
+	If dist <= (start + spacing * 0.5)
 		HideGuideMarkers()
 		GuideMarkers.SetValueInt(0)
 		If CfgGuideDebug() && ((now - GuidePaintDiagAt) >= 5.0)
