@@ -39,6 +39,12 @@ Scriptname SAS_Bridge extends Quest
 ; ★ v2.8：光点形态从「纯光源 LIGH」换成「带发光网格的 MSTT GlowBall10x10」——
 ;   v2.7 实测 markers 有数但玩家看不到，根因是 LIGH 记录**没有 MODL（网格）**，
 ;   白天室外就是一摊看不见的光。详见 CfgGuideMarkerFormID() 的注释。
+; ★ v3.0：面包屑改成「世界锚定的滚动光带」（20 颗密排珠子，每 tick 最多动 3 颗），
+;   修掉「只看得到一颗 / 很强卡顿 / 不随玩家连续移动」。两条根因：
+;   ① SetPosition 等在 Starfield 里是**延迟函数**（DelayFunctor），
+;      调用后立刻读坐标是旧值 ⇒ v2.8 的球飘在半空；
+;   ② 一帧里把整条链重摆一遍（8 颗 x 3 次引擎调用，含 8 次 navmesh 查询）+ 1.5 米移动节流。
+;   详见下面「面包屑引导路径」小节与 PlaceGuideBead 的注释。
 ; ============================================================================
 
 FormList Property OpList Auto Const Mandatory
@@ -209,32 +215,73 @@ EndFunction
 ;   ⇒ 不举扫描仪 = 那个 HUD 根本不存在 = 线永远画不出来（不是没找对 API）。
 ;
 ; 这里的做法：沿「玩家 → 引导目标」铺一串**地面光点**。
-;   1) 标注形态用原版 MSTT（★ v2.8 起默认 00098106 GlowBall10x10，一个 0.1 米的
+;   1) 形态用原版 MSTT（★ v2.8 起默认 00098106 GlowBall10x10，一个 0.1 米的
 ;      **发光球网格** Effects\Ambient\GlowBall10x10.nif，再 SetScale 放大）：
 ;      v2.4~v2.7 用的 LIGH 0x00012E5A 是**纯光源、没有网格**，白天室外看不见
 ;      （这是 v2.7 实测「markers 有数但什么都没有」的根因）。想换观感只改
 ;      CfgGuideMarkerFormID()（候选都列在那个函数里），不用动代码。
 ;   2) 贴地用 ObjectReference.MoveToNearestNavmeshLocation()：B 社自己的
-;      TestNPCArenaScript.psc 就是把路径标记这样放上 navmesh 的，**不需要射线**；
-;      贴完再抬 CfgGuideMarkerLift()（球心在原点，不抬就一半埋地里）。
-;   3) 只在「间隔到点 且 玩家真的动了」时才重算（那是 navmesh 查询，别每帧跑）。
-;   4) 每个标记 BlockActivation(true,true) + SetMotionType(Keyframed) —— 不抢交互、
+;      TestNPCArenaScript.psc 就是把路径标记这样放上 navmesh 的，**不需要射线**。
+;   3) 每个标记 BlockActivation(true,true) + SetMotionType(Keyframed) —— 不抢交互、
 ;      也不会被物理引擎拖走（MSTT 默认是 Dynamic，会滚）。
+;
+; ★★ v3.0：从「每 0.5 秒把 8 颗球整体重摆一遍」改成「世界锚定的滚动光带」★★
+;   实测（v2.8 用户反馈）的三个毛病：
+;     ① 有时候只看得到一颗  ② 卡顿感非常强  ③ 不是随玩家连续移动的（一格一格跳）
+;   根因（两条，都是离线/引擎侧可证的）：
+;     A. **SetPosition / MoveToNearestNavmeshLocation / Enable / Disable / SetScale
+;        在 Starfield 里都是「延迟函数」**（RE::GameScript::DelayFunctor：
+;        kSetPosition=6 / kMoveToNearestNavmeshLoc=26 / kEnable=3 / kDisable=4 /
+;        kSetScale=11）—— 它们被塞进渲染安全队列、等 3D 就绪后由引擎执行，
+;        **调用之后立刻读坐标拿到的是旧值**。v2.8 那句
+;        「贴地之后再读坐标 +0.25 米」读到的正是吸附**之前**的 Z（玩家头顶 2 米）
+;        ⇒ 球飘在半空（用户截图里那颗就是），而且一帧里 8 颗全在飘。
+;     B. **一帧里把整条链重摆一遍**（8 颗 x 3 次引擎调用，其中 8 次是 navmesh 查询）
+;        + 「移动 1.5 米才重算」⇒ 每走 1.5 米卡一下、球一次跳 1.5 米。
+;   新做法（每 tick 只动 ≤ CfgGuideBudget() 颗，判断全是纯数学）：
+;     · 珠子**世界锚定**：铺好后它们不动，玩家往前走时只有「最靠后那颗」被回收
+;       去队尾（每前进一个间距发生一次）⇒ 走动时是光带从脚边流过，不是整条线跟着跳；
+;     · 重铺（方向变了 / 横漂 > 2 米）也是**分批**做的（3 颗/次），所以永远不会有
+;       「一帧铺满整条链」的抖动；
+;     · 链长 = min(20 颗 x 0.55 米, 目标距离 - 余量)，目标近时自动压密，永不越过目标；
+;     · 越过目标的珠子直接 SetPosition 到地下（比 Disable/Enable 便宜，也不来回切 3D）。
 ;
 ; 局限（如实记录，不假装）：
 ;   Papyrus **没有**「玩家正在追踪哪一个目标」的查询接口，所以这里用的是
 ;   「所有 active quest 的当前阶段目标里、同一 cell 内最近的那个」。
 ;   要精确到「追踪中的那一个」需要 hooks/RE，留作后续。
 ; ============================================================================
+; ---- ★ v3.0「滚动光带」状态 ----
+;   几何完全由下面这几个标量决定，逐帧只用**纯数学**判断该动哪几颗珠子：
+;     GuideLX/LY      —— 铺路原点（世界坐标，= 铺路那一刻的玩家位置）
+;     GuideLUX/LUY    —— 铺路方向（XY 单位向量）
+;     GuideSpacingEff —— 本轮有效间距（目标近时自动压密，链尾永不越过目标）
+;     GuideHead       —— 环头：珠子池里「当前离玩家最近」那颗的下标
+;   槽位 k（0 = 最近、N-1 = 最远）离玩家的距离 = start + k*spacing - adv，
+;   其中 adv = 玩家沿铺路方向前进的距离。
+;   珠子**世界锚定**：铺好后玩家走动它们不动，只是「环头那颗被回收去队尾」
+;   （每前进一个间距才回收一颗）⇒ 走动时是光带从脚边流过，而不是整条线跟着跳。
 ObjectReference[] GuideMarkerRefs
+Bool[]  GuideBeadParked
+Float[] GuideBeadZ
 Bool  GuideArrayReady = False
 Int   GuideMarkerFormVer = 0
+Int   GuidePoolVer = 0
+Int   GuideHead = 0
+Bool  GuideLayValid = False
+Float GuideLX = 0.0
+Float GuideLY = 0.0
+Float GuideLUX = 0.0
+Float GuideLUY = 0.0
+Float GuideSpacingEff = 0.0
+Int   GuideRelayNext = -1
+Float GuideLastRelayAt = 0.0
+Float GuideMovedTick = 0.0
+Float GuideMovedTotal = 0.0
+Cell  GuideLastCell = None
 ObjectReference GuideTarget = None
 Float GuideTargetAt = 0.0
 Float GuideLastUpdateAt = 0.0
-Float GuideLastPX = 0.0
-Float GuideLastPY = 0.0
-Float GuideLastPZ = 0.0
 Bool  ScannerUp = False
 
 ; ★ v2.5：诊断（定位「guideMarkers 恒为 -1 = 找不到目标」）——
@@ -251,25 +298,64 @@ Float GuideDoorDiagAt = 0.0
 Float GuidePaintPosDiagAt = 0.0
 Bool  GuideTargetIsProxy = False
 
-Int Function CfgGuideMarkerCount()
-	{ 面包屑个数。8 个 x 3 米 ≈ 覆盖身前 24 米 }
-	Return 8
+Int Function CfgGuidePoolVer()
+	{ ★ 珠子池版本号。改了池子大小 / 排布方式就必须 +1 —— 脚本变量是跟着存档
+	  走的，老存档里握着旧尺寸的数组，不重建就是一团乱（v2.8 那个「形态迁移」坑） }
+	Return 30
 EndFunction
 
-Float Function CfgGuideSpacing()
-	{ 相邻两个面包屑的间距（游戏单位）。★ v2.7：5m → 3m
-	  （代理目标是门时距离往往只有几米，5m 间距会把整段路遮没） }
-	Return 3.0 * 3.4286
+Int Function CfgGuideBeadCount()
+	{ 光带里的珠子总数。20 颗 x 0.55 米 ≈ 11 米的连续光带 }
+	Return 20
+EndFunction
+
+Float Function CfgGuideSpacingBase()
+	{ 相邻两颗珠子的间距（游戏单位）。0.55 米：配 0.4 米的球基本首尾相接 }
+	Return 0.55 * 3.4286
 EndFunction
 
 Float Function CfgGuideStartDist()
-	{ 第一个面包屑离玩家多远（游戏单位）。★ v2.7：3m → 1.5m }
-	Return 1.5 * 3.4286
+	{ 第一颗珠子离玩家多远（游戏单位）。0.9 米（太近会在脚底下闪） }
+	Return 0.9 * 3.4286
 EndFunction
 
-Float Function CfgGuideHeight()
-	{ 标记先放到玩家脚底上方这么高，再由 MoveToNearestNavmeshLocation 贴地 }
+Float Function CfgGuideEndMargin()
+	{ 链尾离目标留的余量（游戏单位）：光带不许铺过目标 }
+	Return 0.5 * 3.4286
+EndFunction
+
+Float Function CfgGuideMinGap()
+	{ 环头那颗离玩家这么近就把它回收去队尾（游戏单位）。0.7 米 }
+	Return 0.7 * 3.4286
+EndFunction
+
+Int Function CfgGuideBudget()
+	{ ★ 单次心跳最多动几颗珠子 —— 「不卡顿」的关键：
+	  绝不把整条链在同一帧里铺满（v2.8 是 8 颗 x 3 次引擎调用一起打、
+	  还夹着 8 次 navmesh 查询 ⇒ 周期性硬卡顿） }
+	Return 3
+EndFunction
+
+Float Function CfgGuideTurnCos()
+	{ 铺路方向与当前方向夹角超过这个 cos 就重铺（cos(8°) ≈ 0.990） }
+	Return 0.990
+EndFunction
+
+Float Function CfgGuideLatTol()
+	{ 玩家相对铺路直线的横向漂移超过这个值就重铺（游戏单位）。2 米 }
 	Return 2.0 * 3.4286
+EndFunction
+
+Float Function CfgGuideRelayCooldown()
+	{ 两次重铺之间至少隔这么久（秒）—— 防止走曲线时一直重铺 }
+	Return 1.5
+EndFunction
+
+Float Function CfgGuideParkDepth()
+	{ 「停用」一颗珠子 = 把它挪到地下这么深（游戏单位）。
+	  为什么不调 Disable()：它同样是延迟函数，而且来回切更贵；
+	  直接 SetPosition 到地下代价一样、还免了 3D 反复附着 }
+	Return 4000.0
 EndFunction
 
 Float Function CfgGuideMaxDist()
@@ -278,13 +364,9 @@ Float Function CfgGuideMaxDist()
 EndFunction
 
 Float Function CfgGuideInterval()
-	{ 引导路径最短重算间隔（秒） }
-	Return 0.5
-EndFunction
-
-Float Function CfgGuideMoveThreshold()
-	{ 玩家相对上次重算移动超过这个距离才重算（游戏单位）。1.5 米 }
-	Return 1.5 * 3.4286
+	{ 引导路径最短重算间隔（秒）= 心跳间隔。判断逻辑是纯数学，
+	  真正调引擎的次数由 CfgGuideBudget() 限死 }
+	Return 0.25
 EndFunction
 
 Float Function CfgGuideTargetRefresh()
@@ -310,14 +392,18 @@ Int Function CfgGuideMarkerFormID()
 EndFunction
 
 Float Function CfgGuideMarkerScale()
-	{ 面包屑缩放。网格本身只有 0.1 米，3 倍 = 0.3 米的发光球
-	  （第一人称在几米外就是一串清清楚楚的光点） }
-	Return 3.0
+	{ 珠子缩放。网格本身只有 0.1 米，4 倍 = 0.4 米的发光球
+	  （配 0.55 米间距 ⇒ 基本首尾相接，看着是一条连续光带而不是一串点） }
+	Return 4.0
 EndFunction
 
 Float Function CfgGuideMarkerLift()
-	{ 贴地之后再抬高这么多（游戏单位）。球的球心在原点 ⇒ 不抬就有一半埋在地面里 }
-	Return 0.25 * 3.4286
+	{ 放置时用的「离地高度」（游戏单位）。★ 它只当一次初始基准用：
+	  紧接着的 MoveToNearestNavmeshLocation() 会把珠子吸附到 navmesh 上。
+	  **绝不能**写成「吸附之后再读坐标来抬高」—— 见 PlaceGuideBead 的注释：
+	  在 Starfield 里 SetPosition / MoveToNearestNavmeshLocation 都是延迟函数，
+	  SetPosition 之后立刻 GetPositionZ() 读到的还是旧值。 }
+	Return 0.2 * 3.4286
 EndFunction
 
 Float Function CfgGuideDoorRadius()
@@ -364,20 +450,37 @@ Bool Function SameSpace(Cell a, Cell b)
 	Return !a.IsInterior() && !b.IsInterior()
 EndFunction
 
-Function EnsureGuideArray()
-	If !GuideArrayReady
-		GuideMarkerRefs = new ObjectReference[CfgGuideMarkerCount()]
-		GuideArrayReady = True
+; ★ 池子每次重建都要满足两个条件：形态没换、池子版本没换。
+;   （脚本变量跟着存档走 —— 老存档里握着旧尺寸/旧形态的数组，不重建就是一团乱。）
+Bool Function EnsureGuideArray(Actor p)
+	If GuideArrayReady && GuidePoolVer == CfgGuidePoolVer() && GuideMarkerFormVer == CfgGuideMarkerFormID()
+		Return True
 	EndIf
-	; ★ v2.8：形态换过就得把老标记全销毁重建。
-	;   脚本变量（含 GuideMarkerRefs）是**跟着存档走的** —— 用户读档后数组里还握着
-	;   v2.7 那些「看不见的 LIGH」引用，而绘制循环只在 m == None 时才新建
-	;   ⇒ 换了 CfgGuideMarkerFormID() 也会一直用旧形态（就是「改了却没变化」的坑）。
-	If GuideMarkerFormVer != CfgGuideMarkerFormID()
+	; 玩家还没进世界（载入中 / 没有 cell）⇒ 这时候 PlaceAtMe 不可靠，下一轮再说
+	If p.GetParentCell() == None
+		Return False
+	EndIf
+	If GuidePoolVer != CfgGuidePoolVer() || GuideMarkerFormVer != CfgGuideMarkerFormID()
 		DestroyGuideMarkers()
-		GuideMarkerFormVer = CfgGuideMarkerFormID()
-		Debug.Trace("[SAS] guide: 面包屑形态变更 -> 旧标记全部销毁重建（form=" + FormHex(Game.GetForm(CfgGuideMarkerFormID())) + "）")
 	EndIf
+	GuidePoolVer = CfgGuidePoolVer()
+	GuideMarkerFormVer = CfgGuideMarkerFormID()
+	GuideLayValid = False
+	GuideRelayNext = -1
+	GuideHead = 0
+	GuideArrayReady = True
+	Int n = CfgGuideBeadCount()
+	GuideMarkerRefs = new ObjectReference[n]
+	GuideBeadParked = new Bool[n]
+	GuideBeadZ = new Float[n]
+	Int i = 0
+	While i < n
+		GuideBeadParked[i] = True
+		GuideMarkerRefs[i] = CreateGuideMarker(p)
+		i = i + 1
+	EndWhile
+	Debug.Trace("[SAS] guide: 光带池重建 poolVer=" + CfgGuidePoolVer() + " form=" + FormHex(Game.GetForm(GuideMarkerFormVer)) + " n=" + n)
+	Return True
 EndFunction
 
 Function DestroyGuideMarkers()
@@ -394,9 +497,12 @@ Function DestroyGuideMarkers()
 		EndIf
 		i = i + 1
 	EndWhile
+	GuideArrayReady = False
 	GuideMarkers.SetValueInt(0)
 EndFunction
 
+; F8 关掉 / 玩家自己举着扫描仪时：整条光带收起来。
+; （这是低频操作，Disable 的延迟函数代价可以接受）
 Function HideGuideMarkers()
 	If !GuideArrayReady
 		Return
@@ -405,10 +511,18 @@ Function HideGuideMarkers()
 	While i < GuideMarkerRefs.Length
 		ObjectReference m = GuideMarkerRefs[i]
 		If m != None
-			m.Disable()
+			If !GuideBeadParked[i]
+				m.Disable()
+				GuideBeadParked[i] = True
+			EndIf
 		EndIf
 		i = i + 1
 	EndWhile
+	; ★ 收起来之后铺路状态就作废了：下次重新亮起来必须**整条重铺**
+	;   （不然珠子是 Disabled 的，而 conveyor 只会偶尔回收几颗 ⇒ 一片空白）
+	GuideLayValid = False
+	GuideRelayNext = -1
+	GuideHead = 0
 EndFunction
 
 ObjectReference Function CreateGuideMarker(Actor p)
@@ -429,10 +543,51 @@ ObjectReference Function CreateGuideMarker(Actor p)
 	m.SetMotionType(m.Motion_Keyframed, True)
 	; 形态本身只有 0.1 米，放大到看得见
 	m.SetScale(CfgGuideMarkerScale())
-	If CfgGuideDebug()
-		Debug.Trace("[SAS] guide: 造出标记 " + FormHex(m) + " form=" + FormHex(f) + " scale=" + CfgGuideMarkerScale())
-	EndIf
 	Return m
+EndFunction
+
+; ============================================================================
+; ★ v3.0：把一颗珠子放到「离玩家 alongPlayer 单位」的位置上（沿铺路方向）
+; ----------------------------------------------------------------------------
+; alongPlayer > cap（链尾上限）⇒ 判定为「该停用」：把它挪到地下 ParkDepth 深，
+; 而不是调 Disable()（延迟函数、来回切更贵）。
+;
+; ★★ 只调一次 SetPosition，而且**绝不在 SetPosition 之后读坐标 ★★
+;   在 Starfield 里这些都是**延迟函数**（GameScript::DelayFunctor 的
+;   kSetPosition=6 / kMoveToNearestNavmeshLoc=26 / kEnable=3 / kDisable=4 /
+;   kSetScale=11）：它们被塞进渲染安全队列，由引擎在 3D 就绪后执行，
+;   调用后立刻 GetPositionZ() 拿到的是**旧值**。
+;   v2.8 那颗飘在半空的球就是这么来的：
+;     SetPosition(x, y, pz+2m) → MoveToNearestNavmeshLocation() → 读回坐标(还是 pz+2m)
+;     → 再加 0.25 米 ⇒ 球落到「玩家头顶 2.25 米」而不是地上。
+; ============================================================================
+Function PlaceGuideBead(Actor p, Int idx, Float alongPlayer, Float cap, Float pz)
+	If idx < 0 || idx >= GuideMarkerRefs.Length
+		Return
+	EndIf
+	ObjectReference m = GuideMarkerRefs[idx]
+	If m == None
+		Return
+	EndIf
+	Float px = p.GetPositionX()
+	Float py = p.GetPositionY()
+	GuideBeadZ[idx] = pz
+	GuideMovedTick = GuideMovedTick + 1.0
+	If alongPlayer > cap
+		; ---- 停用位：挪到地下（不调 Disable/Enable）----
+		m.SetPosition(px + GuideLUX * alongPlayer, py + GuideLUY * alongPlayer, pz - CfgGuideParkDepth())
+		GuideBeadParked[idx] = True
+		Return
+	EndIf
+	If m.GetParentCell() != p.GetParentCell()
+		m.MoveTo(p)
+	EndIf
+	If GuideBeadParked[idx]
+		m.Enable()
+		GuideBeadParked[idx] = False
+	EndIf
+	m.SetPosition(px + GuideLUX * alongPlayer, py + GuideLUY * alongPlayer, pz + CfgGuideMarkerLift())
+	m.MoveToNearestNavmeshLocation()
 EndFunction
 
 ; 引导目标：所有 active quest 的「当前阶段目标」里，同一 cell 内最近的那个。
@@ -663,9 +818,11 @@ Function UpdateGuidePath()
 	If p == None
 		Return
 	EndIf
-	EnsureGuideArray()
+	If !EnsureGuideArray(p)
+		Return
+	EndIf
 
-	; F8 关掉时，面包屑一起收掉
+	; F8 关掉时，光带一起收掉
 	If SASOn.GetValueInt() == 0
 		HideGuideMarkers()
 		GuideMarkers.SetValueInt(0)
@@ -683,26 +840,25 @@ Function UpdateGuidePath()
 	If GuideLastUpdateAt > 0.0 && (now - GuideLastUpdateAt) < CfgGuideInterval()
 		Return
 	EndIf
+	GuideLastUpdateAt = now
+	GuideMovedTick = 0.0
 
 	Float px = p.GetPositionX()
 	Float py = p.GetPositionY()
 	Float pz = p.GetPositionZ()
 
-	; 玩家没怎么动 + 刚算过 ⇒ 什么都不用做
-	If GuideLastUpdateAt > 0.0
-		Float mvx = px - GuideLastPX
-		Float mvy = py - GuideLastPY
-		Float mvz = pz - GuideLastPZ
-		Float thr = CfgGuideMoveThreshold()
-		If (mvx * mvx + mvy * mvy + mvz * mvz) < thr * thr
-			Return
-		EndIf
+	; ★ v3.0：不再用「玩家移动 1.5 米才重算」那种节流 ——
+	;   那正是「一格一格跳、不跟着玩家连续移动」的根源。
+	;   现在每 0.25 秒都过一遍，但判断全是纯数学，
+	;   真正调引擎的次数被 CfgGuideBudget() 限死在「每 tick 最多 3 颗」。
+	Cell myCell = p.GetParentCell()
+	If myCell != GuideLastCell
+		; 换 cell（含换世界空间）⇒ 旧光带整条作废，下一轮重铺
+		GuideLastCell = myCell
+		GuideLayValid = False
+		GuideRelayNext = -1
+		GuideHead = 0
 	EndIf
-
-	GuideLastUpdateAt = now
-	GuideLastPX = px
-	GuideLastPY = py
-	GuideLastPZ = pz
 
 	; 目标检索：缓存 2 秒，失效（被打掉/关掉/换坐标系）立刻重查
 	Bool needSearch = (GuideTarget == None) || ((now - GuideTargetAt) > CfgGuideTargetRefresh())
@@ -751,10 +907,7 @@ Function UpdateGuidePath()
 	Float dy = GuideTarget.GetPositionY() - py
 	Float dist = Math.sqrt(dx * dx + dy * dy)
 	Float start = CfgGuideStartDist()
-	Float spacing = CfgGuideSpacing()
-	; ★ v2.7：v2.6 这里用的是 start+spacing（8 米），而代理目标（门）常在 5~6 米内
-	;   ⇒ 刚找到门就被「太近」挡掉、地上依然看不到东西。改成 start + 半个间距（3 米）。
-	If dist <= (start + spacing * 0.5)
+	If dist <= (start + CfgGuideMinGap())
 		HideGuideMarkers()
 		GuideMarkers.SetValueInt(0)
 		If CfgGuideDebug() && ((now - GuidePaintDiagAt) >= 5.0)
@@ -763,63 +916,109 @@ Function UpdateGuidePath()
 		EndIf
 		Return
 	EndIf
-
 	Float ux = dx / dist
 	Float uy = dy / dist
-	Float reach = dist - spacing * 0.4
-	Cell  myCell = p.GetParentCell()
+	Float cap = dist - CfgGuideEndMargin()   ; 链尾离玩家的距离上限：光带不许越过目标
+	Int   n = CfgGuideBeadCount()
 
-	Int shown = 0
-	Int i = 0
-	While i < GuideMarkerRefs.Length
-		Float d = start + spacing * i
-		ObjectReference m = GuideMarkerRefs[i]
-		If d > reach
-			If m != None
-				m.Disable()
-			EndIf
-		Else
-			If m == None
-				m = CreateGuideMarker(p)
-				GuideMarkerRefs[i] = m
-				If m == None && CfgGuideDebug() && ((now - GuidePaintDiagAt) >= 5.0)
-					GuidePaintDiagAt = now
-					Debug.Trace("[SAS] guide: PlaceAtMe 失败，形态 " + FormHex(Game.GetForm(CfgGuideMarkerFormID())) + " 造不出标记")
-				EndIf
-			EndIf
-			If m != None
-				If m.GetParentCell() != myCell
-					m.MoveTo(p)
-				EndIf
-				m.Enable()
-				m.SetPosition(px + ux * d, py + uy * d, pz + CfgGuideHeight())
-				; 贴地：移到「它附近 navmesh 上最近的位置」（不需要射线，B 社自己的脚本就这么用）
-				m.MoveToNearestNavmeshLocation()
-				; ★ v2.8：贴地后抬一点 —— 球心在原点，不抬就有一半埋在地面里
-				m.SetPosition(m.GetPositionX(), m.GetPositionY(), m.GetPositionZ() + CfgGuideMarkerLift())
-				shown = shown + 1
-			EndIf
+	; ---- ① 要不要重铺（没铺过 / 方向变了 / 玩家横着漂太远）----
+	Bool needLay = False
+	If !GuideLayValid
+		needLay = True
+	ElseIf (now - GuideLastRelayAt) < CfgGuideRelayCooldown()
+		needLay = False
+	ElseIf (GuideLUX * ux + GuideLUY * uy) < CfgGuideTurnCos()
+		needLay = True
+	Else
+		Float adv0 = (px - GuideLX) * GuideLUX + (py - GuideLY) * GuideLUY
+		; ★ 玩家倒退 / 绕回去时珠子会被留在身后 ⇒ 也要重铺（否则光带一直晾在原地）
+		If (0.0 - adv0) > CfgGuideLatTol()
+			needLay = True
 		EndIf
-		i = i + 1
+		Float lx = (px - GuideLX) - GuideLUX * adv0
+		Float ly = (py - GuideLY) - GuideLUY * adv0
+		If (lx * lx + ly * ly) > (CfgGuideLatTol() * CfgGuideLatTol())
+			needLay = True
+		EndIf
+	EndIf
+
+	If needLay
+		GuideLX = px
+		GuideLY = py
+		GuideLUX = ux
+		GuideLUY = uy
+		GuideHead = 0
+		GuideRelayNext = 0
+		GuideLastRelayAt = now
+		GuideLayValid = True
+		; 有效间距：整条链不许超过「目标距离 - 余量」⇒ 目标近时自动压密成一小段
+		Float sp = Math.Min(CfgGuideSpacingBase(), (cap - start) / n)
+		GuideSpacingEff = Math.Max(sp, 0.08 * 3.4286)
+	EndIf
+
+	Float adv = (px - GuideLX) * GuideLUX + (py - GuideLY) * GuideLUY
+	Int budget = CfgGuideBudget()
+
+	If GuideRelayNext >= 0
+		; ---- ② 重铺：每 tick 只铺 budget 颗（永远不会有「一帧铺满整条链」的卡顿）----
+		While budget > 0 && GuideRelayNext < n
+			PlaceGuideBead(p, GuideRelayNext, start + GuideRelayNext * GuideSpacingEff - adv, cap, pz)
+			GuideRelayNext = GuideRelayNext + 1
+			budget = budget - 1
 		EndWhile
-		GuideMarkers.SetValueInt(shown)
-		; ★ v2.8：绘制诊断改用**自己**的时间戳（以前和「指向门」那行共用，
-		;   结果同一轮里那行先刷掉了计时器 ⇒ 这里永远打不出来）。
-		;   打的是「标记 0 到底在哪 / 在哪个 cell / 开没开 / 缩放多少」，
-		;   下次实测一眼就能分清「没造出来」「造在别的 cell」「造在眼前但看不见」。
-		If CfgGuideDebug() && ((now - GuidePaintPosDiagAt) >= 5.0)
-			GuidePaintPosDiagAt = now
-			ObjectReference m0 = None
-			If GuideMarkerRefs.Length > 0
-				m0 = GuideMarkerRefs[0]
-			EndIf
-			If m0 != None
-				Debug.Trace("[SAS] guide/paint: target=" + FormHex(GuideTarget) + " isProxy=" + GuideTargetIsProxy + " d=" + Math.Floor(dist / 3.4286) + "m markers=" + shown + "/" + GuideMarkerRefs.Length + " | m0=" + FormHex(m0) + " cell=" + FormHex(m0.GetParentCell()) + " on=" + m0.IsEnabled() + " scale=" + m0.GetScale() + " m0pos=" + Math.Floor(m0.GetPositionX()) + "," + Math.Floor(m0.GetPositionY()) + "," + Math.Floor(m0.GetPositionZ()) + " ppos=" + Math.Floor(px) + "," + Math.Floor(py) + "," + Math.Floor(pz) + " pcell=" + FormHex(myCell))
-			Else
-				Debug.Trace("[SAS] guide/paint: target=" + FormHex(GuideTarget) + " markersonly=" + shown + " m0=None")
-			EndIf
+		If GuideRelayNext >= n
+			GuideRelayNext = -1
 		EndIf
-		EndFunction
+	Else
+		; ---- ③ 环头回收：最近那颗已经贴到玩家身上了 ⇒ 挪去队尾 ----
+		;   这是「走动时唯一会发生的引擎动作」，频率 = 玩家速度 / 间距（走 3 m/s ≈ 每秒 5 颗）
+		While budget > 0 && (start - adv) < CfgGuideMinGap()
+			PlaceGuideBead(p, GuideHead, start + (n - 1) * GuideSpacingEff - adv, cap, pz)
+			GuideHead = (GuideHead + 1) % n
+			adv = adv - GuideSpacingEff    ; 队首少了一颗 ⇒ 等价于 adv 减一个间距
+			budget = budget - 1
+		EndWhile
+		; ---- ④ 链尾修剪：越过目标的珠子挪到地下（玩家越走越近时才发生）----
+		Int k = n - 1
+		Bool trimmed = False
+		While budget > 0 && k >= 0 && !trimmed
+			Int idx = (GuideHead + k) % n
+			If (start + k * GuideSpacingEff - adv) > cap
+				If !GuideBeadParked[idx]
+					PlaceGuideBead(p, idx, start + k * GuideSpacingEff - adv, cap, pz)
+					trimmed = True
+					budget = budget - 1
+				EndIf
+			Else
+				k = -1
+			EndIf
+			k = k - 1
+		EndWhile
+	EndIf
+
+	; ---- ⑤ 可见珠子数（纯数学，不调引擎）----
+	Int vis = 0
+	Int vi = 0
+	While vi < n
+		Float dv = start + vi * GuideSpacingEff - adv
+		If dv > 0.0 && dv <= cap
+			vis = vis + 1
+		EndIf
+		vi = vi + 1
+	EndWhile
+	GuideMarkers.SetValueInt(vis)
+	GuideMovedTotal = GuideMovedTotal + GuideMovedTick
+
+	; ---- 诊断（每 5 秒一屏）----
+	;   看这几个数就能定位：relay/head/sp/adv/vis/moved 与 m0 的 cell/坐标。
+	If CfgGuideDebug() && ((now - GuidePaintPosDiagAt) >= 5.0)
+		GuidePaintPosDiagAt = now
+		ObjectReference m0 = GuideMarkerRefs[GuideHead]
+		If m0 != None
+			Debug.Trace("[SAS] guide/paint: target=" + FormHex(GuideTarget) + " proxy=" + GuideTargetIsProxy + " d=" + Math.Floor(dist / 3.4286) + "m lay=" + GuideLayValid + " relay=" + GuideRelayNext + " head=" + GuideHead + " sp=" + GuideSpacingEff + " adv=" + Math.Floor(adv / 3.4286) + "m vis=" + vis + "/" + n + " moved=" + GuideMovedTick + "(累计" + GuideMovedTotal + ") | m0=" + FormHex(m0) + " cell=" + FormHex(m0.GetParentCell()) + " on=" + m0.IsEnabled() + " pos=" + Math.Floor(m0.GetPositionX()) + "," + Math.Floor(m0.GetPositionY()) + "," + Math.Floor(m0.GetPositionZ()) + " ppos=" + Math.Floor(px) + "," + Math.Floor(py) + "," + Math.Floor(pz) + " pcell=" + FormHex(myCell))
+		EndIf
+	EndIf
+EndFunction
 
 ; ============================================================================
 ; 事件
@@ -868,11 +1067,15 @@ Event Actor.OnPlayerLoadGame(Actor akSender)
 	StopCursor.SetValueInt(0)
 	LoadEventRegistered = False
 	RegisterLoadEvent()
-	; 面包屑：读档后位置全变了，强制重算一次并忘掉旧目标
+	; 光带：读档后位置全变了 ⇒ 忘掉目标和整条铺路状态，下一轮从零重铺
 	GuideTarget = None
 	GuideTargetAt = 0.0
 	GuideLastUpdateAt = 0.0
 	ScannerUp = False
+	GuideLayValid = False
+	GuideRelayNext = -1
+	GuideHead = 0
+	GuideLastCell = None
 EndEvent
 
 ; ============================================================================
