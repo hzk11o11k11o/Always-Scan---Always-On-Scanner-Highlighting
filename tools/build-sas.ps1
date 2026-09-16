@@ -1,0 +1,253 @@
+# ============================================================================
+#  Starfield Always Scan (SFSE) - 一键构建
+#   1) xEdit 无头生成 StarfieldAlwaysScan.esm（记录表见 build_sas.pas 顶部注释）
+#   2) Papyrus 编译 SAS_Bridge.psc
+#   3) xmake 构建 SAS_AlwaysScan.dll
+#   4) 部署到 MO2 mod 目录
+#   5) 更新 MO2 profile（启用本 mod）
+#
+#  ★ 必须用 pwsh 跑（PowerShell 7）。本文件是 UTF-8 无 BOM，
+#    Windows PowerShell 5.1 会按 GBK 解码，中文路径会变成乱码。
+#      pwsh -File tools\build-sas.ps1
+#
+#  常用组合：
+#    pwsh -File tools\build-sas.ps1 -SkipPluginBuild -SkipDllBuild   # 只重编脚本
+#    pwsh -File tools\build-sas.ps1 -SkipPluginBuild -SkipPapyrusCompile  # 只重编 DLL
+# ============================================================================
+param(
+    [switch]$SkipPluginBuild,
+    [switch]$SkipPapyrusCompile,
+    [switch]$SkipDllBuild,
+    [switch]$SkipDeploy,
+    [switch]$SkipProfile
+)
+
+$ErrorActionPreference = 'Stop'
+
+$root         = Split-Path -Parent $PSScriptRoot          # 项目根
+$xeditExe     = Join-Path $root 'tools\vendor\xEdit\xSFEdit64.exe'
+$runXedit     = Join-Path $root 'tools\run-xedit.ps1'
+$buildScript  = Join-Path $root 'tools\xedit-scripts\build_sas.pas'
+$pluginDir    = Join-Path $root 'plugin'
+$tmp          = 'C:\Users\huangzhe\AppData\Local\Temp\kilo\sf-alwaysscan'
+$tmpOut       = Join-Path $tmp 'out'
+$tmpPex       = Join-Path $tmp 'pex'
+$tmpSrc       = Join-Path $tmp 'src'
+$dataDir      = 'D:\SteamLibrary\steamapps\common\Starfield\Data'
+$papyrusCmp   = 'D:\SteamLibrary\steamapps\common\Starfield\Tools\Papyrus Compiler\PapyrusCompiler.exe'
+$papyrusFlags = Join-Path $dataDir 'Scripts\Source\Base\Starfield_Papyrus_Flags.flg'
+$papyrusInc   = Join-Path $dataDir 'Scripts\Source\Base'
+$pluginName   = 'StarfieldAlwaysScan.esm'
+$bridgeScript = 'SAS_Bridge'
+$dllName      = 'SAS_AlwaysScan'
+$dllPath      = Join-Path $pluginDir "build\windows\x64\releasedbg\$dllName.dll"
+$pdbPath      = Join-Path $pluginDir "build\windows\x64\releasedbg\$dllName.pdb"
+$modsDir      = 'D:\Mod Organizer 2\starfield_mods\mods'
+$modName      = 'Starfield Always Scan (SFSE)'
+
+Write-Host '=== Always Scan (SFSE) Build Pipeline ===' -ForegroundColor Cyan
+$sw = [System.Diagnostics.Stopwatch]::StartNew()
+
+New-Item -ItemType Directory -Force -Path $tmpOut, $tmpPex, $tmpSrc | Out-Null
+
+# ---------------------------------------------------------------- 1. plugin
+if (-not $SkipPluginBuild) {
+    Write-Host '[1/5] Building plugin via headless xEdit (slow, ~4 min)...' -ForegroundColor Yellow
+
+    # ★ .pas 的两条硬约束（两条都真的浪费过一整轮 5 分钟构建）：
+    #   ① 必须纯 ASCII —— xEdit 按 ANSI(GBK) 读脚本，UTF-8 中文注释会变乱码，
+    #      字节撞进语法 → "Error in unit ... : = expected but '(' found"。
+    #   ② **不能出现花括号** —— Pascal 的 { } 注释在**第一个** '}' 处结束，
+    #      注释里写一个 '}' 就会把后半句当代码解析 →
+    #      "Declaration expected but '...' found"。本脚本一律用 // 注释。
+    $raw = [System.IO.File]::ReadAllBytes($buildScript)
+    $badAscii = @()
+    $badBrace = @()
+    $lineNo = 1
+    foreach ($b in $raw) {
+        if ($b -eq 10) { $lineNo++ }
+        elseif ($b -gt 127) { $badAscii += $lineNo }
+        elseif ($b -eq 0x7B -or $b -eq 0x7D) { $badBrace += $lineNo }
+    }
+    if ($badAscii.Count -gt 0) {
+        $uniq = ($badAscii | Select-Object -Unique | Sort-Object) -join ', '
+        throw "build_sas.pas contains non-ASCII bytes on line(s): $uniq (xEdit requires pure ASCII)"
+    }
+    if ($badBrace.Count -gt 0) {
+        $uniq = ($badBrace | Select-Object -Unique | Sort-Object) -join ', '
+        throw "build_sas.pas contains brace characters on line(s): $uniq (Pascal brace comments truncate at the first brace; use // instead)"
+    }
+
+    foreach ($p in @((Join-Path $dataDir $pluginName), (Join-Path $tmpOut $pluginName), (Join-Path $tmpOut 'h_99_done.txt'))) {
+        if (Test-Path -LiteralPath $p) { Remove-Item -LiteralPath $p -Force }
+    }
+
+    & $runXedit -Exe $xeditExe -ScriptPath $buildScript `
+        -DoneFile (Join-Path $tmpOut 'h_99_done.txt') -IdleCloseSec 60 -TimeoutSec 2400 | Select-Object -Last 3
+
+    if (-not (Test-Path -LiteralPath (Join-Path $tmpOut $pluginName))) {
+        throw "Plugin build failed: $pluginName not produced (see $tmpOut\h_*.txt)"
+    }
+    Write-Host '      plugin built.' -ForegroundColor Green
+
+    # FormID map 自检：必须与 plugin/src/AlwaysScan.cpp 的 kLocal* 常量一致
+    $mapFile = Join-Path $tmpOut 'h_99_done.txt'
+    if (Test-Path -LiteralPath $mapFile) {
+        $expect = @{
+            '0x800' = 'SAS_HighlightFXS'
+            '0x801' = 'SAS_OpList'
+            '0x802' = 'SAS_OpCursor'
+            '0x803' = 'SAS_StopList'
+            '0x804' = 'SAS_StopCursor'
+            '0x805' = 'SAS_Epoch'
+            '0x806' = 'SAS_AlwaysScanQuest'
+        }
+        $lines = Get-Content -LiteralPath $mapFile
+        foreach ($id in $expect.Keys | Sort-Object) {
+            $hit = $lines | Where-Object { $_ -match [regex]::Escape($id) }
+            if (-not $hit) {
+                throw "FormID map check failed: $id ($($expect[$id])) not found in h_99_done.txt"
+            }
+            Write-Host ("      {0}  {1}" -f $id, $hit.Trim()) -ForegroundColor DarkGray
+        }
+        # 顺序错位是最致命的（DLL 会往错误的表单写数据），这里再核对一次低 24 位
+        foreach ($line in $lines) {
+            if ($line -match '^\s*(0x[0-9A-F]{3})\s+(\S+)\s+([0-9A-F]{6})$') {
+                $want = [Convert]::ToInt32($Matches[1].Substring(2), 16)
+                $got  = [Convert]::ToInt32($Matches[3], 16)
+                if ($want -ne $got) {
+                    throw "FormID map MISMATCH: $($Matches[1]) $($Matches[2]) -> 0x$($Matches[3]) (expected 0x$($Matches[1].Substring(2)))"
+                }
+            }
+        }
+        Write-Host '      FormID map verified.' -ForegroundColor Green
+    }
+} else {
+    Write-Host '[1/5] Plugin build skipped.' -ForegroundColor DarkGray
+}
+
+# ---------------------------------------------------------------- 2. papyrus
+if (-not $SkipPapyrusCompile) {
+    Write-Host '[2/5] Compiling Papyrus bridge...' -ForegroundColor Yellow
+    Copy-Item -LiteralPath (Join-Path $root "scripts\$bridgeScript.psc") -Destination (Join-Path $tmpSrc "$bridgeScript.psc") -Force
+    $stalePex = Join-Path $tmpPex "$bridgeScript.pex"
+    if (Test-Path -LiteralPath $stalePex) { Remove-Item -LiteralPath $stalePex -Force }
+
+    & $papyrusCmp (Join-Path $tmpSrc "$bridgeScript.psc") "-f=$papyrusFlags" "-i=$papyrusInc" "-o=$tmpPex" | Out-Host
+    if (-not (Test-Path -LiteralPath $stalePex)) { throw 'Papyrus compilation failed' }
+    Write-Host ("      papyrus compiled ({0} B)." -f (Get-Item -LiteralPath $stalePex).Length) -ForegroundColor Green
+} else {
+    Write-Host '[2/5] Papyrus compile skipped.' -ForegroundColor DarkGray
+}
+
+# ---------------------------------------------------------------- 3. dll
+if (-not $SkipDllBuild) {
+    Write-Host '[3/5] Building SFSE plugin (xmake)...' -ForegroundColor Yellow
+    Push-Location $pluginDir
+    try {
+        xmake f -y -p windows -a x64 -m releasedbg --vs=2022 | Out-Host
+        if ($LASTEXITCODE -ne 0) { throw "xmake config failed (exit $LASTEXITCODE)" }
+        xmake build $dllName | Out-Host
+        if ($LASTEXITCODE -ne 0) { throw "xmake build failed (exit $LASTEXITCODE)" }
+    } finally {
+        Pop-Location
+    }
+    if (-not (Test-Path -LiteralPath $dllPath)) { throw "DLL not built: $dllPath" }
+    Write-Host ("      dll built ({0} B)." -f (Get-Item -LiteralPath $dllPath).Length) -ForegroundColor Green
+} else {
+    Write-Host '[3/5] DLL build skipped.' -ForegroundColor DarkGray
+}
+
+# ---------------------------------------------------------------- 4. deploy
+if (-not $SkipDeploy) {
+    Write-Host '[4/5] Deploying to MO2...' -ForegroundColor Yellow
+    $modRoot = Join-Path $modsDir $modName
+    if (Test-Path -LiteralPath $modRoot) { Remove-Item -LiteralPath $modRoot -Recurse -Force }
+
+    $pluginsDir   = Join-Path $modRoot 'SFSE\Plugins'
+    $scriptsDir   = Join-Path $modRoot 'Scripts'
+    $scriptSrcDir = Join-Path $scriptsDir 'Source\SAS'
+    New-Item -ItemType Directory -Force -Path $pluginsDir, $scriptSrcDir | Out-Null
+
+    Copy-Item -LiteralPath (Join-Path $tmpOut $pluginName) -Destination (Join-Path $modRoot $pluginName) -Force
+    Copy-Item -LiteralPath $dllPath -Destination (Join-Path $pluginsDir "$dllName.dll") -Force
+    if (Test-Path -LiteralPath $pdbPath) {
+        Copy-Item -LiteralPath $pdbPath -Destination (Join-Path $pluginsDir "$dllName.pdb") -Force
+    }
+    # 配置 INI：放在 dll 旁边。**用户已经改过的版本不要覆盖**（否则每次构建都会
+    # 把热键/半径重置回默认值）。
+    $iniSrc = Join-Path $root 'resources\SAS_AlwaysScan.ini'
+    $iniDst = Join-Path $pluginsDir 'SAS_AlwaysScan.ini'
+    if ((Test-Path -LiteralPath $iniSrc) -and -not (Test-Path -LiteralPath $iniDst)) {
+        Copy-Item -LiteralPath $iniSrc -Destination $iniDst -Force
+        Write-Host '      config ini installed (default).' -ForegroundColor DarkGray
+    } elseif (Test-Path -LiteralPath $iniDst) {
+        Write-Host '      config ini kept (already exists, not overwritten).' -ForegroundColor DarkGray
+    }
+    if (Test-Path -LiteralPath (Join-Path $tmpPex "$bridgeScript.pex")) {
+        Copy-Item -LiteralPath (Join-Path $tmpPex "$bridgeScript.pex") -Destination (Join-Path $scriptsDir "$bridgeScript.pex") -Force
+    }
+    Copy-Item -LiteralPath (Join-Path $root "scripts\$bridgeScript.psc") -Destination (Join-Path $scriptSrcDir "$bridgeScript.psc") -Force
+
+    Set-Content -LiteralPath (Join-Path $modRoot 'meta.ini') -Value "[General]`nmodid=0`nversion=1.0.0`ncomment=Always-on scanner highlighting (SFSE)" -Encoding UTF8
+
+    Get-ChildItem -LiteralPath $modRoot -Recurse -File | ForEach-Object {
+        Write-Host ("  {0}  ({1} bytes)" -f $_.FullName.Substring($modRoot.Length + 1), $_.Length)
+    }
+
+    # xEdit 的 AddNewFileName 会在游戏 Data 目录留一个空文件，必须清掉
+    $dataCopy = Join-Path $dataDir $pluginName
+    if (Test-Path -LiteralPath $dataCopy) { Remove-Item -LiteralPath $dataCopy -Force }
+    if (Test-Path -LiteralPath $dataCopy) {
+        Write-Host '      WARN: could not remove Data copy (game running?)' -ForegroundColor Yellow
+    } else {
+        Write-Host '      Data dir clean.' -ForegroundColor Green
+    }
+} else {
+    Write-Host '[4/5] Deploy skipped.' -ForegroundColor DarkGray
+}
+
+# ---------------------------------------------------------------- 5. MO2 profile
+if (-not $SkipProfile) {
+    Write-Host '[5/5] Updating MO2 profile...' -ForegroundColor Yellow
+    $profileDir = 'D:\Mod Organizer 2\starfield_mods\profiles\Default'
+    if (-not (Test-Path -LiteralPath $profileDir)) { throw "MO2 profile not found: $profileDir" }
+
+    # --- modlist.txt：启用本 mod（置顶） ---
+    $modlistPath = Join-Path $profileDir 'modlist.txt'
+    $lines = @(Get-Content -LiteralPath $modlistPath)
+    if (-not (Test-Path -LiteralPath "$modlistPath.bak-sas")) { Copy-Item -LiteralPath $modlistPath -Destination "$modlistPath.bak-sas" -Force }
+    $lines = $lines | Where-Object { $_ -ne "+$modName" -and $_ -ne "-$modName" }
+    $firstMod = -1
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        if ($lines[$i] -match '^[+\-*]') { $firstMod = $i; break }
+    }
+    if ($firstMod -lt 0) { $lines += "+$modName" }
+    else { $lines = $lines[0..($firstMod - 1)] + @("+$modName") + $lines[$firstMod..($lines.Count - 1)] }
+    Set-Content -LiteralPath $modlistPath -Value $lines -Encoding UTF8
+
+    # --- plugins.txt / loadorder.txt：确保本插件被激活 ---
+    foreach ($file in @('plugins.txt', 'loadorder.txt')) {
+        $path = Join-Path $profileDir $file
+        if (-not (Test-Path -LiteralPath $path)) { continue }
+        if (-not (Test-Path -LiteralPath "$path.bak-sas")) { Copy-Item -LiteralPath $path -Destination "$path.bak-sas" -Force }
+        $pl = @(Get-Content -LiteralPath $path)
+        $pl = $pl | Where-Object { $_ -ne "*$pluginName" -and $_ -ne $pluginName }
+        if ($file -eq 'plugins.txt') { $pl += "*$pluginName" } else { $pl += $pluginName }
+        Set-Content -LiteralPath $path -Value $pl -Encoding UTF8
+    }
+
+    Write-Host "      enabled '+$modName', plugin=$pluginName" -ForegroundColor Green
+
+    # 上一代项目那个 mod 功能重叠（也往 ref 上打 EFSH），两个一起开会双倍占 VM。
+    $oldMod = 'Starfield Highlight Items (SFSE)'
+    $oldLine = @(Get-Content -LiteralPath $modlistPath) | Where-Object { $_ -eq "+$oldMod" }
+    if ($oldLine) {
+        Write-Host "      WARN: '$oldMod' 仍然启用 —— 与本 mod 功能重叠，建议在 MO2 里禁用它。" -ForegroundColor Yellow
+    }
+    Write-Host '      NOTE: if Mod Organizer 2 is running, restart it (or it will overwrite these files).' -ForegroundColor Yellow
+} else {
+    Write-Host '[5/5] MO2 profile update skipped.' -ForegroundColor DarkGray
+}
+
+Write-Host ("=== Done in {0:N1}s ===" -f $sw.Elapsed.TotalSeconds) -ForegroundColor Cyan

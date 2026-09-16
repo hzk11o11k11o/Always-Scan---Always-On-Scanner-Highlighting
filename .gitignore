@@ -1,0 +1,43 @@
+# 构建产物
+build/
+.vs/
+vsxmake*/
+compile_commands.json
+.xmake/
+
+# 编译中间物
+*.obj
+*.pdb
+*.ilk
+*.exp
+*.lib
+*.dll
+*.exe
+
+# Python（tools/re 下的引擎逆向脚本）
+__pycache__/
+*.pyc
+
+# 第三方源码树 / 工具下载目录（体积大，不入库）
+tools/commonlibsf-main/
+tools/vendor/
+tools/xedit-scripts/_archive/
+tools/*.sf1viewsettings
+
+# xEdit 源码（体积大）
+TES5Edit-xedit-4.1.5f/
+TES5Edit-xedit-4.1.5f-source-code.zip
+
+# 本地回退备份（旧版本的 ESM / pex / dll，不入库）
+out/backup-*/
+out/tmp/
+
+# 编辑器/系统
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
+*~
+
+# 日志
+*.log
