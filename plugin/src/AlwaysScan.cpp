@@ -41,6 +41,7 @@
 
 #include "RE/B/BGSListForm.h"
 #include "RE/F/FormTypes.h"
+#include "RE/N/NiAVObject.h"
 #include "RE/N/NiPoint.h"
 #include "RE/N/NiSmartPointer.h"
 #include "RE/P/PlayerCharacter.h"
@@ -178,6 +179,11 @@ namespace SAS
 			bool          startEnabled    = true;
 			int           hotkeyVk        = VK_F8;
 			float         radiusMeters    = 50.0f;
+			// ★ v2.3：米 → 游戏单位 的换算系数。默认沿用上一代项目实测标定的 3.4286
+			//   （HumanHeight 4.0 ≈ 1.2 米）。它只影响「RadiusMeters 到底折合多少游戏单位」，
+			//   所以做成 INI 可调：改完重进游戏即可，不用重新编译。
+			//   日志里会同时打出「米」和「游戏单位」两个数，方便按实际观感校准。
+			float         unitsPerMeter   = 3.4286f;
 			float         glowDurationSec = 90.0f;
 			int           maxTargets      = 256;
 			double        opsPerSecond    = 8.0;
@@ -323,6 +329,22 @@ namespace SAS
 			std::uint64_t opsDeferred     = 0;  // 因为预算不够而推迟到下一轮的调用数
 			bool          loadingNow      = false;
 
+			// --- ★ v2.3：把 Rescan 拆成几段分别计时（窗口内求和 / 求最大）---
+			//   没有这一行就只能看到「scan avg=32ms」而不知道 32ms 花在哪。
+			//   · shape = 读 cell + 引用数组形状校验（VirtualQuery 集中在这一段，看 vq 次数）
+			//   · loop  = 遍历全部引用挑目标（纯内存读）
+			//   · sync  = 挂/摘（SyncNativeOutline，引擎调用集中在这一段）
+			//   · unh / add = 其中 UnoutlineRef / OutlineRef 各占多少
+			std::uint64_t tShapeMs  = 0;
+			std::uint64_t tShapeMax = 0;
+			std::uint64_t tLoopMs   = 0;
+			std::uint64_t tLoopMax  = 0;
+			std::uint64_t tSyncMs   = 0;
+			std::uint64_t tSyncMax  = 0;
+			std::uint64_t tUnhMs    = 0;
+			std::uint64_t tAddMs    = 0;
+			std::uint64_t vqCalls   = 0;
+
 			// --- 场景跟踪 ---
 			RE::TESObjectCELL* lastCell    = nullptr;
 			std::uint32_t      lastEpoch   = 0;
@@ -356,6 +378,33 @@ namespace SAS
 				duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count());
 		}
 
+		// ★ v2.3：把 Rescan 拆段计时用的小工具（作用域结束自动累加）。
+		//   用它以后，即使代码里中途 return，耗时也照样被记上。
+		struct PhaseTimer
+		{
+			std::uint64_t* sum;
+			std::uint64_t* max;
+			std::uint64_t  t0;
+
+			explicit PhaseTimer(std::uint64_t* a_sum, std::uint64_t* a_max = nullptr) :
+				sum(a_sum), max(a_max), t0(NowMs())
+			{}
+
+			~PhaseTimer()
+			{
+				const auto dt = NowMs() - t0;
+				if (sum) {
+					*sum += dt;
+				}
+				if (max && dt > *max) {
+					*max = dt;
+				}
+			}
+
+			PhaseTimer(const PhaseTimer&) = delete;
+			PhaseTimer& operator=(const PhaseTimer&) = delete;
+		};
+
 		// ----------------------------------------------------------------
 		// 内存安全小工具
 		// 凡是「按实测偏移读出来的指针 / 容器」，用之前一律先用它们验证；
@@ -366,12 +415,60 @@ namespace SAS
 			return a_ptr > 0x10000ULL && a_ptr < 0x7FFFFFFFFFFFULL;
 		}
 
+		// ----------------------------------------------------------------
+		// ★ v2.3：IsReadable 加「已验证可读区域」缓存（治实测里的 31ms 假卡顿）
+		// ----------------------------------------------------------------
+		// v2.2 实测日志里最刺眼的一行：
+		//     scan#1 ... cand=0 sel=0 ... timing: scan avg=31ms max=31ms ops=0
+		// 第一轮扫描**什么活都没干**（引用数组长度第一次见 → 直接 return），却花了 31ms。
+		// 那一段里唯一的重活就是 ValidateCellRefs 那 6~7 次 VirtualQuery。
+		// VirtualQuery 要走内核对 VAD 树，在「几 GB、VAD 极度碎片化」的游戏进程里
+		// 每次都是毫秒级开销；而它要回答的问题（这几个地址能不能读）对于
+		// 「同一个 cell 的同一批对象」几乎是常量。
+		// ⇒ 缓存「已验证可读」的区间：命中直接返回，不再问内核。
+		//   区间带 TTL（3 秒）；cell 变化 / 读档时整体作废。
+		//   底线不变：**没验证过的地址永远返回 false**（宁可不扫，绝不乱读）。
+		struct ReadRegion
+		{
+			std::uintptr_t base      = 0;
+			std::uintptr_t end       = 0;
+			std::uint64_t  expiresMs = 0;
+		};
+		constexpr std::size_t kReadRegionCount = 8;
+		constexpr std::uint64_t kReadRegionTtlMs = 3000;
+		ReadRegion            g_readRegions[kReadRegionCount];
+		std::size_t           g_readRegionNext = 0;
+		std::uint64_t         g_vqCalls        = 0;  // 诊断：窗口内真的问了内核多少次
+
+		void InvalidateReadRegions()
+		{
+			for (auto& r : g_readRegions) {
+				r = ReadRegion{};
+			}
+		}
+
 		bool IsReadable(const void* a_ptr, std::size_t a_len)
 		{
 			if (!IsPlausiblePointer(reinterpret_cast<std::uint64_t>(a_ptr))) {
 				return false;
 			}
+			if (a_len > (1u << 20)) {
+				a_len = 1u << 20;  // 防止下面的加法溢出 / 无谓的巨大区间
+			}
+			const auto start = reinterpret_cast<std::uintptr_t>(a_ptr);
+			const auto end   = start + a_len;
+			if (end < start) {
+				return false;
+			}
+			const auto now = NowMs();
+			for (const auto& r : g_readRegions) {
+				if (r.base && now < r.expiresMs && start >= r.base && end <= r.end) {
+					return true;
+				}
+			}
+
 			MEMORY_BASIC_INFORMATION mbi{};
+			++g_vqCalls;
 			if (::VirtualQuery(a_ptr, &mbi, sizeof(mbi)) == 0) {
 				return false;
 			}
@@ -381,9 +478,17 @@ namespace SAS
 			if (mbi.Protect == PAGE_NOACCESS || (mbi.Protect & PAGE_GUARD)) {
 				return false;
 			}
-			const auto start = reinterpret_cast<std::uintptr_t>(a_ptr);
-			const auto base  = reinterpret_cast<std::uintptr_t>(mbi.BaseAddress);
-			return (start + a_len) <= (base + mbi.RegionSize);
+			const auto base = reinterpret_cast<std::uintptr_t>(mbi.BaseAddress);
+			const auto rend = base + mbi.RegionSize;
+			if (end > rend || rend <= base) {
+				return false;
+			}
+			auto& slot = g_readRegions[g_readRegionNext];
+			g_readRegionNext = (g_readRegionNext + 1) % kReadRegionCount;
+			slot.base        = base;
+			slot.end         = rend;
+			slot.expiresMs   = now + kReadRegionTtlMs;
+			return true;
 		}
 
 		// 一个「BSTArray 风格」的原始视图（size@+0 / capacity@+4 / data@+8）
@@ -515,6 +620,7 @@ namespace SAS
 			g_cfg.scanIntervalMs = std::clamp(getInt("ScanIntervalMs", 200), 50, 2000);
 			g_cfg.logStats       = getInt("LogStats", 1) != 0;
 			g_cfg.radiusMeters   = std::clamp(getFloat("RadiusMeters", 50.0f), 5.0f, 500.0f);
+			g_cfg.unitsPerMeter  = std::clamp(getFloat("UnitsPerMeter", 3.4286f), 0.1f, 200.0f);
 			g_cfg.glowDurationSec = std::clamp(getFloat("GlowDurationSecs", 90.0f), 5.0f, 600.0f);
 			g_cfg.opsPerSecond   = std::clamp(static_cast<double>(getFloat("OpsPerSecond", 8.0f)), 0.5, 60.0);
 			g_cfg.bucketSize     = std::clamp(static_cast<double>(getFloat("BucketSize", 80.0f)), 4.0, 512.0);
@@ -531,6 +637,8 @@ namespace SAS
 			REX::INFO("config: radius={:.1f}m duration={:.0f}s targets={} hotkeyVK=0x{:X} startEnabled={}",
 				g_cfg.radiusMeters, g_cfg.glowDurationSec, g_cfg.maxTargets,
 				g_cfg.hotkeyVk, g_cfg.startEnabled);
+			REX::INFO("config: unitsPerMeter={:.4f} -> 半径 {:.1f}m = {:.1f} 游戏单位",
+				g_cfg.unitsPerMeter, g_cfg.radiusMeters, g_cfg.radiusMeters * g_cfg.unitsPerMeter);
 			REX::INFO("config: highlightMode={} outlineState={} onlyInFront={} frontFov={:.0f}deg reassert={} autoEnsure={}",
 				g_cfg.highlightMode == 1 ? "native-outline" : "legacy-efsh",
 				g_cfg.outlineState, g_cfg.onlyInFront, g_cfg.frontFovDeg,
@@ -901,6 +1009,55 @@ namespace SAS
 			0x40, 0x57, 0x48, 0x83, 0xEC, 0x20, 0x48, 0x8B, 0x02, 0x48, 0x8B, 0xF9, 0x48, 0x8B, 0xCA, 0xFF
 		};
 
+		// ================================================================
+		// ★★★ v2.3：为什么 0x653F60 也删不掉 —— 它的参数是「3D 节点」不是「引用」★★★
+		// ================================================================
+		// v2.2 实测日志：
+		//     outline remove: rmOk=0 unhMiss=3694 removeMiss=3694 unhighlightReady=1
+		// 连引擎自己的 0x653F60 都一次没删到。把 0x17D4CD0（Set 的内部实现）整段
+		// 读完后才看清：**0x653F60 的第二个参数是「引用 3D 图里的一个节点」**。
+		//
+		// 引擎挂高亮的真实流程（0x17D4CD0）：
+		//     rcx = TESObjectREFR*                        ; 引用
+		//     call [ref->vtable + 0x560]                  ; ★ Get3D(NiPointer<NiAVObject>&)
+		//        （commonlibsf 的 TESObjectREFR.h 正好把 0xAC 号虚函数注成
+		//          `Unk_AC` = Get3D(NiPointer<NiAVObject>&)；0xAC*8 = 0x560，对得上）
+		//     → rsi = 3D 根节点
+		//     call 0x24181E0(visitor, 根节点)              ; ★ 递归遍历 3D 图
+		//         0x24181E0 的实现：
+		//            node->vtable[0x20]()  → 子节点容器（是 NiNode 才有）
+		//            有子节点 → 逐个 AddRef 后递归
+		//            没有     → visitor->vtable[0x10](visitor, node)
+		//
+		// visitor 的两个形态（vtable 都在 .rdata，已用 tools/re/func.py vtable 核对）：
+		//     摘除：vtable = 0x4B2F9F0（槽 +0x08 / +0x10 都是 0x653F60）
+		//           数据 = `void** 管理器槽`（&g_outlineManagers[state]）
+		//     挂上：vtable = 0x4B2FA10（槽 +0x08 / +0x10 都是 0x653FC0）
+		//           数据 = { manager, manager->0x40 }
+		//
+		// 而 0x653F60 自己的实现正好印证了这一点：
+		//     node->vtable[0x50]()        ; 由节点拿到「持有它的引用对象」
+		//     id = [那个对象 + 0x1F0]      ; ★ id 从节点侧算出来（不是我们的 FormID）
+		//     rax = [ctx + 8]             ; ctx = visitor
+		//     rcx = [rax] + 0x18          ; 管理器内嵌哈希表
+		//     if (Remove(rcx, &id)) Deactivate(id)
+		//
+		// ⇒ 我们 v2.2 把 `TESObjectREFR*` 直接塞进去，`ref->vtable[0x50]` 取到的
+		//   东西 `[+0x1F0]` 根本不是 FormID ⇒ Remove 永远命中不了 ⇒ 高亮永远摘不掉。
+		//   症状完全对得上用户实测：
+		//     · F8 关掉后「已高亮的不会熄灭」（只停止新增，旧的摘不掉）
+		//     · 「走老远物体还亮着」（同上）
+		//     · 「在已高亮区域也卡」（管理器哈希表只增不减，渲染器每帧过一遍）
+		//     · 「像在重复高亮已高亮的物品」（我们的表 erase 了、引擎表还在 →
+		//        下次进半径又被当新目标挂一次）
+		constexpr std::uintptr_t kRvaOutlineVisit          = 0x24181E0;
+		constexpr std::uintptr_t kRvaOutlineRemoveVisorVt  = 0x4B2F9F0;
+		// TESObjectREFR 虚函数表里 Get3D(NiPointer<NiAVObject>&) 的下标（0xAC*8 = 0x560）
+		constexpr std::uint32_t  kVtblIdxRefGet3D          = 0xAC;
+		constexpr std::uint8_t   kSigOutlineVisit[16] = {
+			0x48, 0x89, 0x5C, 0x24, 0x08, 0x48, 0x89, 0x6C, 0x24, 0x18, 0x48, 0x89, 0x74, 0x24, 0x20, 0x57
+		};
+
 		// HighlightManager(0x48 B) 内嵌哈希表对象的偏移。两处交叉确认：
 		//   ctor 0x6532F0：`lea rax,[rdi+0x10]; lea rbx,[rax+8]` → rbx=manager+0x18，
 		//                  随后 [rbx+8]=data / [rbx+0x10]=capacity / [rbx+0x18]=count；
@@ -942,8 +1099,13 @@ namespace SAS
 		using OutlineEnsure_t      = void (*)(void*);
 		using OutlineRemove_t      = bool (*)(void*, std::uint32_t*);
 		using OutlineDeactivate_t  = void (*)(std::uint32_t);
-		// void Unhighlight(ctx, TESObjectREFR* ref)；ctx 布局见上面的长注释
-		using OutlineUnhighlight_t = void (*)(void*, RE::TESObjectREFR*);
+		// void Unhighlight(ctx, TENode* node)；ctx（= visitor）布局见上面的长注释。
+		// ★ 第二个参数是**3D 节点**，不是 TESObjectREFR —— 这是 v2.3 修掉的关键。
+		using OutlineUnhighlight_t = void (*)(void*, RE::NiAVObject*);
+		// bool Visit(void* visitor, NiAVObject* node)（0x24181E0，自带递归）
+		using OutlineVisit_t = bool (*)(void*, RE::NiAVObject*);
+		// void Get3D(NiPointer<NiAVObject>& a_out)（vtable 下标 0xAC）
+		using RefGet3D_t = void (*)(RE::TESObjectREFR*, RE::NiPointer<RE::NiAVObject>*);
 
 		OutlineLookupOrAdd_t  g_outlineLookupOrAdd  = nullptr;
 		OutlineSet_t          g_outlineSet          = nullptr;
@@ -954,6 +1116,10 @@ namespace SAS
 		OutlineUnhighlight_t  g_outlineUnhighlight  = nullptr;
 		bool                  g_outlineUnhighlightReady = false;
 		std::uintptr_t        g_outlineManagerArray = 0;
+		// v2.3：走引擎那套「3D 图 visitor」摘除所需的三个东西
+		OutlineVisit_t        g_outlineVisit        = nullptr;
+		std::uintptr_t        g_outlineRemoveVisorVt = 0;
+		bool                  g_outlineGraphRemoveReady = false;
 
 		// 前置声明（定义在 ResolveNativeOutline 之后）
 		std::uintptr_t OutlineManagerFor(std::uint32_t a_state);
@@ -1046,6 +1212,33 @@ namespace SAS
 			} else {
 				REX::WARN("native outline unhighlight: +0x{:X} 签名不匹配（游戏版本变了？）-> 退回自己拼的 Remove(FormID)",
 					kRvaOutlineUnhighlight);
+			}
+
+			// ★ v2.3：摘除的真正正确姿势需要三样东西（见文件上方那段长注释）：
+			//   ① 0x24181E0 —— 递归遍历 3D 图的 visitor 访问器；
+			//   ② 0x4B2F9F0 —— 摘除用 visitor 的 vtable（两个槽都必须是 0x653F60，
+			//      这样 0x24181E0 里 `visitor->vtable[0x10](visitor, node)` 才会走摘除）；
+			//   ③ 引用虚函数表下标 0xAC = Get3D(NiPointer<NiAVObject>&)。
+			// 三者任一拿不准就只降级（不清空 = 观感问题，绝不能乱调）。
+			const auto addrVisit  = base + kRvaOutlineVisit;
+			const auto addrVisorVt = base + kRvaOutlineRemoveVisorVt;
+			bool       visorVtOk   = false;
+			if (IsReadable(reinterpret_cast<const void*>(addrVisorVt), 0x18)) {
+				const auto* vt = reinterpret_cast<const std::uintptr_t*>(addrVisorVt);
+				visorVtOk = (vt[1] == base + kRvaOutlineUnhighlight) &&
+				            (vt[2] == base + kRvaOutlineUnhighlight);
+			}
+			if (visorVtOk && g_outlineUnhighlightReady && SigMatches(addrVisit, kSigOutlineVisit)) {
+				g_outlineVisit             = reinterpret_cast<OutlineVisit_t>(addrVisit);
+				g_outlineRemoveVisorVt     = addrVisorVt;
+				g_outlineGraphRemoveReady  = true;
+				REX::INFO("native outline graph-remove: visit=+0x{:X} visitorVtbl=+0x{:X} refGet3D=vtable[0x{:X}] -> 摘除走「3D 图 visitor」（这次才是对的）",
+					kRvaOutlineVisit, kRvaOutlineRemoveVisorVt, kVtblIdxRefGet3D);
+			} else {
+				REX::WARN("native outline graph-remove: 不可用（visit={} visitorVtbl={} unhighlight={}）-> 摘除仍不准（F8 可能关不干净）",
+					SigMatches(addrVisit, kSigOutlineVisit) ? "ok" : "sig-mismatch",
+					visorVtOk ? "ok" : "bad-vtbl",
+					g_outlineUnhighlightReady ? "ok" : "unavailable");
 			}
 			LogManagerDiagnostics("install");
 			LogManagerMapDiag("install", static_cast<std::uint32_t>(g_cfg.outlineState));
@@ -1147,28 +1340,61 @@ namespace SAS
 			return IsReadable(p, sizeof(std::uint32_t)) ? *p : 0;
 		}
 
-		// 用引擎自己的 0x653F60 把一个引用从 state 对应的管理器里摘掉。
-		// 返回「看起来真的动过」（表元素数变了）—— 这个函数本身没有返回值，
-		// 所以只能这样旁证；旁证失败也只是让我们多试几个状态，不影响正确性。
+		// ★ v2.3：把「取引用的 3D 根节点」这一步单独抽出来（引擎在 0x17D4CD0 里就是
+		//   这么干的：`call [ref->vtable + 0x560]`，commonlibsf 里那个槽就是
+		//   `TESObjectREFR::Unk_AC` = Get3D(NiPointer<NiAVObject>&)）。
+		//   返回值是 NiPointer（我们自己持一份引用），用完自动减回去。
+		RE::NiPointer<RE::NiAVObject> RefGet3D(RE::TESObjectREFR* a_ref)
+		{
+			RE::NiPointer<RE::NiAVObject> out;
+			if (!a_ref || !IsReadable(a_ref, 8)) {
+				return out;
+			}
+			const auto vptr = *reinterpret_cast<void** const*>(a_ref);
+			if (!IsPlausiblePointer(reinterpret_cast<std::uint64_t>(vptr))) {
+				return out;
+			}
+			const auto fn = reinterpret_cast<std::uintptr_t>(vptr[kVtblIdxRefGet3D]);
+			// 形状校验：目标必须是**主模块 .text 里的代码地址**。如果哪天游戏改了
+			// 虚表布局，这里取到的多半是个数据指针（比如 0x7FF... 之外的堆地址），
+			// 拦下来就不会去 call 一个数据地址（那是必崩）。
+			const auto base = ModuleBase();
+			if (fn < base || fn >= base + 0x10000000) {
+				return out;
+			}
+			reinterpret_cast<RefGet3D_t>(fn)(a_ref, &out);
+			return out;
+		}
+
+		// 用引擎自己的那套「3D 图 visitor」把一个引用从 state 对应的管理器里摘掉。
+		//
+		//   visitor = { vtable = 0x4B2F9F0, 数据 = &g_outlineManagers[state] }
+		//   0x24181E0(visitor, 引用3D根节点)  → 递归整棵 3D 图，每个节点调一次 0x653F60
+		//
+		// ★ 再说一遍：0x653F60 的第二个参数必须是**节点**（它的 `node->vtable[0x50]()`
+		//   才拿得到持有它的引用对象，`[+0x1F0]` 才是管理器哈希表里真正的键）。
+		//   传 TESObjectREFR 进去就是一次都不会命中（v2.2 的 rmOk=0）。
 		bool OutlineUnhighlightRef(RE::TESObjectREFR* a_ref, std::uint32_t a_state)
 		{
-			if (!g_outlineUnhighlight || !a_ref || a_state >= kOutlineManagerUsed) {
+			if (!g_outlineGraphRemoveReady || !g_outlineVisit || !a_ref || a_state >= kOutlineManagerUsed) {
 				return false;
 			}
-			// ctx 只需要 `*(ctx+8) == 管理器指针所在的槽`，所以直接指向管理器数组的槽。
-			// ★ 槽为空时绝不能调：0x653F60 会把 0x18 当成表头去读。
+			// 管理器槽为空时绝不能调：0x653F60 会把 manager+0x18 当表头去读 → 崩。
 			auto* const slot = reinterpret_cast<void**>(g_outlineManagerArray + a_state * sizeof(std::uintptr_t));
 			if (!IsReadable(slot, sizeof(void*)) || !*slot) {
 				return false;
 			}
-			const auto before = ManagerMapCount(reinterpret_cast<std::uintptr_t>(*slot));
-			struct Ctx
+			const auto root = RefGet3D(a_ref);
+			if (!root) {
+				return false;  // 3D 还没加载（引用存在但没 3D 时本来就没挂上高亮）
+			}
+			struct Visitor
 			{
-				void*   unused;
-				void**  managerSlot;
-			} ctx{ nullptr, slot };
-			g_outlineUnhighlight(&ctx, a_ref);
-			return ManagerMapCount(reinterpret_cast<std::uintptr_t>(*slot)) != before;
+				void*  vtbl;
+				void** managerSlot;
+			} visitor{ reinterpret_cast<void*>(g_outlineRemoveVisorVt), slot };
+			g_outlineVisit(&visitor, root.get());
+			return true;
 		}
 
 		// 确保目标状态的管理器存在。不存在就调用引擎自己的「重建管理器」函数
@@ -1262,48 +1488,30 @@ namespace SAS
 			                                     ? *p
 			                                     : kOutlineStateNone;
 
-			// ---- ① 引擎自己的摘除（首选）----
-			if (g_outlineUnhighlightReady) {
-				std::uint32_t tried[kOutlineManagerUsed]{};
-				std::uint32_t nTried = 0;
-				auto tryState = [&](std::uint32_t a_state) -> bool {
-					if (a_state >= kOutlineManagerUsed) {
-						return false;
-					}
-					for (std::uint32_t i = 0; i < nTried; ++i) {
-						if (tried[i] == a_state) {
-							return false;  // 已经试过
-						}
-					}
-					tried[nTried++] = a_state;
-					return OutlineUnhighlightRef(a_ref, a_state);
-				};
-
-				if (tryState(stateInTable)) {
+			// ---- ① 引擎自己的「3D 图 visitor」摘除（唯一真正有效的一条）----
+			// ★ v2.3：不再扫 11 个状态。v2.2 那套「先试状态表 → 再试配置 → 再全扫一遍」
+			//   是在补救「怎么都删不掉」——而每一次尝试都是一次真的引擎调用
+			//   （虚调用 + 哈希查找 + **整棵 3D 图递归遍历**），单轮最多 11 倍代价。
+			//   实测 `timing max=438ms / ops=64` 里有一大半就是它。
+			//   现在只调「状态表里记的那个」和「配置的那个」各一次，第一次几乎必然命中。
+			if (g_outlineGraphRemoveReady) {
+				const auto cfgState = static_cast<std::uint32_t>(g_cfg.outlineState);
+				bool       done     = false;
+				if (stateInTable < kOutlineManagerUsed) {
+					done = OutlineUnhighlightRef(a_ref, stateInTable);
+				}
+				if (!done && cfgState != stateInTable) {
+					done = OutlineUnhighlightRef(a_ref, cfgState);
+				}
+				if (done) {
 					++g_state.outlineRemoved;
-					if (pOk) {
-						*p = kOutlineStateNone;
-					}
-					return;
+				} else {
+					++g_state.outlineUnhighlightMiss;
 				}
-				if (tryState(static_cast<std::uint32_t>(g_cfg.outlineState))) {
-					++g_state.outlineRemoved;
-					if (pOk) {
-						*p = kOutlineStateNone;
-					}
-					return;
+				if (pOk) {
+					*p = kOutlineStateNone;
 				}
-				// 兜底：状态表和实际所在管理器对不上（重申 / 多状态残留）时全扫一遍
-				for (std::uint32_t s = 0; s < kOutlineManagerUsed; ++s) {
-					if (tryState(s)) {
-						++g_state.outlineRemoved;
-						if (pOk) {
-							*p = kOutlineStateNone;
-						}
-						return;
-					}
-				}
-				++g_state.outlineUnhighlightMiss;
+				return;
 			}
 
 			// ---- ② 回退：自己按 FormID 删（v2.1 的老路，实测基本删不到）----
@@ -1379,26 +1587,30 @@ namespace SAS
 			}
 
 			// ---- 2) 到期的摘除（受预算限制）----
-			for (auto it = g_state.outlined.begin(); it != g_state.outlined.end();) {
-				if (it->second.dropAt == 0 || a_nowMs < it->second.dropAt) {
-					++it;
-					continue;
+			{
+				PhaseTimer tUnh{ &g_state.tUnhMs };
+				for (auto it = g_state.outlined.begin(); it != g_state.outlined.end();) {
+					if (it->second.dropAt == 0 || a_nowMs < it->second.dropAt) {
+						++it;
+						continue;
+					}
+					if (budget == 0) {
+						++g_state.opsDeferred;  // 预算用完，下一轮继续
+						++it;
+						continue;
+					}
+					--budget;
+					++g_state.opsThisScan;
+					UnoutlineRef(it->second.ref.get());
+					it = g_state.outlined.erase(it);
 				}
-				if (budget == 0) {
-					++g_state.opsDeferred;  // 预算用完，下一轮继续
-					++it;
-					continue;
-				}
-				--budget;
-				++g_state.opsThisScan;
-				UnoutlineRef(it->second.ref.get());
-				it = g_state.outlined.erase(it);
 			}
 
 			// ---- 3) 新目标 / 到重申时刻的（同样受预算限制）----
 			const auto wantState = static_cast<std::uint32_t>(g_cfg.outlineState);
 			const auto reassert  = static_cast<std::uint64_t>(g_cfg.reassertMs);
 			const auto nextMs    = reassert ? a_nowMs + reassert : UINT64_MAX;
+			PhaseTimer tAdd{ &g_state.tAddMs };
 			for (auto* c : a_chosen) {
 				auto it = g_state.outlined.find(c->ref);
 				if (it == g_state.outlined.end()) {
@@ -1481,50 +1693,57 @@ namespace SAS
 			if (!cell) {
 				return;
 			}
-			// cell 指针本身也必须可读：下面的 ReadRawArray 会直接解引用 cell+off，
-			// 这一条几乎零成本，专门挡「parentCell 偏移万一也不对」的极端情况。
-			if (!IsReadable(cell, 0x90)) {
-				++g_state.refsRejected;
-				return;
-			}
 
-			// ★ 绝不调 cell->IsAttached() / cell->ForEachReference()：
-			//   两者都按 commonlibsf 的「声明偏移」访问 TESObjectCELL 成员，而那套偏移
-			//   **整体比真实大 8 字节**（见 kCellRefsOffCandidates 上方的完整说明）。
-			//   用 ForEachReference 就是 2026-09-16 那次崩溃（读到垃圾 BSTArray）。
-			//
-			// ★ 也不靠「猜一个偏移」：对候选偏移逐个做**形状校验**
-			//   （BSTArray 头自洽 + 抽查元素确实是 REFR/ACHR），谁通过就用谁。
-			//   一个都不过 = 读到垃圾 / 数组还没建好 → 这一轮不扫描。
 			RawArray    arr{};
 			std::size_t usedOff = 0;
-			for (const auto off : kCellRefsOffCandidates) {
-				const auto cand = ReadRawArray(cell, off);
-				if (ValidateCellRefs(cand, kRefsShapeSamples)) {
-					arr     = cand;
-					usedOff = off;
-					break;
+			{
+				// ★ v2.3：这一段就是实测里那个「什么都没干却花 31ms」的元凶，
+				//   单独计时 + 配合 g_vqCalls（真的问了几次内核）一起看。
+				PhaseTimer tShape{ &g_state.tShapeMs, &g_state.tShapeMax };
+
+				// cell 指针本身也必须可读：下面的 ReadRawArray 会直接解引用 cell+off，
+				// 这一条几乎零成本，专门挡「parentCell 偏移万一也不对」的极端情况。
+				if (!IsReadable(cell, 0x90)) {
+					++g_state.refsRejected;
+					return;
 				}
-			}
-			if (usedOff == 0) {
-				++g_state.refsRejected;
-				g_state.stableRounds = 0;
-				return;
-			}
-			// 长度突变（或换了个偏移）= 加载线程还在往数组里塞引用 → 本轮先不动
-			if (arr.size != g_state.lastRefsSize || usedOff != g_state.cellRefsOff) {
-				g_state.lastRefsSize = arr.size;
-				g_state.cellRefsOff  = usedOff;
-				g_state.stableRounds = 0;
-				return;
-			}
-			// 长度连续稳定若干轮才认为世界已经稳定下来
-			if (++g_state.stableRounds < kRefsStableRounds) {
-				return;
+
+				// ★ 绝不调 cell->IsAttached() / cell->ForEachReference()：
+				//   两者都按 commonlibsf 的「声明偏移」访问 TESObjectCELL 成员，而那套偏移
+				//   **整体比真实大 8 字节**（见 kCellRefsOffCandidates 上方的完整说明）。
+				//   用 ForEachReference 就是 2026-09-16 那次崩溃（读到垃圾 BSTArray）。
+				//
+				// ★ 也不靠「猜一个偏移」：对候选偏移逐个做**形状校验**
+				//   （BSTArray 头自洽 + 抽查元素确实是 REFR/ACHR），谁通过就用谁。
+				//   一个都不过 = 读到垃圾 / 数组还没建好 → 这一轮不扫描。
+				for (const auto off : kCellRefsOffCandidates) {
+					const auto cand = ReadRawArray(cell, off);
+					if (ValidateCellRefs(cand, kRefsShapeSamples)) {
+						arr     = cand;
+						usedOff = off;
+						break;
+					}
+				}
+				if (usedOff == 0) {
+					++g_state.refsRejected;
+					g_state.stableRounds = 0;
+					return;
+				}
+				// 长度突变（或换了个偏移）= 加载线程还在往数组里塞引用 → 本轮先不动
+				if (arr.size != g_state.lastRefsSize || usedOff != g_state.cellRefsOff) {
+					g_state.lastRefsSize = arr.size;
+					g_state.cellRefsOff  = usedOff;
+					g_state.stableRounds = 0;
+					return;
+				}
+				// 长度连续稳定若干轮才认为世界已经稳定下来
+				if (++g_state.stableRounds < kRefsStableRounds) {
+					return;
+				}
 			}
 
 			const RE::NiPoint3 origin  = a_player->GetPosition();
-			const float        radiusU = g_cfg.radiusMeters * kUnitsPerMeter;
+			const float        radiusU = g_cfg.radiusMeters * g_cfg.unitsPerMeter;
 			const float        radius2 = radiusU * radiusU;
 
 			// 「只高亮正前方」：用玩家偏航角做水平夹角判定，把身后的目标排除。
@@ -1537,9 +1756,15 @@ namespace SAS
 			const float fwdX     = std::sin(yaw) * kYawForwardSign;
 			const float fwdY     = std::cos(yaw);
 
-			static std::vector<Candidate> cands;
+			static std::vector<Candidate>   cands;
+			std::vector<Candidate*>         chosen;
 			cands.clear();
 			cands.reserve(512);
+
+			// ★ v2.3：遍历 + 排序 + 挑选这一整段（纯内存读，理论上应该在 1ms 量级；
+			//   实测却是 30ms 上下，所以必须单独计时把它和形状校验分开看）。
+			{
+				PhaseTimer tLoop{ &g_state.tLoopMs, &g_state.tLoopMax };
 
 			auto* const*        list  = reinterpret_cast<RE::TESObjectREFR* const*>(arr.data);
 			const std::uint32_t count = std::min<std::uint32_t>(arr.size, kMaxRefsSanity);
@@ -1611,7 +1836,6 @@ namespace SAS
 			//   —— 实测截图里货架上就有两个罐子/碗不亮，正是同一档被前面 6 个占满。
 			//   原版扫描仪没有这种配额，范围内该亮的都亮，所以这里改成
 			//   「按距离（含黏性折扣）从近到远一路取，直到 MaxTargets 上限」。
-			std::vector<Candidate*> chosen;
 			chosen.reserve(std::min<std::size_t>(cands.size(), static_cast<std::size_t>(g_cfg.maxTargets)));
 			for (auto& c : cands) {
 				if (chosen.size() >= static_cast<std::size_t>(g_cfg.maxTargets)) {
@@ -1620,14 +1844,17 @@ namespace SAS
 				chosen.push_back(&c);
 			}
 			g_state.selCount = chosen.size();
-
+			}  // ← tLoop 计时块结束
 			// ------------------------------------------------------------------
 			// ★ 视觉层
 			// ------------------------------------------------------------------
 			if (g_cfg.highlightMode == 1) {
 				// 原生 outline：引擎自己画描边（和原版扫描仪同一套），
 				// 不需要 Papyrus、不需要 EFSH、也不需要令牌桶。
-				SyncNativeOutline(chosen, a_nowMs);
+				{
+					PhaseTimer tSync{ &g_state.tSyncMs, &g_state.tSyncMax };
+					SyncNativeOutline(chosen, a_nowMs);
+				}
 				return;
 			}
 
@@ -1746,6 +1973,7 @@ namespace SAS
 					g_state.lastRefsSize  = 0;
 					g_state.stableRounds  = 0;
 					g_state.settleUntilMs = now + kSettleAfterSceneChangeMs;
+					InvalidateReadRegions();
 					ResetForNewScene(now, "epoch changed (load game)");
 				}
 			}
@@ -1800,6 +2028,7 @@ namespace SAS
 				g_state.lastRefsSize  = 0;
 				g_state.stableRounds  = 0;
 				g_state.settleUntilMs = now + kSettleAfterSceneChangeMs;
+				InvalidateReadRegions();  // v2.3：旧 cell 的「可读区间」不再可信
 				ResetForNewScene(now, first ? "first cell" : "cell changed");
 			}
 			if (now < g_state.settleUntilMs) {
@@ -1843,11 +2072,16 @@ namespace SAS
 
 				// 摘除计数（诊断）：rmOk 应随 sel/outline 变化一起增长，
 				// unhMiss 长期增长 = 连引擎自己的摘除函数都没动到管理器里的东西。
-				REX::INFO("  outline remove: rmOk={} unhMiss={} removeMiss={} removeReady={} unhighlightReady={}",
+				// ★ v2.3：graphRemove=1 才说明「3D 图 visitor」那条路可用（这是唯一真正
+				//   有效的摘除路径）。mapCnt = 当前状态管理器哈希表里的元素数，它应该
+				//   跟着 outline 一起涨落 —— 只涨不落就说明还有摘不掉的残留。
+				REX::INFO("  outline remove: rmOk={} unhMiss={} removeMiss={} removeReady={} unhighlightReady={} graphRemove={} mapCnt={}",
 					g_state.outlineRemoved, g_state.outlineUnhighlightMiss,
 					g_state.outlineRemoveMiss,
 					g_state.nativeRemoveReady ? 1 : 0,
-					g_outlineUnhighlightReady ? 1 : 0);
+					g_outlineUnhighlightReady ? 1 : 0,
+					g_outlineGraphRemoveReady ? 1 : 0,
+					ManagerMapCount(OutlineManagerFor(static_cast<std::uint32_t>(g_cfg.outlineState))));
 
 				// 性能窗口：每轮扫描耗时（max 才是「卡顿」的感觉来源）与单轮引擎调用数。
 				REX::INFO("  timing: scan avg={}ms max={}ms ops={} deferred={} loading={}",
@@ -1856,9 +2090,34 @@ namespace SAS
 					g_state.opsThisScan,
 					g_state.opsDeferred,
 					g_state.loadingNow ? 1 : 0);
+
+				// ★ v2.3：把「32ms 到底花在哪」直接拆开打出来（数都是窗口内平均）。
+				//   shape = 读 cell + 引用数组形状校验（vq = 真的问内核几次 VirtualQuery）
+				//   loop  = 遍历全部引用 + 排序 + 挑选
+				//   sync  = SyncNativeOutline（其中 unh=摘、add=挂）
+				{
+					const auto avg = [&](std::uint64_t a_sum) -> std::uint64_t {
+						return g_state.scanMsSamples ? a_sum / g_state.scanMsSamples : 0;
+					};
+					REX::INFO("  timing2: shape avg={}ms max={}ms vq={}/scan | loop avg={}ms max={}ms | sync avg={}ms max={}ms (unh avg={}ms add avg={}ms)",
+						avg(g_state.tShapeMs), g_state.tShapeMax,
+						g_state.scanMsSamples ? (g_vqCalls - g_state.vqCalls) / g_state.scanMsSamples : 0,
+						avg(g_state.tLoopMs), g_state.tLoopMax,
+						avg(g_state.tSyncMs), g_state.tSyncMax,
+						avg(g_state.tUnhMs), avg(g_state.tAddMs));
+				}
+				g_state.vqCalls       = g_vqCalls;
 				g_state.scanMsTotal   = 0;
 				g_state.scanMsMax     = 0;
 				g_state.scanMsSamples = 0;
+				g_state.tShapeMs      = 0;
+				g_state.tShapeMax     = 0;
+				g_state.tLoopMs       = 0;
+				g_state.tLoopMax      = 0;
+				g_state.tSyncMs       = 0;
+				g_state.tSyncMax      = 0;
+				g_state.tUnhMs        = 0;
+				g_state.tAddMs        = 0;
 
 				// Papyrus 侧自报状态：guideHb 不再增长 = 脚本没跑；
 				// guideState 0/2/3 的含义见 SAS_Bridge.psc 的说明。

@@ -362,3 +362,129 @@ manager map[runtime] state=0 : 前 N 个非空键 = [0x…, …]
 - `max` 应是个位数毫秒；`ops` 稳态应接近 0（站着不动时宽限期把抖动全吃掉了）；
 - `前 N 个非空键` 直接把管理器哈希表的真实键贴出来 —— 这一步之后不用再猜 id 了。
 
+---
+
+## 十一、v2.3 第四次逆向（2026-09-16 夜）—— 摘除的参数是「3D 节点」，不是「引用」
+
+### 11.1 实测数据（v2.2 的日志）
+
+```
+scan#719 ... outline=256/1/11 ...
+  outline remove: rmOk=0 unhMiss=3694 removeMiss=3694 removeReady=1 unhighlightReady=1
+manager map[runtime] state=0 : mgr=0x203b7f85d88 cap=4096 count18=13 count20=287
+  timing: scan avg=47ms max=146ms ops=0 deferred=0 loading=0
+```
+
+三个致命信号：
+
+1. **`unhMiss` 一直在涨** —— 连引擎自己的 `0x653F60` 都一次没动到管理器里的东西；
+2. **`timing: scan avg=47ms max=146ms ops=0`** —— 单轮扫描（纯内存读！）要 47ms；
+   甚至第 1 轮「什么都还没干」就花了 31ms（`scan#1 ... cand=0 sel=0 ... avg=31ms`）；
+3. 用户的观感三条都能解释：**F8 关不掉已亮的**、**走远了还亮**、
+   **已高亮区域也卡**（管理器哈希表只增不减，渲染器每帧都要过一遍）。
+
+### 11.2 ★ 根因：`0x653F60` 的第二个参数是 3D 节点
+
+把 **`0x17D4CD0`**（就是 `Set(0x17D52B0)` 内部真正干活的那个函数）整段读完之后，
+链条才完全清楚：
+
+```
+017D4CF7  mov rcx, [rdx]              ; rcx = TESObjectREFR*（引用）
+017D4D4C  mov rax, [rcx]              ; 引用虚表
+017D4D57  call [rax + 0x560]          ; ★ Get3D(NiPointer<NiAVObject>&) → rsi = 3D 根节点
+017D4D91  movsxd rax, [rbx+0x28]      ; 树节点里记的「旧状态」
+017D4DA1  mov rax, [managers + rax*8] ; 旧管理器
+017D4DB3  lea rax, [rip+0x335ac36]    ; = 0x4B2F9F0（摘除 visitor 的 vtable）
+017D4DC9  mov rdx, rsi                ; arg2 = ★ 3D 节点
+017D4DD1  call 0x24181E0              ; ★ 递归遍历 3D 图，每个节点摘一次
+...
+017D4DFF  lea rax, [rip+0x335ac0a]    ; = 0x4B2FA10（挂上 visitor 的 vtable）
+017D4E22  call 0x17D5BE0 ; mov [rax], ebp    ; 状态写进「引用→状态」表
+```
+
+而 **`0x24181E0` 是「递归遍历 3D 图」的访问器**（本次新挖出来的东西）：
+
+```
+02418207  call [rax+0x20]        ; node->vtable[0x20]() → 子节点容器（NiNode 才有）
+02418210  jne 0x2418220
+02418212  mov rax,[r15]          ; r15 = visitor
+0241821B  call [rax+0x10]        ; ★ visitor->vtable[0x10](visitor, node) ← 叶子才回调
+02418230  movzx eax, word [rbp+0x142]   ; 子节点数
+02418242  mov rbx, [rbx+rdi*8]          ; 子节点
+02418265  call 0x24181E0                ; 递归
+```
+
+两个 visitor 的 vtable（`tools/re/func.py vtable` 核对过，都在 .rdata）：
+
+| visitor | vtable RVA | 槽 +0x08 / +0x10 | 数据 |
+| --- | --- | --- | --- |
+| 摘除 | `0x4B2F9F0` | `0x653F60` / `0x653F60` | `void** 管理器槽`（&managers[state]） |
+| 挂上 | `0x4B2FA10` | `0x653FC0` / `0x653FC0` | `{ manager, manager->0x40 }` |
+
+再回头看 `0x653F60` 自己就全对上了：
+
+```
+00653F66  mov rax, [rdx]        ; rdx = ★ 节点
+00653F6F  call [rax+0x50]       ; 节点 → 「持有它的引用对象」
+00653F81  mov ebx, [rax+0x1F0]  ; id 由节点侧算出
+00653F87  mov rax, [rdi+8]      ; rdi = visitor；visitor+8 = 管理器槽
+00653F8F  mov rcx, [rax]        ; = manager
+00653F92  add rcx, 0x18         ; 内嵌哈希表
+00653F96  call 0x6535B0         ; Remove(map, &id) → 删到才 Deactivate
+```
+
+⇒ v2.2 把 `TESObjectREFR*` 直接塞进去，`ref->vtable[0x50]` 取到的东西
+`[+0x1F0]` **根本不是管理器表里的键** ⇒ `Remove` 永远返回 false ⇒
+`Deactivate` 永远不执行 ⇒ 描边永远摘不掉。**这就是用户三条反馈的共同根因。**
+
+`Get3D` 的位置还有旁证：commonlibsf 的 `TESObjectREFR.h` 里第 **0xAC** 号虚函数
+注释正好是 `// 0xAC - Get3D(NiPointer<NiAVObject>&)?`，而 `0xAC * 8 = 0x560`，
+与引擎自己 `call [rax + 0x560]` 完全吻合。
+
+### 11.3 v2.3 的修法
+
+```cpp
+// ① 取 3D 根：走引用虚表下标 0xAC（顺手校验目标在主模块 .text 内，防虚表布局变了）
+RE::NiPointer<RE::NiAVObject> root;
+((RefGet3D_t)((void**)*ref)[0xAC])(ref, &root);
+// ② visitor = { vtable = 0x4B2F9F0, &g_outlineManagers[state] }
+// ③ 引擎自己递归整棵 3D 图：0x24181E0(&visitor, root)
+```
+
+- 三个新符号（`0x24181E0` / `0x4B2F9F0` / 虚表下标 `0xAC`）都做校验：
+  `0x24181E0` 首 16 字节签名；`0x4B2F9F0` 的 `+0x08` 与 `+0x10` 必须都等于 `0x653F60`；
+  `0xAC` 槽取出来的地址必须落在主模块范围内。任一不过就整体禁用并打 WARN。
+- **删掉「11 个状态全扫一遍」的兜底**：现在只调「状态表里记的那个」和「配置的那个」
+  各一次。这不是省事，是省钱 —— 每次尝试都是一次真的引擎调用（虚调用 + 哈希查找 +
+  **整棵 3D 图递归遍历**），v2.2 里单轮 64 个目标 × 最多 11 次尝试 = 700 多次调用，
+  实测 `timing max=438ms` 里一大半是它。
+
+### 11.4 顺手治掉的「31ms 假卡顿」
+
+`scan#1 ... cand=0 sel=0 ... timing: scan avg=31ms ops=0` —— 第一轮扫描几乎什么都没干
+（引用数组长度第一次见就直接 return），却花了 31ms。那一段里唯一的重活是
+`ValidateCellRefs` 里的 6~7 次 `VirtualQuery`。
+
+`VirtualQuery` 要走内核对 VAD 树，在这种几 GB、VAD 碎片极多的进程里单次就是毫秒级；
+而它要回答的问题（这几个地址能不能读）对「同一个 cell 的同一批对象」几乎是常量。
+
+⇒ `IsReadable` 加**「已验证可读区间」缓存**（8 槽直接映射，TTL 3 秒；
+cell 变化 / 读档时整体作废；从没验证过的地址永远返回 false）。
+统计日志新增 `vq=N/scan`，可以直接看到内核询问次数降到多少。
+
+另外把 `Rescan` 拆成 `shape / loop / sync` 三段分别计时（`timing2:` 行），
+下次实测不用再猜「47ms 花在哪」。
+
+### 11.5 下次实测要看什么
+
+```
+  outline remove: rmOk=NN unhMiss=NN removeMiss=NN removeReady=1 unhighlightReady=1 graphRemove=1 mapCnt=NN
+  timing2: shape avg=0ms max=1ms vq=0/scan | loop avg=1ms max=2ms | sync avg=0ms max=0ms (unh avg=0ms add avg=0ms)
+```
+
+- `graphRemove=1` 是前提（=0 会打 WARN，说明校验没过，摘除仍不准）；
+- **`rmOk` 应该跟着 `outline` 一起涨落**，`unhMiss` 不再增长；
+- **`mapCnt` 应该能看到回落**（走远 / 按 F8 之后）；
+- `shape` / `loop` 都应该是 **0~2ms**；`vq` 应该接近 0；
+- 观感：F8 → 描边**立刻全灭**；走远 → 远处的东西**会熄灭**。
+
