@@ -141,10 +141,14 @@ def main() -> int:
     # --- 1. TypeDescriptor ---
     # TypeDescriptor = { void* vftable; void* spare; char name[]; }，
     # 所以字符串本身在 TD + 0x10。逐个候选做形状校验，避免命中别处的同名文本。
-    name_pat = (".?AV" + a.cls + "@@").encode()
-    hits = find_all(data, name_pat, 16)
+    # ★ MSVC 的类/结构体前缀不同：class = `?AV`、struct = `?AU`、enum = `?AW`。
+    #   GroundPathPathingNodeGenerator 这类是 struct（`?AU`），只试 `?AV` 会漏掉，
+    #   所以三种前缀都试一遍（各自的命中合并）。
+    hits = []
+    for prefix in (".?AV", ".?AU", ".?AW"):
+        hits.extend(find_all(data, (prefix + a.cls + "@@").encode(), 16))
     if not hits:
-        print(f"找不到 RTTI 名 {name_pat!r}")
+        print(f"找不到 RTTI 名 .?AV/?AU/?AW {a.cls!r}")
         return 2
     td_off = None
     for h in hits:
