@@ -36,6 +36,9 @@ Scriptname SAS_Bridge extends Quest
 ; ★ v2.4：本脚本现在还负责「面包屑引导路径」（见下面的 UpdateGuidePath）——
 ;   原版那条地上的线是扫描仪 HUD 画的，不举扫描仪就永远画不出来（docs/04 第八节），
 ;   所以改成自己沿「玩家 → 引导目标」铺一串地面光点。
+; ★ v2.8：光点形态从「纯光源 LIGH」换成「带发光网格的 MSTT GlowBall10x10」——
+;   v2.7 实测 markers 有数但玩家看不到，根因是 LIGH 记录**没有 MODL（网格）**，
+;   白天室外就是一摊看不见的光。详见 CfgGuideMarkerFormID() 的注释。
 ; ============================================================================
 
 FormList Property OpList Auto Const Mandatory
@@ -206,13 +209,17 @@ EndFunction
 ;   ⇒ 不举扫描仪 = 那个 HUD 根本不存在 = 线永远画不出来（不是没找对 API）。
 ;
 ; 这里的做法：沿「玩家 → 引导目标」铺一串**地面光点**。
-;   1) 标注形态用原版 LIGH（默认 00012E5A GenPointFlare1，一个点光源）：
-;      不用自造网格，放在地上就是一摊光 —— 和原版那条线一样是「发光的路标」。
-;      想换观感只改 CfgGuideMarkerFormID()，不用动代码。
+;   1) 标注形态用原版 MSTT（★ v2.8 起默认 00098106 GlowBall10x10，一个 0.1 米的
+;      **发光球网格** Effects\Ambient\GlowBall10x10.nif，再 SetScale 放大）：
+;      v2.4~v2.7 用的 LIGH 0x00012E5A 是**纯光源、没有网格**，白天室外看不见
+;      （这是 v2.7 实测「markers 有数但什么都没有」的根因）。想换观感只改
+;      CfgGuideMarkerFormID()（候选都列在那个函数里），不用动代码。
 ;   2) 贴地用 ObjectReference.MoveToNearestNavmeshLocation()：B 社自己的
-;      TestNPCArenaScript.psc 就是把路径标记这样放上 navmesh 的，**不需要射线**。
+;      TestNPCArenaScript.psc 就是把路径标记这样放上 navmesh 的，**不需要射线**；
+;      贴完再抬 CfgGuideMarkerLift()（球心在原点，不抬就一半埋地里）。
 ;   3) 只在「间隔到点 且 玩家真的动了」时才重算（那是 navmesh 查询，别每帧跑）。
-;   4) 每个标记 BlockActivation(true,true) —— 绝不抢玩家的交互（AGENTS.md 红线）。
+;   4) 每个标记 BlockActivation(true,true) + SetMotionType(Keyframed) —— 不抢交互、
+;      也不会被物理引擎拖走（MSTT 默认是 Dynamic，会滚）。
 ;
 ; 局限（如实记录，不假装）：
 ;   Papyrus **没有**「玩家正在追踪哪一个目标」的查询接口，所以这里用的是
@@ -221,6 +228,7 @@ EndFunction
 ; ============================================================================
 ObjectReference[] GuideMarkerRefs
 Bool  GuideArrayReady = False
+Int   GuideMarkerFormVer = 0
 ObjectReference GuideTarget = None
 Float GuideTargetAt = 0.0
 Float GuideLastUpdateAt = 0.0
@@ -237,10 +245,14 @@ Float GuideOtherCellDist = 0.0
 Float GuideDiagAt = 0.0
 Float GuidePaintDiagAt = 0.0
 Float GuideDoorDiagAt = 0.0
+; ★ v2.8：绘制诊断单独一个时间戳。以前和 GuidePaintDiagAt 共用，
+;   而「目标在别的 cell ⇒ 指向门」那行会先把它刷掉 ⇒ 同一轮里的绘制行永远打不出来
+;   （v2.7 实测里就看不到任何 markers 的位置信息）。
+Float GuidePaintPosDiagAt = 0.0
 Bool  GuideTargetIsProxy = False
 
 Int Function CfgGuideMarkerCount()
-	{ 面包屑个数。8 个 x 5 米 ≈ 覆盖身前 40 米 }
+	{ 面包屑个数。8 个 x 3 米 ≈ 覆盖身前 24 米 }
 	Return 8
 EndFunction
 
@@ -281,8 +293,31 @@ Float Function CfgGuideTargetRefresh()
 EndFunction
 
 Int Function CfgGuideMarkerFormID()
-	{ 面包屑形态：原版 LIGH GenPointFlare1（点光源） }
-	Return 0x00012E5A
+	{ 面包屑形态。
+	  ★ v2.8：从「LIGH 0x00012E5A GenPointFlare1」换成
+	    「MSTT 0x00098106 GlowBall10x10」（网格 Effects\Ambient\GlowBall10x10.nif）。
+	  为什么（v2.7 实测）：markers 有数（2/3/8）但玩家什么都看不到。
+	  把两个形态的原始记录摊开对比就明白了（tools/re/esmrec.py --formid）：
+	    LIGH 0x00012E5A 只有 EDID/OBND/ODTY/FLLD/DAT2/FLBD/FLRD/FLGD/LLLD/FLAD/FVLD，
+	    **没有 MODL（网格）** —— 它是纯光源，白天室外几乎不可见（夜里才看得见地上被照亮）。
+	    MSTT 0x00098106 有 MODL = 一个 0.1 米的发光球（自带自发光材质）⇒ 白天也看得见。
+	  其它候选（都带可见网格，改这一行即可换）：
+	    0x00098105 GlowCube10x10（方块）
+	    0x0009811C GlowDisc10x10（扁平圆盘，贴地最像原版那种地上小点）
+	    0x0001760F GlowLightCone36（36 单位的光锥，很大，别用）
+	  旧值（已废，留档）：0x00012E5A LIGH GenPointFlare1 }
+	Return 0x00098106
+EndFunction
+
+Float Function CfgGuideMarkerScale()
+	{ 面包屑缩放。网格本身只有 0.1 米，3 倍 = 0.3 米的发光球
+	  （第一人称在几米外就是一串清清楚楚的光点） }
+	Return 3.0
+EndFunction
+
+Float Function CfgGuideMarkerLift()
+	{ 贴地之后再抬高这么多（游戏单位）。球的球心在原点 ⇒ 不抬就有一半埋在地面里 }
+	Return 0.25 * 3.4286
 EndFunction
 
 Float Function CfgGuideDoorRadius()
@@ -334,6 +369,32 @@ Function EnsureGuideArray()
 		GuideMarkerRefs = new ObjectReference[CfgGuideMarkerCount()]
 		GuideArrayReady = True
 	EndIf
+	; ★ v2.8：形态换过就得把老标记全销毁重建。
+	;   脚本变量（含 GuideMarkerRefs）是**跟着存档走的** —— 用户读档后数组里还握着
+	;   v2.7 那些「看不见的 LIGH」引用，而绘制循环只在 m == None 时才新建
+	;   ⇒ 换了 CfgGuideMarkerFormID() 也会一直用旧形态（就是「改了却没变化」的坑）。
+	If GuideMarkerFormVer != CfgGuideMarkerFormID()
+		DestroyGuideMarkers()
+		GuideMarkerFormVer = CfgGuideMarkerFormID()
+		Debug.Trace("[SAS] guide: 面包屑形态变更 -> 旧标记全部销毁重建（form=" + FormHex(Game.GetForm(CfgGuideMarkerFormID())) + "）")
+	EndIf
+EndFunction
+
+Function DestroyGuideMarkers()
+	If !GuideArrayReady
+		Return
+	EndIf
+	Int i = 0
+	While i < GuideMarkerRefs.Length
+		ObjectReference old = GuideMarkerRefs[i]
+		If old != None
+			old.Disable()
+			old.Delete()
+			GuideMarkerRefs[i] = None
+		EndIf
+		i = i + 1
+	EndWhile
+	GuideMarkers.SetValueInt(0)
 EndFunction
 
 Function HideGuideMarkers()
@@ -361,6 +422,16 @@ ObjectReference Function CreateGuideMarker(Actor p)
 		Return None
 	EndIf
 	m.BlockActivation(True, True)
+	; ★ v2.8：MSTT 是「可移动静态」——默认是 Dynamic，会被物理引擎接管
+	;   （落体 / 被玩家踢飞 / 顺坡滚走）。Keyframed = 只认脚本摆的位置，位置才稳得住。
+	;   注意常量要写成 `m.Motion_Keyframed`（它是 ObjectReference 上的属性）——
+	;   直接写 `Motion_Keyframed` 编译报 "variable Motion_Keyframed is undefined"。
+	m.SetMotionType(m.Motion_Keyframed, True)
+	; 形态本身只有 0.1 米，放大到看得见
+	m.SetScale(CfgGuideMarkerScale())
+	If CfgGuideDebug()
+		Debug.Trace("[SAS] guide: 造出标记 " + FormHex(m) + " form=" + FormHex(f) + " scale=" + CfgGuideMarkerScale())
+	EndIf
 	Return m
 EndFunction
 
@@ -722,16 +793,31 @@ Function UpdateGuidePath()
 				EndIf
 				m.Enable()
 				m.SetPosition(px + ux * d, py + uy * d, pz + CfgGuideHeight())
+				; 贴地：移到「它附近 navmesh 上最近的位置」（不需要射线，B 社自己的脚本就这么用）
 				m.MoveToNearestNavmeshLocation()
+				; ★ v2.8：贴地后抬一点 —— 球心在原点，不抬就有一半埋在地面里
+				m.SetPosition(m.GetPositionX(), m.GetPositionY(), m.GetPositionZ() + CfgGuideMarkerLift())
 				shown = shown + 1
 			EndIf
 		EndIf
 		i = i + 1
 		EndWhile
 		GuideMarkers.SetValueInt(shown)
-		If CfgGuideDebug() && ((now - GuidePaintDiagAt) >= 5.0)
-			GuidePaintDiagAt = now
-			Debug.Trace("[SAS] guide: target=" + FormHex(GuideTarget) + " isProxy=" + GuideTargetIsProxy + " d=" + Math.Floor(dist / 3.4286) + "m markers=" + shown + "/" + GuideMarkerRefs.Length)
+		; ★ v2.8：绘制诊断改用**自己**的时间戳（以前和「指向门」那行共用，
+		;   结果同一轮里那行先刷掉了计时器 ⇒ 这里永远打不出来）。
+		;   打的是「标记 0 到底在哪 / 在哪个 cell / 开没开 / 缩放多少」，
+		;   下次实测一眼就能分清「没造出来」「造在别的 cell」「造在眼前但看不见」。
+		If CfgGuideDebug() && ((now - GuidePaintPosDiagAt) >= 5.0)
+			GuidePaintPosDiagAt = now
+			ObjectReference m0 = None
+			If GuideMarkerRefs.Length > 0
+				m0 = GuideMarkerRefs[0]
+			EndIf
+			If m0 != None
+				Debug.Trace("[SAS] guide/paint: target=" + FormHex(GuideTarget) + " isProxy=" + GuideTargetIsProxy + " d=" + Math.Floor(dist / 3.4286) + "m markers=" + shown + "/" + GuideMarkerRefs.Length + " | m0=" + FormHex(m0) + " cell=" + FormHex(m0.GetParentCell()) + " on=" + m0.IsEnabled() + " scale=" + m0.GetScale() + " m0pos=" + Math.Floor(m0.GetPositionX()) + "," + Math.Floor(m0.GetPositionY()) + "," + Math.Floor(m0.GetPositionZ()) + " ppos=" + Math.Floor(px) + "," + Math.Floor(py) + "," + Math.Floor(pz) + " pcell=" + FormHex(myCell))
+			Else
+				Debug.Trace("[SAS] guide/paint: target=" + FormHex(GuideTarget) + " markersonly=" + shown + " m0=None")
+			EndIf
 		EndIf
 		EndFunction
 
