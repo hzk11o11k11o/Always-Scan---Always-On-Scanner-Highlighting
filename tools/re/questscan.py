@@ -119,6 +119,7 @@ def main() -> int:
     ap.add_argument("--samples", type=int, default=3, help="打印几个含 QSTA 的样例")
     ap.add_argument("--formid", default=None, help="查这个 FormID 的记录签名/EDID")
     ap.add_argument("--edid", default=None, help="按 EDID 反查记录")
+    ap.add_argument("--grep", default=None, help="列出 EDID 含该子串的 QUST：FormID / QSTA 数 / EDID")
     args = ap.parse_args()
 
     with open(args.esm, "rb") as f:
@@ -142,6 +143,20 @@ def main() -> int:
                 if needle in blob:
                     # 粗筛：EDID 就是它
                     print(f"{sig} {formid:08X} size={dsize} (blob 含 {args.edid})")
+            return 0
+
+        if args.grep is not None:
+            needle = args.grep.lower()
+            for sig, formid, flags, off, dsize in walk_records(mm, 0, len(mm)):
+                if sig != "QUST":
+                    continue
+                edid = get_edid(mm, off, dsize, flags)
+                if needle not in edid.lower():
+                    continue
+                subs = parse_subs(mm, off, dsize, flags) or []
+                n_qsta = sum(1 for s, _ in subs if s == "QSTA")
+                n_qobj = sum(1 for s, _ in subs if s == "QOBJ")
+                print(f"QUST {formid:08X} QSTA={n_qsta} QOBJ={n_qobj} EDID='{edid}'")
             return 0
 
         # ---- QUST 统计 ----
