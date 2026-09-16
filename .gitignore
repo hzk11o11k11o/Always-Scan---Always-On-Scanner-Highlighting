@@ -32,6 +32,10 @@ TES5Edit-xedit-4.1.5f-source-code.zip
 out/backup-*/
 out/tmp/
 
+# out/ 下其余都是「逆向/调试中间产物」（反汇编 dump、字符串 dump …），
+# 随时可以用 tools/re 里的脚本重跑，不入库
+out/
+
 # 编辑器/系统
 .vscode/
 .idea/

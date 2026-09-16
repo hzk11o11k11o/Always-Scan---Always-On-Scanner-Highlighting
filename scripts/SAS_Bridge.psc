@@ -57,6 +57,60 @@ Float DrainStartedAt = 0.0
 Bool  LoadEventRegistered = False
 
 ; ============================================================================
+; 任务引导路径（v2.1 新增）：把原版扫描仪画「地上那条线」用的法术加到玩家身上
+; ----------------------------------------------------------------------------
+; 调查结论（详见 docs/04-任务引导路径调研.md）：
+;   原版 = 引擎在扫描期间给玩家 AddSpell 一个法术：
+;       SPEL 0x0003CC96  SpellScannerGuide
+;         └ MGEF 0x0003CC95  ScannerGuideEffect   ← 路径是这条 MGEF 自己画出来的
+;   引擎是从 GMST/DObj `HandscannerGuideSpellDO`（DFOB 0x00112B0B）里取的这个法术，
+;   全在 C++ 侧，Papyrus 库里没有任何脚本碰它。
+;   本 MOD 不装备扫描仪 ⇒ 引擎永远不会加它 ⇒ 我们自己加。
+;   ★ 路径的渲染是 magic effect 自己的事，**不需要扫描模式**，所以只要法术在身上，
+;     只要存在「正在追踪的任务目标」就会画出来（没有追踪目标时自然什么都不画）。
+;
+; 与 F8 开关的关系：目前**无关**（F8 只管描边）。要联动需要让 DLL 输出一个状态 GLOB，
+; 见 docs/04 的 TODO。
+; ============================================================================
+Bool GuideApplied = False
+
+Int Function CfgGuideSpellFormID()
+	{ 原版 SpellScannerGuide（含 ScannerGuideEffect） }
+	Return 0x0003CC96
+EndFunction
+
+Int Function CfgGuideEffectFormID()
+	{ ScannerGuideEffect：用来判断效果是否还活着 }
+	Return 0x0003CC95
+EndFunction
+
+Function SyncGuideSpell()
+	Actor p = Game.GetPlayer()
+	if p == None
+		return
+	endif
+	Spell s = Game.GetForm(CfgGuideSpellFormID()) as Spell
+	if s == None
+		return
+	endif
+
+	if p.HasSpell(s)
+		; 法术在、效果没了 = 它是个「发射即忘」型（有持续时间）→ 摘掉重加一次。
+		; 如果是 Ability 型，HasMagicEffect 恒为真，永远不会走到这里。
+		MagicEffect mgef = Game.GetForm(CfgGuideEffectFormID()) as MagicEffect
+		if mgef != None && !p.HasMagicEffect(mgef)
+			p.RemoveSpell(s)
+			p.AddSpell(s, false)
+		endif
+		GuideApplied = True
+		return
+	endif
+
+	p.AddSpell(s, false)
+	GuideApplied = True
+EndFunction
+
+; ============================================================================
 ; 可调参数（函数形式，随时改随时生效）
 ; ============================================================================
 Float Function CfgInterval()
@@ -92,6 +146,7 @@ EndEvent
 Event OnTimer(int aiTimerID)
 	StartTimer(CfgInterval(), 1)
 	DrainGuarded()
+	SyncGuideSpell()
 EndEvent
 
 ; 读档自愈：Quest 自身没有 OnPlayerLoadGame，必须用远事件订阅（上一代验证过）
