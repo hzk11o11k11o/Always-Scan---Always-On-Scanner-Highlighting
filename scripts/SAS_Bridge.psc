@@ -223,6 +223,14 @@ Float GuideLastPY = 0.0
 Float GuideLastPZ = 0.0
 Bool  ScannerUp = False
 
+; ★ v2.5：诊断（定位「guideMarkers 恒为 -1 = 找不到目标」）——
+;   脚本把「看到了哪些任务 / 目标在哪 / 为什么被跳过」写进 Papyrus 日志，
+;   不再靠猜。定位完成后把 CfgGuideDebug() 改成 False 即可（日志会安静下来）。
+ObjectReference GuideOtherCellTarget = None
+Float GuideOtherCellDist = 0.0
+Float GuideDiagAt = 0.0
+Float GuidePaintDiagAt = 0.0
+
 Int Function CfgGuideMarkerCount()
 	{ 面包屑个数。8 个 x 5 米 ≈ 覆盖身前 40 米 }
 	Return 8
@@ -268,6 +276,35 @@ Int Function CfgGuideMarkerFormID()
 	Return 0x00012E5A
 EndFunction
 
+; ★ v2.5 诊断开关。True 时把「目标检索」的每一步写进 Papyrus 日志
+; （<我的文档>\My Games\Starfield\Logs\Script\Papyrus.0.log，搜 "[SAS]"）。
+; 它每 5 秒最多打一屏，跑几分钟足够定位；定位完改回 False。
+Bool Function CfgGuideDebug()
+	Return True
+EndFunction
+
+String Function FormHex(Form f)
+	{ FormID 的十六进制文本（None 直接给 "None"），只为日志好看 }
+	If f == None
+		Return "None"
+	EndIf
+	Return Utility.IntToHex(f.GetFormID())
+EndFunction
+
+Bool Function SameSpace(Cell a, Cell b)
+	{ 两个引用的坐标是否在同一个坐标系里（能不能算距离 / 画面包屑）。
+	  同一个 cell ⇒ 能；
+	  两个都是 exterior cell ⇒ 共享 worldspace 坐标（跨 cell 也能）；
+	  其余（跨 interior cell）⇒ 不能，只能靠原版图标。 }
+	If a == None || b == None
+		Return False
+	EndIf
+	If a == b
+		Return True
+	EndIf
+	Return !a.IsInterior() && !b.IsInterior()
+EndFunction
+
 Function EnsureGuideArray()
 	If !GuideArrayReady
 		GuideMarkerRefs = new ObjectReference[CfgGuideMarkerCount()]
@@ -303,29 +340,64 @@ ObjectReference Function CreateGuideMarker(Actor p)
 	Return m
 EndFunction
 
-; 引导目标：所有 active quest 的「当前阶段目标」里，同一 cell 内最近的那个
+; 引导目标：所有 active quest 的「当前阶段目标」里，同一 cell 内最近的那个。
+; ★ v2.5 起：
+;   - **优先取「玩家在任务菜单里追踪的那个任务」（Quest.IsActive()）**的目标
+;     —— 它的注释原文就是 "Is this quest 'active' (tracked by the player)?"；
+;   - 找不到同 cell 的时，把「最近的跨 cell 目标」记进 GuideOtherCellTarget，
+;     调用方据此区分「根本没有目标」和「目标在别的 cell」；
+;   - 诊断（CfgGuideDebug）把每一步都写进 Papyrus 日志。
 ObjectReference Function FindGuideTarget(Actor p, Float px, Float py, Float pz)
 	ObjectReference best = None
+	ObjectReference bestAny = None
+	ObjectReference bestTracked = None
 	Float bestD = CfgGuideMaxDist()
+	Float bestAnyD = 1000000.0
+	Float bestTrackedD = CfgGuideMaxDist()
 	Cell myCell = p.GetParentCell()
 	Quest[] qs = Game.GetPlayerActiveQuests()
+	Bool dbg = CfgGuideDebug() && ((Utility.GetCurrentRealTime() - GuideDiagAt) > 5.0)
+	If dbg
+		GuideDiagAt = Utility.GetCurrentRealTime()
+		Debug.Trace("[SAS] guide/diag: activeQuests=" + qs.Length + " myCell=" + FormHex(myCell))
+	EndIf
 	Int qi = 0
 	While qi < qs.Length
 		Quest q = qs[qi]
 		If q != None
 			ObjectReference[] ts = q.GetCurrentStageTargets()
+			Bool tracked = q.IsActive()
+			If dbg && (ts.Length > 0 || tracked)
+				Debug.Trace("[SAS] guide/diag:  q=" + FormHex(q) + " stage=" + q.GetStage() + " targets=" + ts.Length + " tracked=" + tracked)
+			EndIf
 			Int ti = 0
 			While ti < ts.Length
 				ObjectReference t = ts[ti]
 				If t != None
-					If !t.IsDeleted() && !t.IsDisabled() && t.GetParentCell() == myCell
-						Float ddx = t.GetPositionX() - px
-						Float ddy = t.GetPositionY() - py
-						Float ddz = t.GetPositionZ() - pz
-						Float d2 = ddx * ddx + ddy * ddy + ddz * ddz
-						If d2 < bestD * bestD
-							bestD = Math.sqrt(d2)
-							best = t
+					Float dx = t.GetPositionX() - px
+					Float dy = t.GetPositionY() - py
+					Float dz = t.GetPositionZ() - pz
+					Float d = Math.sqrt(dx * dx + dy * dy + dz * dz)
+					Cell tc = t.GetParentCell()
+					Bool same = SameSpace(tc, myCell)
+					Bool dead = t.IsDeleted() || t.IsDisabled()
+					If dbg
+						Debug.Trace("[SAS] guide/diag:    t=" + FormHex(t) + " d=" + Math.Floor(d / 3.4286) + "m same=" + same + " dead=" + dead + " cell=" + FormHex(tc))
+					EndIf
+					If !dead
+						If d < bestAnyD
+							bestAnyD = d
+							bestAny = t
+						EndIf
+						If same
+							If tracked && d < bestTrackedD
+								bestTrackedD = d
+								bestTracked = t
+							EndIf
+							If d < bestD
+								bestD = d
+								best = t
+							EndIf
 						EndIf
 					EndIf
 				EndIf
@@ -334,7 +406,29 @@ ObjectReference Function FindGuideTarget(Actor p, Float px, Float py, Float pz)
 		EndIf
 		qi = qi + 1
 	EndWhile
-	Return best
+
+	If dbg
+		Debug.Trace("[SAS] guide/diag:  -> sameCell=" + FormHex(best) + " trackedSame=" + FormHex(bestTracked) + " anyCell=" + FormHex(bestAny) + " anyD=" + Math.Floor(bestAnyD / 3.4286) + "m")
+	EndIf
+
+	If bestTracked != None
+		GuideOtherCellTarget = None
+		GuideOtherCellDist = 0.0
+		Return bestTracked
+	EndIf
+	If best != None
+		GuideOtherCellTarget = None
+		GuideOtherCellDist = 0.0
+		Return best
+	EndIf
+	If bestAny != None
+		GuideOtherCellTarget = bestAny
+		GuideOtherCellDist = bestAnyD
+	Else
+		GuideOtherCellTarget = None
+		GuideOtherCellDist = 0.0
+	EndIf
+	Return None
 EndFunction
 
 Function UpdateGuidePath()
@@ -383,10 +477,10 @@ Function UpdateGuidePath()
 	GuideLastPY = py
 	GuideLastPZ = pz
 
-	; 目标检索：缓存 2 秒，失效（被打掉/关掉/换 cell）立刻重查
+	; 目标检索：缓存 2 秒，失效（被打掉/关掉/换坐标系）立刻重查
 	Bool needSearch = (GuideTarget == None) || ((now - GuideTargetAt) > CfgGuideTargetRefresh())
 	If !needSearch
-		If GuideTarget.IsDeleted() || GuideTarget.IsDisabled() || GuideTarget.GetParentCell() != p.GetParentCell()
+		If GuideTarget.IsDeleted() || GuideTarget.IsDisabled() || !SameSpace(GuideTarget.GetParentCell(), p.GetParentCell())
 			needSearch = True
 		EndIf
 	EndIf
@@ -397,7 +491,16 @@ Function UpdateGuidePath()
 
 	If GuideTarget == None
 		HideGuideMarkers()
-		GuideMarkers.SetValueInt(-1)
+		If GuideOtherCellTarget != None
+			; 找到了目标，但它在别的 cell（跨 cell 画不了 —— 见 docs/99 待办）
+			GuideMarkers.SetValueInt(-2)
+		Else
+			GuideMarkers.SetValueInt(-1)
+		EndIf
+		If CfgGuideDebug() && ((now - GuidePaintDiagAt) >= 5.0)
+			GuidePaintDiagAt = now
+			Debug.Trace("[SAS] guide: 没有同 cell 的目标（markers=" + GuideMarkers.GetValueInt() + " otherCell=" + FormHex(GuideOtherCellTarget) + " otherD=" + Math.Floor(GuideOtherCellDist / 3.4286) + "m）")
+		EndIf
 		Return
 	EndIf
 
@@ -409,6 +512,10 @@ Function UpdateGuidePath()
 	If dist <= (start + spacing)
 		HideGuideMarkers()
 		GuideMarkers.SetValueInt(0)
+		If CfgGuideDebug() && ((now - GuidePaintDiagAt) >= 5.0)
+			GuidePaintDiagAt = now
+			Debug.Trace("[SAS] guide: 目标太近（" + Math.Floor(dist / 3.4286) + "m），不画")
+		EndIf
 		Return
 	EndIf
 
@@ -430,6 +537,10 @@ Function UpdateGuidePath()
 			If m == None
 				m = CreateGuideMarker(p)
 				GuideMarkerRefs[i] = m
+				If m == None && CfgGuideDebug() && ((now - GuidePaintDiagAt) >= 5.0)
+					GuidePaintDiagAt = now
+					Debug.Trace("[SAS] guide: PlaceAtMe 失败，形态 " + FormHex(Game.GetForm(CfgGuideMarkerFormID())) + " 造不出标记")
+				EndIf
 			EndIf
 			If m != None
 				If m.GetParentCell() != myCell
@@ -442,9 +553,13 @@ Function UpdateGuidePath()
 			EndIf
 		EndIf
 		i = i + 1
-	EndWhile
-	GuideMarkers.SetValueInt(shown)
-EndFunction
+		EndWhile
+		GuideMarkers.SetValueInt(shown)
+		If CfgGuideDebug() && ((now - GuidePaintDiagAt) >= 5.0)
+		GuidePaintDiagAt = now
+		Debug.Trace("[SAS] guide: target=" + FormHex(GuideTarget) + " d=" + Math.Floor(dist / 3.4286) + "m markers=" + shown + "/" + GuideMarkerRefs.Length)
+		EndIf
+		EndFunction
 
 ; ============================================================================
 ; 事件
