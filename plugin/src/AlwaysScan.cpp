@@ -253,7 +253,11 @@ namespace SAS
 			//   12 = 无高亮（管理器只有 0..10 共 11 个）
 			// 下标 = Category，默认 可拾取0 / 容器1 / 设备2 / 门3 / 植物7 / 其它0。
 			// ★ 想换配色只改 INI 的 StateXxx；改完重进游戏生效。
-			std::array<int, kCategoryCount> stateByCategory{ 0, 1, 2, 3, 7, 0 };
+			// ★ v4.0.2：默认值按「实测的引擎原生配色」挑的**视觉上真正区分得开**的 5 种色：
+			//   2 蓝 / 9 橙 / 4 绿 / 0 青 / 5 绿 / 1 淡蓝白
+			//   （v4.0.1 的默认 0/1/2/3 实测全是蓝色系，看起来「颜色都一样」——
+			//     3 与 2 的 ref 色值完全相同。实测表见 docs/03 第十四节 14.5 / INI 注释。）
+			std::array<int, kCategoryCount> stateByCategory{ 2, 9, 4, 0, 5, 1 };
 
 			// ★ v4.0.1：可选的「自定义类别颜色」（INI 里写 ColorLoot=RRGGBB 之类）。
 			//   kColorUnset = 不覆盖，完全用引擎那个状态的原生配色。
@@ -686,7 +690,7 @@ namespace SAS
 			const char* const kStateKeys[kCategoryCount] = {
 				"StateLoot", "StateContainer", "StateDevice", "StateDoor", "StateFlora", "StateOther"
 			};
-			const int kStateDef[kCategoryCount] = { 0, 1, 2, 3, 7, 0 };
+			const int kStateDef[kCategoryCount] = { 2, 9, 4, 0, 5, 1 };
 			for (std::size_t i = 0; i < kCategoryCount; ++i) {
 				g_cfg.stateByCategory[i] = std::clamp(getInt(kStateKeys[i], kStateDef[i]), 0, 11);
 			}
@@ -1378,12 +1382,17 @@ namespace SAS
 				const auto hi = rd(mgrTab + i * kOutlineParamStride);
 				const auto lo = rd(mgrTab + i * kOutlineParamStride + 0x20);
 				const auto rf = rd(refTab + i * kOutlineParamStride);
-				char buf[128];
+				// dword 的布局是 `0x00RRGGBB`（用截图反证过：state 0 的值 = 青，
+				// 与画面完全一致）。所以 R = >>16 / G = >>8 / B = &0xFF。
+				const auto rgbOf = [](std::uint32_t v) {
+					return static_cast<unsigned>(((v >> 16) & 0xFFu) << 16 | ((v >> 8) & 0xFFu) << 8 | (v & 0xFFu));
+				};
+				char buf[160];
 				std::snprintf(buf, sizeof(buf),
-					"  state=%2u %-18s ref=#%06X mgrHigh=#%06X mgrLow=#%06X (alpha %02X/%02X)",
-					i, kOutlineStateName[i],
-					rf & 0xFFFFFFu, hi & 0xFFFFFFu, lo & 0xFFFFFFu,
-					(hi >> 24) & 0xFFu, (lo >> 24) & 0xFFu);
+					"  state=%2u %-18s ref=#%06X (%3u,%3u,%3u) mgrHigh=#%06X mgrLow=#%06X",
+					i, kOutlineStateName[i], rgbOf(rf),
+					(rf >> 16) & 0xFFu, (rf >> 8) & 0xFFu, rf & 0xFFu,
+					rgbOf(hi), rgbOf(lo));
 				REX::INFO("outline colors[{}]: {}", a_tag, buf);
 			}
 		}
