@@ -27,8 +27,8 @@ D:\Mod Organizer 2
 5 个 du 系列 Creation 的汉化工作说明在 `docs/06-DU系列mod汉化.md`，
 工具在 `tools/re/trtool.py` / `tr_pipeline.py` / `tr_verify.py` 等，
 词典成果在 `tr/lang/`（**必须入库**，可增量续译）。
-4 个已完成并部署，`du_outlaws_01` 的短串与 `MESG DESC` 讯息正文已完成并部署，
-只剩两类长文本（`BOOK DESC` 401 / `QUST CNAM` 460）。
+4 个已完成并部署，`du_outlaws_01` 的短串、`MESG DESC` 讯息正文与 `BOOK DESC` 书籍正文
+均已完成并部署（`map` 译出 4 472/5 027 = 89.0%），只剩一类长文本（`QUST CNAM` 460）。
 
 ## 其他 mod 汉化
 

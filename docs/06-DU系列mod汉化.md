@@ -15,13 +15,13 @@
 | `du_takeover.esm` | 56 929 | 104 | 54 | **完成并部署** |
 | `du_overtime.esm` | 793 | 3 017 | 554 | **完成并部署** |
 | `du_retrograde.esm` | 85 323 | 5 819 | 2 417 | **完成并部署** |
-| `du_outlaws_01.esm` | 4 421 | 5 027 | 3 750 | **进行中**（名称/书籍/任务目标/短串/**MESG DESC 讯息正文**已完成；剩 BOOK DESC + QUST CNAM） |
+| `du_outlaws_01.esm` | 4 421 | 5 027 | 3 750 | **完成**（长文本 `MESG DESC` + `BOOK DESC` 均已译；剩 `QUST CNAM` 460 与 95 个占位串未译，见第六节） |
 
 五个 mod 都已写过 MO2 的 `overwrite\`（原位替换，原文件备份在 `tr/orig/`）。
-`du_outlaws_01.esm` 当前是**短串 + MESG DESC 完整版**：4 421 条记录里改动 3 134 条、
-替换 4 071 条（81.0% 行），结构校验 `problems: 0`。
-剩余 **956 行**全部是长文本（`QUST CNAM` 460 / `BOOK DESC` 401）加 95 个刻意不译的
-占位串（71 个 `QUST FULL` 8 位十六进制占位名、24 个纯 hull 代号如 `PX-15`）。
+`du_outlaws_01.esm` 当前是**短串 + 全部可译长文本完整版**：4 421 条记录里改动 3 154 条、
+替换 4 472 条（89.0% 行），结构校验 `problems: 0`。
+剩余 **555 行**全部是刻意不译的串：`QUST CNAM` 460（任务简报长文本，尚未动工）
+加 95 个占位串（71 个 `QUST FULL` 8 位十六进制占位名、24 个纯 hull 代号如 `PX-15`）。
 
 ---
 
@@ -173,6 +173,7 @@ tr/lang/todo/                  # 各 mod 的"还没译"清单
 | `b37_outlaws_ships.tsv` | `GBFM FULL` 飞船显示名（纯 hull 代号保持原样） | 67 |
 | `b38_outlaws_misc.tsv` | 零散短串（开发占位、短提示） | 2 |
 | `b50`~`b70_outlaws_msg_desc_*.tsv` | `MESG DESC` 讯息正文（21 批，按字符数由短到长切分） | 318 |
+| `b71`~`b150_outlaws_book_desc_*.tsv` | `BOOK DESC` 书籍/数据板正文（80 批，约 1 万字符/批、由短到长切分，`book_desc_01`~`80`） | 403 |
 
 `dict.tsv` 是 `merge(tr/lang/batches/*.tsv, tr/lang/official_seed.tsv)` 的产物，
 **新增翻译只要往 `tr/lang/batches/` 加文件**，然后重跑 merge 即可。
@@ -232,13 +233,13 @@ Copy-Item tr/build/du_xfire.esm "$O\du_xfire.esm" -Force
 加上官方命中的其余条目 ⇒ **3 753 条 / 74.7% 的行、2 476 / 3 750 个唯一串**，
 已构建（`problems: 0`）并部署到 `overwrite\`。
 
-**未完成**：只剩两类长文本 + 刻意不译的占位串（`MESG DESC` 已于 2026-09-17 完成）：
+**未完成**：只剩 `QUST CNAM` 任务简报一类（两类长文本 `MESG DESC` / `BOOK DESC` 均已完成）：
 
 | 子记录 | 条数 | 字符数 | 内容 |
 | --- | --- | --- | --- |
-| `BOOK DESC` | 401 | ~916 000 | 书籍/数据板正文（长篇小说式） |
-| `QUST CNAM` | 460 | ~378 000 | 任务简报 |
+| `QUST CNAM` | 460 | ~378 000 | 任务简报（尚未动工） |
 | ~~`MESG DESC`~~ | ~~318~~ | ~~~175 000~~ | ✅ 已完成（批次 `b50`~`b70`，318 条 ~175 000 字符） |
+| ~~`BOOK DESC`~~ | ~~401~~ | ~~~916 000~~ | ✅ 已完成（批次 `b71`~`b150`，80 批 **403** 条 ~916 000 字符） |
 | 不译占位 | 95 | — | `QUST FULL` 的 71 个 8 位十六进制占位名 + `GBFM FULL` 的 24 个纯 hull 代号（`PX-15`…） |
 
 继续做法（工具已就绪）：
@@ -264,7 +265,7 @@ Copy-Item tr/build/du_xfire.esm "$O\du_xfire.esm" -Force
 2. 把译文写进新的 `tr/lang/batches/bXX_*.tsv`；
 3. 重跑第五节第 2~5 步（`du_outlaws_01` 那一条）即可。
 
-⚠️ 两个已踩过的坑：
+⚠️ 三个已踩过的坑：
 
 - `tr/lang/batches/b31_outlaws_books.tsv` 里有一行 `Whispers In The Grav\n\n`
   —— 原文结尾带两个换行，键值必须保留 `\n\n` 转义；
@@ -273,6 +274,17 @@ Copy-Item tr/build/du_xfire.esm "$O\du_xfire.esm" -Force
 - `trtool.py extract` 的 `decode_text()` 用 `PRINTABLE`（仅 ASCII）筛串 ⇒
   **对已汉化的 ESM 再 extract，只会导出"还是英文"的串**，正好可以用来反查
   "还有哪些没译"。
+- **★ `tr_mkbatch.py` 只按行号取键，抄错行号不会报错，只会静默错配** —— 做 `BOOK DESC`
+  时 `book_desc_11.txt` 里把 `1258` 误抄成 `1207`，结果是：一条 `BOOK FULL`
+  （`Mutineer Division Travel Records`）被替换成了那篇长文的译文，而该长文保持英文。
+  **防御性做法（每次跑完都要做）**：遍历所有 spec 行号，核对抽取文件里该行的
+  `(recsig, subsig)` 与本类是否一致，例如：
+  ```powershell
+  python -c "import io,glob;ls=io.open('tr/out/du_outlaws_01.tsv',encoding='utf-8').read().splitlines();bad=[];[bad.append((f,l)) for f in glob.glob('tr/lang/spec/book_desc_*.txt') for l in io.open(f,encoding='utf-8').read().splitlines() if l and not l.startswith('#') and ls[int(l.split(chr(9))[0])-1].split(chr(9))[2]!='DESC'];print(bad)"
+  ```
+  另：**一旦发现误配，必须从 `tr/orig/` 的原始文件整份重建**（而不是继续往已汉化的
+  `overwrite\` 上增量 `apply`）——否则那条被错写的记录里已经没有英文键，`apply` 再也
+  匹配不上，错误会永久留在部署文件里。
 
 ---
 
@@ -289,10 +301,11 @@ MO2 profile `Default`（`D:\Mod Organizer 2\starfield_mods\profiles\Default`）�
 | 生成的汉化 ESM | `tr/build/du_*.esm` |
 | 已部署（5 个） | `D:\Mod Organizer 2\starfield_mods\overwrite\du_{xfire,takeover,overtime,retrograde,outlaws_01}.esm` |
 
-> 2026-09-17：`du_outlaws_01.esm` **短串 + MESG DESC 完整版**已部署
-> （`tr/build/du_outlaws_01.esm` = `overwrite\du_outlaws_01.esm`，5 634 470 B，
-> MD5 `0B64F492C5F8F619F9F0F6D9D415D297`；反查 `extract` 只剩 956 条
-> `QUST CNAM` / `BOOK DESC` / 占位串，**`MESG DESC` 0 条残留**）。
+> 2026-09-17：`du_outlaws_01.esm` **短串 + MESG DESC + BOOK DESC 完整版**已部署
+> （`tr/build/du_outlaws_01.esm` = `overwrite\du_outlaws_01.esm`，5 575 493 B，
+> MD5 `191ABBB93FFD4A61F3E6CBA8AEB3805E`；从 `tr/orig/du_outlaws_01.esm` 整份重建，
+> 替换 4 472 条 / 改动 3 154 条记录、`problems: 0`；反查 `extract` 只剩 555 条
+> `QUST CNAM` 460 + 占位串 95，**`MESG DESC` 与 `BOOK DESC` 均 0 条残留**）。
 
 ### 游戏内验证清单
 
