@@ -1,0 +1,378 @@
+#en	zh
+# Dark Universe: Retrograde —— NPC 名称的「职能/职位」后缀表
+# 与前缀表组合使用；也供 GBFM 站点名 / KEYM 钥匙名 复用
+Thug	暴徒
+Goon	帮众
+Punk	混混
+Rat	鼠辈
+Scav	拾荒者
+Mule	驮货手
+Runner	跑腿
+Lookout	望风者
+Courier	信使
+Guard	守卫
+Sentry	哨兵
+Mechanic	机修工
+Welder	焊工
+Rigger	装配工
+Scrapper	拆解工
+Salvager	打捞员
+Looter	掠夺者
+Reaver	强袭者
+Bruiser	蛮汉
+Enforcer	打手
+Captain	船长
+Lieutenant	中尉
+Sergeant	中士
+Commander	指挥官
+Chief	首领
+Boss	头目
+Kingpin	大头目
+Underboss	副头目
+Overseer	监工
+Taskmaster	监工头
+Deckhand	甲板工
+Dockhand	码头工
+Deck Lead	甲板长
+Dock Lead	码头长
+Section Lead	组长
+Shift Lead	班长
+Squad Lead	小队长
+Crew Lead	船员长
+Gang Lead	帮派长
+Raid Lead	突袭长
+Salvage Lead	打捞长
+Boarding Lead	登船长
+Patrol Lead	巡逻长
+Assault Lead	突击长
+Fire Team Lead	火力组长
+Supply Chain Lead	供应链长
+Gun Section Lead	枪械组长
+Dock Section Lead	码头组长
+Senior Hand	资深水手
+Chief Mate	大副
+Senior Mate	资深大副
+Wireman	电线工
+Machinist	机械师
+Stockpiler	囤货者
+Fuel Runner	燃料运输员
+Loot Runner	赃物运输员
+Goods Mover	货物搬运工
+Body Hauler	尸体搬运工
+Crate Hauler	货箱搬运工
+Scrap Hauler	废料搬运工
+Munitions Loader	弹药装填手
+Depot Loader	补给站装卸工
+Manifest Clerk	舱单文员
+Inventory Clerk	库存文员
+Supply Coordinator	补给协调员
+Procurement Lead	采购长
+Salvage Broker	打捞经纪人
+Cargo Broker	货物经纪人
+Black Market Dealer	黑市商人
+Arms Dealer	军火商
+Parts Hawker	零件小贩
+Junk Peddler	废品小贩
+Spark Jockey	电工
+Torch Hand	焊枪手
+Bolt Breaker	螺栓拆卸工
+Pipe Bender	弯管工
+Wire Cutter	剪线工
+Jury Rigger	应急装配工
+Reactor Cracker	反应堆拆解工
+Drive Wrench	驱动扳手
+Drive Engineer	驱动工程师
+Drive Mechanic	驱动技工
+Reactor Technician	反应堆技师
+Reactor Attendant	反应堆看护员
+Reactor Specialist	反应堆专家
+Comms Technician	通讯技师
+Comms Specialist	通讯专家
+Systems Technician	系统技师
+Systems Mechanic	系统技工
+Systems Architect	系统架构师
+Systems Overseer	系统监工
+Hull Mechanic	船体技工
+Hull Technician	船体技师
+Hull Rigger	船体装配工
+Hull Welder	船体焊工
+Hull Scrapper	船体拆解工
+Hull Salvager	船体打捞员
+Hull Scav	船体拾荒者
+Patch Rigger	修补装配工
+Patch Welder	修补焊工
+Arc Welder	电弧焊工
+Cable Rigger	缆线装配工
+Wire Scrapper	电线拆解工
+Wire Salvager	电线打捞员
+Wire Scav	电线拾荒者
+Wire Monkey	电线猴
+Chop Scrapper	拆船工
+Chop Shop Boss	拆船厂头目
+Scrap Engineer	废料工程师
+Cargo Thug	货运暴徒
+Cargo Goon	货运帮众
+Cargo Punk	货运混混
+Cargo Looter	货运掠夺者
+Cargo Runner	货运跑腿
+Cargo Mule	货运驮手
+Cargo Guard	货运守卫
+Cargo Grunt	货运杂兵
+Dock Thug	码头暴徒
+Dock Goon	码头帮众
+Dock Punk	码头混混
+Dock Rat	码头鼠辈
+Dock Boss	码头头目
+Dock Bruiser	码头蛮汉
+Dock Sergeant	码头中士
+Dock Taskmaster	码头监工头
+Dock Sentry	码头哨兵
+Dock Lookout	码头望风者
+Station Punk	站点混混
+Station Veteran	站点老兵
+Station Lieutenant	站点中尉
+Station Nomad	站点游民
+Station Looter	站点掠夺者
+Station Thug	站点暴徒
+Station Enforcer	站点打手
+Station Boss	站点头目
+Station Chief	站点首领
+Station Kingpin	站点大头目
+Station Underboss	站点副头目
+Station Warlord	站点军阀
+Station Commander	站点指挥官
+Station Overseer	站点监工
+Station Superintendent	站点总管
+Station Grunt	站点杂兵
+Void Reaver	虚空强袭者
+Void Nomad	虚空游民
+Void Enforcer	虚空打手
+Void Aspirant	虚空向往者
+Void Captain	虚空船长
+Alley Thug	巷道暴徒
+Tunnel Rat	隧道鼠辈
+Vent Rat	通风管鼠辈
+Stash Rat	藏匿处鼠辈
+Grease Rat	油污鼠辈
+Wreck Looter	残骸掠夺者
+Armed Nomad	武装游民
+Armed Wanderer	武装流浪者
+Armed Pilgrim	武装朝圣者
+Nomad	游民
+Veteran	老兵
+Combat Veteran	战斗老兵
+Senior Veteran	资深老兵
+Field Veteran	战地老兵
+Recruit	新兵
+New Recruit	新兵
+Fresh Recruit	新兵
+Field Recruit	战地新兵
+Trooper	士兵
+Patrol Trooper	巡逻兵
+Perimeter Trooper	外围士兵
+Garrison Trooper	驻防士兵
+Outpost Grunt	前哨杂兵
+Grunt	杂兵
+Supply Grunt	补给杂兵
+Supply Hand	补给手
+Supply Master	补给主管
+Supply Carrier	补给运输员
+Agent	探员
+Scout Agent	侦察斥候
+Recon Agent	侦察探员
+Field Agent	战地探员
+Field Officer	战地军官
+Field Handler	战地领队
+Field Technician	战地技师
+Field Indoctrinator	战地教导官
+Field Colonel	战地上校
+Field Commander	战地指挥官
+Field Sergeant	战地中士
+Watch Officer	值班军官
+Tactical Officer	战术军官
+Logistics Officer	后勤军官
+Acquisitions Officer	采购军官
+Contraband Officer	违禁品军官
+Security Chief	安保主管
+Security Captain	安保队长
+Operations Chief	作战主管
+Operations Head	作战负责人
+Operations Sergeant	作战中士
+Chief Engineer	总工程师
+Chief Mechanic	总机修师
+Director	主管
+Armory Director	军械主管
+Superintendent	总管
+Marshal	执法官
+General	将军
+Colonel	上校
+Senior Colonel	资深上校
+Brigadier	准将
+Commissar	政委
+Senior Commissar	资深政委
+Battle Commissar	战斗政委
+War Captain	战队长
+Serpent Captain	蛇队队长
+Fleet Captain	舰队队长
+Boarding Captain	登船队长
+Assault Captain	突击队长
+Strike Captain	突击队长
+Raid Captain	突袭队长
+Crew Captain	船员队长
+Gang Chief	帮派首领
+Gang Boss	帮派头目
+Gang Commander	帮派指挥官
+Gang Lieutenant	帮派中尉
+Gang Underboss	帮派副头目
+Crew Boss	船员头目
+Crew Sergeant	船员中士
+Gun Sergeant	枪械中士
+Combat Sergeant	战斗中士
+Senior Enforcer	资深打手
+Head Enforcer	首席打手
+Devoted Enforcer	虔诚打手
+Serpent Enforcer	蛇队打手
+Senior Bruiser	资深蛮汉
+Head Bruiser	首席蛮汉
+Senior Reaver	资深强袭者
+Lead Reaver	领队强袭者
+Warlord	军阀
+Raid Warlord	突袭军阀
+Raid Warden	突袭看守
+Raid Commander	突袭指挥官
+Raid Veteran	突袭老兵
+Dispatch Lead	调度长
+Salvage Chief	打捞主管
+Keeper	看守
+Shrine Keeper	神龛看守
+Relic Keeper	圣物看守
+Gate Keeper	门卫
+Watcher	守望者
+Night Watcher	夜巡者
+Flame Watcher	火焰守望者
+Gate Watcher	门禁守望者
+Initiate	入门者
+New Initiate	新入门者
+Bound Initiate	受缚入门者
+Sworn Initiate	宣誓入门者
+Novice	修行者
+Temple Novice	神庙修行者
+Serpent Novice	蛇神修行者
+Flame Novice	火焰修行者
+Aspirant	向往者
+Path Aspirant	道途向往者
+Truth Aspirant	真理向往者
+Supplicant	恳求者
+Blade Supplicant	利刃恳求者
+Faith Supplicant	信仰恳求者
+Sworn Supplicant	宣誓恳求者
+Pilgrim	朝圣者
+Devoted Pilgrim	虔诚朝圣者
+Wanderer	流浪者
+Roaming Wanderer	漫游者
+Devoted Wanderer	虔诚漫游者
+Acolyte	侍僧
+Flame Acolyte	火焰侍僧
+Priest	祭司
+War Priest	战祭司
+High Priest	大祭司
+Serpent Priest	蛇神祭司
+Senior Prelate	资深教长
+Deacon	执事
+War Deacon	战执事
+Exarch	主教
+Regent	摄政
+Grand Regent	大摄政
+Battle Regent	战斗摄政
+Interrogator	审讯官
+Grand Interrogator	大审讯官
+Temple Interrogator	神庙审讯官
+Faith Interrogator	信仰审讯官
+Indoctrinator	教导官
+Senior Indoctrinator	资深教导官
+Combat Indoctrinator	战斗教导官
+High Overseer	高级监工
+Supreme Overseer	最高监工
+Acting Overseer	代理监工
+Junior Overseer	初级监工
+Senior Taskmaster	资深监工头
+Gun Taskmaster	枪械监工头
+Tithe Collector	什一税征收员
+Tithe Auditor	什一税审计员
+Relic Procurer	圣物征集者
+Relic Courier	圣物信使
+Offering Bearer	供奉搬运者
+Acquisitions Handler	采购领队
+Asset Runner	资产运送员
+Cache Tender	藏匿点看管员
+Cell Handler	小组领队
+Cell Leader	小组首领
+Temple Leader	神庙首领
+Crusade Leader	圣战首领
+Shrine Guard	神龛守卫
+Temple Guard	神庙守卫
+Sanctum Guard	圣所守卫
+Facility Guard	设施守卫
+Lockup Guard	禁闭室守卫
+Checkpoint Guard	检查站守卫
+Post Guard	岗哨守卫
+Gate Guard	大门守卫
+Gate Sentry	大门哨兵
+Tower Sentry	塔楼哨兵
+Lead Technician	首席技师
+Technician	技师
+Specialist	专家
+Weapons Specialist	武器专家
+Demolitions Specialist	爆破专家
+Ordnance Expert	军械专家
+Architect	架构师
+Calibrator	校准员
+Fabricator	制造工
+Module Fabricator	模块制造工
+Circuit Fabricator	电路制造工
+Handler	领队
+Senior Handler	资深领队
+Lootmaster	战利品官
+Syndicate Head	辛迪加头目
+Sector Kingpin	星区大头目
+Black Quartermaster	黑市军需官
+Quartermaster Aide	军需助理
+Requisitions Aide	征用助理
+Warehouse Attendant	仓库看管员
+Stockroom Attendant	库房看管员
+Manifest Runner	舱单跑腿
+Package Courier	包裹信使
+Dead Drop Courier	死信箱信使
+Drop Mule	送货驮手
+Patrol Scout	巡逻斥候
+Scout	斥候
+Perimeter Scout	外围斥候
+Forward Scout	前锋斥候
+War Chief	战争首领
+Lookout	望风者
+Gun Lookout	持枪望风者
+Gate Lookout	大门望风者
+Dock Lookout	码头望风者
+Seeker	追寻者
+Disciple	门徒
+Inquisitor	审判官
+Bag Man	收账人
+Junk Scav	废品拾荒者
+Junk Salvager	废品打捞员
+Gate Goon	大门帮众
+Fence Boss	销赃头目
+Contraband Mule	违禁品驮手
+Pickpocket	扒手
+Blade Hand	刀手
+Gun Hand Lead	枪手队长
+Gun Hand	枪手
+Hauler	搬运工
+Officer	军官
+Junior Lieutenant	初级中尉
+Crate Flipper	货箱翻找者
+Gun Boss	枪械头目
+Flame Crusader	火焰十字军
+Garrison Captain	驻防队长
+Acting Lieutenant	代理中尉
+Garrison Superintendent	驻防总管
+Key	钥匙

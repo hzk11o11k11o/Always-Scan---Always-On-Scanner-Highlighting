@@ -1,0 +1,147 @@
+#en	zh
+# Dark Universe: Overtime —— 任务名 / 目标 / 阶段日志（保留 <Alias=...> 占位符原样）
+Defeat <Alias=BountyTarget>	击败<Alias=BountyTarget>
+Hijacked: <Alias=PrimaryRef>	遭劫持：<Alias=PrimaryRef>
+Recover the Critical UC Files	找回关键联殖文件
+Deliver Log to <Alias=FinalLocation>	将日志送至<Alias=FinalLocation>
+Fabricate Component: <Alias=Evidence>	制造部件：<Alias=Evidence>
+Deliver <Alias=Evidence> to The Clinic	将<Alias=Evidence>送至星际诊所号
+Raw Materials: 15 <Alias=ResourceName>	原材料：15 <Alias=ResourceName>
+Destroy Robot At <Alias=DungeonLocation>	摧毁位于<Alias=DungeonLocation>的机器人
+Locate and Survey the <Alias=PrimaryRef>	找到并勘测<Alias=PrimaryRef>
+Locate and repair the <Alias=PrimaryRef>	找到并维修<Alias=PrimaryRef>
+Dismantle: Robots on <Alias=targetPlanet>	拆解：<Alias=targetPlanet>上的机器人
+Infiltration: <Alias=TargetPlanetLocation>	潜入：<Alias=TargetPlanetLocation>
+Deploy <Alias=Evidence> at the base of Neon	在霓虹城底部部署<Alias=Evidence>
+Basic Manufacturing: 20 <Alias=ResourceName>	基础制造：20 <Alias=ResourceName>
+Deliver <Alias=Evidence> to Midtown Minerals	将<Alias=Evidence>送至中城矿业
+Chunks Delivery: <Alias=TargetPlanetLocation>	块餐递送：<Alias=TargetPlanetLocation>
+Deliver Package: <Alias=TargetSystemLocation>	递送包裹：<Alias=TargetSystemLocation>
+Advanced Manufacturing: 5 <Alias=ResourceName>	高级制造：5 <Alias=ResourceName>
+Deliver <Alias=Evidence> to Centaurian Arsenal	将<Alias=Evidence>送至半人马军械库
+Deliver Goods Package to <Alias=FinalLocation>	将货物包裹送至<Alias=FinalLocation>
+Hauling: Goods Package on <Alias=targetPlanet>	运输：<Alias=targetPlanet>上的货物包裹
+Medical Delivery: <Alias=TargetPlanetLocation>	医疗递送：<Alias=TargetPlanetLocation>
+Survey Equipment: <Alias=TargetSystemLocation>	勘测设备：<Alias=TargetSystemLocation>
+Defeat Test Subjects At <Alias=DungeonLocation>	击败位于<Alias=DungeonLocation>的测试对象
+Deliver Terrain Mapper to <Alias=FinalLocation>	将地形测绘仪送至<Alias=FinalLocation>
+Hauling: Terrain Mapper on <Alias=targetPlanet>	运输：<Alias=targetPlanet>上的地形测绘仪
+Cataxi Infestation: <Alias=TargetPlanetLocation>	卡塔西虫侵扰：<Alias=TargetPlanetLocation>
+Collect Goods Package at <Alias=DungeonLocation>	在<Alias=DungeonLocation>收集货物包裹
+Collect the bounty at the <Alias=TargetLocation>	在<Alias=TargetLocation>领取赏金
+Stolen Shipment: Antique on <Alias=targetPlanet>	失窃货物：<Alias=targetPlanet>上的古董
+TerraBrew Delivery: <Alias=TargetPlanetLocation>	地球酿酒递送：<Alias=TargetPlanetLocation>
+Collect Terrain Mapper at <Alias=DungeonLocation>	在<Alias=DungeonLocation>收集地形测绘仪
+Deliver <Alias=Evidence> to New Atlantis Galbank 	将<Alias=Evidence>送至新亚特兰蒂斯城银河银行
+Deliver Mail Consignment to <Alias=FinalLocation>	将邮件托运送至<Alias=FinalLocation>
+Deliver Medical Shipment to <Alias=FinalLocation>	将医疗货物送至<Alias=FinalLocation>
+Gastronomy Delivery: <Alias=TargetPlanetLocation>	美食递送：<Alias=TargetPlanetLocation>
+Hauling: Mail Consignment on <Alias=targetPlanet>	运输：<Alias=targetPlanet>上的邮件托运
+Hauling: Medical Shipment on <Alias=targetPlanet>	运输：<Alias=targetPlanet>上的医疗货物
+Player left location - safe to clean up container	玩家已离开地点 - 可安全清理容器
+Deliver <Alias=Evidence> to the Neon Mining League	将<Alias=Evidence>送至霓虹城矿业联盟
+Predator Infestation: <Alias=TargetPlanetLocation>	掠食者侵扰：<Alias=TargetPlanetLocation>
+Collect Mail Consignment at <Alias=DungeonLocation>	在<Alias=DungeonLocation>收集邮件托运
+Collect Medical Shipment at <Alias=DungeonLocation>	在<Alias=DungeonLocation>收集医疗货物
+Deliver <Alias=Evidence> to The Den Trade Authority	将<Alias=Evidence>送至巢穴站贸易管理局
+Heetleech Infestation: <Alias=TargetSystemLocation>	热蛭侵扰：<Alias=TargetSystemLocation>
+Hunt: Escaped test subjects on <Alias=targetPlanet>	狩猎：<Alias=targetPlanet>上逃脱的测试对象
+Bounty: <Alias=BountyTarget> on <Alias=targetPlanet>	赏金：<Alias=targetPlanet>上的<Alias=BountyTarget>
+Danger: <Alias=BountyTarget> on <Alias=targetPlanet>	危险：<Alias=targetPlanet>上的<Alias=BountyTarget>
+Deliver 5 <Alias=ResourceName> to <Alias=PrimaryRef>	将5件<Alias=ResourceName>送至<Alias=PrimaryRef>
+Strike: <Alias=BountyTarget> on <Alias=targetPlanet>	打击：<Alias=targetPlanet>上的<Alias=BountyTarget>
+UC Recovery: Stolen UC Files on <Alias=targetPlanet>	联殖回收：<Alias=targetPlanet>上的失窃联殖文件
+Deliver 15 <Alias=ResourceName> to <Alias=PrimaryRef>	将15件<Alias=ResourceName>送至<Alias=PrimaryRef>
+Deliver 20 <Alias=ResourceName> to <Alias=PrimaryRef>	将20件<Alias=ResourceName>送至<Alias=PrimaryRef>
+Deliver Cybersecurity Module to <Alias=FinalLocation>	将网络安全模块送至<Alias=FinalLocation>
+Deliver Rare Metals Shipment to <Alias=FinalLocation>	将稀有金属货物送至<Alias=FinalLocation>
+Deliver Stolen Mech Research to <Alias=FinalLocation>	将失窃机甲研究送至<Alias=FinalLocation>
+Player arrives in target system - update quest target	玩家抵达目标星系 - 更新任务目标
+Defeat <Alias=BountyTarget> At <Alias=DungeonLocation>	在<Alias=DungeonLocation>击败<Alias=BountyTarget>
+Deliver Stolen Encryption Key to <Alias=FinalLocation>	将失窃加密密钥送至<Alias=FinalLocation>
+Collect Cybersecurity Module at <Alias=DungeonLocation>	在<Alias=DungeonLocation>收集网络安全模块
+Find <Alias=CorpseContainer> At <Alias=DungeonLocation>	在<Alias=DungeonLocation>找到<Alias=CorpseContainer>
+Recover Rare Metals Shipment at <Alias=DungeonLocation>	在<Alias=DungeonLocation>找回稀有金属货物
+Recover Stolen Mech Research at <Alias=DungeonLocation>	在<Alias=DungeonLocation>找回失窃机甲研究
+Board <Alias=PrimaryRef> At <Alias=TargetPlanetLocation>	在<Alias=TargetPlanetLocation>登临<Alias=PrimaryRef>
+Recover Stolen Encryption Key at <Alias=DungeonLocation>	在<Alias=DungeonLocation>找回失窃加密密钥
+Defeat <Alias=PrimaryRef> At <Alias=TargetPlanetLocation>	在<Alias=TargetPlanetLocation>击败<Alias=PrimaryRef>
+Deliver Critical Firmware Update to <Alias=FinalLocation>	将关键固件更新送至<Alias=FinalLocation>
+Deliver Regolith Extraction Unit to <Alias=FinalLocation>	将风化层提取装置送至<Alias=FinalLocation>
+Deliver Stolen Critical UC Files to <Alias=FinalLocation>	将失窃的关键联殖文件送至<Alias=FinalLocation>
+Dismantle: Kill the Robot on <Alias=TargetPlanetLocation>	拆解：击杀<Alias=TargetPlanetLocation>上的机器人
+Hauling: Regolith Extraction Unit on <Alias=targetPlanet>	运输：<Alias=targetPlanet>上的风化层提取装置
+Recover the <Alias=Treasure> from <Alias=DungeonLocation>	从<Alias=DungeonLocation>找回<Alias=Treasure>
+Stolen Shipment: <Alias=Treasure> on <Alias=targetPlanet>	失窃货物：<Alias=targetPlanet>上的<Alias=Treasure>
+[The data slate contains information on a nearby mission]	[数据板含有附近任务的信息]
+[The data slate contains information on a remote mission]	[数据板含有远程任务的信息]
+Bounty: <Alias=PrimaryRef> at <Alias=TargetPlanetLocation>	赏金：<Alias=TargetPlanetLocation>的<Alias=PrimaryRef>
+Danger: <Alias=PrimaryRef> at <Alias=TargetPlanetLocation>	危险：<Alias=TargetPlanetLocation>的<Alias=PrimaryRef>
+Deliver Public Utility Blueprints to <Alias=FinalLocation>	将公共设施蓝图送至<Alias=FinalLocation>
+Deploy <Alias=Evidence> at the Experiment Location in Neon	在霓虹城的实验地点部署<Alias=Evidence>
+Destroy <Alias=PrimaryRef> At <Alias=TargetPlanetLocation>	摧毁位于<Alias=TargetPlanetLocation>的<Alias=PrimaryRef>
+Hauling: Cybersecurity Module Unit on <Alias=targetPlanet>	运输：<Alias=targetPlanet>上的网络安全模块
+Repair: <Alias=PrimaryRef> at <Alias=TargetSystemLocation>	维修：<Alias=TargetSystemLocation>的<Alias=PrimaryRef>
+Survey: <Alias=PrimaryRef> at <Alias=TargetSystemLocation>	勘测：<Alias=TargetSystemLocation>的<Alias=PrimaryRef>
+UC Recovery: Stolen Encryption Key on <Alias=targetPlanet>	联殖回收：<Alias=targetPlanet>上的失窃加密密钥
+Collect Regolith Extraction Unit at <Alias=DungeonLocation>	在<Alias=DungeonLocation>收集风化层提取装置
+Deliver <Alias=Evidence> to Reliant Medical in New Atlantis	将<Alias=Evidence>送至新亚特兰蒂斯城的信实医疗
+Recover Critical Firmware Update at <Alias=DungeonLocation>	在<Alias=DungeonLocation>找回关键固件更新
+Recover Stolen Critical UC Files at <Alias=DungeonLocation>	在<Alias=DungeonLocation>找回失窃的关键联殖文件
+Boarding: <Alias=PrimaryRef> at <Alias=TargetPlanetLocation>	登船：<Alias=TargetPlanetLocation>的<Alias=PrimaryRef>
+Bounty: Kill the Spacer Gang on <Alias=TargetPlanetLocation>	赏金：击杀<Alias=TargetPlanetLocation>上的太空劫匪团伙
+Cargo Recovery: Rare Metals Shipment on <Alias=targetPlanet>	货运回收：<Alias=targetPlanet>上的稀有金属货物
+Deliver Stolen Xenowarfare Research to <Alias=FinalLocation>	将失窃异兽作战研究送至<Alias=FinalLocation>
+Hijacked: <Alias=PrimaryRef> at <Alias=TargetPlanetLocation>	遭劫持：<Alias=TargetPlanetLocation>的<Alias=PrimaryRef>
+Recover Public Utility Blueprints at <Alias=DungeonLocation>	在<Alias=DungeonLocation>找回公共设施蓝图
+Recovery: <Alias=PrimaryRef> at <Alias=TargetPlanetLocation>	回收：<Alias=TargetPlanetLocation>的<Alias=PrimaryRef>
+Rustborn: <Alias=PrimaryRef> at <Alias=TargetPlanetLocation>	锈生：<Alias=TargetPlanetLocation>的<Alias=PrimaryRef>
+Dark Site: <Alias=PrimaryRef> at <Alias=TargetPlanetLocation>	暗点：<Alias=TargetPlanetLocation>的<Alias=PrimaryRef>
+Dark Site: <Alias=PrimaryRef> at <Alias=TargetPlanetLocation> 	暗点：<Alias=TargetPlanetLocation>的<Alias=PrimaryRef>
+Data recovery: <Alias=ActivatorTarget> on <Alias=targetPlanet>	数据回收：<Alias=targetPlanet>上的<Alias=ActivatorTarget>
+Recover Stolen Xenowarfare Research at <Alias=DungeonLocation>	在<Alias=DungeonLocation>找回失窃异兽作战研究
+Deliver Terraforming Procedure Manuals to <Alias=FinalLocation>	将地球化改造程序手册送至<Alias=FinalLocation>
+Missing Person: <Alias=CorpseContainer> on <Alias=targetPlanet>	失踪人口：<Alias=targetPlanet>上的<Alias=CorpseContainer>
+UC Navy SOS: <Alias=PrimaryRef> at <Alias=TargetPlanetLocation>	联殖海军求救：<Alias=TargetPlanetLocation>的<Alias=PrimaryRef>
+Bounty: Kill the Ecliptic Legion on <Alias=TargetPlanetLocation>	赏金：击杀<Alias=TargetPlanetLocation>上的黄道佣兵团军团
+Cargo Recovery: Critical Firmware Update on <Alias=targetPlanet>	货运回收：<Alias=targetPlanet>上的关键固件更新
+Data Collection: <Alias=ActivatorTarget> on <Alias=targetPlanet>	数据收集：<Alias=targetPlanet>上的<Alias=ActivatorTarget>
+Freestar SOS: <Alias=PrimaryRef> at <Alias=TargetPlanetLocation>	星联求救：<Alias=TargetPlanetLocation>的<Alias=PrimaryRef>
+Syndicate Recovery: Stolen Mech Research on <Alias=targetPlanet>	辛迪加回收：<Alias=targetPlanet>上的失窃机甲研究
+UC Recovery: Stolen Xenowarfare Research on <Alias=targetPlanet>	联殖回收：<Alias=targetPlanet>上的失窃异兽作战研究
+Cargo Recovery: Public Utility Blueprints on <Alias=targetPlanet>	货运回收：<Alias=targetPlanet>上的公共设施蓝图
+Recover Terraforming Procedure Manuals at <Alias=DungeonLocation>	在<Alias=DungeonLocation>找回地球化改造程序手册
+Collect data from <Alias=ActivatorTarget> At <Alias=DungeonLocation>	从<Alias=DungeonLocation>的<Alias=ActivatorTarget>收集数据
+Boarding: Derelict <Alias=PrimaryRef> at <Alias=TargetPlanetLocation>	登船：<Alias=TargetPlanetLocation>的废弃<Alias=PrimaryRef>
+Bounty: Kill the Crimson Fleet Brigade on <Alias=TargetPlanetLocation>	赏金：击杀<Alias=TargetPlanetLocation>上的深红舰队旅团
+Cargo Recovery: Terraforming Procedure Manuals on <Alias=targetPlanet>	货运回收：<Alias=targetPlanet>上的地球化改造程序手册
+Delivery Box at <Alias=TargetLocation> on <Alias=TargetPlanetLocation>	<Alias=TargetPlanetLocation>上<Alias=TargetLocation>的递送箱
+Destroy Nest at <Alias=TargetLocation> on <Alias=TargetPlanetLocation>	摧毁<Alias=TargetPlanetLocation>上<Alias=TargetLocation>的巢穴
+Destroy Stash at <Alias=TargetLocation> on <Alias=TargetPlanetLocation>	摧毁<Alias=TargetPlanetLocation>上<Alias=TargetLocation>的藏匿点
+Recover the Antique from <Alias=DungeonLocation> on <Alias=TargetPlanet>	从<Alias=TargetPlanet>的<Alias=DungeonLocation>找回古董
+Dark Universe: Overtime bounties now available from all bounty terminals.	暗宇宙：加班——所有赏金终端现已提供悬赏。
+Destroy Predators at <Alias=TargetLocation> on <Alias=TargetPlanetLocation>	消灭<Alias=TargetPlanetLocation>上<Alias=TargetLocation>的掠食者
+Destroy Heatleech Nest at <Alias=TargetLocation> on <Alias=TargetPlanetLocation>	摧毁<Alias=TargetPlanetLocation>上<Alias=TargetLocation>的热蛭巢穴
+Pickup <Alias=Evidence> at <Alias=TargetLocation> on <Alias=TargetPlanetLocation>	在<Alias=TargetPlanetLocation>的<Alias=TargetLocation>拾取<Alias=Evidence>
+Recover <Alias=Evidence> at <Alias=TargetLocation> on <Alias=TargetPlanetLocation>	在<Alias=TargetPlanetLocation>的<Alias=TargetLocation>找回<Alias=Evidence>
+Transfer <Alias=Evidence> at <Alias=TargetLocation> on <Alias=TargetPlanetLocation>	在<Alias=TargetPlanetLocation>的<Alias=TargetLocation>移交<Alias=Evidence>
+Deliver 3 <Alias=Evidence> to <Alias=TargetLocation> on <Alias=TargetPlanetLocation>	将3件<Alias=Evidence>送至<Alias=TargetPlanetLocation>的<Alias=TargetLocation>
+Deliver 4 <Alias=Evidence> to <Alias=TargetLocation> on <Alias=TargetPlanetLocation>	将4件<Alias=Evidence>送至<Alias=TargetPlanetLocation>的<Alias=TargetLocation>
+Deliver 5 <Alias=Evidence> to <Alias=TargetLocation> on <Alias=TargetPlanetLocation>	将5件<Alias=Evidence>送至<Alias=TargetPlanetLocation>的<Alias=TargetLocation>
+Deliver 8 <Alias=Evidence> to <Alias=TargetLocation> on <Alias=TargetPlanetLocation>	将8件<Alias=Evidence>送至<Alias=TargetPlanetLocation>的<Alias=TargetLocation>
+Sabotage Ecliptic Scanners at <Alias=TargetLocation> on <Alias=TargetPlanetLocation>	破坏<Alias=TargetPlanetLocation>上<Alias=TargetLocation>的黄道佣兵团扫描仪
+Wipe Out Ecliptic Scanners at <Alias=TargetLocation> on <Alias=TargetPlanetLocation>	清除<Alias=TargetPlanetLocation>上<Alias=TargetLocation>的黄道佣兵团扫描仪
+Burn the Heretical Writings at <Alias=TargetLocation> on <Alias=TargetPlanetLocation>	烧毁<Alias=TargetPlanetLocation>上<Alias=TargetLocation>的异教著作
+Wipe Out Crimson Fleet Stockpile at <Alias=TargetLocation> on <Alias=TargetPlanetLocation>	清除<Alias=TargetPlanetLocation>上<Alias=TargetLocation>的深红舰队储备
+Take Out Crimson Fleets Cave Stockpile at <Alias=TargetLocation> on <Alias=TargetPlanetLocation>	摧毁<Alias=TargetPlanetLocation>上<Alias=TargetLocation>的深红舰队洞穴储备
+Startup	启动
+Stop Stage	停止阶段
+Startup Stage	启动阶段
+Set ships aggressive	将飞船设为敌对
+Player entered location	玩家进入地点
+Player has entered location	玩家已进入地点
+Player Responded to Hail	玩家回应了呼叫
+stage 2 set hailing scene	阶段2：设置呼叫场景
+Player arrives in target system - update quest target	玩家抵达目标星系 - 更新任务目标
+Calculate Rewards	计算奖励
+Complete Quest	完成任务

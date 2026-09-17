@@ -1,0 +1,6 @@
+*Starfield.esm
+*du_xfire.esm
+*du_overtime.esm
+*du_outlaws_01.esm
+*du_retrograde.esm
+*du_takeover.esm

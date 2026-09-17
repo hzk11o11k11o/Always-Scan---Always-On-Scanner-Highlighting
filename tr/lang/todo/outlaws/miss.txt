@@ -1,0 +1,286 @@
+#rec	text
+BOOK	Hullborn Collective Crew Notes
+BOOK	Green Corridor Draft
+BOOK	Ghost Lines of Triage
+BOOK	Triage Route Manifest
+BOOK	Ghosts in the Wiring
+BOOK	Echoes In The Grid
+BOOK	Stolen Corridor Chain
+BOOK	Forked Vector Cache
+BOOK	Grav Echo Ledger
+BOOK	Bent Vectors
+BOOK	Grave Spin Ledger
+BOOK	Test Mission Slate
+BOOK	Test Info  Mission Slate
+BOOK	Test Mission Slate
+BOOK	Space Quest Test 
+BOOK	Lore Book
+BOOK	Kade Pocket Ledger
+BOOK	Whispers Beyond the Manifests
+BOOK	Aegis Shadow Trace
+BOOK	Feral Lancers Summary
+BOOK	Broken Grid Handshake
+BOOK	Whispers Between Jump Points
+BOOK	Fractured Regiment Ledger
+BOOK	Ghosts in the Supply Lines
+BOOK	Borderline Routing Log
+BOOK	Renegade Guard Overview
+BOOK	Gravepack Relay Whispers
+BOOK	Gravline On The Wire
+BOOK	Gravline Route Index
+BOOK	Disavowed Guard Activity Reports
+BOOK	Mesh Trace Index
+BOOK	Forsaken Regiment Crew Notes
+BOOK	Ghost In The Lanes
+BOOK	Bloodied Phalanx Documentation
+BOOK	Aegis Drift Log
+BOOK	Storms Bought In Silence
+BOOK	Stormbroker Contract Notes
+BOOK	Orbit Of Buried Truth
+BOOK	Ghost Lane Audit
+BOOK	Echo Fork Registry
+BOOK	Echo Vector Ledger
+BOOK	Graves Along The Vectors
+BOOK	Scorched Manifest
+BOOK	Stolen Vector Tablet
+BOOK	Diego "Vector" Arancibia Daily Entries
+BOOK	Graves Along The Lanes
+BOOK	Salvage Crown Syndicate Statement
+BOOK	Iron Unit Statement
+BOOK	Wayward Taskforce Voyage Notes
+BOOK	Neon Ledger Lines
+BOOK	Echoes On The Ridge
+BOOK	Thermal Drift Log
+BOOK	Silent Drift Manifest
+BOOK	Graveyard Burn Itinerary
+BOOK	Fold Inversion Path
+BOOK	Graveyard Salvagers Operations Logs
+BOOK	Nullspace Salvagers Shipboard Records
+BOOK	Ledger Spiral Map
+BOOK	Cinderfield Syndicate Mission Notes
+BOOK	Whispers In The Lanes
+BOOK	Grim Cohort Ledger
+BOOK	Outcast Detail Daily Entries
+BOOK	Breakaway Strike Group Overview
+BOOK	Collateral Drift Manifest
+BOOK	Throat Of Neon
+BOOK	Dryline Manifolds Index
+BOOK	Ghost Window Chart
+BOOK	Ghosts Between the Lanes
+BOOK	Silent Vector
+BOOK	Grey Track Manifold
+BOOK	Mutineer Platoon Notes
+BOOK	Grid Ghost Logs
+BOOK	Haunted Corridors
+BOOK	Aegis Shadow Routes
+BOOK	Offset Transit Log
+BOOK	Echoes In The Lanes
+BOOK	Gravline Audit Ledger
+BOOK	Phantom Corridor Logs
+BOOK	Null Window Briefing
+BOOK	Bent Lanes Silent Signals
+BOOK	Discarded Route Shard
+BOOK	Mutineer Division Travel Records
+BOOK	Black Drift Recovery Team Mission Notes
+BOOK	Diego "Vector" Salazar Notes
+BOOK	Neglected Drift Logs
+BOOK	Convergence Relay Log
+BOOK	Deadline Guard Summary
+BOOK	Dead Ledger Rising
+BOOK	Relay Ghost Log
+BOOK	Drift Into Catastrophe
+BOOK	Spiral Drift Log
+BOOK	Vector Fork Log
+BOOK	Paperwork to Nowhere
+BOOK	Redacted Lancers Daily Entries
+BOOK	Cold Brace Manifest
+BOOK	Whispers In The Circuit
+BOOK	Drifting Clinic Log
+BOOK	Salvage Crown Union Diary
+BOOK	Shadow In The Framework
+BOOK	Grav Shadow Log
+BOOK	Crates On Lost Lanes
+BOOK	Frontier Drift Ledger
+BOOK	Dead Seed Ledger
+BOOK	Duststorm Freight Ledger
+BOOK	Paper Ghost Lanes
+BOOK	Fragments In The Dark
+BOOK	Blind Corridor Ledger
+BOOK	Windowmaker Drift Log
+BOOK	Whispers In The Grav\n\n
+BOOK	Cheyenne Vector Log
+BOOK	Shadow On The Manifests
+BOOK	Whispers In The Manifolds
+BOOK	Ghost Corridor Index
+BOOK	Gravestone Claim Jumpers Crew Notes
+BOOK	Lost Legion Crew Journals
+BOOK	Ghostlane Cargo Index
+BOOK	Whispers on Dead Lanes
+BOOK	Quiet Yard Manifest
+BOOK	Off-Axis Origin
+BOOK	Nameless Trails to Nowhere
+BOOK	Silent Vector Brief
+BOOK	Blind Airpath Logs
+BOOK	Sundered Commandos Work Entries
+BOOK	Echo Ledger Route
+BOOK	Ghostlines In Transit
+BOOK	Echo Uplink Route
+BOOK	Silent Vector Anomaly
+BOOK	Phantom Corridor Slate
+BOOK	Cheyenne Approach Fragment
+BOOK	Echoes In The Void
+BOOK	Ghost Corridor Origins
+BOOK	Blind Corridor Ledger
+BOOK	Echoes In The Manifests
+BOOK	Overwatch Vector Trace
+BOOK	Scrapline Breakers Status Reports
+BOOK	Ghosts Between The Stars
+BOOK	Ghostlane Access Log
+BOOK	Null Vector Ledger
+BOOK	Ghost In The Manifests
+BOOK	Broken Vector Playbook
+BOOK	Dead Orbit Collective Duty Records
+BOOK	Turnpoint Claim Ledger
+BOOK	Ghost Inbound Traffic
+BOOK	Ghost Salvage Log
+BOOK	Edge Of Harmonics
+BOOK	Anchor Drift Log
+BOOK	Moonside Manifest Fragments
+BOOK	Blacklisted Unit Documentation
+BOOK	Whispers At The Stormline
+BOOK	Twin Storm Corridors
+BOOK	Grav Shear Ledger
+BOOK	Camila "Vector" Rojas Diary
+BOOK	First Threads Drawn
+BOOK	Shadow Route Ledger
+BOOK	Split Route Ledger
+BOOK	Graveyard Ledger Trail
+BOOK	Forsaken Shock Troop Voyage Notes
+BOOK	Graveyard Route Ledger
+BOOK	Minor Variance
+BOOK	Variance Drift Log
+BOOK	Dead Orbit Claim Jumpers Status Reports
+BOOK	Trail Of Bent Horizons
+BOOK	Obsidian Squadron Shift Reports
+BOOK	Exiled Company Transcript
+BOOK	Black Drift Union Recount
+BOOK	Relay Spine Schema
+BOOK	Redrawn Lanes
+BOOK	Quiet Grid Schematic
+BOOK	Contracted Drift Signals
+BOOK	Grav Echo Slate
+BOOK	Silent Corrections
+BOOK	Highland Shadow Ping
+BOOK	Vector Route Archive
+BOOK	Quiet Triage Echoes
+BOOK	Shadow In The Jump
+BOOK	Shadow Asset Log
+BOOK	Outcast Phalanx Overview
+BOOK	Grave Signal Drift
+BOOK	Split Corridor Manifest
+BOOK	Echoes In The Buffer
+BOOK	Crossroads of Silent Routes
+BOOK	Vector Drift Log
+BOOK	Outcast Platoon Observation Notes
+BOOK	Grav-Shadow Echo
+BOOK	Red Beacon Collective Field Notes
+BOOK	Sundered Company Field Notes
+BOOK	Echoes In The Drift
+BOOK	Redacted Taskforce Recordings
+BOOK	Redacted Squadron Personal Records
+BOOK	Silent Exit Ledger
+BOOK	Bloodied Unit Summary
+BOOK	Silent Harvest Signals
+BOOK	Tidal Route Index
+BOOK	Outcast Cohort Summary
+BOOK	Soft Singularity
+BOOK	Mutineer Division Field Notes
+BOOK	Spin-Balance Manifest
+BOOK	Whispers Along The Drift
+BOOK	Fractured Phalanx Status Reports
+BOOK	Periapsis Route Ledger
+BOOK	Ghost Lanes Awakening
+BOOK	Graveyard Signal
+BOOK	Gravemarked Routes
+BOOK	Junkstar Scavengers Ship Notes
+BOOK	Grave Lattice Ledger
+BOOK	Gravities Of Omission
+BOOK	Interference Flight Archive
+BOOK	Ghostlines First Echo
+BOOK	Kryx Return Path
+BOOK	Storm Table Fragment
+BOOK	Ghosts In The Grid
+BOOK	Threshold Yield Patterns
+BOOK	Dust-Shifted Lanes
+BOOK	Paper Ships
+BOOK	Shadow Manifests
+BOOK	Tangent Relay Log
+BOOK	Corridors of Vanished Light
+BOOK	Dishonored Detachment Ship Notes
+BOOK	Nullspace Scavengers Travel Records
+BOOK	Zero Point Itinerary
+BOOK	Vectors In The Glow
+BOOK	Stormlines Of Omission
+BOOK	Dust Haze Corridor
+BOOK	Camila "Vector" Moreira Memoranda
+BOOK	Spiral Across the Stars
+BOOK	Spiral Dispatch Log
+BOOK	Shadow Registry Map
+BOOK	Graveyard Signal Silence
+BOOK	Nullwake Load Schedule
+BOOK	Diego "Vector" Quiroga Statement
+BOOK	Silent Vectors
+BOOK	Abort Horizon Log
+BOOK	Derelict Claim Jumpers Service Entries
+BOOK	Ghost Corridor Log
+BOOK	Silent Routes Awakening
+BOOK	Quiet Manifests Ledger
+BOOK	Silent Harbor Ledger
+BOOK	Gravelight Drift Log
+BOOK	Graveyard Signal Theft
+BOOK	Graveyard Route Index
+BOOK	Lies In The Lanes
+BOOK	Twinband Route Cache
+BOOK	Convergent Route Schema
+BOOK	Bent Orbits Whisper
+BOOK	Driftlines In The Ledger
+BOOK	Redacted Division Field Notes
+BOOK	Gravelight Balance Ledger
+BOOK	Lanes Gone Silent
+BOOK	Silent Convoy Log
+BOOK	Gravshadow at the Edge
+BOOK	First Wound On The Map
+BOOK	Whispers In Thin Air
+BOOK	Vanished Pilgrims Ledger
+BOOK	Dual Vector Manifest
+BOOK	Bloodied Platoon Documentation
+BOOK	Drift Between The Lines
+BOOK	Silent Fireteam Duty Records
+BOOK	Whispers In The Gale
+BOOK	Storm Echo Log
+BOOK	Quiet Eye Vector
+BOOK	Breakaway Taskforce Service Entries
+BOOK	Dead Orbit Breakers Work Entries
+BOOK	Black Drift Syndicate Field Notes
+BOOK	Blueglass Access Path
+BOOK	Obsidian Regiment Mission Records
+BOOK	Whispers Before The Storm
+BOOK	Storm-Track Field Log
+BOOK	Second Horizon Fieldnotes
+BOOK	Rogue Unit Crew Notes
+BOOK	Margins Of Treason
+BOOK	Catalyst of Silent Harvest
+BOOK	Sanctuary Yield Ledger
+BOOK	Last Window Chart
+BOOK	Ghost Lines Uncharted
+BOOK	Drift Corridor Sketch
+BOOK	Whispers In The Air
+BOOK	Silent Yard Ledger
+BOOK	Whispers On The Line
+BOOK	Silent Routes Rising
+BOOK	Underwriter Access Kernel
+NPC_	Diego "Vector" Arancibia
+NPC_	Diego "Vector" Salazar
+NPC_	Camila "Vector" Rojas
+NPC_	Diego "Vector" Quiroga
+NPC_	Camila "Vector" Moreira

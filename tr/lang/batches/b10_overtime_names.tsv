@@ -1,0 +1,173 @@
+#en	zh
+# Dark Universe: Overtime —— 名称/物品/地点类
+# 官方术语：Crimson Fleet 深红舰队 / Ecliptic 黄道佣兵团 / Spacer 太空劫匪 /
+#          Va'ruun 瓦鲁 / UC 联殖 / Freestar 星联 / Trade Authority 贸易管理局 /
+#          GalBank 银河银行 / The Clinic 星际诊所号 / The Den 巢穴站 /
+#          Heatleech 热蛭 / Chunks 块餐 / LIST 独立盟
+Scanner	扫描仪
+Goliath	歌利亚
+Blackbox	黑匣子
+Delivery	递送
+No Items	无物品
+UC Files	联殖文件
+Mail Disk	邮件磁盘
+MedRunner	医疗快船
+Contraband	违禁品
+Geo-Imager	地质成像仪
+Miners Log	矿工日志
+Pathfinder	探路者
+Eon Voyager	永世旅行者
+Exploration	勘探
+Infestation	生物侵扰
+Ready stage	就绪阶段
+Tool Bundle	工具包
+Workers Log	工人日志
+Delivery Box	递送箱
+EMP Platform	电磁脉冲平台
+Scan Results	扫描结果
+Titan Dredge	泰坦采掘者
+Delivery City	递送城市
+Fuel Platform	燃料平台
+Goliath Mk-IV	歌利亚Mk-IV
+Goods Package	货物包裹
+Machine Parts	机械部件
+Manufacturing	制造业
+Required Item	所需物品
+Scan Complete	扫描完成
+Complete Quest	完成任务
+Delivery Start	递送开始
+Infrastructure	基础设施
+Mineral Sample	矿物样本
+Miners Remains	矿工遗骸
+Mission Failed	任务失败
+SC-77 Starhawk	SC-77星辰鹰
+Terrain Mapper	地形测绘仪
+Worker Remains	工人遗骸
+Aegis MedRunner	神盾医疗快船
+Amount Required	所需数量
+Covert Drug Lab	秘密毒品实验室
+Frozen Asteroid	冰冻小行星
+No Repair Parts	无维修部件
+Xenowarfare Lab	异兽作战实验室
+Litho-Prospector	岩芯勘探器
+Mail Consignment	邮件托运
+Medical Shipment	医疗货物
+Mission Accepted	任务已接受
+Mission Complete	任务完成
+Mission Rejected	任务已拒绝
+Recover the Item	找回物品
+Repairs complete	维修完成
+Rustborn Rotfang	锈生腐牙
+Rustborn Voidrat	锈生虚空鼠
+Stellar Coursier	星骏信使
+Targetting Board	瞄准板
+Calculate Rewards	计算奖励
+Crimson Anchorage	深红锚地
+Critical UC Files	关键联殖文件
+Delivery Location	递送地点
+Propaganda Beacon	宣传信标
+Repair successful	维修成功
+Rifling blueprint	膛线蓝图
+Rustborn Ironhowl	锈生铁嚎
+Rustborn Junkseer	锈生废料先知
+Rustborn Scraprat	锈生废鼠
+Rustborn Torchmaw	锈生炬喉
+Scientists Report	科学家报告
+Stolen Data Vault	失窃数据保险库
+Subsurface Mapper	地下测绘仪
+Zenith Pathfinder	天顶探路者
+Autonomous Factory	自动化工厂
+Dangerous Asteroid	危险小行星
+Experiment Storage	实验储存
+Heretical Writings	异教著作
+Promising Asteroid	有前景的小行星
+RogueTracker Array	游侠追踪阵列
+Rustborn Gravemaul	锈生重锤
+Rustborn Rivetback	锈生铆背
+Rustborn Scrapmaul	锈生碎锤
+Rustborn Scrapwolf	锈生废狼
+Rustborn Wrecktide	锈生残潮
+Scientists Remains	科学家遗骸
+Delivery Successful	递送成功
+Experiment Location	实验地点
+Plasma Wave Inducer	等离子波诱导器
+Rustborn Grindspire	锈生磨尖
+Rustborn Gutterking	锈生阴沟王
+Rustborn Hullreaver	锈生裂壳者
+Rustborn Hullscythe	锈生船壳镰
+Rustborn Rivetfiend	锈生铆魔
+Rustborn Scorchfang	锈生焦牙
+Rustborn Shatterjaw	锈生碎颚
+Rustborn Wreckbarge	锈生残驳
+Scanning the target	正在扫描目标
+Cybersecurity Module	网络安全模块
+Hijacked Spy Station	被劫持的间谍站
+Infested Observatory	被侵染的观测站
+Phased-Array Antenna	相控阵天线
+Rare Metals Shipment	稀有金属货物
+Recovery: The Clinic	回收：星际诊所号
+Rustborn Grimetongue	锈生污舌
+Rustborn Scrapbucket	锈生废桶
+Rustborn Shatterbane	锈生碎祸
+Rustborn Spannerjack	锈生扳手杰克
+Stolen Mech Research	失窃机甲研究
+Freebooters Stockpile	掠夺者储备
+Frontline Launch Site	前线发射场
+Rustborn Driftstalker	锈生漂猎者
+Rustborn Gravescourge	锈生坟疫
+Seismographic Scanner	地震记录扫描仪
+Stolen Encryption Key	失窃加密密钥
+Strike Assembly Point	突击集结点
+Deep Field Observatory	深空观测站
+Local Mission Terminal	本地任务终端
+Neon Air Quality Probe	霓虹城空气质量探测器
+Report Upload Terminal	报告上传终端
+Crimson Hoard Transport	深红囤积运输舰
+Critical Freestar Files	关键星联文件
+Local Mission Dataslate	本地任务数据板
+Remote Mission Terminal	远程任务终端
+Secure Evidence Storage	安全证据储存
+Stolen Medical Research	失窃医学研究
+Critical Firmware Update	关键固件更新
+DU Overtime User Created	暗宇宙加班：用户创建
+Incriminating Data Slate	罪证数据板
+Neon Water Quality Probe	霓虹城水质探测器
+Regolith Extraction Unit	风化层提取装置
+Trade Authority Platform	贸易管理局平台
+Potentially Rich Asteroid	可能富矿的小行星
+Public Utility Blueprints	公共设施蓝图
+Survey Equipment Location	勘测设备位置
+Cosmos Care Services Board	宇宙关怀服务任务板
+Seismological Spectroscope	地震光谱仪
+Asteroid with Ore Potential	有矿石潜力的小行星
+Stolen Patient Medical Data	失窃病患医疗数据
+Stolen Xenowarfare Research	失窃异兽作战研究
+Use Ship weapons to destroy	使用飞船武器摧毁
+Collection: Midtown Minerals	收集：中城矿业
+Experiment: Neon Air Quality	实验：霓虹城空气质量
+Local Cargo Mission Terminal	本地货运任务终端
+Local Cargo Mission Dataslate	本地货运任务数据板
+Va'ruun Heretical Scriptorium	瓦鲁异教经库
+Collection: Centaurian Arsenal	收集：半人马军械库
+Experiment: Neon Water Quality	实验：霓虹城水质
+Remote Space Mission Dataslate	远程太空任务数据板
+Terraforming Procedure Manuals	地球化改造程序手册
+Transfering delivery to target	正在向目标移交递送物
+Collection: Neon Mining League	收集：霓虹城矿业联盟
+Remote Planet Mission Dataslate	远程行星任务数据板
+You deliever the requested items	你交付了所需的物品
+Recovery: The Den Trade Authority	回收：巢穴站贸易管理局
+You don't have the items required	你没有所需的物品
+[Data Slate #A-471 | Secure Playback]	[数据板 #A-471 | 安全回放]
+Recovery: New Atlantis Reliant Medical	回收：新亚特兰蒂斯城信实医疗
+Starting repairs using some ship parts	正在使用部分飞船部件开始维修
+Claims Assessment: New Atlantis GalBank	理赔评估：新亚特兰蒂斯城银河银行
+You don't have the ship parts to repair this.	你没有维修所需的飞船部件。
+Use this terminal to scan for nearby missions.	使用此终端扫描附近的任务。
+Use this terminal to scan for remote missions.	使用此终端扫描远程任务。
+Use this terminal to scan for nearby cargo missions.	使用此终端扫描附近的货运任务。
+Order	订单
+Amount	数量
+Dropoff	交付点
+Delivery City	递送城市
+Delivery Box	递送箱

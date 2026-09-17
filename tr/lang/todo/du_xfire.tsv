@@ -1,0 +1,74 @@
+#chars	hits	sig/sub	text
+3	1	ACTI/FULL	Bar
+7	64	QUST/NAM2	Startup
+7	1	MESG/FULL	Visited
+8	2	ACTI/FULL	Mech Lab
+8	1	ACTI/FULL	Rogue AI
+9	7	QUST/FULL	Lone ship
+10	8	QUST/FULL	Boss Fight
+10	1	QUST/FULL	Lone Storm
+10	1	GBFM/FULL	Mayhem Max
+10	1	GBFM/FULL	Starslayer
+10	71	QUST/NAM2	Stop Stage
+10	1	GBFM/FULL	Viper Vega
+11	1	GBFM/FULL	Plunderlord
+12	1	ACTI/FULL	Ammo Factory
+12	1	MESG/FULL	Faint Signal
+12	1	ACTI/FULL	Secure Vault
+12	1	GBFM/FULL	Spacestation
+12	5	QUST/FULL	Trading Post
+13	3	CONT/FULL	Data Shipment
+13	1	CONT/FULL	Drug Shipment
+13	1	CONT/FULL	Food Shipment
+13	1	GBFM/FULL	Grand General
+13	1	GBFM/FULL	Prophet Atpep
+13	1	GBFM/FULL	Shadow Trader
+13	7	QUST/NAM2	Startup Stage
+13	3	QUST/FULL	Stranded Ship
+13	1	GBFM/FULL	Techno-zealot
+14	1	GBFM/FULL	Chunk-Mad Fred
+15	9	QUST/FULL	Piracy Boarding
+15	1	ACTI/FULL	Repair Platform
+15	6	QUST/FULL	Ship Under Fire
+15	1	GBFM/FULL	Steelheart Jack
+15	2	CONT/FULL	Weapon Shipment
+16	1	MESG/FULL	Concealed Signal
+16	8	QUST/FULL	Faction Skirmish
+16	1	ACTI/FULL	Farming Platform
+16	1	GBFM/FULL	Stranded Banshee
+17	1	MESG/FULL	Combat Signatures
+17	5	ACTI/FULL	Component Factory
+17	1	GBFM/FULL	Heretic Missonary
+17	1	QUST/FULL	Lone Installation
+17	1	QUST/FULL	Lone Trading Post
+18	3	ACTI/FULL	CommsLink Platform
+18	1	CONT/FULL	Expensive Shipment
+18	1	CONT/FULL	Explosive Shipment
+18	3	QUST/FULL	Faction Stronghold
+18	3	CONT/FULL	Spacesuit Shipment
+19	1	MESG/FULL	Black Market Signal
+19	1	CONT/FULL	Crimson Fleet Vault
+19	2	QUST/FULL	Trade Vessel Mayday
+20	64	QUST/NAM2	Set ships aggressive
+22	1	ACTI/FULL	Deep Field Observatory
+22	1	QUST/FULL	Lost Unmarked Shipment
+22	1	GBFM/FULL	Stranded Va'ruun Vigil
+22	1	GBFM/FULL	Trade Authority Trader
+22	1	MESG/FULL	Urgent Distress Signal
+22	1	ACTI/FULL	Xeno Warfare Field Lab
+23	1	MESG/FULL	Hostile Warp Signatures
+23	5	QUST/FULL	Installation Stronghold
+23	4	QUST/NAM2	Player entered location
+23	1	MESG/FULL	Powerful Hostile Signal
+24	64	QUST/NAM2	Player Responded to Hail
+24	1	ACTI/FULL	Trade Authority Platform
+25	1	MESG/FULL	Emergency Distress Signal
+25	1	GBFM/FULL	Stranded Ecliptic Cutlass
+25	64	QUST/NAM2	stage 2 set hailing scene
+26	1	MESG/FULL	Hostile Faction Stronghold
+26	1	MESG/FULL	Trade Vessel Mayday Signal
+27	64	QUST/NAM2	Player has entered location
+28	1	MESG/FULL	Hostile Faction Installation
+30	9	QUST/FULL	Faction Skirmish Tides Turning
+30	1	GBFM/FULL	Stranded Crimson Fleet Banshee
+39	1	QUST/FULL	Mines are super OP and can one shot you

@@ -45,3 +45,20 @@ desktop.ini
 
 # 日志
 *.log
+
+# ---------------------------------------------------------------------------
+# 汉化工作区（tr/）
+# tr/lang 里的词典/词元表/批次是"手工成果"，必须入库；
+# 其余都是可再生的中间物或体积巨大的二进制，不入库：
+#   tr/data   —— 指向游戏 Starfield.esm 的硬链接 + 5 个原始 mod 的副本
+#   tr/orig   —— 原始 mod 备份
+#   tr/loc    —— 从游戏 Localization.ba2 解出的官方 .strings（约 22 MB）
+#   tr/build  —— 生成好的汉化 ESM（约 90 MB，真正交付物在 MO2 里）
+#   tr/out    —— 从 ESM 抽出的字符串表与映射表（可由 trtool.py extract 再生）
+# ---------------------------------------------------------------------------
+tr/data/
+tr/orig/
+tr/loc/
+tr/build/
+tr/out/
+tr/*.sf1viewsettings

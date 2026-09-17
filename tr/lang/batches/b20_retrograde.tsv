@@ -1,0 +1,158 @@
+#en	zh
+# Dark Universe: Retrograde —— 任务简报 / 赏金任务名 / 战利品护甲 / 杂项
+# 官方术语：Crimson Fleet 深红舰队 / Ecliptic 黄道佣兵团 / Spacer 太空劫匪 /
+#          Va'ruun 瓦鲁 / UC 联殖 / SysDef 联殖防务 / Trackers Alliance 追踪者联盟 /
+#          Constellation 星宿座 / Deimos 火卫二 / Cydonia 赛多尼亚 / LIST 独立盟
+Outlaw Station	法外之徒站
+Station Interior	站点内部
+This is choice 1	这是选项1
+This is choice 2	这是选项2
+This is the choice text	这是选项文本
+The is the body of the message	这是讯息正文
+Locate and Board the <Alias=PrimaryRef>	找到并登临<Alias=PrimaryRef>
+Defeat the <Alias=BountyNpc> on <Alias=PrimaryRef>	在<Alias=PrimaryRef>击败<Alias=BountyNpc>
+Sweep <Alias=PrimaryRef>	清扫<Alias=PrimaryRef>
+Cleanse <Alias=PrimaryRef>	清剿<Alias=PrimaryRef>
+Raid on <Alias=PrimaryRef>	突袭<Alias=PrimaryRef>
+Take Out <Alias=BountyNpc>	除掉<Alias=BountyNpc>
+Deal With <Alias=BountyNpc>	处理<Alias=BountyNpc>
+Take Down <Alias=BountyNpc>	拿下<Alias=BountyNpc>
+Clear <Alias=BountyNpc>'s Gang	清剿<Alias=BountyNpc>的帮派
+End <Alias=BountyNpc>'s Crusade	终结<Alias=BountyNpc>的圣战
+Crimson Fleet: <Alias=BountyNpc>	深红舰队：<Alias=BountyNpc>
+Pirate Bounty: <Alias=BountyNpc>	海盗悬赏：<Alias=BountyNpc>
+Serpent's End: <Alias=BountyNpc>	蛇之终结：<Alias=BountyNpc>
+Spacer Bounty: <Alias=BountyNpc>	太空劫匪悬赏：<Alias=BountyNpc>
+Spacer Target: <Alias=BountyNpc>	太空劫匪目标：<Alias=BountyNpc>
+Strike Against <Alias=BountyNpc>	打击<Alias=BountyNpc>
+Zealot Bounty: <Alias=BountyNpc>	狂徒悬赏：<Alias=BountyNpc>
+Bounty: <Alias=BountyNpc>, Spacer	悬赏：<Alias=BountyNpc>，太空劫匪
+Va'ruun Target: <Alias=BountyNpc>	瓦鲁目标：<Alias=BountyNpc>
+Ecliptic Target: <Alias=BountyNpc>	黄道佣兵团目标：<Alias=BountyNpc>
+Bounty: <Alias=BountyNpc>, Ecliptic	悬赏：<Alias=BountyNpc>，黄道佣兵团
+Mercenary Bounty: <Alias=BountyNpc>	佣兵悬赏：<Alias=BountyNpc>
+Breach <Alias=PrimaryRef>'s Defenses	突破<Alias=PrimaryRef>的防御
+End <Alias=BountyNpc>'s Pirate Reign	终结<Alias=BountyNpc>的海盗统治
+Clear Pirates from <Alias=PrimaryRef>	清剿<Alias=PrimaryRef>的海盗
+Evict Spacers from <Alias=PrimaryRef>	驱逐<Alias=PrimaryRef>的太空劫匪
+Scuttle <Alias=BountyNpc>'s Operation	挫败<Alias=BountyNpc>的行动
+Silence <Alias=PrimaryRef>'s Fanatics	消灭<Alias=PrimaryRef>的狂信徒
+Purge <Alias=BountyNpc>'s Va'ruun Cult	清除<Alias=BountyNpc>的瓦鲁教派
+Dismantle <Alias=BountyNpc>'s Operation	瓦解<Alias=BountyNpc>的行动
+Hunt <Alias=BountyNpc> at <Alias=PrimaryRef>	在<Alias=PrimaryRef>猎杀<Alias=BountyNpc>
+Eliminate <Alias=BountyNpc> on <Alias=PrimaryRef>	在<Alias=PrimaryRef>消灭<Alias=BountyNpc>
+A gang of Spacers under <Alias=BountyNpc> are squatting on <Alias=PrimaryRef>. Evict them permanently.	一群听命于<Alias=BountyNpc>的太空劫匪强占了<Alias=PrimaryRef>。将其彻底驱逐。
+Crimson Fleet operatives under <Alias=BountyNpc> have turned <Alias=PrimaryRef> into a black market hub. Shut it down.	<Alias=BountyNpc>手下的深红舰队特工把<Alias=PrimaryRef>变成了黑市中心。将其关停。
+<Alias=BountyNpc> has declared <Alias=PrimaryRef> sovereign Crimson Fleet territory. Remind them it's not theirs to claim.	<Alias=BountyNpc>宣称<Alias=PrimaryRef>为深红舰队的独立领地。让他们明白那块地方不属于他们。
+<Alias=BountyNpc> is using <Alias=PrimaryRef> as an Ecliptic weapons depot. Board the mining station and put an end to it.	<Alias=BountyNpc>把<Alias=PrimaryRef>当作黄道佣兵团的武器库。登临这座采矿站，终结这一切。
+<Alias=BountyNpc> has been broadcasting threats from <Alias=PrimaryRef> demanding tribute from passing ships. Silence them.	<Alias=BountyNpc>一直在<Alias=PrimaryRef>上广播威胁，向过往飞船索要贡品。让他们闭嘴。
+No one docks at <Alias=PrimaryRef> anymore since <Alias=BountyNpc> took over with their Spacer crew. Take back the station.	自从<Alias=BountyNpc>带着太空劫匪船员占据<Alias=PrimaryRef>后，再没人敢在那里停靠。夺回该站。
+<Alias=BountyNpc> has erected Great Serpent shrines throughout <Alias=PrimaryRef>. Tear them down and drive the Va'ruun out.	<Alias=BountyNpc>在<Alias=PrimaryRef>各处竖起了大蛇神龛。将它们推倒，把瓦鲁人赶出去。
+<Alias=BountyNpc> is funneling ore from <Alias=PrimaryRef> to fund Va'ruun operations. Board the station and shut them down.	<Alias=BountyNpc>正把<Alias=PrimaryRef>的矿石偷运出去，为瓦鲁的行动提供资金。登临该站并将其关停。
+The hab decks of <Alias=PrimaryRef> have been overrun by Spacers loyal to <Alias=BountyNpc>. Clear the station room by room.	<Alias=PrimaryRef>的居住甲板已被效忠<Alias=BountyNpc>的太空劫匪占据。逐舱清理该站。
+Ore shipments from <Alias=PrimaryRef> have stopped since <Alias=BountyNpc> and the Crimson Fleet moved in. Retake the facility.	自从<Alias=BountyNpc>和深红舰队进驻后，<Alias=PrimaryRef>的矿石运输便中断了。夺回该设施。
+<Alias=BountyNpc> is smelting ore at <Alias=PrimaryRef> to forge Va'ruun ceremonial blades. Destroy the forge and eliminate them.	<Alias=BountyNpc>正在<Alias=PrimaryRef>冶炼矿石，锻造瓦鲁仪式用刃。摧毁锻造炉并消灭他们。
+Haulers are being hijacked near <Alias=PrimaryRef> by Spacers working for <Alias=BountyNpc>. Eliminate the source of the problem.	运输船在<Alias=PrimaryRef>附近遭<Alias=BountyNpc>手下的太空劫匪劫持。根除问题的源头。
+Spacers under <Alias=BountyNpc> killed the mining crew at <Alias=PrimaryRef> and took the operation for themselves. Make them pay.	<Alias=BountyNpc>手下的太空劫匪杀害了<Alias=PrimaryRef>的采矿队并霸占了作业。让他们付出代价。
+<Alias=BountyNpc> is broadcasting fake distress signals from <Alias=PrimaryRef> to lure in unsuspecting vessels. End the deception.	<Alias=BountyNpc>正从<Alias=PrimaryRef>发出虚假求救信号，诱骗毫无戒心的飞船。终结这场骗局。
+<Alias=BountyNpc> is converting the inhabitants of <Alias=PrimaryRef> to the Great Serpent's cause. Intervene before it's too late.	<Alias=BountyNpc>正把<Alias=PrimaryRef>的居民拉入大蛇神的信仰。趁还来得及，出手干预。
+The crew of <Alias=PrimaryRef> have gone silent since <Alias=BountyNpc> and the Va'ruun arrived. Board the station and find out why.	自从<Alias=BountyNpc>和瓦鲁人到来后，<Alias=PrimaryRef>的船员便再无音讯。登临该站查明原因。
+The crew of <Alias=PrimaryRef> sent a distress signal before <Alias=BountyNpc> jammed their comms. Move in and rescue the survivors.	<Alias=PrimaryRef>的船员在被<Alias=BountyNpc>干扰通讯前发出了求救信号。立即行动，营救幸存者。
+Va'ruun pilgrims loyal to <Alias=BountyNpc> are fortifying <Alias=PrimaryRef> as a sanctuary. Breach the hab decks and disband them.	效忠<Alias=BountyNpc>的瓦鲁朝圣者正把<Alias=PrimaryRef>加固为避难所。突入居住甲板并瓦解他们。
+<Alias=BountyNpc> has welded armor plating across the mining bays of <Alias=PrimaryRef>. Breach the station and root out the Spacers.	<Alias=BountyNpc>在<Alias=PrimaryRef>的采矿舱上焊满了装甲板。突入该站，铲除太空劫匪。
+Spacer gangs under <Alias=BountyNpc> have turned <Alias=PrimaryRef> into a black market bazaar. Board the station and clear them out.	<Alias=BountyNpc>手下的太空劫匪帮派把<Alias=PrimaryRef>变成了黑市集市。登临该站并将其清空。
+<Alias=BountyNpc> has fortified <Alias=PrimaryRef> as an Ecliptic forward base. Dismantle their operation before reinforcements arrive.	<Alias=BountyNpc>把<Alias=PrimaryRef>加固成了黄道佣兵团的前沿基地。在援军抵达前瓦解他们的行动。
+Ecliptic engineers under <Alias=BountyNpc> are retrofitting <Alias=PrimaryRef> to manufacture armaments. Destroy their production line.	<Alias=BountyNpc>手下的黄道佣兵工程师正改造<Alias=PrimaryRef>以生产军械。摧毁他们的生产线。
+Va'ruun zealots led by <Alias=BountyNpc> are extracting rare compounds from <Alias=PrimaryRef> for unknown rituals. Seize the facility.	<Alias=BountyNpc>率领的瓦鲁狂徒正从<Alias=PrimaryRef>提取稀有化合物，用途不明。夺取该设施。
+<Alias=BountyNpc> is running double shifts on the ore processors at <Alias=PrimaryRef> to fuel Ecliptic expansion. Shut down production.	<Alias=BountyNpc>让<Alias=PrimaryRef>的矿石处理设备连轴运转，为黄道佣兵团的扩张提供支持。关停生产。
+Spacer thugs under <Alias=BountyNpc> are stripping <Alias=PrimaryRef> for anything they can sell. Stop them before the station is gutted.	<Alias=BountyNpc>手下的太空劫匪暴徒正在拆光<Alias=PrimaryRef>上一切能卖的东西。在该站被掏空前阻止他们。
+<Alias=BountyNpc> and their Va'ruun zealots have claimed <Alias=PrimaryRef> as a temple. Purge the station before their influence spreads.	<Alias=BountyNpc>及其瓦鲁狂徒宣称<Alias=PrimaryRef>为神庙。在他们的影响力扩散前清剿该站。
+<Alias=BountyNpc> is auctioning off the mineral rights to <Alias=PrimaryRef> to the highest bidder. Board the station and cancel the sale.	<Alias=BountyNpc>正把<Alias=PrimaryRef>的采矿权拍卖给出价最高者。登临该站，取消这笔交易。
+Patrols have spotted Crimson Fleet ships docking at <Alias=PrimaryRef> under <Alias=BountyNpc>. Board the station and scatter their fleet.	巡逻队发现深红舰队飞船在<Alias=BountyNpc>的指挥下停靠<Alias=PrimaryRef>。登临该站并驱散其舰队。
+<Alias=BountyNpc> has contracted Ecliptic mercs to hold <Alias=PrimaryRef> and control its mining output. Break their grip on the facility.	<Alias=BountyNpc>雇了黄道佣兵守住<Alias=PrimaryRef>并控制其矿石产量。打破他们对设施的掌控。
+<Alias=BountyNpc> has rigged the docking bay of <Alias=PrimaryRef> to trap visiting ships. Board from an alternate entry and take them down.	<Alias=BountyNpc>在<Alias=PrimaryRef>的停靠舱设下陷阱，专坑来访飞船。从其他入口登船并解决他们。
+Spacer scavengers led by <Alias=BountyNpc> are tearing apart the mining rigs at <Alias=PrimaryRef>. Salvage what you can and eliminate them.	<Alias=BountyNpc>率领的太空劫匪拾荒者正在拆解<Alias=PrimaryRef>的采矿钻机。能抢救多少算多少，然后消灭他们。
+<Alias=BountyNpc> is running an Ecliptic command post from <Alias=PrimaryRef>. Eliminate their leadership before they launch further attacks.	<Alias=BountyNpc>正以<Alias=PrimaryRef>为黄道佣兵团指挥所。在他们发动更多攻击前除掉其指挥层。
+<Alias=BountyNpc> is running a protection racket from <Alias=PrimaryRef> in the <Alias=TargetSystemLocation> system. Put them out of business.	<Alias=BountyNpc>在<Alias=TargetSystemLocation>星系以<Alias=PrimaryRef>为据点收取保护费。让他们关门大吉。
+Spacers loyal to <Alias=BountyNpc> are sabotaging competing mining operations from <Alias=PrimaryRef>. Board the station and put an end to it.	效忠<Alias=BountyNpc>的太空劫匪正从<Alias=PrimaryRef>破坏竞争对手的采矿作业。登临该站，终结这一切。
+Surveillance drones near <Alias=PrimaryRef> confirm <Alias=BountyNpc> is stockpiling refined metals for the Crimson Fleet. Seize the reserves.	<Alias=PrimaryRef>附近的监视无人机证实，<Alias=BountyNpc>正在为深红舰队囤积精炼金属。夺取这些储备。
+<Alias=BountyNpc> has turned <Alias=PrimaryRef> into a Spacer junkyard in the <Alias=TargetSystemLocation> system. Reclaim the mining facility.	<Alias=BountyNpc>把<Alias=TargetSystemLocation>星系的<Alias=PrimaryRef>变成了太空劫匪的废料场。夺回该采矿设施。
+<Alias=BountyNpc> is stockpiling processed ore at <Alias=PrimaryRef> for a Va'ruun war effort. Board the station and confiscate their reserves.	<Alias=BountyNpc>正为瓦鲁的战争在<Alias=PrimaryRef>囤积加工过的矿石。登临该站并没收其储备。
+<Alias=BountyNpc> is recruiting new Crimson Fleet members from the population of <Alias=PrimaryRef>. Put a stop to it before their numbers grow.	<Alias=BountyNpc>正从<Alias=PrimaryRef>的居民中招募深红舰队新成员。在他们壮大前加以阻止。
+Raw materials from <Alias=PrimaryRef> are being diverted to Ecliptic shipyards by <Alias=BountyNpc>. Seize the station and cut the supply chain.	<Alias=BountyNpc>正把<Alias=PrimaryRef>的原材料转运至黄道佣兵团的船坞。夺取该站并切断供应链。
+Spacer crews under <Alias=BountyNpc> are dumping toxic waste from <Alias=PrimaryRef> to keep patrols away. Push through and reclaim the station.	<Alias=BountyNpc>手下的太空劫匪船员从<Alias=PrimaryRef>倾倒有毒废料以逼退巡逻队。强行突入并夺回该站。
+The refinery at <Alias=PrimaryRef> is being used by <Alias=BountyNpc> to cook chem supplies for Spacer gangs. Destroy the lab and deal with them.	<Alias=BountyNpc>利用<Alias=PrimaryRef>的精炼厂为太空劫匪帮派制毒。摧毁实验室并处置他们。
+<Alias=BountyNpc> is holding <Alias=PrimaryRef> as leverage in a ransom scheme targeting the <Alias=TargetSystemLocation> system. Neutralize them.	<Alias=BountyNpc>扣押<Alias=PrimaryRef>，作为针对<Alias=TargetSystemLocation>星系的勒索筹码。将其清除。
+<Alias=BountyNpc> has commandeered <Alias=PrimaryRef> to harvest resources for a Va'ruun crusade. Seize the mining station and cut off their supply.	<Alias=BountyNpc>征用了<Alias=PrimaryRef>，为瓦鲁圣战采集资源。夺取该采矿站并切断其补给。
+<Alias=BountyNpc> has claimed <Alias=PrimaryRef> as personal territory in the <Alias=TargetSystemLocation> system. Show them it's not theirs to take.	<Alias=BountyNpc>把<Alias=TargetSystemLocation>星系的<Alias=PrimaryRef>占为私人领地。让他们明白那地方不能据为己有。
+Crimson Fleet crews under <Alias=BountyNpc> are using <Alias=PrimaryRef> to launder stolen goods through fake ore manifests. Expose and eliminate them.	<Alias=BountyNpc>手下的深红舰队船员利用<Alias=PrimaryRef>，通过伪造矿石舱单洗白赃物。揭露并消灭他们。
+Va'ruun fanatics under <Alias=BountyNpc> have overrun the mining rigs at <Alias=PrimaryRef>. Drive them out of the <Alias=TargetSystemLocation> system.	<Alias=BountyNpc>手下的瓦鲁狂信徒占领了<Alias=PrimaryRef>的采矿钻机。把他们逐出<Alias=TargetSystemLocation>星系。
+<Alias=BountyNpc> has turned <Alias=PrimaryRef> into an Ecliptic supply depot in the <Alias=TargetSystemLocation> system. Sever their logistics network.	<Alias=BountyNpc>把<Alias=TargetSystemLocation>星系的<Alias=PrimaryRef>变成了黄道佣兵团的补给仓库。切断其后勤网络。
+An Ecliptic cell led by <Alias=BountyNpc> has seized <Alias=PrimaryRef> in the <Alias=TargetSystemLocation> system. Board the station and restore order.	<Alias=BountyNpc>率领的一支黄道佣兵小队夺取了<Alias=TargetSystemLocation>星系的<Alias=PrimaryRef>。登临该站并恢复秩序。
+Crimson Fleet smugglers under <Alias=BountyNpc> are hiding contraband in the ore holds of <Alias=PrimaryRef>. Seize the station and confiscate the goods.	<Alias=BountyNpc>手下的深红舰队走私者把违禁品藏在<Alias=PrimaryRef>的矿石舱中。夺取该站并没收货物。
+Spacers under <Alias=BountyNpc> are using <Alias=PrimaryRef> to ambush travelers passing through the <Alias=TargetSystemLocation> system. Shut them down.	<Alias=BountyNpc>手下的太空劫匪以<Alias=PrimaryRef>为据点，伏击途经<Alias=TargetSystemLocation>星系的旅人。将其关停。
+<Alias=BountyNpc> and a crew of Spacers have seized <Alias=PrimaryRef> for its ore. Reclaim the mining station in the <Alias=TargetSystemLocation> system.	<Alias=BountyNpc>和一伙太空劫匪为夺取矿石而强占了<Alias=PrimaryRef>。夺回<Alias=TargetSystemLocation>星系的采矿站。
+<Alias=BountyNpc> is jamming communications in the <Alias=TargetSystemLocation> system from <Alias=PrimaryRef>. Board the station and restore the network.	<Alias=BountyNpc>正从<Alias=PrimaryRef>干扰<Alias=TargetSystemLocation>星系的通讯。登临该站并恢复网络。
+<Alias=BountyNpc> has turned <Alias=PrimaryRef> into a Spacer den in the <Alias=TargetSystemLocation> system. Clear the station before they hit more ships.	<Alias=BountyNpc>把<Alias=TargetSystemLocation>星系的<Alias=PrimaryRef>变成了太空劫匪巢穴。在他们袭击更多飞船前清空该站。
+<Alias=BountyNpc> has claimed <Alias=PrimaryRef> and is charging a toll on every mining hauler in the <Alias=TargetSystemLocation> system. End their racket.	<Alias=BountyNpc>占据了<Alias=PrimaryRef>，向<Alias=TargetSystemLocation>星系所有采矿运输船收取通行费。终结他们的敲诈。
+<Alias=BountyNpc> has turned <Alias=PrimaryRef> into a pirate haven in the <Alias=TargetSystemLocation> system. Clear them out before more ships go missing.	<Alias=BountyNpc>把<Alias=TargetSystemLocation>星系的<Alias=PrimaryRef>变成了海盗避风港。在更多飞船失踪前将其清除。
+<Alias=BountyNpc> is harboring wanted pirates aboard <Alias=PrimaryRef> in the <Alias=TargetSystemLocation> system. Storm the habitat decks and bring them to justice.	<Alias=BountyNpc>在<Alias=TargetSystemLocation>星系的<Alias=PrimaryRef>上窝藏通缉海盗。强攻居住甲板并将他们绳之以法。
+<Alias=BountyNpc> is selling stolen minerals from <Alias=PrimaryRef> to fund Crimson Fleet raids across the <Alias=TargetSystemLocation> system. Cut off their income.	<Alias=BountyNpc>出售从<Alias=PrimaryRef>掠夺的矿物，为深红舰队在<Alias=TargetSystemLocation>星系的劫掠提供资金。切断其收入来源。
+Va'ruun missionaries under <Alias=BountyNpc> have seized <Alias=PrimaryRef> and are broadcasting sermons across the <Alias=TargetSystemLocation> system. Silence them.	<Alias=BountyNpc>手下的瓦鲁传教士夺取了<Alias=PrimaryRef>，并向<Alias=TargetSystemLocation>星系广播布道。让他们闭嘴。
+<Alias=BountyNpc> has turned the extraction bays of <Alias=PrimaryRef> into a Crimson Fleet armory. Dismantle the operation in the <Alias=TargetSystemLocation> system.	<Alias=BountyNpc>把<Alias=PrimaryRef>的提取舱改成了深红舰队军械库。瓦解其在<Alias=TargetSystemLocation>星系的行动。
+<Alias=BountyNpc> has rigged the refinery on <Alias=PrimaryRef> to process stolen ship components. Shut down their chop shop in the <Alias=TargetSystemLocation> system.	<Alias=BountyNpc>改造了<Alias=PrimaryRef>的精炼厂，用于处理偷来的飞船部件。关停其在<Alias=TargetSystemLocation>星系的拆解窝点。
+Va'ruun forces under <Alias=BountyNpc> are using <Alias=PrimaryRef> to refine fuel for a pilgrimage fleet. Seize the station in the <Alias=TargetSystemLocation> system.	<Alias=BountyNpc>手下的瓦鲁部队利用<Alias=PrimaryRef>为朝圣舰队提炼燃料。夺取<Alias=TargetSystemLocation>星系的该站。
+Supply shipments to the <Alias=TargetSystemLocation> system are being intercepted by Spacers operating from <Alias=PrimaryRef> under <Alias=BountyNpc>. End the blockade.	运往<Alias=TargetSystemLocation>星系的补给船队屡遭<Alias=BountyNpc>手下、以<Alias=PrimaryRef>为基地的太空劫匪拦截。终结这场封锁。
+Weapons caches linked to <Alias=BountyNpc> have been tracked to <Alias=PrimaryRef> in the <Alias=TargetSystemLocation> system. Seize the station and confiscate the arms.	与<Alias=BountyNpc>有关的武器藏匿点被追踪到<Alias=TargetSystemLocation>星系的<Alias=PrimaryRef>。夺取该站并没收军火。
+Neon Viper's Va'ruun	霓虹蝮蛇的瓦鲁套装
+The Marauder's SysDef	劫掠者的联殖防务套装
+Gutter Snake's Cydonia	阴沟蛇的赛多尼亚套装
+The Plunderer's Cydonia	掠夺者的赛多尼亚套装
+The Specialist's Ranger	专家的游骑兵套装
+The Butcher's Shocktroop	屠夫的突击队套装
+Scrapper's Trackers Alliance	拆解者的追踪者联盟套装
+The Butcher's Pirate Raiding	屠夫的海盗劫掠套装
+The Closer's Ranger Spacesuit	终结者的游骑兵宇航服
+Void Touched's UC Shock Armor	虚空触碰者的联殖突击护甲
+Coil Priest's Mercenary Spacesuit	线圈祭司的佣兵宇航服
+Rust Devil's Va'ruun Space Helmet	锈魔的瓦鲁太空头盔
+Deadlock's Deep Recon Space Helmet	死锁的深空侦察太空头盔
+Freebooter's UC AntiXeno Spacesuit	掠夺船员的联殖反异种宇航服
+Hull Breach's SysDef Ace Spacesuit	破壳者的联殖防务王牌宇航服
+Scarlet Tide's Navigator Spacesuit	猩红潮汐的领航员宇航服
+Junkyard King's Deimos Space Helmet	废车场之王的火卫二太空头盔
+Void Rat's UC Ace Pilot Space Helmet	虚空鼠的联殖王牌飞行员太空头盔
+Gutter Snake's Deep Recon Space Helmet	阴沟蛇的深空侦察太空头盔
+Rust Lung's Constellation Space Helmet	锈肺的星宿座太空头盔
+Silent Ledger's UC Marine Space Helmet	沉默账本的联殖陆战队太空头盔
+The Scavenger's Ground Crew Space Helmet	拾荒者的地勤太空头盔
+Zero Trace's Pirate Charger Space Helmet	零痕迹的海盗战马太空头盔
+Iron Maw's Trackers Alliance Space Helmet	铁颚的追踪者联盟太空头盔
+Hostile Takeover's UC Sec Spaceriot Helmet	恶意收购的联殖安保太空暴徒头盔
+No Witness's Trackers Alliance Space Helmet	无证人的追踪者联盟太空头盔
+Blackbeard's Ghost's Pirate Assault Space Helmet	黑胡子幽灵的海盗突击太空头盔
+Armor worn by the infamous Deadlock. Claimed as a trophy.	臭名昭著的死锁所穿的护甲。已作为战利品夺回。
+Armor worn by the infamous Iron Maw. Claimed as a trophy.	臭名昭著的铁颚所穿的护甲。已作为战利品夺回。
+Armor worn by the infamous Scrapper. Claimed as a trophy.	臭名昭著的拆解者所穿的护甲。已作为战利品夺回。
+Armor worn by the infamous Void Rat. Claimed as a trophy.	臭名昭著的虚空鼠所穿的护甲。已作为战利品夺回。
+Armor worn by the infamous Rust Lung. Claimed as a trophy.	臭名昭著的锈肺所穿的护甲。已作为战利品夺回。
+Armor worn by the infamous Freebooter. Claimed as a trophy.	臭名昭著的掠夺船员所穿的护甲。已作为战利品夺回。
+Armor worn by the infamous Neon Viper. Claimed as a trophy.	臭名昭著的霓虹蝮蛇所穿的护甲。已作为战利品夺回。
+Armor worn by the infamous No Witness. Claimed as a trophy.	臭名昭著的无证人所穿的护甲。已作为战利品夺回。
+Armor worn by the infamous Rust Devil. Claimed as a trophy.	臭名昭著的锈魔所穿的护甲。已作为战利品夺回。
+Armor worn by the infamous The Closer. Claimed as a trophy.	臭名昭著的终结者所穿的护甲。已作为战利品夺回。
+Armor worn by the infamous Zero Trace. Claimed as a trophy.	臭名昭著的零痕迹所穿的护甲。已作为战利品夺回。
+Armor worn by the infamous Coil Priest. Claimed as a trophy.	臭名昭著的线圈祭司所穿的护甲。已作为战利品夺回。
+Armor worn by the infamous Hull Breach. Claimed as a trophy.	臭名昭著的破壳者所穿的护甲。已作为战利品夺回。
+Armor worn by the infamous The Butcher. Claimed as a trophy.	臭名昭著的屠夫所穿的护甲。已作为战利品夺回。
+Armor worn by the infamous Gutter Snake. Claimed as a trophy.	臭名昭著的阴沟蛇所穿的护甲。已作为战利品夺回。
+Armor worn by the infamous Scarlet Tide. Claimed as a trophy.	臭名昭著的猩红潮汐所穿的护甲。已作为战利品夺回。
+Armor worn by the infamous The Marauder. Claimed as a trophy.	臭名昭著的劫掠者所穿的护甲。已作为战利品夺回。
+Armor worn by the infamous Void Touched. Claimed as a trophy.	臭名昭著的虚空触碰者所穿的护甲。已作为战利品夺回。
+Armor worn by the infamous Junkyard King. Claimed as a trophy.	臭名昭著的废车场之王所穿的护甲。已作为战利品夺回。
+Armor worn by the infamous Silent Ledger. Claimed as a trophy.	臭名昭著的沉默账本所穿的护甲。已作为战利品夺回。
+Armor worn by the infamous The Plunderer. Claimed as a trophy.	臭名昭著的掠夺者所穿的护甲。已作为战利品夺回。
+Armor worn by the infamous The Scavenger. Claimed as a trophy.	臭名昭著的拾荒者所穿的护甲。已作为战利品夺回。
+Armor worn by the infamous The Specialist. Claimed as a trophy.	臭名昭著的专家所穿的护甲。已作为战利品夺回。
+Armor worn by the infamous Hostile Takeover. Claimed as a trophy.	臭名昭著的恶意收购所穿的护甲。已作为战利品夺回。
+Armor worn by the infamous Blackbeard's Ghost. Claimed as a trophy.	臭名昭著的黑胡子幽灵所穿的护甲。已作为战利品夺回。

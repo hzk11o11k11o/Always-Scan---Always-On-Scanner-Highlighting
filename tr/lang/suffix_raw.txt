@@ -1,0 +1,366 @@
+--- rest (365 distinct) ---
+    19  Cargo Thug
+    18  Dock Thug
+    16  Armed Nomad
+    15  Thug
+    14  Mule
+    14  Dock Lead
+    14  Wreck Looter
+    14  Wire Salvager
+    13  Stash Rat
+    13  Cargo Looter
+    12  Guard
+    12  Bruiser
+    12  Veteran
+    12  Crew Lead
+    12  Grease Rat
+    12  Lead Reaver
+    12  Combat Veteran
+    11  Goon
+    11  Bag Man
+    11  Deckhand
+    11  Enforcer
+    11  Junk Scav
+    11  Cargo Goon
+    11  Cargo Runner
+    11  Station Punk
+    11  Hull Scrapper
+    11  Junk Salvager
+    11  Station Veteran
+    11  Comms Technician
+    11  Station Lieutenant
+    10  Rat
+    10  Nomad
+    10  Scrapper
+    10  Salvager
+    10  Gate Goon
+    10  Raid Lead
+    10  Wire Scav
+    10  Dock Punk
+    10  Alley Thug
+    10  Tunnel Rat
+    10  Gang Lead
+    10  Cargo Punk
+    10  Jury Rigger
+    10  Pipe Bender
+    10  Wire Cutter
+    10  Technician
+    10  Bolt Breaker
+    10  Parts Hawker
+    10  Head Enforcer
+    10  Senior Reaver
+    10  Raid Veteran
+    10  Gun Section Lead
+    10  Munitions Loader
+    10  Dead Drop Courier
+     9  Sergeant
+     9  Dock Goon
+     9  Hull Scav
+     9  Fence Boss
+     9  Lieutenant
+     9  Patch Welder
+     9  Drive Wrench
+     9  Station Nomad
+     9  Chop Scrapper
+     9  Station Looter
+     9  Night Watcher
+     9  Chop Shop Boss
+     9  Contraband Mule
+     9  Reactor Cracker
+     9  Contraband Officer
+     9  Supply Chain Lead
+     9  Systems Technician
+     8  Punk
+     8  Courier
+     8  Vent Rat
+     8  Cargo Mule
+     8  Pickpocket
+     8  Torch Hand
+     8  Body Hauler
+     8  Cargo Guard
+     8  Lockup Guard
+     8  Dock Bruiser
+     8  Head Bruiser
+     8  Scrap Hauler
+     8  Spark Jockey
+     8  Junk Peddler
+     8  Scout Agent
+     8  Cargo Broker
+     8  Boarding Lead
+     8  Depot Loader
+     8  Wire Scrapper
+     8  Scrap Engineer
+     8  Senior Enforcer
+     8  Gang Lieutenant
+     8  Procurement Lead
+     8  Supply Coordinator
+     7  Reaver
+     7  Looter
+     7  Captain
+     7  Overseer
+     7  Trooper
+     7  Deck Lead
+     7  Dock Boss
+     7  Gate Guard
+     7  Senior Hand
+     7  Machinist
+     7  Stockpiler
+     7  Fuel Runner
+     7  Loot Runner
+     7  Goods Mover
+     7  Gate Lookout
+     7  Hull Welder
+     7  Salvage Lead
+     7  Crew Sergeant
+     7  Gun Sergeant
+     7  Hull Salvager
+     7  Manifest Clerk
+     7  Salvage Broker
+     7  Senior Bruiser
+     7  Outpost Grunt
+     7  Dock Taskmaster
+     7  Acting Overseer
+     7  Hull Mechanic
+     7  Junior Overseer
+     7  Manifest Runner
+     7  Blade Supplicant
+     7  Weapons Specialist
+     6  Scav
+     6  Runner
+     6  Lookout
+     6  Welder
+     6  Dock Rat
+     6  Drop Mule
+     6  Commander
+     6  Mechanic
+     6  Blade Hand
+     6  Arc Welder
+     6  Shift Lead
+     6  Void Reaver
+     6  Void Nomad
+     6  Gun Lookout
+     6  Cable Rigger
+     6  Crate Hauler
+     6  Patch Rigger
+     6  Supply Hand
+     6  Supply Grunt
+     6  Cargo Grunt
+     6  Flame Watcher
+     6  Void Enforcer
+     6  Gate Watcher
+     6  Drive Engineer
+     6  Gang Commander
+     6  Watch Officer
+     6  Lead Technician
+     6  Senior Veteran
+     6  Package Courier
+     6  Inventory Clerk
+     6  Systems Mechanic
+     6  Dock Section Lead
+     6  Systems Architect
+     6  Black Market Dealer
+     6  Stockroom Attendant
+     6  Operations Sergeant
+     6  Demolitions Specialist
+     5  Rigger
+     5  Keeper
+     5  Agent
+     5  Grunt
+     5  Dockhand
+     5  Recruit
+     5  Taskmaster
+     5  Fabricator
+     5  Calibrator
+     5  Specialist
+     5  Hull Rigger
+     5  War Captain
+     5  Section Lead
+     5  Recon Agent
+     5  Station Thug
+     5  Cell Handler
+     5  Raid Captain
+     5  Dispatch Lead
+     5  Dock Sergeant
+     5  Gun Hand Lead
+     5  Shrine Keeper
+     5  Asset Runner
+     5  Field Officer
+     5  Station Grunt
+     5  Sanctum Guard
+     5  Field Recruit
+     5  Patrol Trooper
+     5  Chief Engineer
+     5  Tithe Collector
+     5  Offering Bearer
+     5  Perimeter Scout
+     5  Station Enforcer
+     5  Senior Taskmaster
+     5  Requisitions Aide
+     5  Reactor Technician
+     5  Reactor Attendant
+     5  Quartermaster Aide
+     5  Warehouse Attendant
+     5  Acquisitions Officer
+     4  Scout
+     4  Kingpin
+     4  Gun Hand
+     4  Hauler
+     4  Handler
+     4  Watcher
+     4  Officer
+     4  Wireman
+     4  Commissar
+     4  Initiate
+     4  Post Guard
+     4  Wire Monkey
+     4  Squad Lead
+     4  New Recruit
+     4  Patrol Lead
+     4  Temple Guard
+     4  Arms Dealer
+     4  Dock Sentry
+     4  Dock Lookout
+     4  Assault Lead
+     4  Patrol Scout
+     4  New Initiate
+     4  Path Aspirant
+     4  Fresh Recruit
+     4  Gun Taskmaster
+     4  Relic Courier
+     4  Tower Sentry
+     4  Drive Mechanic
+     4  Hull Technician
+     4  Station Warlord
+     4  Logistics Officer
+     4  Battle Commissar
+     4  Tactical Officer
+     4  Junior Lieutenant
+     4  Perimeter Trooper
+     4  Field Indoctrinator
+     4  Station Commander
+     4  Temple Interrogator
+     3  Sentry
+     3  War Chief
+     3  Chief Mate
+     3  Crew Boss
+     3  Director
+     3  Gate Keeper
+     3  Supplicant
+     3  Raid Warlord
+     3  Crate Flipper
+     3  Shrine Guard
+     3  Crew Captain
+     3  Raid Commander
+     3  Gate Sentry
+     3  Temple Novice
+     3  Grand Regent
+     3  Chief Mechanic
+     3  Serpent Novice
+     3  Forward Scout
+     3  Armory Director
+     3  Truth Aspirant
+     3  Fire Team Lead
+     3  Senior Handler
+     3  Strike Captain
+     3  Relic Procurer
+     3  Facility Guard
+     3  Faith Supplicant
+     3  Garrison Trooper
+     3  Station Overseer
+     3  Module Fabricator
+     3  Field Technician
+     3  Black Quartermaster
+     3  Grand Interrogator
+     3  Reactor Specialist
+     3  Senior Indoctrinator
+     3  Acquisitions Handler
+     3  Station Superintendent
+     2  Novice
+     2  Gun Boss
+     2  Aspirant
+     2  Lootmaster
+     2  Gang Chief
+     2  Underboss
+     2  War Priest
+     2  Brigadier
+     2  Colonel
+     2  War Deacon
+     2  Wanderer
+     2  Station Boss
+     2  Field Agent
+     2  Station Chief
+     2  Supply Master
+     2  Cache Tender
+     2  Void Captain
+     2  Field Handler
+     2  Flame Novice
+     2  Syndicate Head
+     2  Relic Keeper
+     2  Indoctrinator
+     2  Void Aspirant
+     2  Sector Kingpin
+     2  Temple Leader
+     2  Field Veteran
+     2  Gang Underboss
+     2  Bound Initiate
+     2  Serpent Captain
+     2  Station Kingpin
+     2  Armed Wanderer
+     2  Sworn Initiate
+     2  Operations Chief
+     2  Senior Colonel
+     2  Supply Carrier
+     2  Ordnance Expert
+     2  Checkpoint Guard
+     2  Combat Sergeant
+     2  Systems Overseer
+     2  Serpent Enforcer
+     2  Senior Commissar
+     2  Comms Specialist
+     2  Roaming Wanderer
+     2  Security Captain
+     2  Station Underboss
+     2  Faith Interrogator
+     2  Combat Indoctrinator
+     1  Chief
+     1  Exarch
+     1  Seeker
+     1  Gang Boss
+     1  General
+     1  Disciple
+     1  Warlord
+     1  Marshal
+     1  Inquisitor
+     1  Raid Warden
+     1  Fleet Captain
+     1  High Priest
+     1  Cell Leader
+     1  Field Colonel
+     1  Senior Mate
+     1  Interrogator
+     1  Armed Pilgrim
+     1  Flame Acolyte
+     1  Battle Regent
+     1  High Overseer
+     1  Tithe Auditor
+     1  Flame Crusader
+     1  Senior Prelate
+     1  Field Commander
+     1  Superintendent
+     1  Crusade Leader
+     1  Salvage Chief
+     1  Field Sergeant
+     1  Devoted Pilgrim
+     1  Supreme Overseer
+     1  Garrison Captain
+     1  Operations Head
+     1  Serpent Priest
+     1  Security Chief
+     1  Acting Lieutenant
+     1  Devoted Wanderer
+     1  Assault Captain
+     1  Devoted Enforcer
+     1  Boarding Captain
+     1  Sworn Supplicant
+     1  Circuit Fabricator
+     1  Garrison Superintendent

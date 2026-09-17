@@ -22,6 +22,13 @@ D:\SteamLibrary\steamapps\common\Starfield
 ## Mod Organizer 2安装位置
 D:\Mod Organizer 2
 
+## DU 系列 Creation 汉化
+
+5 个 du 系列 Creation 的汉化工作说明在 `docs/06-DU系列mod汉化.md`，
+工具在 `tools/re/trtool.py` / `tr_pipeline.py` / `tr_verify.py` 等，
+词典成果在 `tr/lang/`（**必须入库**，可增量续译）。
+4 个已完成并部署，`du_outlaws_01` 的长文本仍在进行中。
+
 ## 注意事项
 - Visual Studio 2026已安装，MSVC v143 生成工具已包含
 - 已完成内容要记录在：docs/99-当前项目进度.md，其他经验总结文档也可以记录在这个文件夹里，单个文件不得超过100KB，超过后可以简化或删除过老或已经不再重要的记录

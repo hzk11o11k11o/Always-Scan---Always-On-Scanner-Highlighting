@@ -1,0 +1,531 @@
+#chars	hits	sig/sub	text
+1	3	QUST/QMDP	3
+1	7	QUST/QMDP	4
+1	5	QUST/QMDP	5
+1	4	QUST/QMDP	8
+2	4	QUST/QMDP	15
+2	4	QUST/QMDP	20
+5	24	QUST/QMDT	Order
+5	2	MESG/DESC	XN-72
+6	16	QUST/QMDT	Amount
+6	2	MESG/DESC	DV-907
+6	2	MESG/DESC	LX-900
+6	2	MESG/DESC	NOVA-6
+6	2	MESG/DESC	Q8-02X
+6	2	MESG/DESC	R4-D13
+6	2	MESG/DESC	RT23-S
+6	2	MESG/DESC	T5-V47
+6	2	MESG/DESC	V9-4R3
+6	2	MESG/DESC	ZRD-77
+7	2	MESG/DESC	COV-884
+7	2	MESG/DESC	Dropoff
+7	2	MESG/DESC	GNT-660
+7	1	GBFM/FULL	Goliath
+7	2	MESG/DESC	HND-302
+7	2	MESG/DESC	IRIS-97
+7	2	MESG/DESC	OPS-513
+7	2	MESG/DESC	Pulse-9
+7	3	ACTI/FULL	Scanner
+7	2	MESG/DESC	Sigma-8
+8	2	MESG/DESC	Aegis-K5
+8	4	MISC/FULL	Blackbox
+8	1	KYWD/FULL	Delivery
+8	2	MESG/DESC	Helix-89
+8	2	MESG/DESC	Hydra-60
+8	2	MESG/DESC	Kronos-3
+8	1	MESG/FULL	No Items
+8	2	MESG/DESC	Orion-23
+8	2	MESG/DESC	Titan-21
+8	2	MISC/FULL	UC Files
+8	2	MESG/DESC	Viper-X2
+9	2	MESG/DESC	Apollo-77
+9	2	MESG/DESC	Boreas-10
+9	1	MISC/FULL	Mail Disk
+9	1	GBFM/FULL	MedRunner
+9	2	MESG/DESC	Sentry-X8
+10	2	MESG/DESC	Contraband
+10	1	MISC/FULL	Geo-Imager
+10	1	MISC/FULL	Miners Log
+10	1	GBFM/FULL	Pathfinder
+10	2	MESG/DESC	Thunder-55
+11	1	GBFM/FULL	Eon Voyager
+11	1	KYWD/FULL	Exploration
+11	1	KYWD/FULL	Infestation
+11	146	QUST/NAM2	Ready stage
+11	1	MISC/FULL	Tool Bundle
+11	1	MISC/FULL	Workers Log
+12	2	MESG/DESC	Avalanche-72
+12	4	MESG/DESC	Delivery Box
+12	1	ACTI/FULL	EMP Platform
+12	2	MESG/DESC	Harbinger-42
+12	25	ACTI/FULL	Scan Results
+12	2	GBFM/FULL	Titan Dredge
+13	8	QUST/QMDT	Delivery City
+13	2	ACTI/FULL	Fuel Platform
+13	1	GBFM/FULL	Goliath Mk-IV
+13	2	MISC/FULL	Goods Package
+13	1	MISC/FULL	Machine Parts
+13	1	KYWD/FULL	Manufacturing
+13	2	QUST/QMDT	Required Item
+13	2	MESG/DESC	Scan Complete
+14	85	QUST/NAM2	Complete Quest
+14	1	MESG/FULL	Delivery Start
+14	1	KYWD/FULL	Infrastructure
+14	2	MISC/FULL	Mineral Sample
+14	3	MESG/FULL	Miners Remains
+14	41	QUST/NAM2	Mission Failed
+14	1	GBFM/FULL	SC-77 Starhawk
+14	2	MISC/FULL	Terrain Mapper
+14	3	MESG/FULL	Worker Remains
+15	1	GBFM/FULL	Aegis MedRunner
+15	11	QUST/QMDT	Amount Required
+15	3	ACTI/FULL	Covert Drug Lab
+15	1	ACTI/FULL	Frozen Asteroid
+15	1	MESG/FULL	No Repair Parts
+15	1	ACTI/FULL	Xenowarfare Lab
+16	26	QUST/QMDP	<Alias=Evidence>
+16	1	MISC/FULL	Litho-Prospector
+16	2	MISC/FULL	Mail Consignment
+16	2	MISC/FULL	Medical Shipment
+16	146	QUST/NAM2	Mission Accepted
+16	146	QUST/NAM2	Mission Complete
+16	20	QUST/NAM2	Mission Rejected
+16	6	QUST/NNAM	Recover the Item
+16	1	MESG/DESC	Repairs complete
+16	2	MESG/DESC	Rustborn Rotfang
+16	2	MESG/DESC	Rustborn Voidrat
+16	2	GBFM/FULL	Stellar Coursier
+16	1	MISC/FULL	Targetting Board
+17	85	QUST/NAM2	Calculate Rewards
+17	3	ACTI/FULL	Crimson Anchorage
+17	1	ACTI/FULL	Critical UC Files
+17	3	ACTI/FULL	Delivery Location
+17	1	ACTI/FULL	Propaganda Beacon
+17	1	MESG/FULL	Repair successful
+17	1	MISC/FULL	Rifling blueprint
+17	2	MESG/DESC	Rustborn Ironhowl
+17	2	MESG/DESC	Rustborn Junkseer
+17	2	MESG/DESC	Rustborn Scraprat
+17	2	MESG/DESC	Rustborn Torchmaw
+17	1	MISC/FULL	Scientists Report
+17	2	MESG/DESC	Stolen Data Vault
+17	1	MISC/FULL	Subsurface Mapper
+17	1	GBFM/FULL	Zenith Pathfinder
+18	41	QUST/QMDP	<Alias=PrimaryRef>
+18	3	ACTI/FULL	Autonomous Factory
+18	1	ACTI/FULL	Dangerous Asteroid
+18	2	MESG/DESC	Experiment Storage
+18	2	MESG/DESC	Heretical Writings
+18	1	ACTI/FULL	Promising Asteroid
+18	1	ACTI/FULL	RogueTracker Array
+18	2	MESG/DESC	Rustborn Gravemaul
+18	2	MESG/DESC	Rustborn Rivetback
+18	2	MESG/DESC	Rustborn Scrapmaul
+18	2	MESG/DESC	Rustborn Scrapwolf
+18	2	MESG/DESC	Rustborn Wrecktide
+18	3	MESG/FULL	Scientists Remains
+19	1	MESG/FULL	Delivery Successful
+19	2	MESG/DESC	Experiment Location
+19	1	MISC/FULL	Plasma Wave Inducer
+19	2	MESG/DESC	Rustborn Grindspire
+19	2	MESG/DESC	Rustborn Gutterking
+19	2	MESG/DESC	Rustborn Hullreaver
+19	2	MESG/DESC	Rustborn Hullscythe
+19	2	MESG/DESC	Rustborn Rivetfiend
+19	2	MESG/DESC	Rustborn Scorchfang
+19	2	MESG/DESC	Rustborn Shatterjaw
+19	2	MESG/DESC	Rustborn Wreckbarge
+19	2	MESG/DESC	Scanning the target
+20	11	QUST/QMDP	<Alias=ResourceName>
+20	2	MISC/FULL	Cybersecurity Module
+20	3	ACTI/FULL	Hijacked Spy Station
+20	1	ACTI/FULL	Infested Observatory
+20	1	MISC/FULL	Phased-Array Antenna
+20	1	MISC/FULL	Rare Metals Shipment
+20	1	QUST/FULL	Recovery: The Clinic
+20	2	MESG/DESC	Rustborn Grimetongue
+20	2	MESG/DESC	Rustborn Scrapbucket
+20	2	MESG/DESC	Rustborn Shatterbane
+20	2	MESG/DESC	Rustborn Spannerjack
+20	2	ACTI/FULL	Stolen Mech Research
+21	1	ACTI/FULL	Freebooters Stockpile
+21	1	ACTI/FULL	Frontline Launch Site
+21	2	MESG/DESC	Rustborn Driftstalker
+21	2	MESG/DESC	Rustborn Gravescourge
+21	1	MISC/FULL	Seismographic Scanner
+21	3	ACTI/FULL	Stolen Encryption Key
+21	2	ACTI/FULL	Strike Assembly Point
+22	105	QUST/QMDP	<Alias=TargetLocation>
+22	4	ACTI/FULL	Deep Field Observatory
+22	1	TERM/FULL	Local Mission Terminal
+22	1	MISC/FULL	Neon Air Quality Probe
+22	1	ACTI/FULL	Report Upload Terminal
+23	1	GBFM/FULL	Crimson Hoard Transport
+23	1	ACTI/FULL	Critical Freestar Files
+23	1	BOOK/FULL	Local Mission Dataslate
+23	1	TERM/FULL	Remote Mission Terminal
+23	2	MESG/DESC	Secure Evidence Storage
+23	1	MISC/FULL	Stolen Medical Research
+24	2	ACTI/FULL	Critical Firmware Update
+24	1	MESG/FULL	DU Overtime User Created
+24	1	MISC/FULL	Incriminating Data Slate
+24	1	MISC/FULL	Neon Water Quality Probe
+24	2	MISC/FULL	Regolith Extraction Unit
+24	3	ACTI/FULL	Trade Authority Platform
+25	1	ACTI/FULL	Potentially Rich Asteroid
+25	2	ACTI/FULL	Public Utility Blueprints
+25	2	MESG/DESC	Survey Equipment Location
+26	1	ACTI/FULL	Cosmos Care Services Board
+26	1	MISC/FULL	Seismological Spectroscope
+27	1	ACTI/FULL	Asteroid with Ore Potential
+27	16	QUST/NNAM	Defeat <Alias=BountyTarget>
+27	1	MISC/FULL	Stolen Patient Medical Data
+27	2	ACTI/FULL	Stolen Xenowarfare Research
+27	2	MESG/DESC	Use Ship weapons to destroy
+28	105	QUST/QMDP	<Alias=TargetPlanetLocation>
+28	84	QUST/QMDP	<Alias=TargetSystemLocation>
+28	1	QUST/FULL	Collection: Midtown Minerals
+28	1	QUST/FULL	Experiment: Neon Air Quality
+28	8	QUST/FULL	Hijacked: <Alias=PrimaryRef>
+28	1	TERM/FULL	Local Cargo Mission Terminal
+29	1	BOOK/FULL	Local Cargo Mission Dataslate
+29	12	QUST/NNAM	Recover the Critical UC Files
+29	1	ACTI/FULL	Va'ruun Heretical Scriptorium
+30	1	QUST/FULL	Collection: Centaurian Arsenal
+30	1	QUST/FULL	Experiment: Neon Water Quality
+30	1	BOOK/FULL	Remote Space Mission Dataslate
+30	2	ACTI/FULL	Terraforming Procedure Manuals
+30	1	MESG/DESC	Transfering delivery to target
+31	1	QUST/FULL	Collection: Neon Mining League 
+31	1	BOOK/FULL	Remote Planet Mission Dataslate
+32	1	MESG/DESC	You deliever the requested items
+33	1	QUST/FULL	Recovery: The Den Trade Authority
+33	1	MESG/DESC	You don't have the items required
+36	8	QUST/NNAM	Deliver Log to <Alias=FinalLocation>
+37	7	QUST/FULL	Fabricate Component: <Alias=Evidence>
+37	4	BOOK/ENAM	[Data Slate #A-471 | Secure Playback]
+38	1	QUST/NNAM	Deliver <Alias=Evidence> to The Clinic
+38	4	QUST/FULL	Raw Materials: 15 <Alias=ResourceName>
+38	1	QUST/FULL	Recovery: New Atlantis Reliant Medical
+38	2	MESG/DESC	Starting repairs using some ship parts
+39	2	QUST/FULL	Claims Assessment: New Atlantis GalBank
+40	7	QUST/NNAM	Destroy Robot At <Alias=DungeonLocation>
+40	4	QUST/NNAM	Locate and Survey the <Alias=PrimaryRef>
+40	5	QUST/NNAM	Locate and repair the <Alias=PrimaryRef>
+41	7	QUST/FULL	Dismantle: Robots on <Alias=targetPlanet>
+42	18	QUST/FULL	Infiltration: <Alias=TargetPlanetLocation>
+43	1	QUST/NNAM	Deploy <Alias=Evidence> at the base of Neon
+44	4	QUST/FULL	Basic Manufacturing: 20 <Alias=ResourceName>
+44	1	QUST/NNAM	Deliver <Alias=Evidence> to Midtown Minerals
+45	5	QUST/FULL	Chunks Delivery: <Alias=TargetPlanetLocation>
+45	5	QUST/FULL	Deliver Package: <Alias=TargetSystemLocation>
+45	1	MESG/DESC	You don't have the ship parts to repair this.
+46	3	QUST/FULL	Advanced Manufacturing: 5 <Alias=ResourceName>
+46	1	QUST/NNAM	Deliver <Alias=Evidence> to Centaurian Arsenal
+46	1	QUST/NNAM	Deliver Goods Package to <Alias=FinalLocation>
+46	1	QUST/FULL	Hauling: Goods Package on <Alias=targetPlanet>
+46	3	QUST/FULL	Medical Delivery: <Alias=TargetPlanetLocation>
+46	5	QUST/FULL	Survey Equipment: <Alias=TargetSystemLocation>
+46	1	COBJ/DESC	Use this terminal to scan for nearby missions.
+46	1	COBJ/DESC	Use this terminal to scan for remote missions.
+47	12	QUST/NNAM	Defeat Test Subjects At <Alias=DungeonLocation>
+47	1	QUST/NNAM	Deliver Terrain Mapper to <Alias=FinalLocation>
+47	1	QUST/FULL	Hauling: Terrain Mapper on <Alias=targetPlanet>
+48	3	QUST/FULL	Cataxi Infestation: <Alias=TargetPlanetLocation>
+48	1	QUST/NNAM	Collect Goods Package at <Alias=DungeonLocation>
+48	20	QUST/NNAM	Collect the bounty at the <Alias=TargetLocation>
+48	8	QUST/FULL	Stolen Shipment: Antique on <Alias=targetPlanet>
+48	4	QUST/FULL	TerraBrew Delivery: <Alias=TargetPlanetLocation>
+49	1	QUST/NNAM	Collect Terrain Mapper at <Alias=DungeonLocation>
+49	2	QUST/NNAM	Deliver <Alias=Evidence> to New Atlantis Galbank 
+49	1	QUST/NNAM	Deliver Mail Consignment to <Alias=FinalLocation>
+49	1	QUST/NNAM	Deliver Medical Shipment to <Alias=FinalLocation>
+49	4	QUST/FULL	Gastronomy Delivery: <Alias=TargetPlanetLocation>
+49	1	QUST/FULL	Hauling: Mail Consignment on <Alias=targetPlanet>
+49	1	QUST/FULL	Hauling: Medical Shipment on <Alias=targetPlanet>
+49	85	QUST/NAM2	Player left location - safe to clean up container
+50	1	QUST/NNAM	Deliver <Alias=Evidence> to the Neon Mining League
+50	18	QUST/FULL	Predator Infestation: <Alias=TargetPlanetLocation>
+51	1	QUST/NNAM	Collect Mail Consignment at <Alias=DungeonLocation>
+51	1	QUST/NNAM	Collect Medical Shipment at <Alias=DungeonLocation>
+51	1	QUST/NNAM	Deliver <Alias=Evidence> to The Den Trade Authority
+51	3	QUST/FULL	Heetleech Infestation: <Alias=TargetSystemLocation>
+51	12	QUST/FULL	Hunt: Escaped test subjects on <Alias=targetPlanet>
+52	12	QUST/FULL	Bounty: <Alias=BountyTarget> on <Alias=targetPlanet>
+52	6	QUST/FULL	Danger: <Alias=BountyTarget> on <Alias=targetPlanet>
+52	3	QUST/NNAM	Deliver 5 <Alias=ResourceName> to <Alias=PrimaryRef>
+52	16	QUST/FULL	Strike: <Alias=BountyTarget> on <Alias=targetPlanet>
+52	2	QUST/FULL	UC Recovery: Stolen UC Files on <Alias=targetPlanet>
+52	1	COBJ/DESC	Use this terminal to scan for nearby cargo missions.
+53	4	QUST/NNAM	Deliver 15 <Alias=ResourceName> to <Alias=PrimaryRef>
+53	4	QUST/NNAM	Deliver 20 <Alias=ResourceName> to <Alias=PrimaryRef>
+53	1	QUST/NNAM	Deliver Cybersecurity Module to <Alias=FinalLocation>
+53	1	QUST/NNAM	Deliver Rare Metals Shipment to <Alias=FinalLocation>
+53	1	QUST/NNAM	Deliver Stolen Mech Research to <Alias=FinalLocation>
+53	41	QUST/NAM2	Player arrives in target system - update quest target
+54	18	QUST/NNAM	Defeat <Alias=BountyTarget> At <Alias=DungeonLocation>
+54	1	QUST/NNAM	Deliver Stolen Encryption Key to <Alias=FinalLocation>
+55	1	QUST/NNAM	Collect Cybersecurity Module at <Alias=DungeonLocation>
+55	8	QUST/NNAM	Find <Alias=CorpseContainer> At <Alias=DungeonLocation>
+55	1	QUST/NNAM	Recover Rare Metals Shipment at <Alias=DungeonLocation>
+55	1	QUST/NNAM	Recover Stolen Mech Research at <Alias=DungeonLocation>
+56	18	QUST/NNAM	Board <Alias=PrimaryRef> At <Alias=TargetPlanetLocation>
+56	1	QUST/NNAM	Recover Stolen Encryption Key at <Alias=DungeonLocation>
+57	37	QUST/NNAM	Defeat <Alias=PrimaryRef> At <Alias=TargetPlanetLocation>
+57	1	QUST/NNAM	Deliver Critical Firmware Update to <Alias=FinalLocation>
+57	1	QUST/NNAM	Deliver Regolith Extraction Unit to <Alias=FinalLocation>
+57	2	QUST/NNAM	Deliver Stolen Critical UC Files to <Alias=FinalLocation>
+57	2	QUST/FULL	Dismantle: Kill the Robot on <Alias=TargetPlanetLocation>
+57	1	QUST/FULL	Hauling: Regolith Extraction Unit on <Alias=targetPlanet>
+57	10	QUST/NNAM	Recover the <Alias=Treasure> from <Alias=DungeonLocation>
+57	10	QUST/FULL	Stolen Shipment: <Alias=Treasure> on <Alias=targetPlanet>
+57	2	BOOK/DESC	[The data slate contains information on a nearby mission]
+57	2	BOOK/DESC	[The data slate contains information on a remote mission]
+58	9	QUST/FULL	Bounty: <Alias=PrimaryRef> at <Alias=TargetPlanetLocation>
+58	2	QUST/FULL	Danger: <Alias=PrimaryRef> at <Alias=TargetPlanetLocation>
+58	1	QUST/NNAM	Deliver Public Utility Blueprints to <Alias=FinalLocation>
+58	1	QUST/NNAM	Deploy <Alias=Evidence> at the Experiment Location in Neon
+58	7	QUST/NNAM	Destroy <Alias=PrimaryRef> At <Alias=TargetPlanetLocation>
+58	1	QUST/FULL	Hauling: Cybersecurity Module Unit on <Alias=targetPlanet>
+58	5	QUST/FULL	Repair: <Alias=PrimaryRef> at <Alias=TargetSystemLocation>
+58	4	QUST/FULL	Survey: <Alias=PrimaryRef> at <Alias=TargetSystemLocation>
+58	1	QUST/FULL	UC Recovery: Stolen Encryption Key on <Alias=targetPlanet>
+59	1	QUST/NNAM	Collect Regolith Extraction Unit at <Alias=DungeonLocation>
+59	1	QUST/NNAM	Deliver <Alias=Evidence> to Reliant Medical in New Atlantis
+59	1	QUST/NNAM	Recover Critical Firmware Update at <Alias=DungeonLocation>
+59	2	QUST/NNAM	Recover Stolen Critical UC Files at <Alias=DungeonLocation>
+60	4	QUST/FULL	Boarding: <Alias=PrimaryRef> at <Alias=TargetPlanetLocation>
+60	7	QUST/FULL	Bounty: Kill the Spacer Gang on <Alias=TargetPlanetLocation>
+60	1	QUST/FULL	Cargo Recovery: Rare Metals Shipment on <Alias=targetPlanet>
+60	1	QUST/NNAM	Deliver Stolen Xenowarfare Research to <Alias=FinalLocation>
+60	7	QUST/FULL	Hijacked: <Alias=PrimaryRef> at <Alias=TargetPlanetLocation>
+60	1	QUST/NNAM	Recover Public Utility Blueprints at <Alias=DungeonLocation>
+60	6	QUST/FULL	Recovery: <Alias=PrimaryRef> at <Alias=TargetPlanetLocation>
+60	13	QUST/FULL	Rustborn: <Alias=PrimaryRef> at <Alias=TargetPlanetLocation>
+61	11	QUST/FULL	Dark Site: <Alias=PrimaryRef> at <Alias=TargetPlanetLocation>
+62	7	QUST/FULL	Dark Site: <Alias=PrimaryRef> at <Alias=TargetPlanetLocation> 
+62	2	QUST/FULL	Data recovery: <Alias=ActivatorTarget> on <Alias=targetPlanet>
+62	1	QUST/NNAM	Recover Stolen Xenowarfare Research at <Alias=DungeonLocation>
+63	1	QUST/NNAM	Deliver Terraforming Procedure Manuals to <Alias=FinalLocation>
+63	8	QUST/FULL	Missing Person: <Alias=CorpseContainer> on <Alias=targetPlanet>
+63	4	QUST/FULL	UC Navy SOS: <Alias=PrimaryRef> at <Alias=TargetPlanetLocation>
+64	5	QUST/FULL	Bounty: Kill the Ecliptic Legion on <Alias=TargetPlanetLocation>
+64	1	QUST/FULL	Cargo Recovery: Critical Firmware Update on <Alias=targetPlanet>
+64	5	QUST/FULL	Data Collection: <Alias=ActivatorTarget> on <Alias=targetPlanet>
+64	4	QUST/FULL	Freestar SOS: <Alias=PrimaryRef> at <Alias=TargetPlanetLocation>
+64	1	QUST/FULL	Syndicate Recovery: Stolen Mech Research on <Alias=targetPlanet>
+64	1	QUST/FULL	UC Recovery: Stolen Xenowarfare Research on <Alias=targetPlanet>
+65	1	QUST/FULL	Cargo Recovery: Public Utility Blueprints on <Alias=targetPlanet>
+65	1	QUST/NNAM	Recover Terraforming Procedure Manuals at <Alias=DungeonLocation>
+68	7	QUST/NNAM	Collect data from <Alias=ActivatorTarget> At <Alias=DungeonLocation>
+69	8	QUST/FULL	Boarding: Derelict <Alias=PrimaryRef> at <Alias=TargetPlanetLocation>
+70	6	QUST/FULL	Bounty: Kill the Crimson Fleet Brigade on <Alias=TargetPlanetLocation>
+70	1	QUST/FULL	Cargo Recovery: Terraforming Procedure Manuals on <Alias=targetPlanet>
+70	12	QUST/NNAM	Delivery Box at <Alias=TargetLocation> on <Alias=TargetPlanetLocation>
+70	3	QUST/NNAM	Destroy Nest at <Alias=TargetLocation> on <Alias=TargetPlanetLocation>
+71	4	QUST/NNAM	Destroy Stash at <Alias=TargetLocation> on <Alias=TargetPlanetLocation>
+72	8	QUST/NNAM	Recover the Antique from <Alias=DungeonLocation> on <Alias=TargetPlanet>
+73	1	MESG/DESC	Dark Universe: Overtime bounties now available from all bounty terminals.
+75	18	QUST/NNAM	Destroy Predators at <Alias=TargetLocation> on <Alias=TargetPlanetLocation>
+80	3	QUST/NNAM	Destroy Heatleech Nest at <Alias=TargetLocation> on <Alias=TargetPlanetLocation>
+81	5	QUST/NNAM	Pickup <Alias=Evidence> at <Alias=TargetLocation> on <Alias=TargetPlanetLocation>
+82	5	QUST/NNAM	Recover <Alias=Evidence> at <Alias=TargetLocation> on <Alias=TargetPlanetLocation>
+83	5	QUST/NNAM	Transfer <Alias=Evidence> at <Alias=TargetLocation> on <Alias=TargetPlanetLocation>
+84	3	QUST/NNAM	Deliver 3 <Alias=Evidence> to <Alias=TargetLocation> on <Alias=TargetPlanetLocation>
+84	7	QUST/NNAM	Deliver 4 <Alias=Evidence> to <Alias=TargetLocation> on <Alias=TargetPlanetLocation>
+84	2	QUST/NNAM	Deliver 5 <Alias=Evidence> to <Alias=TargetLocation> on <Alias=TargetPlanetLocation>
+84	4	QUST/NNAM	Deliver 8 <Alias=Evidence> to <Alias=TargetLocation> on <Alias=TargetPlanetLocation>
+84	4	QUST/NNAM	Sabotage Ecliptic Scanners at <Alias=TargetLocation> on <Alias=TargetPlanetLocation>
+84	2	QUST/NNAM	Wipe Out Ecliptic Scanners at <Alias=TargetLocation> on <Alias=TargetPlanetLocation>
+85	6	QUST/NNAM	Burn the Heretical Writings at <Alias=TargetLocation> on <Alias=TargetPlanetLocation>
+90	1	QUST/NNAM	Wipe Out Crimson Fleet Stockpile at <Alias=TargetLocation> on <Alias=TargetPlanetLocation>
+96	1	QUST/NNAM	Take Out Crimson Fleets Cave Stockpile at <Alias=TargetLocation> on <Alias=TargetPlanetLocation>
+97	1	QUST/QMSU	A new task awaits in <Alias=TargetSystemLocation>. Locate the <Alias=PrimaryRef> and overhaul it.
+97	1	QUST/QMSU	A repair job is posted in <Alias=TargetSystemLocation>. Locate the <Alias=PrimaryRef> and fix it.
+98	16	QUST/CNAM	I've discovered a data slate containing information on a a bounty landing on <Alias=TargetPlanet>.
+99	4	QUST/QMSU	Deliver 4 <Alias=Evidence> to <Alias=TargetLocation> on <Alias=TargetPlanetLocation>. Chunks to go.
+99	1	QUST/QMSU	Deliver 5 <Alias=Evidence> to <Alias=TargetLocation> on <Alias=TargetPlanetLocation>. Chunks to go.
+103	1	QUST/CNAM	A brutal Spacer crew roams the sector with a C-class <Alias=PrimaryRef>. Destroy it for a hefty reward.
+104	1	QUST/CNAM	A hidden facility orbits the planet, producing illicit substances. Destroy it to disrupt the drug trade.
+104	2	QUST/QMSU	A repair request has come in from <Alias=TargetSystemLocation>. Find and restore the <Alias=PrimaryRef>.
+104	1	QUST/QMSU	The <Alias=TargetSystemLocation> system needs repairs. Track down the <Alias=PrimaryRef> and service it.
+110	1	COBJ/DESC	A specialized device designed to gather and process loose surface materials from planetary or lunar terrains. 
+115	1	QUST/QMSU	Mining corporations have an interest in this asteroid. Verify its resource potential by conducting a thorough scan.
+116	1	QUST/QMSU	Critical systems await maintenance. Manufacture the necessary parts and expedite shipment to <Alias=TargetLocation>.
+117	1	QUST/CNAM	A B-class <Alias=PrimaryRef> has terrorized the sector. Track it down and destroy it to collect a substantial reward.
+118	3	QUST/QMSU	<Alias=TargetLocation> on <Alias=TargetPlanetLocation> is running low on crucial supplies. Deliver 3 <Alias=Evidence>.
+118	3	QUST/CNAM	A hijacked surveillance facility orbits the planet under stealth. Destroy this dark site to end its covert operations.
+118	8	QUST/CNAM	I've collected the log from <Alias=CorpseContainer>, I need report it to <Alias=FinalLocation> on <Alias=TargetPlanet>
+121	1	QUST/CNAM	A heavily armed <Alias=PrimaryRef> has sparked a heretical uprising. Destroy it for a lucrative reward and restore peace.
+123	1	QUST/CNAM	A B-class <Alias=PrimaryRef>, branded heretical, poses a grave threat. Destroy it for a hefty reward and restore stability.
+123	1	QUST/CNAM	A deadly C-class <Alias=PrimaryRef> roams the star lanes. Disable it to earn a lucrative reward and safeguard local routes.
+124	1	QUST/CNAM	A Regolith Extraction Unit is needed at <Alias=FinalLocation>. Retrieve it from <Alias=DungeonLocation> and deliver to them.
+124	1	COBJ/DESC	An advanced antenna system made up of numerous individual radiating elements whose signals can be electronically controlled.
+125	1	QUST/CNAM	A Cybersecurity Module Unit is needed at <Alias=FinalLocation>. Retrieve it from <Alias=DungeonLocation> and deliver to them.
+125	1	QUST/QMSU	This disk holds important communications. Ensure it arrives intact at <Alias=TargetLocation> on <Alias=TargetPlanetLocation>.
+126	4	QUST/CNAM	A UC Navy distress call shows they are in combat with a <Alias=PrimaryRef> and it's allies. Join the battle to aid the UC Navy
+126	4	QUST/QMSU	Deliver 8 <Alias=Evidence> to <Alias=TargetLocation> on <Alias=TargetPlanetLocation>. You can purchase or cook these yourself.
+127	1	QUST/QMSU	A new set of tools is needed for repairs at <Alias=TargetLocation> on <Alias=TargetPlanetLocation>. Deliver them without delay.
+128	1	QUST/CNAM	A violent Spacer crew terrorizes the sector from their B-class <Alias=PrimaryRef>. Neutralize them to collect a generous reward.
+129	2	QUST/CNAM	A covert fueling station orbits the planet, aiding pirate fleets. Disable it to deprive them of resources and curb their attacks.
+130	1	QUST/CNAM	A notorious B-class <Alias=PrimaryRef> is causing chaos. Track it down, neutralize it, and collect the reward for restoring peace.
+130	1	QUST/QMSU	A request came from <Alias=TargetSystemLocation>. Secure 20 <Alias=ResourceName> for <Alias=PrimaryRef> to bolster their supplies.
+130	3	QUST/QMSU	The <Alias=PrimaryRef> is harboring dangerous forces in <Alias=TargetSystemLocation>. Destroy the station to end their operations.
+131	1	QUST/CNAM	A violent C-class <Alias=PrimaryRef> is devastating trade routes. Destroy it to earn a substantial reward and restore safe passage.
+132	4	QUST/CNAM	A Freestar Collective distress call shows they are in combat with a <Alias=PrimaryRef> and it's allies. Join the battle to aid them.
+132	2	QUST/CNAM	I've recovered the Stolen files from <Alias=DungeonLocation>, now I need to take it to <Alias=FinalLocation> on <Alias=TargetPlanet>
+133	1	QUST/CNAM	I've collected the Goods Package from <Alias=DungeonLocation>, now I need to take it to <Alias=FinalLocation> on <Alias=TargetPlanet>
+134	1	QUST/QMSU	A <Alias=PrimaryRef> has been discovered in <Alias=TargetSystemLocation>. Destroy it before it collides with important infrastructure.
+134	1	QUST/CNAM	A Rare Metals Shipment has been stolen on route to <Alias=FinalLocation>. Recover it from <Alias=DungeonLocation> and deliver to them.
+134	1	QUST/CNAM	I've collected the Terrain Mapper from <Alias=DungeonLocation>, now I need to take it to <Alias=FinalLocation> on <Alias=TargetPlanet>
+134	1	QUST/QMSU	The <Alias=TargetSystemLocation> system requests help. Bring 15 <Alias=ResourceName> to <Alias=PrimaryRef> to maintain vital services.
+135	1	QUST/CNAM	A hidden stronghold circles the planet, serving as a rendezvous point for mercenaries. Attack and dismantle it to halt their offensive.
+136	1	QUST/CNAM	I've collected the Mail Consignment from <Alias=DungeonLocation>, now I need to take it to <Alias=FinalLocation> on <Alias=TargetPlanet>
+136	1	QUST/CNAM	I've collected the Medical Shipment from <Alias=DungeonLocation>, now I need to take it to <Alias=FinalLocation> on <Alias=TargetPlanet>
+137	1	QUST/QMSU	Reports indicate the <Alias=PrimaryRef> is disrupting trade routes in <Alias=TargetSystemLocation>. Dismantle it to restore safe passage.
+137	3	QUST/QMSU	The <Alias=PrimaryRef> has been hijacked by rogue factions in <Alias=TargetSystemLocation>. Bring it down before they can expand further.
+139	2	QUST/QMSU	<Alias=Evidence> has been taken during transit. Travel to <Alias=TargetPlanetLocation> and reclaim it before it falls into the wrong hands.
+139	1	QUST/QMSU	<Alias=PrimaryRef> is installing new tech in <Alias=TargetSystemLocation>. They need 5 hard-to-find <Alias=ResourceName> to finish the job.
+140	1	QUST/CNAM	I've collected the Cybersecurity Module from <Alias=DungeonLocation>, now I need to take it to <Alias=FinalLocation> on <Alias=TargetPlanet>
+140	1	QUST/CNAM	I've recovered the Rare Metals Shipment from <Alias=DungeonLocation>, now I need to take it to <Alias=FinalLocation> on <Alias=TargetPlanet>
+140	1	QUST/CNAM	I've recovered the Stolen Mech Research from <Alias=DungeonLocation>, now I need to take it to <Alias=FinalLocation> on <Alias=TargetPlanet>
+140	1	QUST/QMSU	Recent breaches have put <Alias=TargetLocation> at risk. Construct a robust security system and ship it promptly for immediate installation.
+141	1	QUST/CNAM	I've recovered the Stolen Encryption Key from <Alias=DungeonLocation>, now I need to take it to <Alias=FinalLocation> on <Alias=TargetPlanet>
+142	1	QUST/QMSU	<Alias=PrimaryRef> in <Alias=TargetSystemLocation> is upgrading vital systems. Deliver 5 rare <Alias=ResourceName> to finalize their retrofit.
+142	1	QUST/QMSU	An <Alias=Evidence> has been taken during transit. Travel to <Alias=TargetPlanetLocation> and reclaim it before it falls into the wrong hands.
+144	1	QUST/QMSU	Anya Griffon has requested collection of a <Alias=Evidence> from <Alias=TargetPlanetLocation>. Apparently it could revolutionise rifling design.
+144	1	QUST/CNAM	I've collected the Regolith Extraction Unit from <Alias=DungeonLocation>, now I need to take it to <Alias=FinalLocation> on <Alias=TargetPlanet>
+144	1	QUST/CNAM	I've recovered the Critical Firmware Update from <Alias=DungeonLocation>, now I need to take it to <Alias=FinalLocation> on <Alias=TargetPlanet>
+145	1	QUST/QMSU	A contract is open in <Alias=TargetSystemLocation>. Locate <Alias=PrimaryRef> and deliver 15 <Alias=ResourceName> they need for essential upkeep.
+145	1	QUST/CNAM	I've recovered the Public Utility Blueprints from <Alias=DungeonLocation>, now I need to take it to <Alias=FinalLocation> on <Alias=TargetPlanet>
+146	2	QUST/QMSU	A supply order is active in <Alias=TargetSystemLocation>. Find <Alias=PrimaryRef> and provide 15 <Alias=ResourceName> to support their operations.
+146	2	QUST/QMSU	A supply order is active in <Alias=TargetSystemLocation>. Find <Alias=PrimaryRef> and provide 20 <Alias=ResourceName> to support their operations.
+147	1	COBJ/DESC	A Plasma Wave Inducer is a device designed to generate and control plasma waves, which are oscillations in the density and temperature of a plasma.
+147	1	QUST/QMSU	Arc-Might has a shipment of letters that need transported to <Alias=TargetLocation> on <Alias=TargetPlanetLocation>. Complete the delivery swiftly.
+147	18	QUST/QMSU	Dangerous wildlife has claimed <Alias=TargetLocation>, disrupting operations on <Alias=TargetPlanetLocation>. Exterminate them to reclaim the area.
+147	1	QUST/CNAM	I've recovered the Stolen Xenowarfare Research from <Alias=DungeonLocation>, now I need to take it to <Alias=FinalLocation> on <Alias=TargetPlanet>
+148	1	QUST/QMSU	Healthcare teams at <Alias=TargetLocation> on <Alias=TargetPlanetLocation> are awaiting these crucial supplies. Complete the delivery without delay.
+150	13	QUST/CNAM	A Rustborn clan has taken a new <Alias=PrimaryRef> to add to thier armada. Track it down, either seize it intact or eliminate it, and end this threat.
+150	1	QUST/QMSU	An invasive species is nesting in <Alias=TargetLocation>, forcing evacuations across <Alias=TargetPlanetLocation>. Remove the threat to restore order.
+150	1	QUST/CNAM	I've recovered the Terraforming Procedure Manuals from <Alias=DungeonLocation>, now I need to take it to <Alias=FinalLocation> on <Alias=TargetPlanet>
+150	1	QUST/QMSU	The Seismographic Scanners readings will provide detailed topographic data, vital for safe navigation and resource planning at <Alias=TargetLocation>.
+151	1	QUST/QMSU	<Alias=PrimaryRef> has begun a high-level enhancement in <Alias=TargetSystemLocation>. Track down 5 specialized <Alias=ResourceName> to ensure success.
+151	1	QUST/QMSU	A <Alias=PrimaryRef> has been discovered in <Alias=TargetSystemLocation>. Destroy it before anyone breaks the quarantine and the biohazards can spread.
+153	3	QUST/QMSU	Deliver 4 <Alias=Evidence> to <Alias=TargetLocation> on <Alias=TargetPlanetLocation>. Delivering hot fresh coffee across the settled systems and beyond. 
+153	1	QUST/QMSU	Deliver 5 <Alias=Evidence> to <Alias=TargetLocation> on <Alias=TargetPlanetLocation>. Delivering hot fresh coffee across the settled systems and beyond. 
+155	1	QUST/QMSU	A powerful phased-array system is vital for interplanetary comms. Build the device to specification and deliver it to <Alias=TargetLocation> without delay.
+155	12	QUST/CNAM	A shipment of dangerous alien have escaped from a science facility. Track them down at <Alias=DungeonLocation> on <Alias=TargetPlanet> and neutralize them.
+155	1	QUST/QMSU	Researchers need precise core data from <Alias=TargetLocation> to understand ancient volcanic layers. Install the device to gather essential rock profiles.
+157	1	QUST/QMSU	Hostile creatures have overrun <Alias=TargetLocation>, threatening nearby settlements on <Alias=TargetPlanetLocation>. Destroy their nest to halt the spread.
+157	3	QUST/QMSU	Security alerts warn that the <Alias=PrimaryRef> in <Alias=TargetSystemLocation> is heavily armed. Your mission is to eliminate it and neutralize the threat.
+158	2	QUST/CNAM	UC files have been stolen and taken to <Alias=DungeonLocation>. A Strike team has gone dark. Retrieve the Stolen Files and return it to <Alias=FinalLocation>.
+159	8	QUST/CNAM	I've discovered a data slate containing information on a nearby bounty target. The coordinates suggest it is at <Alias=DungeonLocation> on <Alias=TargetPlanet>
+161	1	QUST/QMSU	Intelligence reveals that the <Alias=PrimaryRef> has become a hostile stronghold in <Alias=TargetSystemLocation>. Shut it down before it launches another attack.
+161	1	QUST/QMSU	LIST has requested a package be delivered to one of its members. Get the package to <Alias=PrimaryRef> in <Alias=TargetLocation> on <Alias=TargetPlanetLocation>.
+162	2	QUST/CNAM	I've discovered a data slate containing information on a nearby Cataxi infection. The coordinates suggest it is at <Alias=DungeonLocation> on <Alias=TargetPlanet>
+163	1	QUST/CNAM	A Critical Firmware Update needed at <Alias=FinalLocation> has been stolen. Recover it from <Alias=DungeonLocation> and return it so the upgrades can be performed.
+164	1	QUST/CNAM	<Alias=FinalLocation> needs Public Utility Blueprints. Some have been located at <Alias=DungeonLocation>. Aquire them and return them so that research can continue.
+164	1	QUST/QMSU	A group of scientists are doing a study on the water Quality around Neon. Pickup the Water Probe from <Alias=TargetPlanetLocation> and deploy it at the base of Neon
+164	2	QUST/CNAM	I've discovered a data slate containing information on a nearby Predator infection. The coordinates suggest it is at <Alias=DungeonLocation> on <Alias=TargetPlanet>
+164	7	QUST/CNAM	I've discovered a data slate containing information on a robot that has gone rogue. The coordinates suggest it is at <Alias=DungeonLocation> on <Alias=TargetPlanet>
+165	1	QUST/QMSU	Scientists suspect hidden caverns beneath <Alias=TargetLocation>. Placing the Terrain Mapper will confirm the presence of subterranean structures and water deposits.
+166	1	QUST/QMSU	Heatleeches have burrowed into power conduits in <Alias=TargetLocation>, causing blackouts across <Alias=TargetPlanetLocation>. Destroy the nest to restore stability.
+166	2	QUST/CNAM	I've discovered a data slate containing information on a nearby Terrormorph sighting. The coordinates suggest it is at <Alias=DungeonLocation> on <Alias=TargetPlanet>
+167	1	QUST/QMSU	A concealed <Alias=TargetLocation> serves as a key stockpile for the Crimson Fleet. Eliminate this cache to stop further illegal trade on <Alias=TargetPlanetLocation>.
+167	1	QUST/QMSU	Position this device to capture high-resolution scans of <Alias=TargetLocation>, revealing hidden fault lines and structural anomalies on <Alias=TargetPlanetLocation>.
+169	1	QUST/CNAM	<Alias=FinalLocation> needs Terraforming Procedure Manuals. Some have been located at <Alias=DungeonLocation>. Aquire them and return them so that research can continue.
+171	1	QUST/QMSU	Heatleeches have crippled vital machinery in <Alias=TargetLocation>, halting production across <Alias=TargetPlanetLocation>. Wipe out the infestation to resume operations.
+172	8	QUST/CNAM	I've discovered a data slate containing the location of a stolen shipment containing Armor. The coordinates suggest it is at <Alias=DungeonLocation> on <Alias=TargetPlanet>
+173	1	QUST/QMSU	A <Alias=PrimaryRef> is retrofitting new hardware. They require 20 <Alias=ResourceName> to complete the upgrade. They are located in the <Alias=TargetSystemLocation> system.
+173	1	QUST/QMSU	A swarm of predators has established a lair in <Alias=TargetLocation>, damaging critical systems on <Alias=TargetPlanetLocation>. Eliminate them before they cause more harm.
+173	1	QUST/QMSU	Frequent tremors on <Alias=TargetPlanetLocation> demand better monitoring. Assemble this spectroscope and deliver it to <Alias=TargetLocation> for critical seismic analysis.
+173	1	QUST/QMSU	The tactical systems at <Alias=TargetLocation> require precise alignment. Craft the board carefully and deliver it for immediate integration on <Alias=TargetPlanetLocation>.
+175	1	QUST/QMSU	A group of scientists are doing a study on the air quality around Neon. Pickup the Air Probe from <Alias=TargetPlanetLocation> and deploy it at the experiment location in Neon
+175	2	QUST/CNAM	I've discovered a data slate containing the location of a stolen shipment containing a Weapon. The coordinates suggest it is at <Alias=DungeonLocation> on <Alias=TargetPlanet>
+175	1	QUST/QMSU	Technicians at <Alias=TargetLocation> require a robust device to harvest top-layer materials on <Alias=TargetPlanetLocation>. Construct the unit and ensure a secure transport.
+176	1	QUST/CNAM	Crimson Fleet pirates are assaulting <Alias=DungeonLocation> on <Alias=TargetPlanet>, endangering vital data and personnel. Move in, repel the invaders, and secure the outpost.
+177	8	QUST/CNAM	I've discovered a data slate containing the location of a stolen shipment containing an Antique. The coordinates suggest it is at <Alias=DungeonLocation> on <Alias=TargetPlanet>
+178	1	QUST/CNAM	A UC Encryption Key has been stolen and taken to <Alias=DungeonLocation>. A Strike team has gone dark. Retrieve the Stolen Encryption Key  and return it to <Alias=FinalLocation>.
+180	8	QUST/CNAM	A Rustborn clan has taken vital UC data and stored it on <Alias=PrimaryRef>. Track it down and board the ship to recover the data. Do not destroy the ship as the data will be lost.
+181	1	QUST/CNAM	I've found a request for the transport of a Terrain Mapper. Retrieve it from <Alias=DungeonLocation> and deliver to <Alias=FinalLocation>. This is used to map subsurface structures.
+182	7	QUST/CNAM	I've discovered a data slate containing information on a experiment that needs its data broadcasting. The coordinates suggest it is at <Alias=DungeonLocation> on <Alias=TargetPlanet>
+182	1	QUST/QMSU	Scientists at <Alias=TargetLocation> require a device to harness volatile energy bursts on <Alias=TargetPlanetLocation>. Assemble the inducer with precision and ensure safe delivery.
+182	1	QUST/CNAM	The Crimson Fleet has taken vital UC data and stored it on <Alias=PrimaryRef>. Track it down and board the ship to recover the data. Do not destroy the ship as the data will be lost.
+183	1	QUST/CNAM	A group of Varuun have taken vital UC data and stored it on <Alias=PrimaryRef>. Track it down and board the ship to recover the data. Do not destroy the ship as the data will be lost.
+184	1	QUST/CNAM	A group of Spacers have taken vital UC data and stored it on <Alias=PrimaryRef>. Track it down and board the ship to recover the data. Do not destroy the ship as the data will be lost.
+184	1	QUST/QMSU	Reports indicate a large store of valuable items held by the Crimson Fleet in <Alias=TargetLocation>. Wiping it out will cripple their smuggling routes on <Alias=TargetPlanetLocation>.
+185	1	QUST/CNAM	A group of Ecliptic have taken vital UC data and stored it on <Alias=PrimaryRef>. Track it down and board the ship to recover the data. Do not destroy the ship as the data will be lost.
+187	1	QUST/CNAM	UC Xenowarfare Research has been stolen and taken to <Alias=DungeonLocation>. A Strike team has gone dark. Retrieve the Stolen Xenowarfare Research and return it to <Alias=FinalLocation>.
+189	2	QUST/QMSU	The <Alias=PrimaryRef> is loaded with spoils from recent raids. Intercept and destroy it at <Alias=TargetSystemLocation> to cut off their loot supply and restore safe passage to the region.
+193	1	QUST/QMSU	Although barren and uninhabited, <Alias=TargetPlanetLocation> hosts crucial infrastructure. A well-armed Ecliptic mercenary squad has targeted these facilities. Move in fast to secure the site.
+193	1	QUST/QMSU	Structures in <Alias=TargetLocation> have suffered major breaches from rampant Heatleeches, risking total collapse on <Alias=TargetPlanetLocation>. Eradicate the nest to prevent further damage.
+196	6	QUST/CNAM	A critical firmware update was being transported on <Alias=PrimaryRef> but it has gone dark. Track it down and board the ship to recover the data. Do not destroy the ship as the data will be lost.
+197	8	QUST/CNAM	A recovered data slate reveals the last known whereabouts of a missing person. The coordinates point to <Alias=DungeonLocation> on <Alias=TargetPlanet>. Investigate the site and uncover their fate.
+199	1	COBJ/DESC	An instrument used to decompose seismic waves into their component frequencies. By examining these frequencies, scientists can identify distinctive wave signatures and gain insights into the origins.
+202	1	QUST/CNAM	A request has come in for the transport of a Mail Consignment. Retrieve it from <Alias=DungeonLocation> and deliver to <Alias=FinalLocation>. This contains communications from home and will boost moral.
+204	2	QUST/QMSU	A dangerous rogue robot has been detected on <Alias=TargetPlanetLocation>, threatening local settlements and disrupting operations. Eliminate the mechanical menace before it causes further damage or harm.
+205	1	COBJ/DESC	A system designed to identify and prioritize targets for strategic or tactical operations. By collecting and analyzing real-time data, it ensures precise engagement and maximizes operational effectiveness.
+212	1	QUST/QMSU	A band of pirates is assaulting a vital mining operation on <Alias=TargetPlanetLocation>, endangering workers and precious resources. Intercept their attack and secure the site before any more damage can be done.
+212	1	MESG/DESC	This asteroid contains mostly low grade iron ore with scattered traces of common silicates. Mineral density is weak making extraction efforts costly and inefficient. Not a worthwhile target for mining operations.
+215	1	QUST/CNAM	A stolen ship has been sighted at <Alias=TargetSystemLocation>, the Goliath Mk-IV features reinforced hull plating, modular drop bays, and automated defensive turrets to ensure safe deployment even in hostile zones.
+217	1	MESG/DESC	This asteroid is composed mostly of inert rock with negligible amounts of usable minerals. Scans reveal weak metal presence and high impurity levels making extraction impractical. Not a worthwhile prospect for mining.
+218	1	QUST/QMSU	A high-security installation at <Alias=TargetLocation> is housing the Crimson Fleets illicit goods. Infiltrate the compound and wipe out the stash before they can expand their influence on <Alias=TargetPlanetLocation>.
+219	1	QUST/CNAM	Mech Research has been stolen and taken to <Alias=DungeonLocation>. The report indicates that the Syndicate are the ones behind the theft. Retrieve the Stolen Xenowarfare Research and return it to <Alias=FinalLocation>.
+221	1	QUST/QMSU	A band of pirates has targeted a cutting-edge research outpost on <Alias=TargetPlanetLocation>, threatening both staff and valuable findings. Move in quickly to repel the attack and protect the sites critical discoveries.
+221	6	QUST/QMSU	A cache of banned texts has emerged at <Alias=TargetLocation>. Authorities have declared these writings heretical, ordering their complete destruction to preserve order on <Alias=TargetPlanetLocation>. Find and burn them.
+221	1	COBJ/DESC	The essential components that form the building blocks of mechanical devices and industrial equipment. They are typically crafted with precision and durability in mind, enabling smooth operation and efficient performance.
+222	1	QUST/QMSU	A band of pirates is assaulting a <Alias=TargetLocation> on <Alias=TargetPlanetLocation>, putting civilians and critical supplies at risk. Mobilize quickly, repel the attackers, and protect the civilians from further harm.
+223	1	QUST/CNAM	A request has come in for urgent transport of a Medical Shipment. Retrieve it from <Alias=DungeonLocation> and ensure safe, timely delivery to <Alias=FinalLocation>. These supplies could help save lives to handle with care.
+227	1	MESG/DESC	This asteroid is composed mainly of brittle rock and low value carbon deposits with only minor traces of usable metals. Scans show poor mineral concentration making extraction unprofitable. Best to move on and search elsewhere.
+227	1	MESG/DESC	This asteroid is primarily made up of silicate rock with only faint traces of iron and nickel. Mineral concentration is too low to justify extraction making it an unprofitable target. Best to look elsewhere for richer deposits.
+229	1	MESG/DESC	This asteroid consists mostly of dense basalt with minimal traces of useful minerals. Scans indicate low metal content and high impurity levels making extraction inefficient. Not worth the effort for any serious mining operation.
+230	6	QUST/QMSU	Ecliptic mercenaries have deployed high-tech scanners at <Alias=TargetLocation> to monitor activity across <Alias=TargetPlanetLocation>. Disabling these devices will cripple their surveillance network and disrupt their operations.
+231	1	QUST/CNAM	A ruthless Crimson Fleet raiding party is assaulting <Alias=DungeonLocation> on <Alias=TargetPlanet>, threatening both key facilities and civilians. Deploy immediately to repel the pirates, protect vital systems, and restore order.
+231	7	QUST/QMSU	A ruthless band of Spacers is assaulting a <Alias=TargetLocation> on <Alias=TargetPlanetLocation>, putting civilians and critical supplies at risk. Mobilize quickly, repel the attackers, and protect the civilians from further harm.
+233	1	QUST/QMSU	A squad of Ecliptic mercenaries has launched an assault on a strategic military facility on <Alias=TargetPlanetLocation>. Deploy immediately, repel their incursion, and secure any classified information from falling into enemy hands.
+234	1	QUST/QMSU	Midtown Minerals is looking for fresh resources to keep its shelves stocked. Travel to <Alias=TargetPlanetLocation>, obtain the <Alias=Evidence>, and deliver it to the store so they can continue trading with travelers and prospectors.
+234	1	QUST/QMSU	The Neon Mining League is on the verge of closing its doors. They urgently need a <Alias=Evidence> from <Alias=TargetPlanetLocation> to reignite their business. Secure the sample and bring it back to the shop to help them stay afloat.
+234	1	MESG/DESC	This asteroid contains a dense core of silver and tungsten with scattered pockets of vanadium. Mineral analysis suggests high purity levels making extraction efficient and rewarding. A prime candidate for a lucrative mining operation.
+236	1	QUST/CNAM	A request has come in for urgent transport of a valuable Goods Package. Retrieve it from <Alias=DungeonLocation> and ensure safe, timely delivery to <Alias=FinalLocation>. Failure could disrupt operations, so handle the cargo with care.
+237	2	QUST/QMSU	A spaceship has crashed, leaving behind a critical black box needed to process the insurance claim. Travel to the crash site on <Alias=TargetPlanetLocation>, retrieve the device, and safely return it to Galbank for further investigation.
+238	2	QUST/QMSU	A cutting-edge expedition vessel designed for extended missions into the cosmic frontier, the Eon Voyager boasts a state-of-the-art navigation system and a modular research bay allowing its crew to explore the vast unknown without limits.
+241	1	MESG/DESC	This asteroid is packed with high quality iridium and osmium along with a steady presence of nickel. Scans indicate a strong yield with minimal waste material ensuring efficient extraction. A highly profitable find worth immediate attention.
+243	1	QUST/QMSU	A band of Ecliptic mercenaries is threatening a newly established settlement on vibrant, resource-rich <Alias=TargetPlanetLocation>. Rush to defend the colony, protect its residents, and secure the lush environment against further hostilities.
+249	1	QUST/QMSU	A gang of pirates has launched a violent attack on a vital fracking station on <Alias=TargetPlanetLocation>, putting both the infrastructure and its workers at severe risk. Move in fast to repel their assault and safeguard this critical energy site.
+250	1	QUST/CNAM	A band of Crimson Fleet pirates has launched a vicious assault on <Alias=DungeonLocation>, imperiling both its residents and valuable resources. Move in swiftly to repel the attackers, secure the area, and safeguard the settlement from further raids.
+250	1	COBJ/DESC	A specialized system designed to protect digital environments by monitoring, detecting, and mitigating security threats. It employs encryption, access controls, and threat intelligence to safeguard sensitive information and maintain system integrity.
+250	1	MESG/DESC	This asteroid contains rich deposits of platinum along with significant traces of rare earth elements. The mineral density suggests an excellent yield potential with minimal processing required. A highly profitable discovery for any mining operation.
+251	1	QUST/QMSU	A well-organized group of Ecliptic mercenaries has targeted a valuable mining operation on <Alias=TargetPlanetLocation>, endangering both workers and resources. Deploy swiftly to defend the facility, repel the assault, and ensure continued production.
+252	1	QUST/QMSU	A Ecliptic mercenary group has targeted a research station devoted to studying <Alias=TargetPlanetLocation>s unique flora and fauna. Move quickly to defend the scientists, safeguard their work, and prevent the destruction of invaluable biological data.
+252	2	QUST/QMSU	Designed for high-speed emergency response, the Aegis MedRunner is a sleek, agile craft equipped with advanced triage bays, automated medical drones, and a state-of-the-art stabilization suite, ensuring critical care reaches the wounded in record time.
+253	2	QUST/QMSU	A colossal strip-mining barge built for maximum resource extraction, the Titan Dredge is equipped with high-powered excavation beams, automated refinery systems, and massive cargo holds, capable of stripping entire asteroids down to their core minerals.
+253	1	QUST/QMSU	A massive, heavily armored troop transport designed to deploy entire squads into the heart of battle, the Goliath Mk-IV features reinforced hull plating, modular drop bays, and automated defensive turrets to ensure safe deployment even in hostile zones.
+253	2	QUST/QMSU	A state-of-the-art experimental ship has fallen into pirate hands, jeopardizing advanced technology and intelligence. The SC-77 Starhawk combines classic aerospace design with cutting-edge propulsion, making it a nimble predator in deep space dogfights.
+253	2	QUST/QMSU	Engineered for long-duration cosmic surveys, the Zenith Pathfinder is outfitted with high-resolution planetary scanners, a reinforced hull for extreme environments, and an onboard research lab, making it suited for mapping the uncharted depths of space.
+254	2	QUST/QMSU	Designed for speed and efficiency, the Stellar Coursier is a high-performance cargo transport featuring enhanced thrusters, and reinforced cargo bays, ensuring valuable shipments reach their destination swiftly and securely even through hostile territory
+255	1	QUST/QMSU	A band of pirates has fortified themselves deep within a remote cave on <Alias=TargetPlanetLocation>, using it as a base for raids on nearby settlements. Infiltrate their hideout, neutralize the threat, and put an end to their operations once and for all.
+255	1	QUST/QMSU	A gang of pirates has launched a raid on a high-value industrial facility on <Alias=TargetPlanetLocation>, threatening vital production lines and the workforce. Your objective is to intervene swiftly, drive out the raiders, and ensure the facility remains
+256	1	MESG/DESC	This asteroid is rich in high grade cobalt and palladium with a notable presence of trace gold deposits. Mineral scans indicate strong extraction potential with minimal impurities. A highly valuable target for any mining crew looking for a profitable haul.
+262	1	MESG/DESC	This asteroid is nothing more than a drifting pile of rubble with no redeeming mineral value. Scans reveal a near total absence of metals and an unstable structure prone to collapse. Any attempt to mine this rock would be an absolute waste of time and equipment.
+265	1	MESG/DESC	This asteroid is a worthless mass of brittle stone and compacted dust with no significant mineral content. Scans show extreme instability with no viable extraction prospects. Any mining attempt would be a complete loss of time and resources. Best to avoid entirely.
+268	1	MESG/DESC	This asteroid is a jackpot of valuable minerals featuring rich deposits of gold platinum and high grade titanium. Scans indicate exceptional purity with minimal impurities ensuring maximum extraction efficiency. A prime mining target with outstanding profit potential.
+270	1	MESG/DESC	This asteroid is little more than a floating chunk of worthless debris with almost no detectable mineral value. Scans show unstable composition with high fragmentation risk making even basic extraction a waste of resources. A completely useless find best left untouched.
+277	1	MESG/DESC	This asteroid is a hollowed out husk of fractured rock and frozen dust with no measurable mineral value. Scans detect extreme instability with a high probability of structural collapse making any mining attempt both dangerous and pointless. A complete waste of time and effort.
+280	1	MESG/DESC	This asteroid holds an abundance of valuable minerals including thick veins of titanium and a generous amount of nickel. Scans reveal a strong concentration of industrial grade metals making this a prime candidate for extraction. A worthwhile find with excellent profit potential.
+417	1	MESG/DESC	Sysmic scanner data confirms a stable geological profile. Tectonic activity is minimal with only trace microquakes detected likely the result of natural planetary cooling. Soil samples indicate a well balanced mineral composition with high concentrations of silicates and trace amounts of rare metals. No significant subsurface anomalies detected. Ideal conditions for further study or potential outpost construction.
+437	1	MESG/DESC	Sysmic scanner data shows no abnormal seismic activity. The planetary crust remains stable with only minor tremors detected deep below the surface. Soil analysis reveals a rich mixture of silicates and organic compounds suggesting a history of geological and possibly biological processes. Subsurface scans indicate steady thermal gradients with no evidence of volatile disruptions. Conditions are excellent for research and exploration.
+482	1	MESG/DESC	Sysmic scanner data indicates a calm and stable environment. Tectonic activity is nearly undetectable with only faint tremors recorded at extreme depths. Soil composition is rich in iron and magnesium with trace amounts of crystallized quartz suggesting long term geological stability. Subsurface readings show uniform thermal distribution with no signs of magma movement or pressure buildup. Conditions are highly suitable for continued monitoring and potential excavation efforts.
+491	1	MESG/DESC	The body is still, the suit pierced by multiple gunshot wounds. The reinforced fabric tried to self seal, but the damage was too extensive. The life support system failed minutes later, leaving only a dim red light blinking on the wrist module, signaling a distress call that was never answered.\r\n\r\nA datapad is clutched tightly in one hand, the screen cracked but still displaying scattered research notes. The final entry cuts off mid-sentence, the text uneven, as if typed in a hurry.
+496	1	MESG/DESC	Sysmic scanner data reveals mild tectonic shifts with occasional tremors recorded at mid crust levels. While not immediately hazardous these fluctuations suggest an active geological cycle. Soil samples contain a mix of stable silicates and loosely compacted sediment indicating gradual surface erosion. Subsurface scans detect minor thermal variations that could indicate pockets of geothermal activity. Conditions remain manageable but warrant continued observation for any signs of escalation.
+500	1	MESG/DESC	Sysmic scanner data reveals frequent tremors with some reaching moderate intensity. Subsurface layers show signs of shifting plates which may indicate developing fault lines. Soil samples contain loosely packed sediment and fractured mineral deposits suggesting ongoing ground instability. Thermal readings fluctuate irregularly hinting at potential magma movement or deep crust stress points. Conditions are unpredictable and may pose risks for further exploration or settlement. Caution is advised.
+512	1	MESG/DESC	Sysmic scanner data detects faint tremors at irregular intervals though they pose no immediate concern. The crust remains intact with only subtle shifts in deeper layers suggesting slow tectonic adjustments. Soil analysis shows a stable mix of silicates and compacted dust with minor traces of organic residue possibly from past atmospheric interactions. Thermal scans indicate slight variations but nothing outside normal geological activity. Conditions remain mostly steady with minimal risk of sudden changes.
+517	1	MESG/DESC	Sysmic scanner data shows low level tremors occurring intermittently but without significant movement in the planetary crust. The terrain appears largely stable though minor shifts in subsurface layers suggest slow geological activity. Soil analysis reveals a balanced mix of compact minerals and loose sediments with no immediate signs of disruption. Thermal readings indicate mild fluctuations but nothing out of expected parameters. Conditions remain mostly steady with only minor concerns for long term stability.
+523	1	MESG/DESC	The body is motionless, their suit punctured by multiple high-velocity impacts. The entry wounds are clean precision shots, the kind favored by Spacers who do not waste ammunition. The internal seals tried to compensate, but the ruptures were too severe. A slow oxygen leak did the rest.\r\n\r\nTheir datapad is still active, the last recorded log unfinished. Scattered sensor readings flicker on the screen, interrupted by a brief audio clip. a frantic breath, a muttered curse, then gunfire. The playback ends in silence.
+552	1	MESG/DESC	Sysmic scanner data detects continuous tremors with occasional strong quakes disrupting the terrain. Subsurface analysis reveals fractured fault lines and shifting rock layers indicating significant geological stress. Soil samples show a high concentration of loose sediment and unstable mineral deposits making surface conditions hazardous. Thermal scans register erratic heat spikes suggesting deep magma movement or rising geothermal activity. The environment is highly volatile and may become increasingly dangerous. Extreme caution is recommended.
+558	1	MESG/DESC	Sysmic scanner data registers frequent minor tremors with occasional stronger pulses indicating gradual crust movement. Subsurface analysis shows early signs of shifting fault lines though no major fractures have formed. Soil samples reveal a mix of compacted minerals and loose sediment suggesting moderate surface erosion. Thermal readings display mild fluctuations with isolated heat pockets that could indicate low level geothermal activity. Conditions are somewhat unstable but remain manageable with proper precautions. Continued monitoring is advised.
+562	1	MESG/DESC	The body is still, frozen in a twisted posture. The miners suit is scarred with deep, seared gashes. Clean, precise cuts left by a mining laser. The fabric around the wounds is charred, the metal plating warped from the heat.\r\n\r\nThe visor is intact, but the readouts on the helmet display flicker weakly, warning of catastrophic pressure loss. A single red light blinks on their wrist module. A final, unsent message. The laser cutter lies silent nearby, its energy cell depleted. Whether it was a weapon or a tool in their last moments is impossible to say.
+588	1	MESG/DESC	You find them slumped against a jagged rock, their spacesuit coated in a thin layer of dust. The visor of their helmet is fractured, reflecting the cold, empty void above. The faint glint of dried blood streaks across their chestplate, a silent testament to their final struggle.\r\n\r\nLife support systems are long dead. Readouts flicker weakly, warning of oxygen depletion hours ago. Their gloved hand still grips a data slate, the cracked screen frozen on an unfinished log. A distress signal was sent, but no one came in time. The vast silence of space has claimed another lost soul.
+678	1	MESG/DESC	The body is motionless, the suit scorched and torn. Signs of a struggle are clear. Dents in the armor, a severed strap, a utility tool lying just out of reach. The worker never had a chance.\r\n\r\nThe life support display flickers weakly, its last recorded vitals long since flatlined. A faint red smear trails across the chest plate where hands once clutched at fatal wounds. The cause of death is clear multiple close range strikes, precise and ruthless.\r\n\r\nA symbol has been carved into the suits plating, jagged and unmistakable. The Crimson Fleet does not leave witnesses. Whatever this worker saw, whatever they were fixing, it was enough to sign their death warrant.
+695	1	MESG/DESC	The body is still, their suit perforated by ballistic impacts. The self sealing fabric tried to compensate, but against this many shots, it never stood a chance. The scientists helmet display flickers weakly, warning of critical system failure.\r\n\r\nA datapad is clutched in one hand, the cracked screen still displaying a series of incomplete readings. A final log entry is partially typed, trailing off midsentence:\r\n\r\nThey saw me. No time to...\r\n\r\nA Spacer insignia is scrawled across the suit in deep knife gouges, a crude signature of those who kill without reason. The weapon fire was precise, deliberate. Whatever the scientist was studying, someone did not want them to finish.
+714	1	MESG/DESC	The body is still, the suit torn open by brutal close quarters strikes. The emergency seals failed, leaving jagged gaps where the reinforced fabric was punctured. A weak signal pulses from the wrist module, a distress call that was never answered.\r\n\r\nA battered tool lies nearby, its surface stained. The worker tried to defend themselves, but the outcome was never in question. The utility belt has been ransacked, pockets turned inside out, tools missing. Whatever they were repairing, someone did not want it fixed.\r\n\r\nA crude symbol is scratched into the chest plate, a calling card left behind without care. The pirates took what they wanted, and the worker became just another casualty in their path.
+726	1	MESG/DESC	The body lies still, the suit punctured by deep, deliberate blade wounds. The self sealing material failed to contain the damage, leaving dark stains where the life support system struggled and lost. A weak signal blinks from the wrist module, a final alert that no one answered.\r\n\r\nA worn-out tool lies nearby, its handle slick with blood, as if the worker tried to fight back. The utility belt is half unfastened, the pockets rifled through. Whatever was taken, the killers knew what they were looking for.\r\n\r\nA crude insignia has been slashed into the chest plate, a jagged mark left behind like a signature. The Crimson Fleet does not leave loose ends, and this worker became just another example of their methods.

@@ -1,0 +1,141 @@
+#en	zh
+# Dark Universe: Outlaws —— 由模板组合的任务目标
+Defeat <Alias=BountyTarget> At <Alias=DungeonLocation>	在<Alias=DungeonLocation>击败<Alias=BountyTarget>
+Destroy the <Alias=BountyTarget> At <Alias=DungeonLocation>	在<Alias=DungeonLocation>摧毁<Alias=BountyTarget>
+Destroy the <Alias=PrimaryRef> At <Alias=TargetPlanetLocation>	在<Alias=TargetPlanetLocation>摧毁<Alias=PrimaryRef>
+Locate the <Alias=BountyTarget> At <Alias=DungeonLocation>	在<Alias=DungeonLocation>找到<Alias=BountyTarget>
+Locate the <Alias=BountyTarget> At Akila City Spaceport	在阿基拉城太空港找到<Alias=BountyTarget>
+Locate the <Alias=BountyTarget> At Akila City The Stretch	在阿基拉城延伸区找到<Alias=BountyTarget>
+Locate the <Alias=BountyTarget> At Cydonia Central Hub	在赛多尼亚中央枢纽找到<Alias=BountyTarget>
+Locate the <Alias=BountyTarget> At Cydonia Residential Level	在赛多尼亚住宅层找到<Alias=BountyTarget>
+Locate the <Alias=BountyTarget> At Gagarin Landing	在加加林着陆点找到<Alias=BountyTarget>
+Locate the <Alias=BountyTarget> At HopeTown	在霍普镇找到<Alias=BountyTarget>
+Locate the <Alias=BountyTarget> At Neon Astrall Lounge	在霓虹城星光酒廊找到<Alias=BountyTarget>
+Locate the <Alias=BountyTarget> At Neon Core	在霓虹城核心找到<Alias=BountyTarget>
+Locate the <Alias=BountyTarget> At Neon Ebbside	在霓虹城埃布赛德找到<Alias=BountyTarget>
+Locate the <Alias=BountyTarget> At Neon Rooftops	在霓虹城屋顶找到<Alias=BountyTarget>
+Locate the <Alias=BountyTarget> At Neon Ryujin HQ	在霓虹城龙神总部找到<Alias=BountyTarget>
+Locate the <Alias=BountyTarget> At Neon Starport	在霓虹城星港找到<Alias=BountyTarget>
+Locate the <Alias=BountyTarget> At Neon Underbelly	在霓虹城底层找到<Alias=BountyTarget>
+Locate the <Alias=BountyTarget> At New Atlantis	在新亚特兰蒂斯城找到<Alias=BountyTarget>
+Locate the <Alias=BountyTarget> At New Homestead	在新家园找到<Alias=BountyTarget>
+Locate the <Alias=BountyTarget> At Red Mile	在红里找到<Alias=BountyTarget>
+Locate the <Alias=BountyTarget> At The Clinic	在星际诊所号找到<Alias=BountyTarget>
+Locate the <Alias=BountyTarget> At The Den	在巢穴站找到<Alias=BountyTarget>
+Locate the <Alias=BountyTarget> At The Well	在深井区找到<Alias=BountyTarget>
+Locate the <Alias=BountyTarget> At Waggoner Farm	在瓦戈纳农场找到<Alias=BountyTarget>
+Locate the <Alias=PrimaryRef> At <Alias=TargetPlanetLocation>	在<Alias=TargetPlanetLocation>找到<Alias=PrimaryRef>
+Make A Choice	做出选择
+Read the Aegis Drift Log from Mason Kade	从梅森·凯德处阅读神盾漂流日志
+Read the Aegis Shadow Routes from Kade Morrell	从凯德·莫雷尔处阅读神盾暗影航线
+Read the Aegis Shadow Trace from Mira Calder	从米拉·卡尔德处阅读神盾暗影踪迹
+Read the Blind Airpath Logs from Ruben Calvert	从鲁本·卡尔弗特处阅读盲航路日志
+Read the Blueglass Access Path from Kayla Rourke	从卡伊拉·鲁尔克处阅读蓝玻璃访问路径
+Read the Broken Grid Handshake from Ronan Havel	从罗南·哈维尔处阅读断裂网格握手
+Read the Broken Vector Playbook from Lena Corbett	从莉娜·科比特处阅读断裂向量行动手册
+Read the Cheyenne Approach Fragment from Lena Corbett	从莉娜·科比特处阅读夏延接近残片
+Read the Convergence Relay Log from Jaxon Mire	从杰克森·米尔处阅读汇聚中继日志
+Read the Discarded Route Shard from Nadia Serrano	从娜迪亚·塞拉诺处阅读被弃路线残片
+Read the Drifting Clinic Log from Mara Quintero	从玛拉·金特罗处阅读漂流诊所日志
+Read the Dryline Manifolds Index from Cole Varron	从科尔·瓦伦处阅读干线城市群索引
+Read the Dual Vector Manifest from Nadia Harrow	从娜迪亚·哈罗处阅读双向量舱单
+Read the Duststorm Freight Ledger from Nadia Cortez	从娜迪亚·科尔特斯处阅读尘暴货运账册
+Read the Echo Fork Registry from Calen Rourke	从卡伦·鲁尔克处阅读回响分叉名录
+Read the Forked Vector Cache from Rico Vargan	从里科·瓦尔甘处阅读分叉向量缓存
+Read the Ghost Corridor Index from Lena Corbett	从莉娜·科比特处阅读幽灵走廊索引
+Read the Ghost Corridor Log from Davin Kordel	从达文·科德尔处阅读幽灵走廊日志
+Read the Ghost Window Chart from Kara Vescovi	从卡拉·韦斯科维处阅读幽灵窗口图表
+Read the Ghostlane Access Log from Lena Vorchak	从莉娜·沃尔查克处阅读幽灵航线访问日志
+Read the Grav Shadow Log from Tessa Crowley	从泰莎·克劳利处阅读重力暗影日志
+Read the Grave Lattice Ledger from Darren Kopec	从达伦·科佩茨处阅读墓格账册
+Read the Gravelight Drift Log from Rena Vasquez	从蕾娜·巴斯克斯处阅读墓光漂流日志
+Read the Graveyard Route Ledger from Kade Mercer	从凯德·默瑟处阅读墓场路线账册
+Read the Gravline Route Index from Riley Vance	从莱利·万斯处阅读重力线路线索引
+Read the Grid Ghost Logs from Ria Calderon	从瑞娅·卡尔德隆处阅读网格幽灵日志
+Read the Highland Shadow Ping from Lena Corbett	从莉娜·科比特处阅读高地暗影脉冲
+Read the Interference Flight Archive from Marla Keswick	从玛尔拉·凯西克处阅读干扰飞行档案
+Read the Kade Pocket Ledger from Jace Morales	从杰斯·莫拉莱斯处阅读凯德袖珍账册
+Read the Ledger Spiral Map from Kellan Duarte	从凯兰·杜阿尔特处阅读账册螺旋地图
+Read the Mesh Trace Index from Nadia Korrigan	从娜迪亚·科里根处阅读网格踪迹索引
+Read the Moonside Manifest Fragments from Rico Malloran	从里科·马洛兰处阅读月面舱单残片
+Read the Overwatch Vector Trace from Rico Navarrete	从里科·纳瓦雷特处阅读守望向量踪迹
+Read the Phantom Corridor Logs from Sabine Kellar	从萨宾·凯拉处阅读幻影走廊日志
+Read the Phantom Corridor Slate from Rhea Kozlova	从瑞亚·科兹洛娃处阅读幻影走廊数据板
+Read the Quiet Manifests Ledger from Lena Corbett	从莉娜·科比特处阅读静默舱单账册
+Read the Relay Ghost Log from Rhea Santoro	从瑞亚·桑托罗处阅读中继幽灵日志
+Read the Second Horizon Fieldnotes from Darren Kovacs	从达伦·科瓦奇处阅读第二地平线野外笔记
+Read the Shadow Asset Log from Kade Mercer	从凯德·默瑟处阅读暗影资产日志
+Read the Shadow Manifests from Calen Rourke	从卡伦·鲁尔克处阅读暗影舱单
+Read the Shadow Route Ledger from Darius Foyle	从达里乌斯·福伊尔处阅读暗影路线账册
+Read the Silent Harbor Ledger from Naomi Varga	从娜奥米·瓦尔加处阅读静默港湾账册
+Read the Silent Vector Brief from Calen Dravos	从卡伦·德拉沃斯处阅读静默向量简报
+Read the Spiral Dispatch Log from Lena Corbett	从莉娜·科比特处阅读螺旋调度日志
+Read the Split Corridor Manifest from Kara Veldt	从卡拉·维尔特处阅读分岔走廊舱单
+Read the Split Route Ledger from Nina Corbett	从妮娜·科比特处阅读分岔路线账册
+Read the Stolen Corridor Chain from Kane Madrigal	从凯恩·马德里加尔处阅读失窃走廊链
+Read the Stolen Vector Tablet from Damon Kellan	从达蒙·凯兰处阅读失窃向量石板
+Read the Storm Echo Log from Rosa Velez	从罗莎·贝莱斯处阅读风暴回响日志
+Read the Storm-Track Field Log from Rico Dalhart	从里科·达尔哈特处阅读风暴轨迹野外日志
+Read the Tangent Relay Log from Kara Delvecchio	从卡拉·德尔维奇奥处阅读切线中继日志
+Read the Thermal Drift Log from Ethan Marrow	从伊桑·马罗处阅读热漂流日志
+Read the Tidal Route Index from Kara Mendoza	从卡拉·门多萨处阅读潮汐路线索引
+Read the Twinband Route Cache from Kara Delvecchio	从卡拉·德尔维奇奥处阅读双带路线缓存
+Read the Vanished Pilgrims Ledger from Rhea Calder	从瑞亚·卡尔德处阅读消失朝圣者账册
+Read the Variance Drift Log from Rico Valdez	从里科·巴尔迪兹处阅读偏差漂流日志
+Read the Vector Drift Log from Kellan Ortiz	从凯兰·奥尔蒂斯处阅读向量漂流日志
+Read the Vector Fork Log from Kara Mireles	从卡拉·米雷莱斯处阅读向量分叉日志
+Recover the <Alias=BountyTarget> At <Alias=DungeonLocation>	在<Alias=DungeonLocation>找回<Alias=BountyTarget>
+Recover the Abort Horizon Log from the PX-3446	从PX-3446处找回中止地平线日志
+Recover the Anchor Drift Log from the GC-5222 Stockwind	从GC-5222 存风处找回锚点漂流日志
+Recover the Blind Corridor Ledger from the Seamender AX-6874	从缝海者 AX-6874处找回盲走廊账册
+Recover the Blind Corridor Ledger from the Tidewalker TA-7207	从潮行者 TA-7207处找回盲走廊账册
+Recover the Borderline Routing Log from the Widebeam AX-1562	从宽带 AX-1562处找回临界航线日志
+Recover the Cheyenne Vector Log from the GC-8466 Depositron	从GC-8466 储蓄者处找回夏延向量日志
+Recover the Cold Brace Manifest from the OM-2098	从OM-2098处找回冷支架舱单
+Recover the Collateral Drift Manifest from the FR-4274 Dustlance	从FR-4274 尘枪处找回抵押漂流舱单
+Recover the Convergent Route Schema from the LX-6790	从LX-6790处找回汇聚路线图式
+Recover the Drift Corridor Sketch from the Deepwater LT-7924	从深水 LT-7924处找回漂流走廊草图
+Recover the Dust Haze Corridor from the Ironkeel TR-5394	从铁龙骨 TR-5394处找回尘霾走廊
+Recover the Echo Ledger Route from the Starborne TA-3154	从星裔 TA-3154处找回回响账册路线
+Recover the Echo Uplink Route from the Starwharf AX-3779	从星码头 AX-3779处找回回响上行路线
+Recover the Echo Vector Ledger from the Skyclipper TA-1174	从天帆船 TA-1174处找回回响向量账册
+Recover the Fold Inversion Path from the PX-15	从PX-15处找回折叠反转路径
+Recover the Frontier Drift Ledger from the Silverwake AX-1824	从银尾流 AX-1824处找回边境漂流账册
+Recover the Grav Echo Ledger from the YP-4360	从YP-4360处找回重力回响账册
+Recover the Grav Echo Slate from the PX-9199	从PX-9199处找回重力回响数据板
+Recover the Grav Shear Ledger from the PX-7708	从PX-7708处找回重力剪切账册
+Recover the Grave Spin Ledger from the CB-6735 Trustsphere	从CB-6735 信球处找回墓旋账册
+Recover the Gravelight Balance Ledger from the LX-2547	从LX-2547处找回墓光平衡账册
+Recover the Graveyard Burn Itinerary from the JN-7547	从JN-7547处找回墓场焚毁行程表
+Recover the Graveyard Route Index from the FX-1555	从FX-1555处找回墓场路线索引
+Recover the Gravline Audit Ledger from the LF-2357 Highnoon	从LF-2357 正午处找回重力线审计账册
+Recover the Green Corridor Draft from the GL-1355 Capitalwing	从GL-1355 资本之翼处找回绿色走廊草案
+Recover the Grey Track Manifold from the Windcrier TA-6451	从风呼者 TA-6451处找回灰色轨迹流形
+Recover the Kryx Return Path from the KN-9575	从KN-9575处找回克里克斯返航路径
+Recover the Last Window Chart from the GL-7623 Assetguard	从GL-7623 资产卫队处找回最后窗口图表
+Recover the Null Vector Ledger from the BX-1113 Creditforge	从BX-1113 信贷熔炉处找回空向量账册
+Recover the Null Window Briefing from the KN-4320	从KN-4320处找回空窗简报
+Recover the Nullwake Load Schedule from the Voyager AX-1329	从旅行者 AX-1329处找回空尾航载货日程表
+Recover the Offset Transit Log from the VK-5408 Boneclaw cargo hold	从VK-5408 骨爪的货舱找回偏移过境日志
+Recover the Periapsis Route Ledger from the Deepwater TR-9346	从深水 TR-9346处找回近拱点路线账册
+Recover the Quiet Eye Vector from the KN-7893	从KN-7893处找回静眼向量
+Recover the Quiet Grid Schematic from the WK-2921	从WK-2921处找回静默网格图式
+Recover the Quiet Yard Manifest from the Longshore AX-7571	从长岸 AX-7571处找回静默堆场舱单
+Recover the Relay Spine Schema from the WK-9192	从WK-9192处找回中继脊图式
+Recover the Sanctuary Yield Ledger from the GA-2267 Securehaul	从GA-2267 安全运输处找回庇护所产出账册
+Recover the Shadow Registry Map from the Tradewind LT-8645	从贸易风 LT-8645处找回暗影名录地图
+Recover the Silent Convoy Log from the HM-6310	从HM-6310处找回静默船队日志
+Recover the Silent Drift Manifest from the RS-8275 Riftblade cargo hold	从RS-8275 裂隙之刃的货舱找回静默漂流舱单
+Recover the Silent Exit Ledger from the LX-3802	从LX-3802处找回静默出口账册
+Recover the Silent Yard Ledger from the Northstar CT-278	从北极星 CT-278处找回静默堆场账册
+Recover the Spin-Balance Manifest from the PX-2395	从PX-2395处找回旋衡舱单
+Recover the Spiral Drift Log from the DS-1671 Scarrunner cargo hold	从DS-1671 疤痕快船的货舱找回螺旋漂流日志
+Recover the Storm Table Fragment from the ZT-8387	从ZT-8387处找回风暴表残片
+Recover the Stormbroker Contract Notes from the FC-9470 Prairiefire	从FC-9470 草原之火处找回风暴经纪人合同笔记
+Recover the Threshold Yield Patterns from the ZT-7430	从ZT-7430处找回阈限产出模式
+Recover the Triage Route Manifest from the HM-7378	从HM-7378处找回分诊航线舱单
+Recover the Turnpoint Claim Ledger from the GB-3498 Stockwind	从GB-3498 存风处找回转折点索取账册
+Recover the Underwriter Access Kernel from the CR-9292 Fundrunner	从CR-9292 资金快船处找回承保人访问核心数据
+Recover the Vector Route Archive from the CM-1304	从CM-1304处找回向量路线档案
+Recover the Windowmaker Drift Log from the BL-6924	从BL-6924处找回开窗者漂流日志
+Recover the Zero Point Itinerary from the VG-5970	从VG-5970处找回零点行程表
