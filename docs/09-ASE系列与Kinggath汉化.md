@@ -17,7 +17,7 @@
 | `ase3.esm` | 内联 | 242 | 233（96.3%） | **完成并部署** |
 | `aseveil.esm` | 内联 | 222 | 216（97.3%） | **完成并部署** |
 | `aseeverbright.esm` | 内联 | 388 | 347（89.4%） | **完成并部署** |
-| `kinggathcreations_spaceship.esm` | **外部 `.strings`** | 8141 | 3153（38.7%） | **部分完成并部署**（UI/终端/物品全译，对白约 1101/6006） |
+| `kinggathcreations_spaceship.esm` | **外部 `.strings`** | 8141 | 5294（65.0%） | **部分完成并部署**（UI/终端/物品全译，对白 3242/6006） |
 
 三个 ASE 插件都用 `trtool.py extract → 词典 → apply` 原位汉化，`tr_verify.py` 均 `problems: 0`。
 `kinggath` 用**新工具 `tr_locpack.py`** 生成 `_zhhans` 字符串包，`kg_sanity.py` 自检通过。
@@ -26,7 +26,7 @@
 - `ase3` / `aseveil` / `aseeverbright` 里**纯内部代号**（`SEDA`、`ASE3`、`ASE3AstOrbital`、
   `ASEHuman_Male_LeftEye2_Black`、`ASE2PlayerHome`、`EternalFaction`、`[BE - ASE3]`…）
   以及 `QUST QMDP` 的 `<Alias=...>` 占位符、伪造加密乱码串。
-- `kinggath` 里未译的 **4988 行**全部是 `ilstrings`（NPC 对白），见第五节。
+- `kinggath` 里未译的 **2847 行**全部是 `ilstrings`（NPC 对白），见第五节。
 
 ---
 
@@ -161,10 +161,10 @@ mod 自造词（官方表里没有）的统一译法：
 | --- | --- | --- | --- |
 | `strings` | 1892 | **1794** | UI、终端正文、书籍/日志、任务目标、飞船部件、阵营 |
 | `dlstrings` | 243 | **243** | 物品说明、perk 描述、教程（含超长的 Watchtower 玩法说明） |
-| `ilstrings` | 6006 | **1101** | NPC 对白（**主要剩余工作量**） |
+| `ilstrings` | 6006 | **3242** | NPC 对白（**主要剩余工作量**） |
 
-`map` 统计：`rows=8141 translated=3153 missing=4988（38.7%）`。
-**剩余 4988 行全部是 `ilstrings` 对白**。
+`map` 统计：`rows=8141 translated=5294 missing=2847（65.0%）`。
+**剩余 2847 行全部是 `ilstrings` 对白**（`tr/out/kg_en.tsv` 第 5327 行起）。
 
 ### 续译一条龙（已就绪，可增量）
 

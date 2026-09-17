@@ -1,0 +1,266 @@
+#en	zh
+There are some navies with fewer ships than you. Hah, I wouldn't be surprised if some of the local powers were starting to feel a little bit threatened!	有些海军的飞船还没你多。哈，要是某些地方势力开始觉得有点受到威胁，我一点也不意外！
+Sure, but it's kinda important. So don't leave it too long, alright?	好，不过这事还挺重要的。所以别拖太久，行吗？
+Now's a bad time, let's talk later.	现在不方便，回头再谈。
+Actually, can we talk about something else?	其实，我们能聊点别的吗？
+I got time, let's talk.	我有时间，谈吧。
+I just wanted to say, the whole fleet thing, you've done a first-rate job.	我只是想说，舰队这档子事，你干得一流。
+First though, if you'll indulge me for just a second, I have a small side tangent.	不过首先，容我岔开一小会儿，说点题外话。
+It's... It's about Watchtower.	是……是关于瞭望塔的。
+Hey, got some time to talk about Watchtower now?	嘿，现在有空聊聊瞭望塔吗？
+I see you got my slate, perfect! Then you know I wanna chat.	看来你收到我的数据板了，太好了！那你就知道我想聊聊。
+Good to see you again! Don't suppose you're free for a chat?	很高兴又见到你！想必你有空聊两句吧？
+Authorization failure. Docking request denied.	授权失败。对接请求被拒绝。
+Access denied. Your credentials do not meet our docking requirements.	访问被拒绝。你的凭证不符合我们的对接要求。
+Docking lockout is active. Please seek alternate facilities.	对接锁定已启用。请寻找其他设施。
+This station cannot currently accommodate vessels.	本站目前无法接纳飞船。
+Docking attempt refused.	对接尝试被拒绝。
+Alert: This station is on restricted operations. Docking is not permitted.	警报：本站正在执行受限行动。不允许对接。
+Your vessel is authorized to dock. Please begin approach.	你的飞船已获准对接。请开始接近。
+Permission to dock has been confirmed. Maintain standard docking procedure.	对接许可已确认。请保持标准对接程序。
+Authorization verified. You are cleared to dock.	授权已核实。你已获准对接。
+Docking clearance is approved.	对接许可已批准。
+Docking permission granted. Please proceed to your assigned bay.	已授予对接许可。请前往你被分配的舱位。
+Greetings. B.A.B.S. at your service.	你好。B.A.B.S.为你服务。
+My directives include ship maintenance and station assistance.	我的指令包括飞船维护与空间站协助。
+Pilot recognized.	已识别飞行员。
+[<Global=ShipServicesRepairCost> Credits] My ship needs some repairs.	[<Global=ShipServicesRepairCost>信用点]我的飞船需要维修。
+Can I ask you some questions?	我能问你几个问题吗？
+Is there a specific service you require?	你需要某项具体的服务吗？
+Please let me know how I may facilitate.	请告知我能如何协助。
+Ship support services are available.	飞船支援服务可用。
+Please vocalize your request.	请说出你的请求。
+Stardock services are at your disposal.	星坞的服务任你使用。
+Please state your needs.	请说明你的需求。
+How may I facilitate you today?	今天我能如何为你效劳？
+Your credit balance is below the minimum requirements.	你的信用点余额低于最低要求。
+Insufficient funds detected. I am unable to proceed.	检测到资金不足。我无法继续。
+Payment error: You lack sufficient credits to cover repairs.	支付错误：你的信用点不足以支付维修费用。
+Acknowledged. Your vessel will receive priority servicing.	已收到。你的飞船将优先接受维护。
+Directing station's auto-repair arms to your vessel.	正在引导空间站自动维修臂前往你的飞船。
+Repairs are underway. I appreciate your patience.	维修正在进行。感谢你的耐心。
+Processing repairs now. Expect minimal vessel downtime.	正在执行维修。预计飞船停机时间极短。
+Your ship is entering the repair queue. One moment, please.	你的飞船正在进入维修队列。请稍候。
+Certainly. Initiating repair protocols. Stand by.	当然。正在启动维修协议。请等待。
+I confirm no malfunction or structural harm. Service is unnecessary.	我确认无故障或结构损伤。无需维护。
+All systems read nominal. No service is required.	所有系统读数正常。无需维护。
+Negative. Ship maintenance is unnecessary at this time.	否定。目前无需飞船维护。
+I like the paintwork on this one.	我喜欢这一艘的涂装。
+Providing you with the current list of vehicles.	正在为你提供当前的载具清单。
+Request accepted. Reviewing inventory.	请求已接受。正在查看库存。
+I have retrieved our vehicle inventory.	我已调取我们的载具库存。
+Presenting updated vehicle catalog.	正在呈现更新后的载具目录。
+Affirmative. Compiling current vehicle listings.	确认。正在汇编当前载具清单。
+Please provide modification details.	请提供改装详情。
+I stand ready to implement desired changes.	我已准备好执行你想要的改动。
+Ship modification request acknowledged.	飞船改装请求已收到。
+Please outline your desired parameters.	请说明你想要的参数。
+We can initiate modifications immediately. Please advise.	我们可以立即开始改装。请指示。
+I can assist with any modifications you require.	我可以协助你所需的任何改装。
+I'd like to view my vehicles.	我想查看我的载具。
+I'd like to purchase a vehicle.	我想购买一架载具。
+I'd like to view and modify my ships.	我想查看并改装我的飞船。
+I can provide detailed listings of each ship model offered.	我可以提供所售每款飞船型号的详细清单。
+Review ship listings at your leisure.	请随意查看飞船清单。
+Here is our current inventory of vessels.	这是我们当前的飞船库存。
+Ship data active. Inspect at will.	飞船数据已激活。请随意查看。
+Generating summary of starship listings.	正在生成星舰清单摘要。
+Accessing starship sales manifest.	正在访问星舰销售清单。
+Let me see what ships you have for sale.	让我看看你们有什么飞船出售。
+The station's recreation area is a hub for new arrivals.	空间站的休闲区是新来者的聚集地。
+A variety of skilled personnel can often be found at the Stardock bar.	在星坞的酒吧里常能找到各色能人。
+Many freelancers gather on this station. I recommend inquiring at the bar.	本站聚集了许多自由职业者。建议你去酒吧问问。
+[<Global=kgcShip_GLOB_SkydropRestockCost> Watchtower Components] I'd like to restock my Skydrops.	[<Global=kgcShip_GLOB_SkydropRestockCost>瞭望塔组件]我想补充我的空投次数。
+Request not applicable. All Skydrop modules read full.	请求不适用。所有空投模块均为满额。
+All Skydrop modules at capacity. No restock required.	所有空投模块均为满额。无需补充。
+Records show your Skydrops are fully stocked. No action required.	记录显示你的空投已满额。无需操作。
+Please stand by. Restocking is in progress.	请稍候。正在补充。
+Understood. Restock procedure underway.	明白。补充程序进行中。
+Commencing Skydrop restocking protocols.	正在启动空投补充协议。
+Processing. Skydrop restock in progress.	处理中。空投补充进行中。
+Starting reload procedure.	正在开始装填程序。
+Your Skydrops will be restocked momentarily.	你的空投很快就将补充完毕。
+Credit verification failed. Cannot proceed with Skydrop reload.	信用点核实失败。无法继续为空投装填。
+Transaction denied. You lack adequate credits to restock.	交易被拒绝。你的信用点不足以补充。
+Insufficient funds detected. Restock request canceled.	检测到资金不足。补充请求已取消。
+You have permission to proceed.	你已获准继续。
+Please provide details.	请提供详情。
+Clarify the modifications, and I will comply.	请说明改装内容，我会照办。
+Please outline the nature of the modification request.	请说明该改装请求的性质。
+Which systems or structures do you wish to adjust?	你想调整哪些系统或结构？
+Please specify desired alterations.	请指明你想要的改动。
+Can I make some changes to Stardock?	我能对星坞做些改动吗？
+Please let me know if you require anything else.	如果你还需要别的，请告诉我。
+I will resume standard operations.	我将恢复标准运作。
+Inquiry session terminated.	查询会话已终止。
+So what type of robot are you?	那你是什么类型的机器人？
+Nevermind, I've no more questions.	算了，我没有其他问题了。
+I am a refurbished and reconditioned military-grade Model A unit.	我是一台翻新重整过的军用A型单元。
+Berthing and Boarding Supervisor. B.A.B.S.	泊位与登船主管。B.A.B.S.
+Please present your questions one at a time.	请一次提出一个问题。
+You are free to inquire.	你可以随意提问。
+I will do my best to provide accurate responses.	我会尽力提供准确的回答。
+Can you tell me what B.A.B.S. stands for?	你能告诉我B.A.B.S.代表什么吗？
+Supplemental. I have been authorized to provide additional services to you. Please request my services at your convenience.	补充说明。我已获授权为你提供额外服务。请在你方便时提出服务请求。
+I assist in docking, cargo and ship maintenance.	我协助对接、货运与飞船维护。
+What do you do here?	你在这里做什么？
+Where can I go if I need more crew for my ship?	如果我需要更多船员，该去哪里？
+Hey, got something I wanna talk about but figured it's probably best we discuss it in person. It's about... you know, our overbearing "friends". Meet me at Stardock as soon as you can. Don't keep me waiting! Your bestest pal, Torin.	嘿，我有些事想谈，但想来还是当面说比较好。是关于……你知道的，我们那些专横的"朋友"。尽快来星坞找我。别让我等太久！你最好的哥们，托林。
+Hey, watch it!	嘿，当心点！
+Look at this...	看看这个……
+Waste of time.	浪费时间。
+Hmph.	哼。
+This needs to get cleared up.	这事得处理干净。
+A good soldier...	一个好兵……
+Hmm...	嗯……
+Another casualty.	又一个阵亡者。
+Didn't deserve it.	不该如此。
+Clear.	清空。
+Secure.	安全。
+Perimeter secure.	周边安全。
+All quiet over here.	这边一切安静。
+Negative.	否定。
+We'll be ready...	我们会准备好的……
+Affirmative.	确认。
+Shouldn't take long now...	应该不会太久了……
+Be prepared.	做好准备。
+Eyes open.	睁大眼睛。
+Stay sharp.	保持警觉。
+Hmm.	嗯。
+Could still be something.	可能还有情况。
+Anomaly detected... But where?	检测到异常……但在哪？
+A presence...	有某种存在……
+Something's here.	这里有东西。
+Anomalies!	有异常体！
+Brace for anomalies!	准备应对异常体！
+Containment!	收容！
+Avoid the disruptions!	避开那些扰乱！
+They're using their powers!	他们在用能力了！
+Neutralize the Deviant!	消除异常体！
+Deviant!	异常体！
+We have a Deviant!	发现异常体！
+You can not understand the danger you bring!	你无法理解你带来的危险！
+This is why we exist. To contain you!	这就是我们存在的意义。收容你们！
+You're not the only one who can bend reality!	能扭曲现实的可不是只有你！
+You are unrefined, uncontrolled!	你未经锤炼，毫无约束！
+Your Deviant tricks won't work on me!	你那套异常体的把戏对我没用！
+You play with forces you can't comprehend!	你在玩弄你无法理解的力量！
+Searching.	搜索中。
+Investigating.	调查中。
+Sweeping.	清扫中。
+Weapon systems primed.	武器系统已就绪。
+Defiance will not be tolerated.	绝不姑息反抗。
+Commencing threat neutralization.	正在开始消除威胁。
+Initiating containment procedures.	正在启动收容程序。
+You were never in control.	你从来都掌控不了局面。
+Your defiance is amusing. But pointless.	你的反抗很有趣。但毫无意义。
+Run. Fight. It changes nothing.	逃吧。打吧。都改变不了什么。
+Your fate was sealed the moment you crossed us!	你与我们作对的那一刻，命运就已注定！
+Watchtower sees all.	瞭望塔洞悉一切。
+Lethal force authorized.	已授权使用致命武力。
+They won't let you escape... not forever...	他们不会让你逃掉的……不会永远……
+See ya.	回见。
+Alrighty.	好吧。
+Yeah, whatever.	行，随便吧。
+Bye for now.	先告辞了。
+Catch you later.	回头见。
+Off with you then! I've things to do.	那你走吧！我还有事要忙。
+See you next time...	下次见……
+Good luck out there.	外面祝你好运。
+Off you go.	走吧。
+Stay safe.	注意安全。
+Come back in one piece, alright?	完好无损地回来，行吗？
+Bye-bye!	拜拜！
+Stay out of trouble!	别惹麻烦！
+Please remember to refuel.	请记得加注燃料。
+Thank you for your patronage	感谢你的惠顾
+Commencing standby.	正在进入待机。
+Return if you require service.	如需服务请再来。
+Logging you out.	正在将你登出。
+Thank you for your visit.	感谢你的光临。
+You are cleared for departure.	你已获准离站。
+Goodbye.	再见。
+Interaction complete.	交互完成。
+Departure acknowledged.	已确认离站。
+Bye, then.	那就再见了。
+Take care.	保重。
+See you later.	回头见。
+Alright.	好吧。
+Don't get into too much trouble.	别惹太多麻烦。
+Hm? Okay, bye.	嗯？好，再见。
+Stay sharp out there.	在外面保持警觉。
+Alright, bye for now.	好，先再见了。
+Yeah, see you.	嗯，再见。
+Catch you later!	回头见！
+I assume I'm dismissed?	我想我可以告退了吧？
+Return if you require further assistance.	如需进一步协助请再来。
+I will remain here.	我会留在这里。
+Um? Bye.	嗯？再见。
+Until next time.	下次见。
+You know where to find me.	你知道去哪儿找我。
+Farewell.	珍重。
+Be well.	安好。
+Return when you're ready.	准备好时再来。
+Our business is concluded.	我们的事已了结。
+Catch you next time.	下次见。
+Later.	回头见。
+Hope to see you back soon.	希望不久后再见到你。
+Safe travels.	一路平安。
+Alright, take it easy.	好，别太累。
+See you around.	回头见。
+Alright, don't be a stranger.	好，别断了联系。
+Stardock's always open for you.	星坞永远为你敞开。
+Don't do anything too stupid.	别干太蠢的事。
+Alright, see you around.	好，回头见。
+Uh-huh?	嗯？
+I see you.	我看到你了。
+Yeah?	怎么了？
+Hm?	嗯？
+'sup?	怎么着？
+What?	什么？
+...What's that gentle hissing sound?	……那轻柔的嘶嘶声是什么？
+Wonder if the Surgeons miss me yet...	不知道那些外科医生有没有想我……
+Could really use a decent cup of coffee.	真想来杯像样的咖啡。
+Ugh, there's always something breaking around here...	呃，这地方总有东西在坏……
+I should get around to organizing this place...	我该找时间把这地方收拾收拾……
+Surprisingly quiet today.	今天出奇地安静。
+...I miss Akila. Even with all its rough edges.	……我想念阿基拉城。哪怕它有那么多糙地方。
+Been meaning to recalibrate that scanner... someday.	一直想重新校准那台扫描器……哪天吧。
+Nothing like a little peace before the chaos returns.	混乱回来之前的那点平静最是难得。
+Why does this station feel like it's held together by vacuum tape...?	这空间站怎么感觉是用真空胶带粘起来的……？
+Hello there!	你好啊！
+Ah, you again.	啊，又是你。
+Well, look who it is.	哟，看看是谁来了。
+Need a quick check-up? Maybe later.	需要快速检查一下吗？也许待会儿吧。
+You don't look half bad today.	你今天气色还不错。
+Oh, it's you.	哦，是你啊。
+Ignoring injuries only works until it doesn't.	无视伤势，只是一直有效到不再有效为止。
+I've seen better looking corpses. Please, let me help.	我见过更好看的尸体。拜托，让我帮你。
+You're in rough shape. Better let me do my job.	你状况很糟。最好让我尽我的职责。
+You really ought to see a doctor. Oh wait! That's me!	你真该去看个医生。哦等等！就是我！
+Feeling faint? Let me take a look at you.	觉得头晕？让我看看你。
+You look like you've been through a meat grinder.	你看上去像被绞肉机绞过一样。
+Systems online.	系统在线。
+Your arrival has been logged.	你的抵达已被记录。
+Welcome back.	欢迎回来。
+Welcome to Stardock.	欢迎来到星坞。
+B.A.B.S. stands ready to assist.	B.A.B.S.随时准备协助。
+Greetings, traveler.	你好，旅人。
+Systems nominal.	系统正常。
+Presence detected.	检测到存在。
+State your intent.	说明你的意图。
+Remain calm.	保持冷静。
+Stand by.	待命。
+Compliance is mandatory.	必须服从。
+Yeah?	怎么了？
+Hello again.	又见面了。
+Keeping well?	还好吗？
+Good to see you.	很高兴见到你。
+Hey!	嘿！
+I cannot determine the manufacturer of your vessel.	我无法确定你飞船的制造商。
+I lack sufficient data to analyze your ship. Fascinating.	我缺乏分析你飞船的足够数据。真有意思。
+The technology behind your ship is quite advanced.	你这艘飞船的技术相当先进。
+Your vessel... Its design is familiar. Curious.	你的飞船……这设计很眼熟。奇怪。
+Hello.	你好。
+Back again I see.	看来你又回来了。
+You have my attention.	你引起我的注意了。

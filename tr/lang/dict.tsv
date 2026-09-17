@@ -4289,6 +4289,2032 @@ I have little doubt that's why you're still here and not in some Watchtower cell
 Anyway, I'm glad you took my advice about building a fleet seriously.	总之，很高兴你认真对待了我关于组建舰队的建议。
 True, you could have more ships, but maybe that's just me being greedy. The amount you've got clearly works just fine.	确实，你本可以有更多飞船，但也许那只是我贪心。你现在这些显然已经够用了。
 You have a fair number of ships under your command. More than enough to take care of any common riffraff. Hehe. it's good to see!	你麾下有不少飞船。对付寻常的乌合之众绰绰有余。嘿嘿。看着真不错！
+There are some navies with fewer ships than you. Hah, I wouldn't be surprised if some of the local powers were starting to feel a little bit threatened!	有些海军的飞船还没你多。哈，要是某些地方势力开始觉得有点受到威胁，我一点也不意外！
+Sure, but it's kinda important. So don't leave it too long, alright?	好，不过这事还挺重要的。所以别拖太久，行吗？
+Now's a bad time, let's talk later.	现在不方便，回头再谈。
+I got time, let's talk.	我有时间，谈吧。
+I just wanted to say, the whole fleet thing, you've done a first-rate job.	我只是想说，舰队这档子事，你干得一流。
+First though, if you'll indulge me for just a second, I have a small side tangent.	不过首先，容我岔开一小会儿，说点题外话。
+It's... It's about Watchtower.	是……是关于瞭望塔的。
+Hey, got some time to talk about Watchtower now?	嘿，现在有空聊聊瞭望塔吗？
+I see you got my slate, perfect! Then you know I wanna chat.	看来你收到我的数据板了，太好了！那你就知道我想聊聊。
+Good to see you again! Don't suppose you're free for a chat?	很高兴又见到你！想必你有空聊两句吧？
+Authorization failure. Docking request denied.	授权失败。对接请求被拒绝。
+Access denied. Your credentials do not meet our docking requirements.	访问被拒绝。你的凭证不符合我们的对接要求。
+Docking lockout is active. Please seek alternate facilities.	对接锁定已启用。请寻找其他设施。
+This station cannot currently accommodate vessels.	本站目前无法接纳飞船。
+Docking attempt refused.	对接尝试被拒绝。
+Alert: This station is on restricted operations. Docking is not permitted.	警报：本站正在执行受限行动。不允许对接。
+Your vessel is authorized to dock. Please begin approach.	你的飞船已获准对接。请开始接近。
+Permission to dock has been confirmed. Maintain standard docking procedure.	对接许可已确认。请保持标准对接程序。
+Authorization verified. You are cleared to dock.	授权已核实。你已获准对接。
+Docking clearance is approved.	对接许可已批准。
+Docking permission granted. Please proceed to your assigned bay.	已授予对接许可。请前往你被分配的舱位。
+Greetings. B.A.B.S. at your service.	你好。B.A.B.S.为你服务。
+My directives include ship maintenance and station assistance.	我的指令包括飞船维护与空间站协助。
+Pilot recognized.	已识别飞行员。
+[<Global=ShipServicesRepairCost> Credits] My ship needs some repairs.	[<Global=ShipServicesRepairCost>信用点]我的飞船需要维修。
+Can I ask you some questions?	我能问你几个问题吗？
+Is there a specific service you require?	你需要某项具体的服务吗？
+Please let me know how I may facilitate.	请告知我能如何协助。
+Ship support services are available.	飞船支援服务可用。
+Please vocalize your request.	请说出你的请求。
+Stardock services are at your disposal.	星坞的服务任你使用。
+Please state your needs.	请说明你的需求。
+How may I facilitate you today?	今天我能如何为你效劳？
+Your credit balance is below the minimum requirements.	你的信用点余额低于最低要求。
+Insufficient funds detected. I am unable to proceed.	检测到资金不足。我无法继续。
+Payment error: You lack sufficient credits to cover repairs.	支付错误：你的信用点不足以支付维修费用。
+Acknowledged. Your vessel will receive priority servicing.	已收到。你的飞船将优先接受维护。
+Directing station's auto-repair arms to your vessel.	正在引导空间站自动维修臂前往你的飞船。
+Repairs are underway. I appreciate your patience.	维修正在进行。感谢你的耐心。
+Processing repairs now. Expect minimal vessel downtime.	正在执行维修。预计飞船停机时间极短。
+Your ship is entering the repair queue. One moment, please.	你的飞船正在进入维修队列。请稍候。
+Certainly. Initiating repair protocols. Stand by.	当然。正在启动维修协议。请等待。
+I confirm no malfunction or structural harm. Service is unnecessary.	我确认无故障或结构损伤。无需维护。
+All systems read nominal. No service is required.	所有系统读数正常。无需维护。
+Negative. Ship maintenance is unnecessary at this time.	否定。目前无需飞船维护。
+I like the paintwork on this one.	我喜欢这一艘的涂装。
+Providing you with the current list of vehicles.	正在为你提供当前的载具清单。
+Request accepted. Reviewing inventory.	请求已接受。正在查看库存。
+I have retrieved our vehicle inventory.	我已调取我们的载具库存。
+Presenting updated vehicle catalog.	正在呈现更新后的载具目录。
+Affirmative. Compiling current vehicle listings.	确认。正在汇编当前载具清单。
+Please provide modification details.	请提供改装详情。
+I stand ready to implement desired changes.	我已准备好执行你想要的改动。
+Ship modification request acknowledged.	飞船改装请求已收到。
+Please outline your desired parameters.	请说明你想要的参数。
+We can initiate modifications immediately. Please advise.	我们可以立即开始改装。请指示。
+I can assist with any modifications you require.	我可以协助你所需的任何改装。
+I'd like to view my vehicles.	我想查看我的载具。
+I'd like to purchase a vehicle.	我想购买一架载具。
+I'd like to view and modify my ships.	我想查看并改装我的飞船。
+I can provide detailed listings of each ship model offered.	我可以提供所售每款飞船型号的详细清单。
+Review ship listings at your leisure.	请随意查看飞船清单。
+Here is our current inventory of vessels.	这是我们当前的飞船库存。
+Ship data active. Inspect at will.	飞船数据已激活。请随意查看。
+Generating summary of starship listings.	正在生成星舰清单摘要。
+Accessing starship sales manifest.	正在访问星舰销售清单。
+Let me see what ships you have for sale.	让我看看你们有什么飞船出售。
+The station's recreation area is a hub for new arrivals.	空间站的休闲区是新来者的聚集地。
+A variety of skilled personnel can often be found at the Stardock bar.	在星坞的酒吧里常能找到各色能人。
+Many freelancers gather on this station. I recommend inquiring at the bar.	本站聚集了许多自由职业者。建议你去酒吧问问。
+[<Global=kgcShip_GLOB_SkydropRestockCost> Watchtower Components] I'd like to restock my Skydrops.	[<Global=kgcShip_GLOB_SkydropRestockCost>瞭望塔组件]我想补充我的空投次数。
+Request not applicable. All Skydrop modules read full.	请求不适用。所有空投模块均为满额。
+All Skydrop modules at capacity. No restock required.	所有空投模块均为满额。无需补充。
+Records show your Skydrops are fully stocked. No action required.	记录显示你的空投已满额。无需操作。
+Please stand by. Restocking is in progress.	请稍候。正在补充。
+Understood. Restock procedure underway.	明白。补充程序进行中。
+Commencing Skydrop restocking protocols.	正在启动空投补充协议。
+Processing. Skydrop restock in progress.	处理中。空投补充进行中。
+Starting reload procedure.	正在开始装填程序。
+Your Skydrops will be restocked momentarily.	你的空投很快就将补充完毕。
+Credit verification failed. Cannot proceed with Skydrop reload.	信用点核实失败。无法继续为空投装填。
+Transaction denied. You lack adequate credits to restock.	交易被拒绝。你的信用点不足以补充。
+Insufficient funds detected. Restock request canceled.	检测到资金不足。补充请求已取消。
+You have permission to proceed.	你已获准继续。
+Please provide details.	请提供详情。
+Clarify the modifications, and I will comply.	请说明改装内容，我会照办。
+Please outline the nature of the modification request.	请说明该改装请求的性质。
+Which systems or structures do you wish to adjust?	你想调整哪些系统或结构？
+Please specify desired alterations.	请指明你想要的改动。
+Can I make some changes to Stardock?	我能对星坞做些改动吗？
+Please let me know if you require anything else.	如果你还需要别的，请告诉我。
+I will resume standard operations.	我将恢复标准运作。
+Inquiry session terminated.	查询会话已终止。
+So what type of robot are you?	那你是什么类型的机器人？
+Nevermind, I've no more questions.	算了，我没有其他问题了。
+I am a refurbished and reconditioned military-grade Model A unit.	我是一台翻新重整过的军用A型单元。
+Berthing and Boarding Supervisor. B.A.B.S.	泊位与登船主管。B.A.B.S.
+Please present your questions one at a time.	请一次提出一个问题。
+You are free to inquire.	你可以随意提问。
+I will do my best to provide accurate responses.	我会尽力提供准确的回答。
+Can you tell me what B.A.B.S. stands for?	你能告诉我B.A.B.S.代表什么吗？
+Supplemental. I have been authorized to provide additional services to you. Please request my services at your convenience.	补充说明。我已获授权为你提供额外服务。请在你方便时提出服务请求。
+I assist in docking, cargo and ship maintenance.	我协助对接、货运与飞船维护。
+What do you do here?	你在这里做什么？
+Where can I go if I need more crew for my ship?	如果我需要更多船员，该去哪里？
+Hey, got something I wanna talk about but figured it's probably best we discuss it in person. It's about... you know, our overbearing "friends". Meet me at Stardock as soon as you can. Don't keep me waiting! Your bestest pal, Torin.	嘿，我有些事想谈，但想来还是当面说比较好。是关于……你知道的，我们那些专横的"朋友"。尽快来星坞找我。别让我等太久！你最好的哥们，托林。
+Hey, watch it!	嘿，当心点！
+Look at this...	看看这个……
+Waste of time.	浪费时间。
+Hmph.	哼。
+This needs to get cleared up.	这事得处理干净。
+A good soldier...	一个好兵……
+Hmm...	嗯……
+Another casualty.	又一个阵亡者。
+Didn't deserve it.	不该如此。
+Clear.	清空。
+Secure.	安全。
+Perimeter secure.	周边安全。
+All quiet over here.	这边一切安静。
+Negative.	否定。
+We'll be ready...	我们会准备好的……
+Affirmative.	确认。
+Shouldn't take long now...	应该不会太久了……
+Be prepared.	做好准备。
+Eyes open.	睁大眼睛。
+Stay sharp.	保持警觉。
+Hmm.	嗯。
+Could still be something.	可能还有情况。
+Anomaly detected... But where?	检测到异常……但在哪？
+A presence...	有某种存在……
+Something's here.	这里有东西。
+Anomalies!	有异常体！
+Brace for anomalies!	准备应对异常体！
+Containment!	收容！
+Avoid the disruptions!	避开那些扰乱！
+They're using their powers!	他们在用能力了！
+Neutralize the Deviant!	消除异常体！
+Deviant!	异常体！
+We have a Deviant!	发现异常体！
+You can not understand the danger you bring!	你无法理解你带来的危险！
+This is why we exist. To contain you!	这就是我们存在的意义。收容你们！
+You're not the only one who can bend reality!	能扭曲现实的可不是只有你！
+You are unrefined, uncontrolled!	你未经锤炼，毫无约束！
+Your Deviant tricks won't work on me!	你那套异常体的把戏对我没用！
+You play with forces you can't comprehend!	你在玩弄你无法理解的力量！
+Searching.	搜索中。
+Investigating.	调查中。
+Sweeping.	清扫中。
+Weapon systems primed.	武器系统已就绪。
+Defiance will not be tolerated.	绝不姑息反抗。
+Commencing threat neutralization.	正在开始消除威胁。
+Initiating containment procedures.	正在启动收容程序。
+You were never in control.	你从来都掌控不了局面。
+Your defiance is amusing. But pointless.	你的反抗很有趣。但毫无意义。
+Run. Fight. It changes nothing.	逃吧。打吧。都改变不了什么。
+Your fate was sealed the moment you crossed us!	你与我们作对的那一刻，命运就已注定！
+Watchtower sees all.	瞭望塔洞悉一切。
+Lethal force authorized.	已授权使用致命武力。
+They won't let you escape... not forever...	他们不会让你逃掉的……不会永远……
+See ya.	回见。
+Alrighty.	好吧。
+Yeah, whatever.	行，随便吧。
+Bye for now.	先告辞了。
+Catch you later.	回头见。
+Off with you then! I've things to do.	那你走吧！我还有事要忙。
+See you next time...	下次见……
+Good luck out there.	外面祝你好运。
+Off you go.	走吧。
+Stay safe.	注意安全。
+Come back in one piece, alright?	完好无损地回来，行吗？
+Bye-bye!	拜拜！
+Stay out of trouble!	别惹麻烦！
+Please remember to refuel.	请记得加注燃料。
+Thank you for your patronage	感谢你的惠顾
+Commencing standby.	正在进入待机。
+Return if you require service.	如需服务请再来。
+Thank you for your visit.	感谢你的光临。
+You are cleared for departure.	你已获准离站。
+Goodbye.	再见。
+Interaction complete.	交互完成。
+Departure acknowledged.	已确认离站。
+Bye, then.	那就再见了。
+Take care.	保重。
+See you later.	回头见。
+Alright.	好吧。
+Don't get into too much trouble.	别惹太多麻烦。
+Hm? Okay, bye.	嗯？好，再见。
+Stay sharp out there.	在外面保持警觉。
+Alright, bye for now.	好，先再见了。
+Yeah, see you.	嗯，再见。
+Catch you later!	回头见！
+I assume I'm dismissed?	我想我可以告退了吧？
+Return if you require further assistance.	如需进一步协助请再来。
+I will remain here.	我会留在这里。
+Um? Bye.	嗯？再见。
+Until next time.	下次见。
+You know where to find me.	你知道去哪儿找我。
+Farewell.	珍重。
+Be well.	安好。
+Return when you're ready.	准备好时再来。
+Our business is concluded.	我们的事已了结。
+Catch you next time.	下次见。
+Later.	回头见。
+Hope to see you back soon.	希望不久后再见到你。
+Safe travels.	一路平安。
+Alright, take it easy.	好，别太累。
+See you around.	回头见。
+Alright, don't be a stranger.	好，别断了联系。
+Stardock's always open for you.	星坞永远为你敞开。
+Don't do anything too stupid.	别干太蠢的事。
+Alright, see you around.	好，回头见。
+Uh-huh?	嗯？
+I see you.	我看到你了。
+Yeah?	怎么了？
+Hm?	嗯？
+'sup?	怎么着？
+What?	什么？
+...What's that gentle hissing sound?	……那轻柔的嘶嘶声是什么？
+Wonder if the Surgeons miss me yet...	不知道那些外科医生有没有想我……
+Could really use a decent cup of coffee.	真想来杯像样的咖啡。
+Ugh, there's always something breaking around here...	呃，这地方总有东西在坏……
+I should get around to organizing this place...	我该找时间把这地方收拾收拾……
+Surprisingly quiet today.	今天出奇地安静。
+...I miss Akila. Even with all its rough edges.	……我想念阿基拉城。哪怕它有那么多糙地方。
+Been meaning to recalibrate that scanner... someday.	一直想重新校准那台扫描器……哪天吧。
+Nothing like a little peace before the chaos returns.	混乱回来之前的那点平静最是难得。
+Why does this station feel like it's held together by vacuum tape...?	这空间站怎么感觉是用真空胶带粘起来的……？
+Hello there!	你好啊！
+Ah, you again.	啊，又是你。
+Well, look who it is.	哟，看看是谁来了。
+Need a quick check-up? Maybe later.	需要快速检查一下吗？也许待会儿吧。
+You don't look half bad today.	你今天气色还不错。
+Oh, it's you.	哦，是你啊。
+Ignoring injuries only works until it doesn't.	无视伤势，只是一直有效到不再有效为止。
+I've seen better looking corpses. Please, let me help.	我见过更好看的尸体。拜托，让我帮你。
+You're in rough shape. Better let me do my job.	你状况很糟。最好让我尽我的职责。
+You really ought to see a doctor. Oh wait! That's me!	你真该去看个医生。哦等等！就是我！
+Feeling faint? Let me take a look at you.	觉得头晕？让我看看你。
+You look like you've been through a meat grinder.	你看上去像被绞肉机绞过一样。
+Systems online.	系统在线。
+Your arrival has been logged.	你的抵达已被记录。
+Welcome back.	欢迎回来。
+Welcome to Stardock.	欢迎来到星坞。
+B.A.B.S. stands ready to assist.	B.A.B.S.随时准备协助。
+Greetings, traveler.	你好，旅人。
+Systems nominal.	系统正常。
+Presence detected.	检测到存在。
+State your intent.	说明你的意图。
+Remain calm.	保持冷静。
+Stand by.	待命。
+Compliance is mandatory.	必须服从。
+Hello again.	又见面了。
+Keeping well?	还好吗？
+Good to see you.	很高兴见到你。
+Hey!	嘿！
+I cannot determine the manufacturer of your vessel.	我无法确定你飞船的制造商。
+I lack sufficient data to analyze your ship. Fascinating.	我缺乏分析你飞船的足够数据。真有意思。
+The technology behind your ship is quite advanced.	你这艘飞船的技术相当先进。
+Your vessel... Its design is familiar. Curious.	你的飞船……这设计很眼熟。奇怪。
+Hello.	你好。
+Back again I see.	看来你又回来了。
+You have my attention.	你引起我的注意了。
+I am here.	我在这儿。
+We meet again.	又见面了。
+State your needs.	说明你的需求。
+Hey, you.	嘿，你。
+Can't stay away, huh?	舍不得走远，是吧？
+Everything alright?	一切还好吗？
+Ah, my favorite patron.	啊，我最喜欢的客人。
+Back again?	又回来了？
+Look who decided to drop by!	看看是谁决定来串门了！
+Not that it's my business, you look like you need medical attention.	虽说这不关我的事，但你看上去需要医疗处理。
+Scared of doctors or something? Go get yourself treated already!	怕医生还是怎么着？快去治治吧！
+You don't look so good. You should go to the med clinic.	你气色不太好。该去医疗站看看。
+You're in bad shape, you should visit Laine.	你伤势不轻，该去找莱恩。
+You should probably go see Dr. Laine, get that checked out.	你该去看看莱恩博士，把那个检查一下。
+Enemy intruder!	敌意入侵者！
+Hostile in the area!	区域内有敌人！
+Perimeter breach!	周边被突破！
+Friendly down. Be on alert!	友方倒下。保持警戒！
+Eyes open! Enemy on location!	睁大眼睛！敌人就在附近！
+Can't have gotten far.	跑不远。
+They might still be around. Keep looking!	他们可能还在附近。继续找！
+Show yourself.	现身吧。
+Get enemy position!	查出敌人位置！
+Get their position!	查明他们的位置！
+Scan the area!	扫描该区域！
+We sense you.	我们感觉到你了。
+I know you're here.	我知道你在这儿。
+Who's there?	谁在那儿？
+Continuing sweep.	继续清扫。
+I got something...	我有发现……
+Come out!	出来！
+I'm gonna enjoy this!	我会好好享受这个的！
+You picked a bad day to get lost!	你挑错了迷路的日子！
+Ready for battle.	准备战斗。
+We have no choice, ready for combat.	别无选择，准备作战。
+We must eliminate any threat.	我们必须消除一切威胁。
+New targets.	新目标。
+Moving to strike.	前去打击。
+Neutralize.	消除。
+Acquiring lock.	正在锁定。
+Target acquired.	已锁定目标。
+Engage at will.	自由开火。
+Initiate suppression.	开始压制。
+Hostile confirmed.	敌人确认。
+Clearance to engage.	已获交战许可。
+Erase them.	抹除他们。
+Pursuit enabled.	追击已启用。
+Confirmed contact. Moving to strike.	接触确认。前去打击。
+Proceed with lethal force.	执行致命武力。
+Belligerent vessel, prepare for eradication.	敌对飞船，准备被消灭。
+Weapons primed.	武器已就绪。
+Shoot to kill!	格杀勿论！
+We're under attack!	我们遭到攻击！
+Get in position!	各就各位！
+Enemy engaged!	已与敌人交战！
+Commencing attack!	开始进攻！
+Defensive positions!	防御阵位！
+Hostiles incoming!	敌人来袭！
+Let's do this!	开干吧！
+Hostiles.	敌人。
+Sensors show hostiles.	传感器显示有敌人。
+Arming defenses.	正在武装防御。
+Danger! Danger!	危险！危险！
+Activating weapon systems.	正在激活武器系统。
+Hostile proximity.	敌人接近。
+Battle mode active.	战斗模式已激活。
+Entering combat.	进入战斗。
+Providing cover!	提供掩护！
+You can rely on me!	你可以依靠我！
+Fight time!	开打！
+I'm on your six!	我在你六点钟方向！
+I'm with you!	我跟你一起！
+Weapons out, it's go time!	抄家伙，上！
+Time for action!	该行动了！
+Here we go!	来吧！
+Brace yourself!	做好准备！
+Got you!	逮到你了！
+Found you!	找到你了！
+Hostile located!	已定位敌人！
+Engaging hostile!	正在与敌交战！
+Target acquired!	已锁定目标！
+Enemy at my location!	敌人就在我这儿！
+On me! On me!	在我这！在我这！
+Enemy found!	发现敌人！
+Target located!	已定位目标！
+Threat engaged.	已与威胁交战。
+All systems ready.	所有系统就绪。
+Weapon systems active.	武器系统已启动。
+Confirmed contact.	接触确认。
+Hostiles!	有敌人！
+Aha!	啊哈！
+Got eyes on 'em!	看见他们了！
+And we've got contact!	我们接上敌了！
+Found our target!	找到目标了！
+Commencing attack.	开始进攻。
+Engaging enemy forces.	正在与敌军交战。
+Initiating combat protocol.	正在启动战斗协议。
+Enemy detected. Engaging.	检测到敌人。开始交战。
+Contact lost.	失去接触。
+Lost visual.	丢失视野。
+I lost visual!	我丢失视野了！
+Target lost! Find them!	目标丢失！找到他们！
+Scanning vicinity.	正在扫描周边。
+Most frustrating...	真叫人气恼……
+Hostile contact interrupted.	与敌人的接触中断。
+Beginning search pattern.	开始搜索模式。
+Searching for hostile contact.	正在搜索敌人接触。
+Maintaining search pattern.	保持搜索模式。
+Scanning for hostile.	正在扫描敌人。
+Resuming search pattern.	恢复搜索模式。
+Where'd they go?	他们去哪儿了？
+Stay sharp! They could be close by.	保持警觉！他们可能就在附近。
+We were in the middle of a fight! Rude.	我们正打得兴起呢！真没礼貌。
+Gave us the slip...	让他们溜了……
+Did they bail?	他们跑了吗？
+Hahahaha!	哈哈哈哈！
+There you are!	你在这儿！
+Target reacquired!	重新锁定目标！
+Your tricks won't save you!	你的把戏救不了你！
+Found you.	找到你了。
+There you are.	你在这儿。
+Got eyes on the target!	看见目标了！
+Hostile exposed!	敌人暴露了！
+Signature reappeared.	信号重新出现。
+Sensors locked.	传感器已锁定。
+Reacquiring target.	正在重新锁定目标。
+You have been detected.	你已被发现。
+Resuming engagement.	恢复交战。
+Combat mode re-initiated.	战斗模式已重新启动。
+Hostile contact re-established.	与敌人的接触已重新建立。
+Target re-acquired.	已重新锁定目标。
+Round two!	第二回合！
+No more hide-and-seek!	别再玩捉迷藏了！
+Trying to ghost us, huh? Nice try.	想跟我们玩消失，是吧？想得美。
+Evidently, you can run, but you can't hide!	显然，你能跑，但藏不住！
+Caught ya!	抓到你了！
+Missed 'em.	让他们跑了。
+Gone? Really?	没了？真的？
+Nevermind!	算了！
+Was nothing.	没什么。
+False alarm.	虚惊一场。
+Calling it. Everyone back to your post!	收队。所有人回到岗位！
+Disregard search. There's nothing here.	取消搜索。这里什么都没有。
+Negative on movement.	未发现移动。
+Error: Threat not found.	错误：未发现威胁。
+Possible false alarm.	可能是误报。
+Threat abated.	威胁已消退。
+Lowering alert status.	正在降低警戒级别。
+Scanning complete. Threat resolved.	扫描完成。威胁已解除。
+No threat detected.	未检测到威胁。
+Hostile activity unconfirmed. Standing down.	敌意活动未获确认。解除戒备。
+Alert protocols reset.	警报协议已重置。
+No threat? That's a pleasant surprise.	没有威胁？这可真让人惊喜。
+Crisis averted, apparently.	看来危机解除了。
+Looks like my instincts were off, this time.	看来这次我的直觉出错了。
+Huh. I'm just jumpy today.	嗯。我今天就是有点神经过敏。
+Secure the perimeter.	守住周边。
+Standby.	待命。
+Someone's here...	有人在这儿……
+Heads up. Hostiles in the area!	注意。区域内有敌人！
+Weapons hot. We've got hostiles.	武器上膛。发现敌人。
+Possible false reading.	可能是误读。
+Returning to scan mode.	正在返回扫描模式。
+Perimeter scan ongoing...	周边扫描进行中……
+Scanning...	扫描中……
+Maintaining caution.	保持谨慎。
+Gone like smoke...	像烟一样消失了……
+Vanished! Probably for the best.	消失了！大概这样最好。
+One second here, the next...	前一秒还在，下一秒……
+Guess the shadows swallowed 'em up.	大概是被阴影吞掉了。
+All that tension, and now... nothing? Hmph.	那么紧张，结果现在……什么都没有？哼。
+What was that?	那是什么？
+What the...	这是……
+What's that?	那是什么？
+Listen.	听。
+Wait.	等等。
+Proximity alert triggered. Investigating.	接近警报触发。正在调查。
+Potential danger identified. Please stand by.	发现潜在危险。请稍候。
+Scanning environment.	正在扫描环境。
+Unusual activity noted.	发现异常活动。
+Proximity alert.	接近警报。
+Motion detected.	检测到移动。
+Threat level: Elevated.	威胁等级：升高。
+Feel that? Something's skulking around...	感觉到了吗？有东西在附近潜行……
+My gut says trouble's nearby.	我的直觉说附近有麻烦。
+Pretty sure we've got company.	我挺肯定我们有伴了。
+We're not alone...	我们并不孤单……
+Thought I heard something...	好像听到了什么……
+All over.	结束了。
+...That's it?	……就这？
+Area secure.	区域安全。
+Victory confirmed.	胜利确认。
+All clear.	全部清空。
+Transitioning to idle.	正在转为待机。
+Dock secured.	对接区已确保。
+Area secured.	区域已确保。
+Threat neutralized.	威胁已消除。
+Combat protocols disengaged.	战斗协议已解除。
+Enemy destruction confirmed.	敌人已确认被摧毁。
+Hah! That was almost fun.	哈！这几乎算得上好玩。
+Phew! That got the blood pumping.	呼！这可真让人血脉贲张。
+Huh. Too easy? Maybe.	嗯。太容易了？也许吧。
+Show's over.	演出结束了。
+Glad we didn't have to go all out.	幸好我们不必全力以赴。
+And away we walk unscathed. ...Mostly.	我们毫发无伤地走开了。……大多是。
+We dusted 'em!	我们把他们解决了！
+Nice teamwork! Like a well-oiled machine.	配合得好！就像一台上了油的机器。
+No more hostiles.	没有敌人了。
+That's that.	就这样了。
+This area is now secure.	该区域现已安全。
+Situation under control.	局势已受控。
+All quiet now.	现在一切都安静了。
+It's over.	结束了。
+That's what you get.	这就是你的下场。
+Ahh, let 'em go...	唉，随他们去吧……
+Pfft. Ran off.	哼。跑了。
+All clear. Target's long gone.	全部清空。目标早就跑了。
+Stand down. Area secure.	解除戒备。区域安全。
+Target must have fled the area.	目标一定已经逃离该区域。
+Enemy escaped. We'll get 'em next time.	敌人逃了。下次我们再收拾他们。
+Fine, let them scurry away.	算了，让他们溜吧。
+Ran off, huh?	跑了，是吗？
+Couldn't stand the heat.	受不了这份热。
+No further hostilities detected.	未检测到进一步敌意活动。
+Minimal threat level. All clear.	威胁等级极低。全部清空。
+Threat vanished. Returning to standard operations.	威胁消失。正在恢复标准运作。
+Re-evaluating environment.	正在重新评估环境。
+Resuming patrol mode.	恢复巡逻模式。
+Standing down.	解除戒备。
+Returning to standard operations.	正在恢复标准运作。
+Think we lost them.	我想我们甩掉他们了。
+All quiet again.	又安静下来了。
+They bolted. Can't say I blame them.	他们开溜了。我不怪他们。
+If they show up again, we'll be ready.	如果他们再来，我们准备好了。
+Huh. They must've cut and run.	嗯。他们一定是吓得跑了。
+Pursuit is unnecessary.	无需追击。
+Retreat was their only viable option.	撤退是他们唯一可行的选择。
+They fled. A predictable response.	他们逃了。可以预见的反应。
+Looks like they lost their nerve.	看来他们没了胆。
+Let 'em go. Not worth chasing.	放他们走吧。不值得追。
+They ran off. Cowards.	他们跑了。懦夫。
+Warning, shield matrix has collapsed.	警告，护盾矩阵已崩溃。
+We're unshielded.	我们没有护盾了。
+Shield emitters offline. Evasive maneuvers!	护盾发射器离线。规避机动！
+Shield failure! Brace for hull impact.	护盾故障！准备承受船体冲击。
+They'll punch through our shields!	他们会击穿我们的护盾！
+Shields have collapsed.	护盾已崩溃。
+That was the last of the shielding.	那是最后一点护盾了。
+Shields are down!	护盾失效！
+We've lost propulsion control.	我们失去了推进控制。
+Fix the engines or we die!	修好引擎，否则我们就死定了！
+Helm is useless! Rebooting subsystems.	舵机失灵了！正在重启子系统。
+Main thrusters unresponsive.	主推进器无响应。
+Engine system failure!	引擎系统故障！
+Engines down. Initiate emergency protocols.	引擎失效。启动应急协议。
+Main drive failure. We've lost maneuvering.	主引擎故障。我们失去了机动能力。
+Engines dead. We're drifting!	引擎报废。我们在漂流！
+The universe bows to my will!	宇宙都要臣服于我的意志！
+We will harness this power!	我们会驾驭这股力量！
+I am beyond you!	我远在你之上！
+You cannot run from the inevitable!	你逃不过不可避免的结局！
+I control the very fabric of reality!	我掌控着现实的经纬！
+You are nothing before my power!	在我的力量面前你什么都不是！
+Covering fire!	掩护射击！
+Suppressive fire!	压制射击！
+Pinned down.	被压制住了。
+Taking suppressive fire!	遭到压制射击！
+Don't let up!	别停手！
+Keep the pressure on!	保持施压！
+I want covering fire!	我要掩护火力！
+Suppressive fire! Now!	压制射击！现在！
+Out of ammo!	没子弹了！
+Swapping mags! Cover me!	换弹匣！掩护我！
+I'm empty! Reloading!	我打空了！正在装填！
+Reloading!	装填中！
+Engaging!	交战！
+Go, go!	快，快！
+Eyes on hostile!	看到敌人了！
+Target!	目标！
+Engaging target!	正在攻击目标！
+Fire!	开火！
+Open fire!	开火！
+Look out!	当心！
+Heads down!	低头！
+Get down!	趴下！
+Take cover!	找掩护！
+Advance!	前进！
+Push!	推进！
+Push! Push!	推进！推进！
+Let's go! Moving in!	走！进去！
+Surround 'em!	包围他们！
+Hit their flank! Now! Now!	打他们的侧翼！快！快！
+Flank 'em!	包抄他们！
+Flank!	包抄！
+Back up! Move! Move!	后撤！走！走！
+Pull back! We need to regroup!	撤回来！我们需要重整！
+Regroup!	重整！
+Fall back!	撤退！
+Clear out!	撤出去！
+Evacuate the area!	撤离该区域！
+Abort! Abort!	中止！中止！
+Fall back to base!	撤回基地！
+Backing up!	正在后撤！
+Repositioning!	正在转移位置！
+Back up! Back up!	后撤！后撤！
+Falling back!	正在撤退！
+Leg's hit!	腿中弹了！
+Mobility compromised!	机动能力受损！
+Knee shattered!	膝盖碎了！
+Ribs... broken...	肋骨……断了……
+Can't... breathe...	没法……呼吸……
+My chest...	我的胸口……
+My head!	我的头！
+Can't concentrate!	无法集中精神！
+I can't see!	我看不见了！
+They got my arm!	他们打中了我的手臂！
+Shoulder wound. Need assistance!	肩部受伤。需要帮助！
+Arm's hit!	手臂中弹了！
+I need a diversion!	我需要有人吸引注意！
+Run distraction!	去分散他们的注意力！
+Keep their attention!	拖住他们的注意力！
+I need cover! Now!	我需要掩护！现在！
+Cover me!	掩护我！
+Taking casualties!	出现伤亡！
+We're down a mech!	我们损失了一台机甲！
+Mech disabled!	机甲已失能！
+Mech offline!	机甲离线！
+We're hit!	我们中弹了！
+They're gone!	他们没了！
+Soldier down!	士兵倒下！
+Man down!	有人倒下！
+...You could've just asked for that, you know.	……你知道，你本来直接问我要就行了。
+Nargh!	啊！
+I will break you!	我会撕碎你！
+Yeargh!	呀啊！
+Rargh!	吼！
+Nnyyyaarrgghh!	啊啊啊——！
+Yyyyaaaargh!	呀啊啊啊！
+Aaaayyyaarrrrgghh!	啊啊呀啊啊——！
+Boom!	轰！
+Eat this!	尝尝这个！
+Frag out!	榴弹出手！
+Grenade out!	手雷出手！
+This will flush 'em out!	这能把他们逼出来！
+Throwing grenade!	投掷手雷！
+Grenade going live!	手雷即将引爆！
+Hot potato!	烫手山芋！
+Here's a present!	送你个礼物！
+Tossing a frag!	扔颗榴弹！
+Incoming!	来袭！
+Watch out!	当心！
+Grenade!	手雷！
+Move! Move!	快跑！快跑！
+Heads up!	注意！
+Find cover!	找掩护！
+Hit the deck!	趴下！
+Move it or lose it!	快跑，不然就完了！
+Contained.	已收容。
+Enemy neutralized.	敌人已消除。
+Situation contained.	局势已控制。
+Target down.	目标倒下。
+Nothing personal!	别往心里去！
+That'll show you!	让你长点记性！
+Target neutralized!	目标已消除！
+Who's next?!	下一个是谁？！
+Scratch one hostile!	干掉一个敌人！
+And stay down!	给我躺着别动！
+One less thorn in our side!	少了一根眼中钉！
+Go get 'em!	去收拾他们！
+Won't bother us again!	不会再烦我们了！
+Down for the count!	彻底倒地了！
+Target terminated.	目标已终结。
+Enemy presence nullified.	敌方存在已清除。
+Objective complete.	目标完成。
+Confirmed kill.	击杀确认。
+Even if I fall... Watchtower remains...	即便我倒下……瞭望塔依然存在……
+I saw... the stars...	我看到了……群星……
+Don't... let them...	别……让他们……
+I... regret...	我……后悔……
+I can't hold it together!	我撑不住了！
+All hands, brace--...	全体人员，准备——……
+We weren't ready...	我们还没准备好……
+Reactor breach!	反应堆破损！
+Control lost! Rerouting failed...	失去控制！改道失败……
+We're not going to make it!	我们撑不过去了！
+We have failed...	我们失败了……
+We're losing all systems!	我们正在失去所有系统！
+No recovery. We're finished...	无法恢复。我们完了……
+Breaches! Multiple decks!	多处破损！多个甲板！
+It was fun... while it lasted...	在结束之前……还挺有趣的……
+Good... Goodbye, my friends...	再……再见了，我的朋友们……
+See ya in the next... ugh...	下辈子……见……呃……
+Pl-- Please...	求——求你……
+*gasp* No...	*喘气*不……
+Ain't... done yet...	还……没完呢……
+This... this wasn't...	这……这不该是……
+No... I was supposed to be...	不……我本该是……
+I've reached... my limit...	我到……极限了……
+Need a medic!	需要医疗兵！
+Keep it... together...	撑……住……
+Failure... unacceptable...	失败……不可接受……
+Mission... incomplete...	任务……未完成……
+Must... hold...	必须……守住……
+Medic...	医疗兵……
+Need... a little assistance...	需要……一点帮助……
+Someone, get over here...	谁来，过来一下……
+Ugh, I need a minute...	呃，我需要缓一缓……
+Ooo... going down...	哦……倒下了……
+I'm... not done yet... need help!	我……还没完……需要帮助！
+Can't stand... darn it!	站不起来了……该死！
+Wounded. This complicates matters...	受伤了。这让事情变得麻烦了……
+I need a... a moment.	我需要……一下下。
+I require assistance...	我需要协助……
+Need backup here...	这里需要支援……
+This ain't how I planned it...	这可不是我计划的样子……
+Ugh, I need a breather...	呃，我需要喘口气……
+Confirmed impact! Compensating.	冲击确认！正在补偿。
+Taking hits...	正在受击……
+Inefficient, but effective.	效率不高，但有效。
+They're persistent...	他们很顽固……
+Reinforce bulkheads!	加固舱壁！
+Maintain vector. Return fire.	保持航向。还击。
+Recalibrating defenses.	正在重新校准防御。
+Hull plating compromised.	船体装甲受损。
+Structural damage confirmed.	结构损伤确认。
+Hull breach!	船体破损！
+Crap!	糟了！
+Agh... I'll get you for that!	啊……这笔账我记下了！
+Too much...	太过了……
+I will adapt...	我会适应……
+Pain is temporary.	痛苦是暂时的。
+That was... unexpected.	那真是……出乎意料。
+It'll take more than that!	那点手段还不够！
+You're testing my patience.	你在试探我的耐心。
+Agh... Not done yet!	啊……还没完！
+Compromised!	已受损！
+Injured.	受伤。
+Need a Med Pack!	需要医疗包！
+Wounded!	受伤了！
+I'm hit!	我中弹了！
+Taking fire!	遭到射击！
+Urgh, could use some help!	呃，能来点帮助就好了！
+Ahh, that's gonna scar!	啊，这要留疤了！
+Argh, I'm hit!	啊，我中弹了！
+Great, I'm bleeding!	好极了，我在流血！
+Damn!	该死！
+Augh, got me...	啊，打中我了……
+Sustained damage.	受到损伤。
+Losing shield cohesion...	正在失去护盾凝聚力……
+We've sustained damage.	我们受到损伤。
+Shields are compromised.	护盾受损。
+Their accuracy is... unexpected.	他们的准头……出乎意料。
+Hull losing integrity...	船体正在失去完整性……
+Hostile fire, prepare to counter.	敌方火力，准备反击。
+Impact!	受击！
+Enemies engaging.	敌人正在交战。
+Damn it!	该死！
+Warning: Physical integrity declining.	警告：物理完整性下降。
+Critical strike detected.	检测到致命打击。
+Auto-repair engaged.	自动维修已启动。
+Alert: Hostile contact confirmed.	警报：敌人接触确认。
+Impact registered.	已记录受击。
+Re-evaluating threat level.	正在重新评估威胁等级。
+System integrity at risk.	系统完整性受到威胁。
+Structural integrity compromised.	结构完整性受损。
+System damage identified.	已识别系统损伤。
+Damage detected.	检测到损伤。
+Technician requested.	需要技术员。
+Bring it!	放马过来！
+You ain't walking away from this!	这回你别想走掉！
+Come on!	来啊！
+You're easy pickings! Easy!	你太好收拾了！太容易了！
+You won't be the first Deviant I've broken!	你不会是我击垮的第一个异常体！
+Your kind is a blight!	你们这种人是祸害！
+I was made to surpass you.	我被造就出来就是为了超越你。
+You are a threat to humanity!	你是对人类的威胁！
+You are a threat.	你是个威胁。
+You will not survive this encounter.	你活不过这次遭遇。
+You are delaying the inevitable.	你只是在拖延那不可避免的结局。
+This was over before it began.	这场战斗在开始之前就已结束。
+You will fall, just as the others.	你会倒下，就像其他人一样。
+Predictable...	不出所料……
+Submit or perish.	臣服，或灭亡。
+The stars will not remember you.	群星不会记得你。
+Let us show you precision.	让我们向你展示何为精准。
+Your destruction is a mercy.	毁灭你是一种仁慈。
+Resistance is noted. Futile, but noted.	已记录你的抵抗。徒劳，但已记录。
+Your efforts are wasted.	你的努力都是白费。
+We do not tolerate interference.	我们不容许干涉。
+This will be archived as a minor incident.	这将被归档为一起轻微事件。
+No match for us!	不是我们的对手！
+Do not resist!	不要抵抗！
+Lay down your arms!	放下武器！
+Stand down!	解除武装！
+Take out the hostile!	干掉敌人！
+Shut 'em down!	让他们停下！
+Eliminate the target!	消灭目标！
+Get 'em!	上！
+Take 'em out!	解决他们！
+Just another catch!	不过是又一次捕获！
+This is what we trained for!	这正是我们训练的目标！
+Watchtower! Neutralize the hostile!	瞭望塔！消除敌人！
+Watchtower! Let's make this quick!	瞭望塔！速战速决！
+Wait for the break!	等它露出破绽！
+Watch for reload!	注意对方装填！
+Get ready!	做好准备！
+Stay down!	别起来！
+Head down!	低头！
+You're out of your depth!	你高估自己了！
+If you're smart, you'll back off!	识相的话就退后！
+You think I'm just a doctor? Big mistake!	你以为我只是个医生？大错特错！
+I didn't sign up for this, but I'll finish it!	这可不是我签约要干的事，但我会了结它！
+Please do not resist.	请不要抵抗。
+Your posture indicates aggression.	你的姿态显示具有攻击性。
+I predict your swift defeat.	我预测你会迅速溃败。
+Attempt to harm me at your own peril.	想伤害我，后果自负。
+Think you can take me?	觉得你能打得过我？
+You'll regret this.	你会后悔的。
+Let's do this.	来吧。
+You're not so tough.	你也没那么硬。
+I can take you.	我打得过你。
+That the best you've got?	你就这点本事？
+This is nothing...	这不算什么……
+Hah. I can handle this.	哈。我应付得来。
+Don't mess with me.	别惹我。
+You're mine.	你是我的了。
+I'll destroy you if I must!	必要的话，我会毁掉你！
+With a ship like that, you've already lost.	开着那样的飞船，你已经输了。
+Keep pushing, and I may lose my temper.	再逼我，我可要发火了。
+I'm confident in our victory.	我对我们的胜利很有信心。
+Still more opponents? Fine...	还有更多对手？行吧……
+You're as good as vaporized.	你基本等同于被汽化了。
+You have nowhere to run.	你无处可逃。
+Resistance is ill-advised.	抵抗是不明智的。
+This is your end.	这就是你的终点。
+Foolish.	愚蠢。
+Prepare yourself.	准备好。
+I warn you, Watchtower trained me well.	我警告你，瞭望塔把我训练得很好。
+Do you really wish to engage me?	你真想与我交手？
+Your odds of success are... minimal.	你成功的几率……微乎其微。
+Bring it, I'm ready!	放马过来，我准备好了！
+You're not walking away from this!	这回你别想走掉！
+You think that scares me?!	你以为那能吓到我？！
+Think you can take me?!	觉得你能打得过我？！
+I've survived worse than you!	我挺过了比你更糟的东西！
+Code Red.	红色代码。
+Prepare for immediate termination.	准备立即终止。
+Cease resistance.	停止抵抗。
+Hostile activity noted.	已记录敌意活动。
+Prepare for neutralization.	准备被消除。
+Resistance is futile.	抵抗是徒劳的。
+This unit was not designed for negotiation.	本单元并非为谈判而设计。
+Combat algorithms engaged.	战斗算法已启用。
+Engaging target.	正在攻击目标。
+Threat analysis: Red.	威胁分析：红色。
+Commencing purge.	开始清除。
+This area is restricted.	此区域受限。
+Somebody do something!	谁来想想办法！
+Wh-- What the...	怎——怎么回事……
+There's a body. Someone get help!	有人倒下了。快来人帮忙！
+Someone get security here!	快叫安保过来！
+Emergency: Unauthorized termination of life.	紧急情况：发生未经授权的致死事件。
+This is not permissible. Stand by for enforcement.	这是不允许的。准备强制执行。
+Alarm: Homicidal behavior detected.	警报：检测到杀人行为。
+An unlawful killing.	一起非法杀害。
+Hm, dead.	嗯，死了。
+A murder has occurred.	发生了一起谋杀。
+Security, we've got trouble!	安保，我们出事了！
+Someone get over here! There's a body.	快来人！有人倒下了。
+Oh no!	哦不！
+I'm outta here!	我走了！
+Knock it off before someone gets killed!	别闹了，不然要出人命了！
+Security!	安保！
+Hostile action detected.	检测到敌意行为。
+Engaging hazard protocols.	正在启用危害应对协议。
+Notifying station security.	正在通知空间站安保。
+I will forcibly eject you from the dock, if necessary.	如有必要，我会强行把你赶出对接区。
+Under fire!	遭到攻击！
+I'm under attack!	我遭到攻击！
+I'm being engaged!	我正被攻击！
+An attack is underway!	袭击正在进行！
+Don't make me throw you out!	别逼我把你赶出去！
+We've got a fight!	打起来了！
+What's going on?! Security!	怎么回事？！安保！
+Don't try me again.	别再来试探我。
+Mine. Not yours! Remember that.	我的。不是你的！记住了。
+You're lucky I'm in a forgiving mood.	你运气好，我现在心情还算宽容。
+Please refrain from removing station resources without clearance.	未经许可，请勿取走空间站资源。
+Property recovered. This incident is logged.	财物已追回。本事件已记录。
+I do not recommend repeating this transgression.	我不建议你重蹈覆辙。
+I'd advise you cease your foolishness.	我建议你停止这种蠢行。
+I won't overlook such actions.	这种事我可不会睁一只眼闭一只眼。
+I will keep hold of this.	这个我会收着。
+I expected better from you.	我本对你有所期待。
+Stealing from Stardock? Tsk. Bad idea.	从星坞偷东西？啧。馊主意。
+Try it again, I dare you.	你再试一次看看，我赌你不敢。
+Hey, I saw that!	嘿，我看见了！
+What the hell?	搞什么鬼？
+Sticky fingers? Not in my clinic.	手不老实？在我的诊所可不行。
+Trying to rob a doctor? Have you no shame?	想抢医生？你就不害臊吗？
+...What're you doing in my pockets, there!	……你在我的口袋里干什么呢！
+This is a direct violation of station regulations.	这直接违反了空间站规章。
+You attempted to bypass my sensory modules. Security will be notified.	你试图绕过我的传感模块。将通知安保。
+Your attempt at theft is noted.	你的盗窃企图已被记录。
+Think carefully...	好好想想……
+Don't push your luck!	别得寸进尺！
+If you value your hands, I suggest you stop that.	如果你珍惜自己的手，我建议你住手。
+You've either got guts or just poor judgment.	你要么有胆量，要么就是判断力有问题。
+Hands off, unless you're paying.	别乱动，除非你付钱。
+Stealing is not very nice.	偷窃可不是什么好事。
+Return the stolen item or face immediate retaliation.	归还被盗物品，否则立即反击。
+Theft is not permitted.	不允许偷窃。
+You have acquired unauthorized materials.	你获取了未经许可的材料。
+You are not authorized to remove that.	你无权取走那件东西。
+That does not belong to you.	那不是你的东西。
+I'll be taking that back.	这个我拿回来了。
+You seriously think I wouldn't notice?	你真以为我会没注意到？
+Sticky fingers, huh?!	手不老实，是吧？！
+Give that here!	把它拿过来！
+Put it down...	放下……
+Don't make me call security.	别逼我叫安保。
+Put that back, please.	请把那东西放回去。
+You are tampering with station assets.	你正在擅自挪用空间站资产。
+Please return any stolen property.	请归还任何被盗财物。
+That item is not authorized for removal.	该物品未经许可不得取走。
+Return it. Now.	还回来。现在。
+That item's not yours to take.	那件东西不归你拿。
+Put that back. Immediately.	把那东西放回去。立刻。
+I've dealt with thieves before, y'know!	我可处理过小偷，你知道的！
+Hey! What do you think you're doing?	嘿！你以为你在干什么？
+Put that back. Now!	把那东西放回去。现在！
+Let me see what you have for sale.	让我看看你有什么卖的。
+You do whatever you want with that slate, my job's done. You have a good day now!	那块数据板你爱怎么处理就怎么处理，我的活儿干完了。祝你有美好的一天！
+Then I guess someone paid a lot of credits for nothing!	那我想是有人白花了一大笔信用点！
+...If you can afford the rates.	……如果你付得起这个价的话。
+"Our courier service specializes in secure, and discreet, data transfers across the Settled Systems. No questions, no tampering, and guaranteed delivery."	"我们的快递服务专精于在定居星系群内进行安全而隐秘的数据传输。不问缘由、不予篡改、保证送达。"
+I'm an employee of SolarLink, part of the Data Courier branch.	我是太阳联的员工，属于数据快递部门。
+I don't want some stupid slate.	我不要什么破数据板。
+Who do you work for? 	你为谁工作？
+Who sent the slate?	是谁寄来的数据板？
+But what I do know -- is whoever sent this didn't want it in the wrong hands.	但我确实知道的是——寄这个的人不想让它落到不该有的人手里。
+I wasn't told! Standard operating procedure. The less a courier knows, the less chance we get accused of data breaches.	没人告诉我！这是标准作业流程。快递员知道得越少，我们被指控泄露数据的可能性就越小。
+Well, that's my job done. You have a good day, now!	好了，我的活干完了。祝你有美好的一天！
+You're welcome! Whatever's on there, someone paid top credits to make sure it got to you and no one else.	不客气！不管那上面是什么，有人花了大价钱确保它只送到你手上，别人都没有。
+Thanks for the slate.	谢谢你的数据板。
+*sigh* Anyway, this slate is for you. I was instructed to hand-deliver. No drop-offs, no relays.	*叹气*总之，这块数据板是给你的。我被指示必须亲手送达。不许寄放，不许中继。
+Trying to catch up with you -- took me through five systems and more contraband scans then I tend to care for...	为了追上你——我穿过了五个星系，还挨了比我乐意接受的更多次违禁品扫描……
+You're a difficult person to track down!	你这个人可真难找！
+You're awfully quiet. You okay?	你安静得反常。你还好吗？
+...Did I lose signal?	……我信号掉了吗？
+This is Torin, checking in... again. Hello?	我是托林，再次……呼叫。喂？
+No pressure, but I'm starting to feel like I'm on hold here...	不急，但我开始觉得自己像在被搁置了……
+Hellooo? You're still there, right?	喂——？你还在那边，对吧？
+The galaxy's such a big place! And yet somehow, we keep bumping into the same handful of weirdos...	星系这么大！可不知怎的，我们老是撞见那同一小撮怪人……
+When I first gained Starborn powers, I thought I'd gone nuts! Took me a while to figure it all out...	刚获得星裔能力时，我以为自己疯了！花了好一阵子才弄明白……
+You feel that? There's a "tension" in the air. I've noticed it everywhere we go... It's really starting to put me a bit on edge.	你感觉到了吗？空气中有种"紧张"。我们到哪儿我都察觉到了……真开始让我有点不安了。
+One of the weirdest things about jumping universes? Bumping into someone who was dead. It's even more weird if you're the one who killed them...	跳宇宙最诡异的事情之一？撞见一个已经死了的人。要是那人还是你杀的，那就更诡异了……
+Once, I hopped universes just to dodge overdue credit payments. Now, I'm not proud of that! But, if you ever feel like going on a shopping spree... Just sayin'...	有一次，我为了躲逾期的信用点账单就跳了个宇宙。唉，我可不为此自豪！不过，要是你有天想大肆血拼……我就是说说……
+You know, if you really set your mind to it, and completely disregard the laws of physics, you can do almost anything!	你知道，只要你下定决心，并且彻底无视物理定律，你几乎什么都能做到！
+Don't knock old-school ballistic weapons. Sometimes simpler is better.	别看不起老派弹道武器。有时候简单就是好。
+I've grown quite fond of traveling with just the basics. Too much gear just weighs you down.	我越来越喜欢只带必需品出行。装备太多只会拖累你。
+Nothing beats that feeling when your ship breaks atmo...	飞船冲破大气层那种感觉，无可替代……
+Best advice I ever got: "Duck first, hurl insults later."	我听过的最好的建议："先躲，再骂。"
+I'm sure I spotted someone wearing one of those fancy new McClarence spacesuits the other day. It looked good!	前几天我肯定看到有人穿着麦克拉伦斯那种新款太空服。挺好看的！
+Hey, if there was another war, who'd you think would win? My credits are on the UC.	嘿，要是再打一场战争，你觉得谁会赢？我押联殖。
+You know, I can kinda respect what the UC's trying to do, but man, they are just too uptight about it! Just ends up rubbing folks the wrong way.	你知道，联殖想做的事我多少还挺佩服，但老天，他们也太较真了！结果只会惹人不痛快。
+I'll admit, I get a sort of... "twisted excitement" every time we faceoff with Watchtower. It's like playing a very dangerous game of chess.	我承认，每次和瞭望塔对峙，我都会有种……"扭曲的兴奋"。就像下一盘极其危险的棋。
+I've been debating on writing a book, "The Wayfarer's Guide to the Universe". What do you think...? Would anyone read something like that?	我一直在纠结要不要写本书，叫《旅人宇宙指南》。你觉得呢……？会有人看这种东西吗？
+I still get a rush visiting new planets. Hope I never lose that feeling...	造访新行星时我仍会心潮澎湃。希望我永远不会失去这种感觉……
+Hah. Those Constellation folks sure are dreamers, huh? Hm. Good on 'em! Universe could use more people like that...	哈。星宿座那帮人真是梦想家，是吧？嗯。他们挺好！宇宙需要更多这样的人……
+Harper's got some rough edges, but deep down, she's as sweet as they come. Just... don't tell her I said it like that. Okay?	哈珀是有点糙，但骨子里她是最温柔的那种人。只是……别告诉她我这么说。行吗？
+I used to use boost packs all the time! But, could never really stick the landings...	我以前总用喷气背包！可落地从来都稳不住……
+All's good over here.	这边一切正常。
+This is Torin! Need something?	我是托林！有事吗？
+Hailing frequency open!	呼叫频道已开启！
+How can I help?	我能帮上什么忙？
+I hear your signal, loud and clear.	你的信号我听得清清楚楚。
+To what do I owe the pleasure?	是什么风把你吹来了？
+I'm not going down this path with you!	我可不会跟你走这条路！
+...WHAT are you doing?!	……你在干什么？！
+...Have you lost your mind?!	……你疯了吗？！
+Sorry, but no.	抱歉，不行。
+That's not right.	这样不对。
+Uh-uh.	不行。
+Nope.	不。
+Careful, we might have a problem if we keep doing that...	当心，再这样下去我们可能就出问题了……
+I'm not sold on that...	这我可不太买账……
+Not my favorite idea, but hey, your call!	这不是我最喜欢的主意，不过，你说了算！
+Might wanna think that through...	也许你该想清楚……
+Yeah, okay.	嗯，好吧。
+No problem.	没问题。
+Can do!	行！
+Sure thing, easy enough.	当然，小菜一碟。
+Great minds, am I right?	英雄所见略同，对吧？
+Exactly what I would've done.	换我也会这么做。
+Good call, count me in.	好主意，算我一个。
+Sounds like a plan!	听起来可行！
+Welcome home!	欢迎回家！
+Always good to have you back on the station.	你能回空间站总是好事。
+Checking in on us?	来看我们啦？
+Careful out there. I won't always be around to bail you out.	外面小心点。我不总能来救你。
+Fleet's shaping up nicely!	舰队成型得不错！
+Glad to see your face again.	很高兴又见到你。
+Welcome back to Stardock.	欢迎回到星坞。
+Hey, it's you!	嘿，是你啊！
+What's the plan?	计划是什么？
+Getting cobwebs here.	我这儿都要结蜘蛛网了。
+Need something?	需要什么吗？
+Man, am I bored...	老天，我真是无聊透了……
+We're still in one piece, I see.	看来我们还完整无缺。
+Have an assignment?	有任务吗？
+Whatever I can do to help!	只要能帮上忙，什么都行！
+Aye-aye?	遵命？
+What's the mission?	任务是什么？
+Just say the word.	你一句话的事。
+New orders?	新命令？
+Hey there, Cap'n!	你好啊，舰长！
+Let's talk about something else...	我们聊点别的吧……
+More than happy to! What's the subject matter?	非常乐意！想聊什么话题？
+Alright! Starborn, Unity? What do you wanna talk about?	好！星裔、归一？你想聊什么？
+Sure! What topic did you have in mind?	当然！你想聊什么话题？
+Be seeing ya!	回头见！
+I'll be around if you need me.	需要我随时在。
+See you when I see you.	有缘再见。
+Holler if you need anything!	有需要就喊我！
+Fly safe!	飞行平安！
+It's now or never.	现在不干就没机会了。
+Once more unto the breach!	再度冲入缺口！
+We got this!	我们能行！
+They picked the wrong ship to mess with.	他们挑错了要招惹的飞船。
+Shields up, safety's off!	护盾升起，保险关闭！
+Enemy on sensors!	传感器发现敌人！
+Time to dance.	该跳舞了。
+Show 'em what we've got!	让他们见识见识我们的本事！
+Buckle up!	系好安全带！
+We win!	我们赢了！
+Haha, you've got a real knack for this!	哈哈，你这方面真有天分！
+Let's see what they left behind.	看看他们留下了什么。
+Time to breathe again...	总算能喘口气了……
+Kinda fun, but glad it's over.	挺好玩，但很高兴它结束了。
+They never stood a chance.	他们根本毫无胜算。
+We're clear, good work!	威胁解除，干得好！
+Nothing but space dust now.	现在只剩太空尘埃了。
+Made it in one piece.	我们完好无损。
+Nice flying!	飞得漂亮！
+Shields need fixing, fast!	护盾需要抢修，快！
+The ship can't survive another hit like that!	飞船经不起再来那么一下了！
+We need those shields back online, now!	我们需要护盾立刻恢复！
+We're not winning this without shields!	没有护盾我们赢不了！
+Shield systems are down!	护盾系统失效！
+We can't take another hit with no shields!	没有护盾我们挨不起第二下！
+Starting shield repairs now!	现在开始修复护盾！
+We're exposed without shields!	没有护盾我们完全暴露！
+Shields just went offline!	护盾刚刚离线！
+Our shields are down!	我们的护盾失效了！
+We lost a weapon!	我们损失了一件武器！
+Weapon system down...	武器系统失效……
+One of our guns is shot...	我们有一门炮被打坏了……
+Lost a weapon, can't return fire!	损失一件武器，无法还击！
+Damn. Weapon's toast!	该死。武器废了！
+That shot crippled a weapon.	那一击打瘫了一件武器。
+Not good, we're down a gun!	不妙，我们少了一门炮！
+Weapon's offline...	武器离线……
+They knocked out one of our guns!	他们打坏了我们一门炮！
+Agh, we lost a weapon.	啊，我们损失了一件武器。
+We're good on weapons!	我们的武器没事！
+Weapons repaired!	武器已修复！
+Feel free to fire, guns working again.	尽管开火，炮又能用了。
+We've got weapons again!	我们又有武器了！
+Repairs complete! Weapons ready.	维修完成！武器就绪。
+Guns are back!	炮回来了！
+Weapon systems repaired!	武器系统已修复！
+We're back in business, fire away!	我们又行了，开火吧！
+Weapon's good to go!	武器可以用了！
+Our guns are back online!	我们的炮重新上线了！
+One less gun pointed our way.	对着我们的炮少了一门。
+They're down some firepower now.	他们的火力减了些。
+That weapon's kaput!	那件武器报废了！
+Weapon offline on their end!	他们那边有武器离线了！
+Oh, look at that! You got one of their weapons!	哦，瞧瞧！你打掉了他们一件武器！
+They won't be firing that one anytime soon.	那门炮一时半会儿开不了火了。
+One more enemy weapon offline!	又一件敌方武器离线！
+Knocked out their guns!	打瘫了他们的炮！
+They're down a weapon!	他们少了一件武器！
+Nice shot! One of their guns just went offline.	好枪法！他们有一门炮刚离线了。
+They've got their weapons systems!	他们的武器系统恢复了！
+Enemy weapons just sprang back to life!	敌方武器突然又恢复运作了！
+Look out, they've rearmed!	当心，他们重新武装了！
+They're ready to blast us again, stay sharp!	他们准备好再轰我们一轮了，保持警觉！
+Their weapons are back!	他们的武器回来了！
+Uh-oh, they patched up their guns!	哎呀，他们把炮修好了！
+Those guns are alive again!	那些炮又活了！
+They fixed their weapons. Time for round two!	他们修好了武器。第二回合开始！
+Their weapons are hot again!	他们的武器又热起来了！
+They've got their guns back online!	他们的炮重新上线了！
+Hm. Kinda sad we're done. It made for an interesting talk!	嗯。聊完了还有点遗憾。这话题挺有意思的！
+Feel free to ask about anything "Starborn"! Any time, any place.	有关"星裔"的任何事都尽管问！随时，随地。
+If there's anything else you're curious about, feel free to ask.	如果你还好奇别的什么，尽管问。
+That's all I wanted to ask about Starborn and Unity.	关于星裔和归一，我想问的就这些了。
+Starborn relationships can be... unique, to say the least.	星裔之间的关系，往轻了说，都称得上……独特。
+Alright, we can explore that.	好，我们可以聊聊这个。
+Interacting with others isn't always straightforward for us...	对我们来说，与人往来并不总是那么简单……
+I'm curious about how Starborn interact with others.	我很好奇星裔如何与他人相处。
+I can share what I've pieced together so far.	我可以分享我目前拼凑出的东西。
+Sure! Although, still figuring a lot of it out myself.	当然！不过很多我自己也还在琢磨。
+Pretty deep subjects, but I'm game if you are!	话题挺深的，但你有兴趣我就奉陪！
+Let's talk about Starborn and Unity, specifically.	我们就具体聊聊星裔和归一吧。
+Sure, I suppose I can share a little.	好，我想我可以透露一点。
+Okay then, let's get personal.	那好，我们聊点私人的。
+Alright, let's talk about me!	好，聊聊我自己吧！
+I'd like to know more about your personal experiences.	我想多了解一些你的亲身经历。
+I'll take my leave. You'll know where to find me.	我先告辞了。你知道去哪儿找我。
+Do you have anything for me, Torin?	你有什么要给我的吗，托林？
+Don't say I never give you anything. Here.	别说我从不给你东西。拿着。
+Keep an eye out for people like that. They could be potential allies! Or they might be a future threat, another Starborn-in-waiting.	留意那样的人。他们可能是潜在的盟友！也可能成为未来的威胁，又一个即将成为星裔的人。
+That said, once in a while you do find someone who notices and remembers...	话虽如此，偶尔你确实会遇到注意到并记住这些的人……
+Starborn powers, floating rocks and strange temples, they just seem to dismiss such things as... unimportant anomalies!	星裔能力、漂浮的岩石、奇异的神殿，他们似乎只是把这类东西当作……无关紧要的异常现象一笔带过！
+They don't exactly forget, but they do seem to decide none of it's important enough to really think about.	他们并非真的忘记，但似乎认定这些都不重要到值得去认真琢磨。
+They do and they don't. People see the strange things we do, but they usually just write it all off.	既记得又不记得。人们看得到我们做的怪事，但通常只是把它们一概否定。
+Don't normal people notice any of the weird stuff?	普通人不会注意到那些怪事吗？
+I'm sorry if it felt like I was keeping secrets. But I did what I thought was best -- so you could become the Starborn you were meant to be.	如果让你觉得我在藏着掖着，我很抱歉。但我做的是我认为最好的选择——好让你成为你命中注定要成为的那个星裔。
+I was worried that if I laid it all out too soon, I'd disrupt your path, rob you of the growth you needed. You had to figure it out on your own time.	我担心如果过早地说清楚，会扰乱你的道路，剥夺你所需的成长。你得在自己的节奏里弄明白。
+Becoming Starborn isn't just about hoarding artifacts, it's a journey, a shift in perspective.	成为星裔不只是囤积神器，而是一段旅程，一种视角的转变。
+Why not tell Harper and Gren about everything?	为什么不把一切都告诉哈珀和格伦？
+I will tell them eventually, but only when I'm sure they can handle it. Right now just isn't that time.	我终究会告诉他们的，但只在确定他们能承受的时候。现在还不是时候。
+I don't want Harper or Gren to have to deal with any of that... I care about them.	我不想让哈珀或格伦去面对这些……我在乎他们。
+They either find themselves targeted by Starborn, or god forbid, Watchtower, start to lose their grip on reality, or get pulled onto a path they aren't ready for.	他们要么被星裔盯上，要么——但愿不会——被瞭望塔盯上，要么开始失去对现实的把握，要么被拽上一条他们还没准备好的路。
+For most people, learning about The Unity and everything around it, assuming they understand what they're told, it tends to go one of three ways...	对大多数人来说，了解到归一及其周遭的一切——假设他们真听懂了——往往会走向三种结局之一……
+Something I am sure of, though, is that we don't seem to age! My clock stopped ticking a while ago. Kind of freaky, but hey, all part of the Starborn package.	不过有一点我确定：我们似乎不会变老！我的钟早就不走了。有点瘆人，但嘿，这也是星裔套餐的一部分。
+I don't know if it's really them, or just their memories that survive, but it might explain why some Starborn act like they're immortal daredevils.	我不知道存活下来的是他们本人，还是仅仅是他们的记忆，但这也许解释了为什么有些星裔活得像个不死的亡命之徒。
+So, my working theory is -- whenever a Starborn dies, their consciousness simply "slides" into another universe's version of themselves!	所以，我目前的推测是——每当星裔死去，他们的意识就只是"滑入"了另一个宇宙中的自己身上！
+Now, I could be wrong, but I'm fairly sure that's happened to me too. I died, and I remember it happening. But as you can see, I currently seem to be alive!	嗯，我也许错了，但我挺肯定这也在我身上发生过。我死了，而且我记得那过程。但你也看到了，我现在似乎还活着！
+Good question. I'm sure by now you've noticed -- that whenever you take down a Starborn they just crumble away into glowing dust.	好问题。我肯定你已经注意到了——每当你击倒一个星裔，他们都会化成发光的尘埃消散。
+So, can we die? And when we jump, is that still us?	那么，我们会死吗？当我们跳跃时，那还是我们吗？
+Now, I used to get new equipment and even a ship when I jumped, but, heh, not anymore... Apparently, now those things are just too good for stinky old Torin!	以前我跳跃的时候还能拿到新装备甚至一艘飞船，但嘿，现在不行了……显然，这些东西如今配不上臭烘烘的老托林了！
+I find myself dumped on some random planet, naked as the day I was born, in a brand new universe.	我发现自己被扔到某个随机行星上，赤条条像个刚出生的人，置身于一个全新的宇宙。
+Then as I try to move closer, it gets louder. Too loud! Like it's gonna tear my skull apart. Then, right when I think my mind will split in two...	然后当我试着靠近，那声音就更响了。太响了！像要把我的头骨撕开。然后，就在我以为自己的心智要裂成两半时……
+For me, The Unity is an endless void where I'm just... floating. I see a faint light way off in the distance. It calls to me, but I can't make out the words.	对我来说，归一是一片无尽的虚空，我只是……漂浮着。我远远地看见一点微光。它在呼唤我，但我听不清那些词句。
+Now you see, that's interesting... Because no two Starborn seem to describe it in exactly the same way.	你看，这就很有意思了……因为似乎没有两个星裔的描述是完全一样的。
+When you enter The Unity, what's it like for you?	你进入归一的时候，那对你来说是什么感觉？
+At a guess? I think there's more out there than we might realize. Sure, some Starborn like to stomp around, but I think a lot more like to keep things quiet.	猜猜看？我觉得外面的东西比我们意识到的要多。当然，有些星裔喜欢大张旗鼓，但我认为更多星裔喜欢悄无声息。
+Maybe there's a kinda "pull" that drags multiple Starborn into the same universe, like a cosmic magnet.	也许存在某种"引力"，像宇宙磁铁一样把多个星裔拽进同一个宇宙。
+All a matter of perspective, I suppose. Although, it is odd how often we all seem to bump into each other...	我想这都取决于视角吧。不过，我们老是撞见彼此，这确实很怪……
+Hard to say. From one angle, you could say it's just a handful. From another, you could argue there are infinite Starborn!	很难说。从一个角度看，你可以说只有一小撮。从另一个角度看，你也可以说星裔是无穷无尽的！
+How many other Starborn are out there?	外面还有多少别的星裔？
+These days, I try my best to avoid either of them. Along with any other Starborn who give themselves a grandiose title.	如今，我尽量避开他们两个。也避开任何给自己安上浮夸头衔的星裔。
+I even fought The Emissary once! And I lost... badly. But they let me live. Not exactly sure why, but I wasn't about to stick around and ask.	我还跟星使交过一次手！而且输得……很惨。但他们放过了我。不太清楚为什么，但我可没打算留在那儿问。
+Yeah... I've encountered them. A couple times, actually! Or at least, variations of them.	是啊……我遇到过他们。其实是好几次！至少是他们的一些变体。
+We're a byproduct of a process outside our understanding! The truth of The Unity? Hah. I don't think we'll ever know! And I'm okay with that.	我们是一个超出我们理解的过程的副产品！归一的真相？哈。我觉得我们永远不会知道！而我不介意。
+I'm convinced The Unity exists for something beyond just granting us powers. Frankly, I think Starborn are just a happy accident!	我确信归一的存在意义并不只是赋予我们能力。坦白说，我觉得星裔只是个意外之喜！
+But enough stalling, you asked for my take on things, so here it is!	好了，别拖了，你问了我的看法，那我就说吧！
+Maybe that's why some keep returning to it. Repeating the cycle again and again. They're chasing answers they can't quite see...	也许这就是有些人不断回到那里的原因。一遍又一遍地重复这个循环。他们在追逐自己看不清的答案……
+You know, anyone who claims they've got Unity all figured out is either lying or fooling themselves. Starborn or not, we're all just guessing.	你知道，任何声称自己完全搞懂了归一的人，要么在撒谎，要么在自欺。不管是不是星裔，我们都只是在猜。
+Have you ever met The Hunter or The Emissary?	你见过星狩或星使吗？
+What do you think the Unity is?	你觉得归一是什么？
+What is Unity?	归一是什么？
+*sigh* I'd tell you more but -- it's one of those things you have to experience yourself. Trust me, you'll understand once you're there.	*叹气*我本想多告诉你些，但——这种事你得亲身经历。相信我，等你到了那儿就会明白。
+Embracing Unity grants tremendous power. But there is a cost. One that can be hard to appreciate until it's too late.	拥抱归一能带来巨大的力量。但那是有代价的。一种直到为时已晚才容易被低估的代价。
+Unity is a... place, or maybe a time, where reality's fabric is "thinner", letting you reach out and touch something you probably weren't meant to.	归一是一个……地方，也许是一段时间，那里的现实之布"更薄"，让你得以伸手触及某种你本不该触碰的东西。
+Yeah, I wish I had a clear answer, but it's... it's not as simple as that.	是啊，我也希望我能有个明确的答案，但……事情没那么简单。
+Just what are Starborn?	星裔究竟是什么？
+And I suppose you get some sweet powers too. You know, if you're into that kinda thing	我猜你还会得到些很酷的能力。你知道，如果你好这口的话
+And once that happens, you're on a path you can't just walk away from. A path that leads to a new understanding of the entire universe!	而一旦那发生，你就踏上了一条无法抽身的道路。一条通往对整个宇宙全新认知的道路！
+Though, I'd say the process starts as early as the very first time you touch an Artifact. That physical connection... it sparks something in you.	不过，我觉得这个过程从你第一次触碰神器时就已经开始了。那种切身的联系……会在你体内点燃某种东西。
+Starborn are folks who've stepped through The Unity and come out the other side... changed.	星裔就是那些穿过归一、从另一侧走出来的人……而且已经改变。
+Hope you've got a long enough lever and a good fulcrum to place it on.	希望你有根够长的杠杆，还有个能撬的好支点。
+Guess you're stuck with me! Hah. If you want me gone, you'll have to pry me off the multiverse itself.	看来你甩不掉我了！哈。想让我走，你得把我从多元宇宙本身上撬下来。
+Honestly, I wasn't sure it would work at all. But I'm glad it did. I'd say it's a testament to our... synergy? Yeah, that's a good word for it.	说实话，我都不确定这能不能成。但很高兴成了。我觉得这证明了我们的……协同？对，这个词不错。
+And here we are, still side-by-side in a whole other universe!	而我们就在这里，在另一个完整的宇宙里并肩而行！
+Looks like it! I mean, last time you stepped through The Unity -- we did jump together.	看来是！我是说，上次你穿过归一的时候——我们确实一起跳了。
+The "bond" we have, is it still working?	我们之间的那个"羁绊"，还有效吗？
+Oh! And Chunks, you know, that food stuff? In my universe? Never existed. Do with that information what you will.	哦！还有块餐，你知道，就是那种食品？在我的宇宙？从来不存在。这条信息你爱怎么用就怎么用。
+And before I passed through The Unity, there was even talk of folks reclaiming Earth! Or at least, that's what the official bulletins said.	在我穿过归一之前，甚至还有人在谈论重新收复地球！至少官方公告是这么说的。
+For example, in my universe, the UC won the Colony War outright, and fully absorbed the Freestar Collective!	比如，在我的宇宙里，联殖彻底赢下了殖民地大战，并完全吞并了自由星系联盟！
+There are some key differences, though. Events that unfolded a little differently.	不过也有一些关键差异。一些事件的发展略有不同。
+Really, it's almost a mirror-perfect copy of this one! Similar history, same major powers...	真的，它几乎是这个宇宙的镜像复刻！历史相似，主要势力相同……
+Can you tell me more about your home universe?	你能多讲讲你原本的宇宙吗？
+Oh, and my latest party trick is teleportation! But it's unpredictable. Still kinda hit or miss with that one. I try to avoid it if I can...	哦，我最新的拿手好戏是传送！但它很不稳定。这一手还算时灵时不灵。能避免我就尽量避免……
+I've also picked up a few time-bending abilities! Sometimes I can slow it down or even reverse it! Seems to take a lot out of me, though.	我还学会了几个扭曲时间的能力！有时我能让它变慢甚至倒流！不过这似乎很耗我。
+I can pop up a shield, which has saved my life more times than I'd care to admit. Can fire a beam of energy... What else...?	我能撑起一面护盾，它救过我命的次数我都不好意思承认。还能发射一道能量光束……还有什么……？
+Let's see... I can manipulate gravity! Throw it around like a weapon. Packs a real punch! But if I'm not careful, the recoil can be a bitch...	我想想……我能操纵重力！把它当武器一样甩出去。威力十足！但要是不小心，反冲力可真够呛……
+What kind of powers do you have?	你有什么样的能力？
+Hah... I didn't know if I was dreaming or had gone mad! It was pretty cool, though.	哈……我不知道自己是在做梦还是疯了！不过还挺酷的。
+The whole experience was weirdly... personal. Like I was being invited to a dinner for one. And then, when I actually entered the Unity...	整个体验诡异得……很私人。就像被邀请参加一场只有一个人的晚宴。然后，当我真正进入归一的时候……
+Strangely enough, I didn't run into any Starborn! At least, none that I noticed.	奇怪的是，我没遇到任何星裔！至少没注意到。
+I scavenged every Artifact I could track down, rigged together the Armillary in some abandoned shipyard...	我搜寻了每一件能追踪到的神器，在某处废弃的造船厂里拼出了浑天仪……
+It was nothing too special, at least compared to some of the other stories I've heard. For the most part, I went about it the usual way.	这没什么特别的，至少跟我听过的其他一些故事相比。大体上，我是按常规方式做的。
+What was finding The Unity like in your universe?	在你的宇宙里，找到归一是什么感觉？
+As far as Starborn go, I think that makes me a seasoned amateur!	就星裔而言，我觉得自己算是个老练的业余选手！
+But, if I had to put a number on it, I'd say I passed through The Unity... twenty-six times! Yeah, twenty-six, before I first met you!	但要是非要说个数，我穿过归一……二十六次！对，二十六次，在我第一次遇见你之前！
+...You know, I've honestly lost track. After the first dozen, details start to blur. It's like... skimming pages of the same book again and again.	……你知道，我老实说已经记不清了。过了头十几次，细节就开始模糊了。就像……一遍又一遍地翻同一本书。
+Just how many universe jumps have you made?	你到底跳跃过多少个宇宙？
+You don't have to continue, let's talk about something else.	你不必继续说，我们聊点别的吧。
+After that, the colony was just left to rot. But for me, Londinion's destruction is only half the story.	在那之后，殖民地就被弃置荒废了。但对我来说，隆蒂涅恩城的毁灭只是故事的一半。
+Largest outbreak ever recorded! And as people tried to evacuate, a UC admiral had the starport blown sky-high. A lot of people died as a result.	有记录以来最大规模的爆发！当人们试图撤离时，一名联殖上将把太空港炸上了天。很多人因此丧命。
+Huh. I thought it was common knowledge... Londinion was overrun by Terrormorphs.	嗯。我以为这是常识……隆蒂涅恩城被骇变兽占领了。
+Thanks. I appreciate it.	谢谢。我很感激。
+Destroyed? Just what happened to Londinion?	被摧毁？隆蒂涅恩城到底发生了什么？
+Hah, sorry. Didn't mean to bring the mood down. Let's talk about something else!	哈，抱歉。不是故意扫兴。我们聊点别的吧！
+It's been a long time since I've seen any of them, and I... I just... I just miss them, you know?	我已经很久没见过他们中的任何一个了，而我……我只是……我只是想念他们，你知道吗？
+But in every other universe I've visited, Londinion is the way that you know it. And everyone I ever knew, or cared about, is dead, or never existed...	但在我到过的其他每一个宇宙里，隆蒂涅恩城都是你熟知的那个样子。而所有我认识或在乎的人，都已死去，或从未存在过……
+Not abandoned. No destruction. Everyone alive! My friends, my family...	没有被废弃。没有被摧毁。所有人都活着！我的朋友，我的家人……
+So, I'm Starborn, right? Which means I can jump universes. Well, in my home universe, Londinion is just fine!	所以，我是星裔，对吧？也就是说我能跳宇宙。嗯，在我原本的宇宙里，隆蒂涅恩城好好的！
+If you're willing to share, I'd like to hear the rest.	如果你愿意说，我想听完剩下的部分。
+But they did leave behind a lot of logs and dusty records to help my search. And slowly but surely, I found more Artifacts...	但他们留下了大量日志和积灰的记录，帮了我不少。就这样一点一点地，我找到了更多神器……
+So, I started chasing every Artifact I could find. Unfortunately though, in my universe, Constellation had long been disbanded...	于是，我开始追查每一件能找到的神器。可惜，在我的宇宙里，星宿座早已解散……
+Could tell it was a piece of something bigger. And for whatever reason, I got it into my head that I needed to find more of them!	看得出它是某个更大东西的一部分。不知为何，我脑子里冒出个念头：我得找到更多！
+For me, it all started after finding an Artifact -- floating out in a deserted corner of space. Was funny... Almost like it was waiting there for me.	对我来说，一切始于发现一件神器——它漂在太空一个荒凉的角落。说来好笑……简直就像在那儿等我一样。
+But that's not why it's a sore topic for me. No, not quite...	但这不是它让我难受的原因。不，不完全是……
+But I... I don't really want to talk about it. Sorry...	但我……我真的不太想谈这个。抱歉……
+Londinion! Or at least, what's left of Londinion. That's where I used to call home.	隆蒂涅恩城！至少是隆蒂涅恩城的残骸。那里曾是我的家。
+If you didn't know, Londinion is an abandoned colony on the planet Toliman II. Some call it "abandoned", but a more apt description would be destroyed.	如果你不知道的话，隆蒂涅恩城是南门二II上的一座废弃殖民地。有人称它"废弃"，但更贴切的说法是"被摧毁"。
+You've been to Toliman II. You saw for yourself the fate of Londinion. "Abandoned"? Well, really more like destroyed.	你去过南门二II。你亲眼看到了隆蒂涅恩城的命运。"废弃"？嗯，其实更像是被摧毁。
+What put you on the path to being Starborn?	是什么让你走上了成为星裔的路？
+Their records showed it had been them who were shadowing me the whole time! So, my first brush with Watchtower happened before I even realized.	他们的记录显示，一直暗中跟踪我的就是他们！所以，我与瞭望塔的第一次接触，在我意识到之前就已经发生了。
+At first, I thought it was just other Starborn! They are known to be a bit stalkery, after all. But after I found that first Watchtower computer...	起初，我以为只是别的星裔！毕竟众所周知，他们有点爱跟踪。但在我找到第一台瞭望塔计算机之后……
+For a few good months before, I kept getting the feeling of being watched. I noticed strange faces in crowds or ships that seemed to be tailing me.	在那之前的几个月里，我一直有种被人盯着的感觉。我注意到人群中的陌生面孔，或似乎尾随我的飞船。
+But technically speaking, while that was my first encounter, it wasn't my first exposure to Watchtower.	但严格来说，那虽然是我第一次正面遭遇，却不是我第一次接触到瞭望塔。
+You might know of it as an abandoned colony...	你可能知道它，一座废弃的殖民地……
+Actually, you've already paid it a visit...	其实，你已经去过一趟了……
+Well, it's a rough subject for me. But maybe not for the reasons you might think.	嗯，这对我来说是个难受的话题。但原因也许和你想的不一样。
+Alright, ask away! I'll do my best to answer.	好，尽管问！我会尽力回答。
+You want to ask? Then ask. Any particular topic, or...?	你想问？那就问吧。有特定的话题吗，还是……？
+Sure! But just know, I don't have all the answers.	当然！但要明白，我并没有所有答案。
+I want to ask about the Starborn, about Unity...	我想问关于星裔、关于归一的事……
+Always nice to have a chit-chat!	能闲聊两句总是好的！
+Alright! Anything else?	好！还有别的吗？
+Hope you got the answers you were looking for.	希望你得到了想要的答案。
+I've no more questions.	我没有其他问题了。
+And that's why I'm glad we now have a fleet! It's the only thing that seems to have worked at keeping Watchtower at bay.	这就是为什么我很高兴我们现在有了舰队！这是唯一真正挡住瞭望塔的办法。
+I tried to come up with safeguards, defensive strategies, but none of them really worked...	我试过想出各种防护措施、防御策略，但都没有真正奏效……
+I escaped, of course, and after that, it was a cosmic game of cat and mouse.	我当然逃掉了，那之后就是一场宇宙级的猫鼠游戏。
+I already knew about Watchtower, so I was keeping an eye open. But they still somehow managed to sneak up on me. Almost caught me too!	我已经知道瞭望塔的存在，所以一直留意着。但他们还是不知怎么就摸到了我身边。差点抓到我！
+My first encounter? Let's see... That would be... yeah, it was in orbit around Leonis III.	我第一次遭遇？我想想……那是在……对，是在狮子座III的轨道上。
+I think I already told you about that. It was in orbit around Leonis III. A bunch of Watchtower ships tried to sneak up on me!	我想我已经跟你说过了。是在狮子座III的轨道上。一队瞭望塔飞船想偷偷靠近我！
+Let's see... That would be an ambush in orbit around Leonis III. Yeah, it was a small fleet of Watchtower ships. Thankfully, I saw them coming and got away.	我想想……那是在狮子座III轨道上的一次伏击。对，是一小支瞭望塔飞船。好在，我发现了他们并脱身了。
+What was your first encounter with Watchtower?	你第一次遭遇瞭望塔是什么时候？
+Hm. I like to think it's the former! Gren. Good guy! Glad to have him around.	嗯。我宁愿相信是前者！格伦。好人！很高兴有他在。
+Does that speak to his strength of character? Or did Watchtower just not brainwash him enough?	这说明了他人格的坚韧？还是瞭望塔就是没把他洗脑彻底？
+Despite everything Watchtower does to their members, all the genetic tampering and cyber implants -- he still chose to defect!	尽管瞭望塔对成员做了那么多——各种基因改造和赛博植入——他还是选择叛逃了！
+Hah. Gren's an unlikely ally, that's for sure. Still, I do find it curious, though...	哈。格伦确实是个意想不到的盟友。不过，我还是觉得挺好奇的……
+What do you think about Gren?	你觉得格伦怎么样？
+Harper's a good person. And truth be told, I like her style! And I suppose I like her too.	哈珀是个好人。说实话，我喜欢她的风格！我想我也喜欢她这个人。
+But, after she's had the chance to size someone up, get a feel for 'em, assuming that person is decent -- she'll treat them right.	但等她有机会把一个人看透、摸清底细之后，只要那人还算正派——她就会好好待他。
+She's had a rough life, and so can be a little closed off, even abrasive!	她这辈子过得不顺，所以可能有点封闭，甚至有点冲！
+I don't think most people get Harper, you know? At least, not until they've spent some real time with her.	我觉得大多数人都不懂哈珀，你知道吗？至少要跟她真正相处过一段时间才行。
+What are your thoughts on Harper?	你对哈珀怎么看？
+Somewhere that's... no longer around. Not really...	一个……已经不在了的地方。不完全是……
+...Ah! Right. That's a fair question. It's not something I usually talk about, but, um, I'm from... Londinion. Sorry if I seem distracted, it's just...	……啊！对。这问题问得好。这不是我常谈的事，不过，呃，我来自……隆蒂涅恩城。如果我显得心不在焉，抱歉，只是……
+I'm from Londinion... I think you already asked me about this, and I'm fairly sure I blew you off. Sorry about that, it's just...	我来自隆蒂涅恩城……我想你已经问过我这个了，而且我挺肯定我敷衍过去了。抱歉，只是……
+Where are you from originally?	你原本是哪儿的？
+Right now? I'm not so sure. I suppose, whatever you think is best.	现在？我不太确定。我想，你觉得怎么最好就怎么吧。
+Hah, that's up to you! You've earned the right to do what you want, when you want.	哈，那由你决定！你已经挣得了随心所欲做事的权利。
+You find any Intel Slates? Maybe Harper could direct you to new Listening Posts to take care of.	你找到什么情报数据板了吗？也许哈珀能给你指些新的监听哨去处理。
+Could always shut down more Watchtower Listening Posts.	总是可以再关掉一些瞭望塔监听哨。
+Why not see if Harper has anything for you? Might be fun to take down a Listening Post or two.	何不去看看哈珀有没有什么活儿给你？顺手端掉一两个监听哨也挺好玩。
+Hmm, how about some more Cyberamps? Maybe get the blueprints for some new models.	嗯，再来几个赛博增幅怎么样？也许能弄到一些新型号的图纸。
+That doctor lady, she can make more Cyberamps, right? Could be worth your time looking into that.	那位女医生，她能做更多赛博增幅，对吧？也许值得你花点时间看看。
+How about fabricating more of those Cyberamps? They seem pretty handy.	再多制造几个那种赛博增幅怎么样？看着挺实用的。
+You checked in with Gren recently? Bet he'd be down to install a Skydrop or two.	你最近找过格伦吗？我打赌他乐意给你装一两个空投。
+I bet there's still more Skydrops we can find blueprints for.	我打赌还有更多空投的图纸能找。
+How about some more Skydrops? Those are always fun.	再来几个空投怎么样？那玩意儿总是好玩。
+If the Fleet Command System can be upgraded, it may be worth getting another ship into the fleet.	如果舰队指挥系统能升级，也许值得再往舰队里加一艘飞船。
+How about some more ships for the fleet?	给舰队再添几艘飞船怎么样？
+Could always add another ship to your fleet. May have to upgrade the Fleet Command System, though.	总可以再往舰队里加一艘飞船。不过可能得先升级舰队指挥系统。
+This "Hunter" and "Emissary", I don't know how much you can trust either of them, but... well, you certainly can't ignore them!	这个"星狩"和"星使"，我不知道你能信他们多少，但……嗯，你肯定没法无视他们！
+"Unity". That means something! It's likely Keeper Aquilus can guide you on the right path.	"归一"。那一定意味着什么！守护者阿奎勒斯大概能指引你走上正确的路。
+My recommendation? I'd take a moment to reflect on the loss of your colleague. I'm sure other members of Constellation would appreciate your presence.	我的建议？花点时间悼念你那位同事的离世。我相信星宿座的其他成员会感激你的到场。
+Constellation needs your attention right now. Given recent events, I'd make it a priority.	星宿座现在需要你的关注。鉴于近期的事情，我会把它当作优先事项。
+If you're looking for a suggestion, conclude your business with Captain Petrov. His Artifact? Its better off in your hands.	如果你想要个建议，就去把彼得罗夫船长那事做个了结。他的神器？放在你手里更妥当。
+Didn't Vladimir want your help repairing The Eye? If I were you, I'd lend a hand!	弗拉基米尔不是想让你帮忙修天眼吗？换我我就去搭把手！
+If I remember, Vladimir had you hunting for more Artifacts. I'd suggest you keep working on that.	我记得弗拉基米尔让你去找更多神器。我建议你继续办那件事。
+I'd think that obvious! Talk to these Starborn guys, or get the hell outta here.	我觉得这不是明摆着吗！要么去跟这些星裔谈谈，要么赶紧离开这鬼地方。
+Wasn't there something in Neon you were meant to be taken care of? Something about Walter Stroud and some kind of purchase?	霓虹城不是有件事要你去办吗？关于沃尔特·斯特劳和某笔采购的？
+Correct me if I'm wrong, but I believe you were meant to be rescuing Barret and making sure he gets back to Constellation in one piece.	如果我说错了纠正我，但我记得你要去救巴雷特，并确保他完好无损地回到星宿座。
+I believe you were in the middle of hunting more Artifacts. I'd suggest you keep going with that!	我记得你正在找更多神器。我建议你继续干！
+You've business on Akila, right? I'd say focus your efforts there. I'm sure Mr. Coe's already provided the relevant details.	你在阿基拉城有事要办，对吧？我觉得你该把精力放在那儿。我相信科伊先生已经提供了相关细节。
+Why ask me when you've got Miss Morgan at hand? Whatever she's asked you to do, I'd say do it!	你身边就有摩根小姐，何必问我？不管她让你做什么，我觉得你就去做！
+My advice? Wrap up your business regarding that Artifact of yours. I'm sure Constellation would be eager to see what you uncovered.	我的建议？把有关你那件神器的事情收个尾。我相信星宿座会很想看看你发现了什么。
+The Armillary is complete, Unity awaits. Pass through, or stay. It's your choice! Just make sure you're ready, okay?	浑天仪已建成，归一在等待。穿过去，或留下来。这是你的选择！只要确保你准备好了，行吗？
+It's time. ...The Hunter, the Emissary? In the grand scheme of your existence, they don't really matter. What does, are your actions. So make 'em good.	是时候了。……星狩，星使？在你存在的宏大图景里，他们其实并不重要。重要的是你的行动。所以，让它们有意义吧。
+My recommendation? Finish up with Nishina Research Station. I'm sure you'll do what's right.	我的建议？把仁科研究站的事了结。我相信你会做出正确的选择。
+You've still a few loose ends with Constellation to wrap up. If I were in your boots, that's where I'd put my focus.	你和星宿座还有几件没结的事。换作我，我会把精力放在那儿。
+"Earth", "NASA"... Two words you don't hear much these days. I think you're reaching the end of this particular road. For now, might as well keep walking!	"地球"、"NASA"……如今不太常听到的两个词。我觉得你走到这条路尽头了。眼下，既然还走着，就继续走吧！
+It's time to take down Watchtower! At least, in this universe... We just need to deal with their starstation...	是时候干掉瞭望塔了！至少在这个宇宙里……我们只需要解决他们的星际站……
+We need to find that Watchtower computer, see if it says what I think it might say... *sigh* Although, I really hope I'm wrong about all this...	我们得找到那台瞭望塔计算机，看看它说的是不是我以为的那些……*叹气*不过，我真希望这一切我都猜错了……
+Let's hear it.	说来听听。
+Sure, fire away.	好，尽管问。
+Alright, let's chat.	好，我们聊聊。
+Sure thing, go ahead.	当然，请说。
+Of course, what's on your mind?	当然，你在想什么？
+I'll answer whatever I can.	我能答什么就答什么。
+Sure! Nothing's off-limits. Well, almost nothing.	当然！没什么不能问的。嗯，几乎没有。
+Anything you need to know, just ask.	你想知道什么，尽管问。
+Go ahead. Nothing's off the table.	说吧。没什么不能谈的。
+Absolutely. You can ask me anything.	当然。你什么都可以问我。
+And if there's anything you asked me before, feel free to ask again. Now that you know the truth, I'll try to not be so "evasive".	如果之前问过我什么，也尽管再问。既然你知道真相了，我会尽量不那么"闪烁其词"。
+Now that you know I'm Starborn, I'd assume you have some questions about that! Hah, well, I'll gladly share what I can.	既然你知道我是星裔了，我猜你对此有些疑问！哈，我很乐意分享我能说的。
+And it'll be nice to talk to someone who's in the same cosmic boat, so to speak... Ask whatever you want!	而且能跟一个可以说"同在这条宇宙船上"的人聊聊也挺好……你想问什么都行！
+Since you're a full-blown Starborn, there's no reason for me to hide anything from you. Not anymore...	既然你已是货真价实的星裔，我就没理由对你隐瞒什么了。不再有……
+What should I do next?	我接下来该做什么？
+Mind if we talk? I have a few questions.	介意聊聊吗？我有几个问题。
+I'd like to think I have many useful skills! But I suppose... Piloting, Missile Weapon Systems and Starship Engineering. That would be what I'm best at.	我想我有很多有用的技能！不过我想……驾驶、导弹武器系统和星舰工程。这是我最擅长的。
+What's your area of expertise?	你的专长是什么？
+You should return to Stardock.	你该回星坞了。
+Time to see what's out there.	该去看看外面有什么了。
+Sure, let's get to it.	好，我们开始吧。
+Got it. I'm on you.	明白。我跟着你。
+Alright, let's make some tracks!	好，我们出发！
+Okay, I'm right behind you.	好，我就在你后面。
+You got it. Lead the way!	没问题。带路吧！
+Alright, heading back. Might take the scenic route, though...	好，我回去了。不过可能会走条风景好的路……
+No sweat. I'll catch a ride back. Safe travels out there.	别担心。我搭个顺风船回去。外面一路平安。
+Alright, I'll head back. See you later!	好，我回去了。回头见！
+No problem. I'll hitch a ride back to Stardock.	没问题。我搭个顺风船回星坞。
+Got it. Don't worry, I'll find my way back.	明白。别担心，我能自己回去。
+Roger that! Plotting a course, powering Grav Drive...	收到！正在规划航线，重力引擎充能中……
+Understood, heading to Stardock. Later!	明白，前往星坞。回头见！
+I'll set a course right away! Shouldn't take me too long. Bye for now.	我这就设定航线！应该不会太久。先再见了。
+Alright, I'll fly back to Stardock. Should be a smooth enough trip.	好，我飞回星坞。应该会一路顺利。
+Okay, I'll take my ship and head back. Catch you later!	好，我开自己的飞船回去。回头见！
+Let's get moving.	我们走吧。
+Take your time. I'll be here when you're ready to move on.	慢慢来。等你准备好继续时我就在这儿。
+I'll just hang tight 'til you're back.	我就待着等你回来。
+Got it. I'll wait here. Promise I won't wander off.	明白。我在这儿等。保证不乱跑。
+Alright, I'll wait here. Just don't forget about me, okay?	好，我在这儿等。只是别把我忘了，行吗？
+You got it. I'll hold down the fort while you're off doing... whatever.	没问题。你去忙你的事时我在这儿守着。
+I'll be right here. Don't take too long, though!	我就在这儿。不过别太久！
+Wait here a moment.	在这儿等一下。
+You can return to your post now.	你现在可以回岗位了。
+How could I say no? You've got yourself a tagalong.	我怎么能拒绝？你多了个跟班。
+Sure thing! I was hoping you'd ask.	当然！我就盼着你开口。
+Lead on, fearless leader. I'm right behind you!	带路吧，无畏的领袖。我就在你后面！
+Sure! What's life without a little wandering about the universe...	当然！没有点漫游宇宙的经历，人生还有什么意思……
+Of course! I've got your back.	当然！我支持你。
+Sounds like an adventure waiting to happen. I'm in!	听着就像一场即将上演的冒险。算我一个！
+I'm in. But if there's a uniform, I draw the line at matching hats.	我加入。但要是得穿制服，配同款帽子就免了。
+Absolutely. I've been meaning to stretch my space legs.	当然。我一直想活动活动太空腿脚。
+Sure thing! Sounds like fun.	当然！听着挺有意思。
+Sure! Somebody's gotta keep you outta trouble	当然！总得有人看着你别惹麻烦
+I'd be delighted. I'll make my way to your ship.	我很乐意。我这就去你的飞船。
+Best offer I've had all day! Count me in.	这是我今天收到的最好的邀请！算我一个。
+Would you mind joining my crew?	你愿意加入我的船员队伍吗？
+I'd like you to follow me for a while.	我希望你跟我走一阵子。
+Hey, remember the location of that Watchtower warehouse? Whole bunch of Computer Cores and useful hardware there up for grabs! Just need the code to get in.	嘿，还记得那座瞭望塔仓库的位置吗？那里有一大堆计算机核心和有用的硬件可以拿！只需要进去的密码。
+Once we've spoken to him, we can finally get this Watchtower plan rolling.	等跟他谈过，我们终于可以让这个瞭望塔计划动起来了。
+Let's head back to Stardock! Gren will be in his workshop.	我们回星坞吧！格伦会在他的工坊里。
+Let's head down to Gren's workshop, we should be able to find him there.	我们去格伦的工坊，应该能在那里找到他。
+No sweat, we still have plenty of time. Well, maybe not plenty, but we do have some time! Just let me know when you're ready.	别担心，我们还有充足的时间。嗯，也许不算充足，但确实还有些时间！你准备好了就告诉我。
+Changed my mind, I'm not ready...	我改主意了，还没准备好……
+You'll want your best weapons and armored suits for this!	为此你最好带上最好的武器和护甲！
+We also shouldn't rule out the need for more "intimate" combat. So make sure your personal gear is up to snuff too!	我们也不能排除需要更"近距离"交战的可能。所以也要确保你的个人装备达标！
+Ideally, we want ships that are well-fitted for combat, and that includes Skydrops.	理想情况下，我们要适合战斗的飞船，其中也包括空投。
+Fleet size would be the obvious thing to focus on. The more ships, the better. But we don't want to bring junkers to the fight!	舰队规模显然是要重点关注的。飞船越多越好。但我们可不想带着破烂去打仗！
+What sort of things should I have prepared?	我该准备些什么？
+I do have one! But I'll need to clarify a few details first... We need to speak to Gren.	我确实有一个！但我得先弄清几个细节……我们得和格伦谈谈。
+Right, yes! Plan...	对，没错！计划……
+I'm ready. So what's the plan?	我准备好了。那么计划是什么？
+Once we start this, outside of a Unity jump, there's no going back...	一旦开始，除了归一跳跃，就没有回头路了……
+You sure your fleet's ready? And what about you? Fully stocked up on weapons and gear?	你确定舰队准备好了吗？那你呢？武器和装备都备齐了？
+I think it's time we dealt with Watchtower.	我觉得该处理瞭望塔了。
+Not going to leave that for the scavengers, eh?	不打算把这留给拾荒者，是吧？
+Something useful there?	那儿有什么有用的东西吗？
+No sense in letting it spoil.	让它坏掉可没道理。
+You dig in, I'll just watch.	你慢慢翻，我就看着。
+Nature provides.	大自然自有馈赠。
+Could be something valuable in there...	里面可能有值钱的东西……
+No point letting perfectly good resources go to waste.	让好好的资源浪费掉可没意义。
+Think something's here?	觉得这儿有东西？
+Take your time...	慢慢来……
+What are you looking for?	你在找什么？
+Guess I'll just stand here looking pretty...	那我想我就站在这儿当个花瓶吧……
+I'm all for exploring and scanning.	我完全赞成探索和扫描。
+If you ping something cool, let me know!	你要是扫到什么好东西，告诉我一声！
+Looking for something?	在找什么吗？
+Alright, I'll leave you to it.	好，我就不打扰你了。
+Understood. Returning to my post.	明白。我回岗位了。
+You've got it! Heading back.	没问题！我回去了。
+Okay, back to regular duties.	好，回去干常规的活儿。
+Alright, I'll return to my post.	好，我回岗位。
+Got it. Back to the grind...	明白。回去搬砖……
+Try not to cause too much trouble without me.	没我在的时候别惹太多麻烦。
+Sure, I'll hold down the fort. 	好，我在这儿守着。
+Got it. I'll keep the engine warm or something.	明白。我把引擎热着什么的。
+No worries, I'll make myself useful behind the scenes.	别担心，我会在幕后找点有用的事做。
+Alright, guess I'm on standby. 	好，那我想我待命吧。
+I've seen cargo freighters carry less. Let me help.	我见过货运飞船装的都没你多。让我搭把手。
+I get that you like souvenirs, but it's getting out of hand!	我明白你喜欢纪念品，但这也太夸张了！
+If you topple over, I'm leaving you here.	你要是被压趴下了，我可就把你留这儿了。
+You're starting to look like a walking junk heap. Hand some over!	你都快变成会走路的垃圾堆了。拿点过来！
+At this rate, we'll reach our destination in a week...	照这速度，我们得一个星期才能到地方……
+C'mon, let me lighten your load.	来吧，让我给你减减负。
+You sure you need all that...?	你确定需要带这些……？
+Hah! I'll have to remember that one.	哈！这一手我得记下来。
+Keep that kinda display up, and I might learn a thing or two.	你再这么耍下去，我也许还能学两手。
+Man, that move never gets old, does it?	老天，那招永远看不腻，是吧？
+Impressive! Makes my own abilities feel downright tame in comparison.	厉害！相比之下我自己的能力显得平平无奇。
+You handle that better than most folks handle a gun!	你玩那个比大多数人用枪还溜！
+Hah! Got 'em.	哈！解决了。
+Think you could teach me how to do that?	你觉得能教教我怎么做到吗？
+You handle that power well!	你把那股力量掌握得很好！
+How much did you have to practice to pull that off?	你得练多久才能使出那一招？
+Huh! That's one neat trick.	嗯！那招挺妙。
+Let's not stay here longer than we have to.	我们别在这儿多耽搁。
+Just so you know, hazard suits only do so much...	跟你说一声，防护服能顶的也有限……
+Are we going to bail? This place, it's not safe.	我们要撤吗？这地方不安全。
+My suit's complaining. Never a good sign!	我的防护服在报警了。这从来不是好兆头！
+Air's thick with... ugh, who-knows-what...	空气里充满了……呃，谁知道是什么……
+I'm picking up some nasty readings here...	我这儿读到一些不妙的读数……
+Uh, yeah... I think this place wants to kill us.	呃，是啊……我觉得这地方想弄死我们。
+I'll try not to make this a habit.	我会尽量不让这成为习惯。
+Ah, my hero! Thanks.	啊，我的英雄！谢谢。
+Ahh... Thanks for not letting me bleed out!	啊……谢谢你没让我流血而死！
+Phew, I appreciate the patch-up.	呼，谢谢你的紧急处理。
+Ahh, thanks! Feeling spry again!	啊，谢谢！又觉得精神了！
+Need some gear?	需要些装备吗？
+I can haul a few things.	我能扛几件东西。
+My pockets are your pockets.	我的口袋就是你的口袋。
+I can hold a few things.	我能拿几件东西。
+I'm all ears, whatcha got for me?	我洗耳恭听，有什么要给我的？
+I can lighten your load	我能给你减负
+Picking up, or dropping off?	是要取，还是要存？
+I've got room in my pack.	我的背包还有空间。
+If you need something from me, just grab it.	如果你需要我身上的东西，直接拿。
+Need me to carry something?	需要我拿什么东西吗？
+Bleak and barren...	荒凉贫瘠……
+Just because it seems we're alone here, don't assume that's the case.	别因为这里看着只有我们，就以为真是这样。
+No signs of life... yet.	还没有生命迹象……目前。
+Doesn't look like much here, but who knows?	这儿看起来没什么，但谁知道呢？
+Don't see any wildlife, probably not a hotspot for visitors.	没看到什么野生动物，大概不是什么访客常来的地方。
+Could be some resources hidden under all this planet's nothingness.	这颗行星一片荒芜之下，也许藏着些资源。
+Huh. Kinda eerie here...	嗯。这儿有点瘆人……
+I won't be shocked to encounter other explorers here...	在这儿碰到其他探险者我也不会惊讶……
+There's so much life in the universe! More than you'd expect.	宇宙里的生命真多！比你想象的多。
+Can't beat a planet teeming with life!	生机勃勃的行星，那才是最好的！
+Wonder what we'll discover here if we dig a little deeper.	不知道再挖深一点会发现什么。
+Whole area's practically begging for explorers!	这整片区域简直在召唤探险者！
+I'm betting we'll run into some wildlife here.	我打赌我们会在这儿遇到些野生动物。
+Lush, somewhat green, and probably crawling with critters!	郁郁葱葱、带着几分绿意，多半还有不少小生物！
+Sometimes I worry we'll pass through The Unity, only to find no station here.	有时我担心穿过归一后，会发现这里根本没有空间站。
+Hm. Stardock. Nice to have some consistency in the universe...	嗯。星坞。能在这宇宙里有点不变的东西真好……
+Ah, Stardock--... Uh, wait, what letter are we on now?	啊，星坞——……呃，等等，我们现在到哪个字母了？
+Wanna grab a drink while we're here?	要在这儿喝一杯吗？
+*crunch* I wonder if B.A.B.S. will carry my gear for me...	*咔嚓*不知道B.A.B.S.愿不愿意帮我扛装备……
+Glad to see the station's still running smoothly.	很高兴看到空间站还在顺畅运转。
+Nice to see the place still humming along.	看到这地方还在忙碌运转真好。
+Station looks good. Harper's been busy.	空间站看起来不错。哈珀一直很忙。
+Home sweet home, just as we left it. More or less.	甜蜜的家，跟我们离开时一样。差不多吧。
+*crunch* Same again! Always is...	*咔嚓*还是老样子！总是这样……
+In my home universe, Londinion was a sight to behold. Not like here...	在我原本的宇宙里，隆蒂涅恩城可是蔚为壮观。跟这里不一样……
+*sigh* You know, every universe I jump to, this place is always the same...	*叹气*你知道，我跳到的每一个宇宙，这地方都一模一样……
+Careful here. There's a reason this place was abandoned... 	这里小心点。这地方被废弃是有原因的……
+*crunch* One of these jumps, maybe we should try to find out more on the whole serpent god thing.	*咔嚓*哪次跳跃，我们也许该去多了解了解那个蛇神的事。
+Doesn't matter how many times we might come here, still weird.	不管来多少次，还是觉得怪。
+Before joining up with you, never visited Dazra before.	在跟你会合之前，我从没来过达兹拉。
+This should be interesting...	这应该会很有意思……
+Dazra. Hm. Weird place...	达兹拉。嗯。怪地方……
+Didn't expect to be landing here today...	没想到今天会在这儿着陆……
+If anyone asks, we're just passing through. Right?	要是有人问起，我们就说是路过。对吧？
+Got a feeling they don't get many tourists here...	感觉这里没什么游客……
+House Va'ruun's home turf, huh?	瓦鲁家族的地盘，是吧？
+Do Constellation know you're Starborn? Hm. What an awkward conversation...	星宿座知道你是星裔吗？嗯。那场面得多尴尬……
+You off to visit Constellation? Hah, maybe I should join them some time...	你要去拜访星宿座？哈，也许哪天我也该加入他们……
+New Atlantis, it's not what it seems, you know? At least, not in most universes.	新亚特兰蒂斯城，它并不像表面看起来那样，你知道吗？至少大多数宇宙里不是。
+...Always surprises me how Earth-like this planet is...	……这颗行星像地球到这种程度，总让我吃惊……
+There are worse places to land than New Atlantis.	比新亚特兰蒂斯城更差的着陆点有的是。
+Ugh... The people here creep me out.	呃……这儿的人让我发毛。
+You ever wonder what Jemison was like before humans arrived?	你有没有想过，人类到来之前的杰米森是什么样？
+Skyline's pretty spectacular here, if a bit cluttered.	这里的天际线相当壮观，虽说有点杂乱。
+*crunch* New Atlantis! Shiny, impressive... Shame that most of it's just a charade.	*咔嚓*新亚特兰蒂斯城！光鲜、气派……可惜大部分都只是做戏。
+Was hoping we could avoid Neon this jump...	我还指望这一跳能避开霓虹城……
+*crunch* You know what they do with the fish here, right...?	*咔嚓*你知道他们拿这里的鱼做什么吧……？
+Worked for Ryujin once, mostly out of curiosity. Didn't care for it.	我曾为龙神集团干过，多半是出于好奇。不太喜欢。
+Few places I've been that are more crime-ridden than Neon...	我去过的地方里，比霓虹城犯罪更猖獗的没几个……
+Watch your pockets here. Things like to go missing...	在这儿看好你的口袋。东西说没就没……
+Let's handle business and get off this rig as soon as we can.	我们办完事就尽快离开这鬼地方。
+This place always makes my head spin.	这地方总让我头晕。
+Think we'll see any sea monsters?	你觉得我们会看到海怪吗？
+Never liked Neon, too much shady stuff. Reminds me of Watchtower.	一直不喜欢霓虹城，见不得人的事太多。让我想起瞭望塔。
+Had a shootout here once. Didn't end well. So much for playing Sheriff...	我曾在这儿有过一场枪战。结局不太好。当治安官这事就算了……
+You ever feel tempted to draw pistols here and just go crazy? No? Just-- just me...? Alright.	你有没有在这儿想掏枪大干一场的冲动？没有？只是——只是我……？好吧。
+So, back to Akila. Suppose there are worse places to be.	那么，又回到阿基拉城。想来还有比这儿更糟的地方。
+Wonder if the local watering hole has anything decent on tap.	不知道本地酒馆有没有像样的酒。
+*crunch* Heh, "Rangers". Kinda cute, really! All dressed up and playing cowboy.	*咔嚓*嘿，"游骑兵"。还挺可爱！一身行头扮牛仔。
+Might be tough, but try to keep a low profile here. Trust me.	可能有点难，但在这儿尽量低调。相信我。
+I prefer a bit more lawlessness, and Akila delivers!	我更喜欢多一点无法无天，阿基拉城正合我意！
+Akila's a testament to human stubbornness, I'll give 'em that.	阿基拉城是人类执拗的证明，这点我得承认。
+Freestar territory's not exactly my go-to...	星联的地盘可不是我的首选……
+You think we'll ever see this place... I dunno, less dusty?	你觉得我们能看到这地方……怎么说呢，少点尘土吗？
+Before meeting you, I always seemed to find trouble on Mars.	在遇见你之前，我老是在火星上惹上麻烦。
+You know, one jump, I saw this place completely terraformed! It was beautiful.	你知道，有一次跳跃，我看到这地方被完全地球化了！很美。
+*sigh* Cydonia... Not my cup of tea.	*叹气*赛多尼亚……不合我的口味。
+Don't breathe too deep while we're here...	在这儿别深呼吸……
+*crunch* You ever hear that old myth, about the rock with a face?	*咔嚓*你听说过那个老传说吗，关于长着人脸的那块岩石？
+I never liked the whole dusty mining vibe...	我一直不喜欢那种尘土飞扬的采矿氛围……
+Not my first time here...	这不是我第一次来……
+Mars, huh? Red dust and old stories.	火星，是吧？红色的尘土和古老的故事。
+We're not exactly invited, so watch for surprises.	我们可没被邀请，所以当心点。
+Let's scope it out real quick...	我们快速查看一下……
+Keep that trigger finger ready, just in case!	手指放在扳机上，以防万一！
+We can poke around, just be careful.	我们可以四处看看，只是小心点。
+Hope they don't mind unexpected guests...	希望他们不介意不速之客……
+I'll watch your back, but still keep your eyes peeled.	我会替你看着后面，但你自己也得留神。
+Let's be polite visitors. No stealing or smashing. Unless... we have to.	我们做个礼貌的访客。不偷不砸。除非……不得不。
+I get the feeling that we're trespassing...	我有种我们正在擅闯的感觉……
+This is someone else's ride, so let's step carefully, huh?	这是别人的船，所以我们走稳点，行吗？
+Thought you might want this...	想你可能想要这个……
+Hey, snagged something cool for ya.	嘿，给你顺了件好东西。
+If we destroy the Array, we might be able to recover some data from the wreckage! But first, we gotta deal with our "friends" here.	如果我们摧毁阵列，也许能从残骸中找回些数据！但首先，我们得应付这里的"朋友"。
+When Watchtower show, they'd easily be able to capture us! One shot from their Disruptor and we'd be sitting ducks! C'mon, let's head to Stardock instead.	瞭望塔一出现，就能轻易抓住我们！他们的干扰器一枪就能让我们坐以待毙！来吧，我们还是去星坞吧。
+The Altair system... You're not thinking about taking out the Listening Post, are you? We've only got one ship, you know!	牵牛星星系……你不会是想去端掉那个监听哨吧？我们只有一艘飞船，你知道的！
+Go snatch up the important stuff. Slate, Cores, and a few components... Then back to Stardock.	去把重要的东西拿走。数据板、核心，还有几个部件……然后回星坞。
+Time to mop up the scraps. Intel Slate, Cores, and so on, then we head home to Stardock.	该收拾残局了。情报数据板、核心之类的，然后我们回星坞。
+All that's left is to clean up. Grab the Slate, Cores and components! Then jump on back to Stardock.	剩下就是打扫战场。拿走数据板、核心和部件！然后跃迁回星坞。
+We just need to find the Intel Slate for Harper, and components for Gren. Oh, and the Computers Cores too! Then back to Stardock we go.	我们只要找到给哈珀的情报数据板，还有给格伦的部件。哦，还有计算机核心！然后我们就回星坞。
+Let's grab the Intel Slate, Cores and components from the wrecks, then head back to Stardock.	我们从残骸里拿走情报数据板、核心和部件，然后回星坞。
+Easy win. Just goes to show, a fleet's the best insurance policy.	轻松取胜。这就说明，舰队是最好的保险。
+Oh yeah! That's what I'm talking about. Eat fleet, Watchtower...	哦耶！这才像话。尝尝舰队的厉害吧，瞭望塔……
+Hah! Good to see having a fleet still works for now.	哈！很高兴有舰队这招眼下还有效。
+Done and dusted! A fleet's clearly still the way to go!	干净利落！有舰队果然还是正道！
+Yup, the fleet strategy is a winner in this Universe too! At least for now...	对，舰队策略在这个宇宙里同样管用！至少目前如此……
+Here we go! Us vs. Watchtower... The ultimate grudge match!	来吧！我们对瞭望塔……终极宿怨之战！
+Let's demonstrate the meaning of "strength in numbers"!	让我们来演示一下什么叫"人多力量大"！
+Let's show this version of Watchtower what a fleet can do!	让这个宇宙的瞭望塔见识见识舰队的本事！
+This should be a walk in the park, let's put 'em down!	这应该是小菜一碟，把他们干掉！
+Hey, it's our Watchtower buddies! Let's give 'em a warm welcome!	嘿，是我们瞭望塔的老朋友！让我们好好"欢迎"他们！
+Alright, planet operation complete. On to the Array!	好，行星行动完成。去阵列那边！
+All clear down here. Now let's get that Array in orbit!	下面都清干净了。现在去解决轨道上的阵列！
+Okay, Array time! Doubt it'll be too tough.	好，该对付阵列了！估计不会太难。
+Nice, now back to the black to deal with the Array.	不错，现在回到太空去处理阵列。
+Ground complex dealt with, the sky calls!	地面设施已解决，天空在召唤！
+Standard procedure. We secure the Post on the surface, then tackle the Array above. Let's move, move! *chuckle*	标准流程。我们先拿下地表的监听哨，再对付上面的阵列。走，快走！*轻笑*
+Same routine! Hit the ground first for the Listening Post, then head spaceward for the Array.	老规矩！先落地解决监听哨，再上太空对付阵列。
+Scan for the Listening Post, then on to the Array!	扫描找到监听哨，然后去阵列！
+Time to get scanning for the Post! Then we can take care of the Array.	该扫描寻找监听哨了！然后就能处理阵列。
+You know the drill! Find the Listening Post on the ground, then back into space for the Array!	你知道套路！找到地表的监听哨，然后回到太空对付阵列！
+Here we are. Now, we can't go straight to the Array, as it'll likely be in a different spot. So, we'll need to hit the ground facility first. Okay, get scanning!	我们到了。现在，我们不能直接去阵列，因为它多半在另一个位置。所以我们得先去地面设施。好，开始扫描！
+*laugh* Glad to see the "fleet strategy" works as anticipated. We should search the Array's wreckage. See if we can recover that intel for Harper.	*笑*很高兴看到"舰队策略"如预期奏效。我们该搜查阵列的残骸。看看能不能为哈珀找回那些情报。
+Whoo!! That's how it's done!	哇哦！！就该这么干！
+Altair system, huh? You know... we could scan for the Altair III Listening Post, then take care of the Array before Harper asks us to? If you wanted...	牵牛星星系，是吧？你知道……我们可以先扫描找到牵牛星III的监听哨，然后在哈珀开口之前就把阵列解决掉？如果你愿意的话……
+Time to go! I'll travel with you. Next stop: Watchtower Listening Post.	该出发了！我跟你一起走。下一站：瞭望塔监听哨。
+That's it, then. I'll be tagging along on your ship. Listening Post, here we come!	那就这样。我跟着上你的飞船。监听哨，我们来了！
+Okay, that was all we had to do! I'll join you aboard your ship. Let's go get that Listening Post!	好，我们要做的都做完了！我上你的飞船跟你一起。去拿下那个监听哨！
+Done and done! I'll go jump on my ship, then off we go!	搞定！我上我的飞船，然后出发！
+Looks like we're set. I'll board my ship, see you in space!	看来我们准备好了。我登船了，太空见！
+That's everything! I'll go board my ship, and we can head off. To the Listening Post!	都齐了！我去登船，我们就能出发了。目标监听哨！
+Almost good to go, but we can't leave yet. We've gotta get a ship in your fleet first. Otherwise, we risk Watchtower catching us off guard.	差不多可以出发了，但我们还不能走。得先给你的舰队添一艘飞船。否则，我们就有被瞭望塔打个措手不及的风险。
+We're just about ready! But first, assign a ship to your fleet, or we'll be sitting ducks...	我们差不多准备好了！但首先，给你的舰队指派一艘飞船，否则我们就只能坐以待毙……
+We're almost good to go, but first, we need to assign a ship to your fleet. Otherwise we'll be vulnerable to Watchtower.	我们差不多可以出发了，但首先，我们需要给你的舰队指派一艘飞船。否则我们会很容易被瞭望塔拿下。
+Relax, we're in the clear! It's all been taken care of already. Even brought back a Slate packed with intel...	放心，我们没事！全都已经办妥了。还带回了一块装满情报的数据板……
+Nothing to worry about there! We already handled it. And, even snagged an Intel Slate full of interesting info...	没什么可担心的！我们已经处理好了。而且还弄到了一块装满有趣信息的情报数据板……
+Ah, no need to worry! We've already dealt with that. Even recovered an Intel Slate with some juicy data...	啊，不用担心！我们已经处理了。还找回了一块载有劲爆数据的情报数据板……
+Now, use the terminal here -- and "Commission" Sledgeback to your fleet.	现在，用这里的终端——把"碎背"编入你的舰队。
+Ships yours. Its name's Sledgeback. Keep it until you no longer need it.	船归你了。它叫"碎背"。用到你不再需要为止。
+Don't worry about me. The ship's more useful to you right now.	别担心我。现在这艘飞船对你更有用。
+Well... Wasn't planning on leaving the station anytime soon, so -- should be fine.	嗯……我近期也不打算离开空间站，所以——应该没问题。
+You're friends with Torin. That's reason enough.	你是托林的朋友。这就够了。
+Let's head back to Stardock. Harper and Gren will wanna hear what went down.	我们回星坞吧。哈珀和格伦会想知道发生了什么。
+What are these...? Computer Cores?! Hm. Well! Alright, I think we got what we need.	这些是什么……？计算机核心？！嗯。好吧！行，我想我们需要的东西都拿到了。
+Hey, this salvage looks promising... Looks like we recovered a slate with some Intel, got some Watchtower Components, and... huh.	嘿，这批战利品看着不错……看来我们找回了一块带情报的数据板，还有些瞭望塔组件，还有……嗯。
+Don't worry, though! They won't be able to overwhelm us. With two ships in our fleet, we should be okay.	不过别担心！他们没法压垮我们。舰队里有两艘飞船，我们应该没问题。
+Oh no... Watchtower! How'd they-... Nevermind.	哦不……瞭望塔！他们怎么——……算了。
+Here we are! We should hunt down that Listening Post...	我们到了！我们该去找到那个监听哨……
+Looks like we found it! Readings are similar to that Watchtower Safe House we cracked open, only... smaller.	看来我们找到了！读数和我们撬开的那座瞭望塔安全屋相似，只不过……小一些。
+I'll stay up here and provide cover. Remember, you can always call down a Skydrop if you need it.	我会留在上面提供掩护。记住，需要的话随时可以呼叫空投。
+Need to gain entry to that Listening Post... Check the bodies. One of them might have a way in.	得想办法进入那个监听哨……检查尸体。他们中可能有人有进去的办法。
+Gotta admit, I'm also a tad curious as to what Watchtower are doing here...	得承认，我也挺好奇瞭望塔在这儿干什么……
+But looks like we've still got a chance to recover some data... Seems there's some sort of "broadcast array" close by...?	但看来我们仍有机会找回些数据……附近似乎有某种"广播阵列"……？
+Damn. Whatever intel was here is gone.	该死。这里原本无论有什么情报，都没了。
+Yup, I think this is the Surveillance Array we're looking for.	对，我想这就是我们要找的监视阵列。
+A bit difficult to tell, but... I'm fairly sure that's Watchtower hardware!	不太好判断，但……我挺肯定那是瞭望塔的硬件！
+Or I suppose we could just blow it up? May be able to recover the data we need from the wreckage.	或者我想我们干脆把它炸掉？也许能从残骸中找回我们需要的数据。
+...Hm. Maybe try hailing it? We might be able to pull the intel we need from its memory banks, before it broadcasts.	……嗯。也许试着呼叫它？我们也许能在它广播之前，从它的存储库里提取到需要的情报。
+...Doubt we'll be able to crack its encryption remotely. But maybe if we destroy it, we might be able to recover some data from the wreckage!	……我们大概没法远程破解它的加密。但也许摧毁它的话，我们能从残骸中找回一些数据！
+Whoa! What was that?!	哇！那是什么？！
+You see that energy burst? Readings say it was... some sorta unstable gravitational fold...	你看到那道能量爆发了吗？读数说那是……某种不稳定的重力褶皱……
+Hm. It's causing issues with some of our ship's systems... Damn. Grav jumps offline...	嗯。它正在影响我们飞船的一些系统……该死。重力跃迁离线了……
+The Intel Slate, when I started poking around for more specific info, the rest of the data... kinda deleted itself.	那块情报数据板，当我开始翻查更具体的信息时，其余的数据……就自己删掉了。
+Don't you need your ship? Are you sure you want to give it to me?	你不需要你的飞船吗？你确定要把它给我？
+Why are you doing all this for me? We've only just met.	你为什么为我做这些？我们才刚认识。
+Thanks for the ship. That's very generous of you.	谢谢你的飞船。你太慷慨了。
+Altair III awaits!	牵牛星III在等着呢！
+We should head down to Altair III, deal with this Listening Post.	我们该去牵牛星III，处理这个监听哨。
+You checked your sensors? There's something that looks like an array not too far off... We should investigate.	你查看传感器了吗？不远处有个看起来像阵列的东西……我们该去看看。
+If in doubt, blow it up! That's definitely one way to deal with that array.	拿不准就炸掉！这绝对是处理那个阵列的办法之一。
+Let's search that Watchtower wreckage. See if we can find Harper's intel, and some components for Gren.	我们搜索那堆瞭望塔残骸。看看能不能找到哈珀要的情报，还有一些给格伦的部件。
+Oh. Actually, that might--... Okay.	哦。其实，那也许——……好吧。
+Ugh, Torin!	呃，托林！
+Why is it every time we get back from a supply run, you're nowhere to be found?! Is it really that hard to stay put and not leave the station unattended?	为什么每次我们补给回来，你都不见人影？！好好待着、别让空间站无人看管就那么难吗？
+Pfft. Put a sock in it, Torin!	噗。闭嘴吧，托林！
+If you wanna give them a bloody lip, come talk to me when you have a moment. Got a job for you...	如果你想让他们吃点苦头，有空来找我。有活儿给你……
+And you, Torin's friend? From what I understand, you'd be no fan of Watchtower, right?	还有你，托林的朋友？据我所知，你也不喜欢瞭望塔，对吧？
+Apologies if I caused distress. Maybe I should remove my helmet...	如果造成困扰，我道歉。也许我该摘下头盔……
+This particular version, the Model 2 -- is outdated, has a number of security exploits. Making it perfect for integration with a non-Watchtower ship.	这个特定版本，2型——已经过时，存在不少安全漏洞。正好适合整合到非瞭望塔的飞船上。
+The Fleet-Sync Control Node -- is capable of doing the same job, but with considerably less overhead.	舰队同步控制节点——能完成同样的工作，但开销小得多。
+Such things are often handled by a suite of human operators, situated on command decks of large vessels.	这类事务通常由一整套人工操作员处理，他们坐镇于大型飞船的指挥甲板上。
+Interfleet coordination can be complicated.	舰队间的协调可能很复杂。
+...Didn't know about the mechs, though. They shouldn't have been there. Someone must've changed orders at the last minute... Um, sorry.	……不过我不知道那些机甲的事。它们本不该在那儿。一定是有人在最后一刻改了命令……呃，抱歉。
+I was one of the last people to step foot inside before it was abandoned. Therefore, I knew it had what you and Torin needed.	在被废弃之前，我是最后进去过的人之一。所以我清楚里面有你和托林需要的东西。
+An off the grid outpost -- offering supplies, or refuge to traveling operatives.	一处脱离网络的哨站——为过往特工提供补给或庇护。
+A few years back, the facility you broke into was an active Watchtower safe house.	几年前，你们闯入的那处设施还是一座仍在运作的瞭望塔安全屋。
+Now, I do believe the delightful Miss Harper requested your presence! So let us visit her, post haste!	好了，我相信可爱的哈珀小姐要求你过去！那我们赶快去拜访她吧！
+C'mon, let's go talk to Harper.	来吧，我们去和哈珀谈谈。
+Let's get a move on and talk with Harper.	我们快点，去和哈珀谈谈。
+Harper's waiting for us, let's get moving.	哈珀在等我们，走吧。
+C'mon, let's go check in with Harper.	来吧，我们去向哈珀报到。
+Well, that's everything we needed to do here. C'mon! We should investigate that Watchtower Listening Post.	好了，这里要做的都做完了。来吧！我们该去调查那个瞭望塔监听哨。
+Nothing left to do here now! So, let's go deal with the Listening Post!	这里没别的事了！那我们去处理监听哨吧！
+We're finished here. Time to scope out the Watchtower Post!	这里完事了。该去查看瞭望塔的哨站了！
+We've done what we need to! Onwards to the Listening Post!	该做的都做了！向监听哨进发！
+I think we're good here. Let's check out the Listening Post.	我想这里没问题了。我们去看看监听哨。
+Before we leave, I guess I should go familiarize myself with my new ship. See you in space!	走之前，我想我该去熟悉一下我的新飞船。太空见！
+I'll go check out my brand new ship! See you out there.	我去看看我的新飞船！外面见。
+Will just need a moment to prep my vessel. See you out there!	我需要一点时间准备飞船。外面见！
+Just need to ready my ship. Will rendezvous with you as soon as you're good to go!	我得把飞船准备好。你一就绪我就与你会合！
+I'll be right with you. Just gotta do a quick inspection of my ship first.	我马上就到。先快速检查一下我的飞船。
+I'll join you aboard your ship. Don't feel right sending you off by yourself just yet...	我上你的飞船跟你一起。现在还不太放心让你一个人去……
+I'll tag along aboard your ship for now. Let's go!	我先搭你的飞船一起去。走吧！
+I'll be hitching a ride on your ship for now. Safety in numbers, right?	我先搭你的飞船一程。人多力量大，对吧？
+I'll tag along! Feels wrong to send you off into the void solo.	我跟你一起去！让你一个人进虚空感觉不对劲。
+I'll come with. No sense in letting you handle this alone!	我一起去。没道理让你一个人处理这事！
+Say no more! We've already taken care of it. That Listening Post is yesterday's news.	不用说了！我们已经处理好了。那个监听哨已是过去式。
+Before we get going, you should really assign a ship to your fleet. Otherwise, Watchtower can grab us whenever they want!	出发之前，你真该给舰队指派一艘飞船。否则，瞭望塔想什么时候抓我们就什么时候抓！
+Come with me. I wanna just run some things by you before we get moving.	跟我来。出发前我想跟你过几件事。
+Sorry, busy now. Come back later.	抱歉，现在正忙。回头再来。
+Use the Fleet Command Terminal. Should be easy to figure out.	用舰队指挥终端。应该很容易上手。
+Let me know how it goes with that Listening Post!	监听哨那边进展如何，告诉我一声！
+I think Torin and Gren want to talk with you. You should check in with them.	我想托林和格伦想跟你谈谈。你该去找他们。
+Not right now. You should see what Torin wants.	现在不行。你该去看看托林要什么。
+Gren will wanna see the equipment we recovered.	格伦会想看看我们回收的装备。
+Need to pass that Intel onto Harper.	得把那份情报交给哈珀。
+We should touch base with Harper and Gren.	我们该跟哈珀和格伦接头。
+Harper's waiting for you. Think she wants to talk about something.	哈珀在等你。她好像有事要谈。
+Should talk with Gren.	该和格伦谈谈。
+We should speak with Gren and Harper.	我们该和格伦、哈珀谈谈。
+Hey, don't look at me! Look at that fleet terminal instead.	嘿，别看我！去看那台舰队终端。
+Let's head back to Stardock. We can talk more once we're there.	我们回星坞吧。到了那儿再细谈。
+Eventually, Watchtower will spook, and start development on their Armillaries. Inadvertently giving us what we need to destroy them.	最终，瞭望塔会惊慌起来，开始研发他们的浑天仪。无意中给了我们摧毁他们所需的东西。
+So! I'd advise that we start building up our fleet, researching and installing Skydrops, and maybe even grabbing a few Cyberamps!	那么！我建议我们开始扩充舰队，研究并安装空投，也许再弄几个赛博增幅！
+Not to mention, until Watchtower start work on their Armillary device to counter us, our only option to destroy the station, would be the self-destruct.	更何况，在瞭望塔开始研制他们用来对付我们的浑天仪装置之前，我们摧毁那座空间站的唯一办法就是自毁程序。
+Yes, we could charge straight to Heimdall Station, and we might even make some progress, but there's too many things that could go wrong.	是的，我们可以直扑海姆达尔站，也许还能有所进展，但可能出岔子的地方太多了。
+Well, huzzah and hurrah! On the warpath we go! However, as eager as you might be, we're still going to need to prepare.	好啊，欢呼吧！我们踏上征途！不过，无论你多急切，我们仍然需要做准备。
+I could use your help, let's go.	我需要你的帮助，走吧。
+Honestly, I think it just comes down to how you wanna handle this!	老实说，我觉得就看你想怎么处理这事！
+On the other hand, there's no reason to rush. We have time on our side! Knowing how things will play out gives us breathing room.	另一方面，也没必要急。时间在我们这边！知道事情会如何发展给了我们喘息的空间。
+Conventional wisdom would have us get ready and prepare as soon as possible. Not a bad plan, all things considered.	按常理，我们会尽快准备好。综合考虑，这计划不坏。
+But, if you can find even more Computer Cores, bring them to me, and I'll see what I can do with them.	不过，如果你能找到更多计算机核心，拿给我，我看看能用它们做些什么。
+Now you'll have access to that Skydrop -- to install onto any of your vessels.	现在你可以使用那个空投了——可安装到你任意一艘飞船上。
+There. It's done. I've downloaded the relevant data.	好了。搞定了。相关数据我已下载完毕。
+We're all set to resume standard operations. Expand our fleet, prep for Watchtower.	我们已准备好恢复标准运作。扩充舰队，为瞭望塔做准备。
+Time to get organized again! We'll grow our fleet, and then face Watchtower head-on.	该重新组织起来了！我们会扩充舰队，然后正面迎战瞭望塔。
+Time we get back to the grind. Let's beef up our fleet and prepare for any Watchtower trouble.	该回去干活了。我们把舰队壮大起来，为瞭望塔可能带来的麻烦做好准备。
+Back to business, I'd say. Fleet-building time! Should help us handle watchever Watchtower throws at us!	我看该回到正事了。造舰队的时候到了！这能帮我们应对瞭望塔甩过来的任何东西！
+I think we're good to get back into the usual flow of things. Let's start building our fleet, and gearing up to deal with Watchtower.	我想我们可以回到正常的节奏了。我们开始造舰队，并为对付瞭望塔做准备。
+Nailed it once again. Good going!	又一次干得漂亮。做得好！
+Unity jumps seem to suit you! At this point, I think you've mastered the catchup process.	归一跳跃看来挺适合你！到这一步，我想你已经精通了追赶流程。
+Excellent job as always! You're a natural.	一如既往地出色！你天生就是这块料。
+Not bad at all! You're handling this all like a pro these days.	相当不错！这些天你处理起来就像个老手。
+That went well! You've really got the hang of this now.	进展顺利！你现在真的上手了。
+You should stay on Stardock, at least for now.	你该留在星坞，至少目前是。
+I concur. The more components like this that you bring me, the more things I can construct.	我同意。你带给我越多这种东西，我就能造出越多东西。
+Agreed. With a sufficient stock of such parts, I'd be able to produce additional equipment for you.	同意。有了足够多的这类零件，我就能为你生产更多装备。
+Hm. You're right. With enough components like these, I'll be able to fabricate more things.	嗯。你说得对。有了足够多的这种组件，我就能制造更多东西。
+Got it! I'm sure I can keep myself busy...	明白！我肯定能给自己找点事做……
+Alright, I'll hold down the fort. Take care out there.	好，我在这儿守着。外面保重。
+No problem, see you later!	没问题，回头见！
+I can back you up if you'd like? Just say the word.	如果你愿意，我可以支援你？你一句话的事。
+Should I tag along, or would you rather go solo?	我该一起去，还是你更想单独行动？
+You want some company, or...?	你要不要人陪，还是……？
+Roger that. Let's see what this galaxy has in store for us...	收到。看看这个星系为我们准备了什么……
+Sure thing! Let's hit the stars.	当然！我们奔向群星。
+You got it! Adventure awaits.	没问题！冒险在等着。
+Well, that's all. Don't be a stranger!	好了，就这些。别断了联系！
+Let's go. You'll be joining me, I assume?	走吧。我猜你会跟我一起？
+I'm unsure how to proceed. What would you suggest?	我不确定该怎么进行。你有什么建议？
+Let's take things slow and steady. I hear that wins the race.	我们稳扎稳打。听说这样能赢下比赛。
+Oh! Last thing, if at some point I start talking like its the very first time we're doing all this, just play along, okay? It's weird, I know. But I'll have good reason.	哦！最后一件事，如果某个时候我开始说得好像我们是第一次做这一切，你就配合一下，好吗？我知道这很怪。但我会有充分的理由。
+If anything comes up, I'll be in contact. Keep safe out there!	有什么情况我会联系你。外面注意安全！
+Not at all! I'll hang here for now.	完全不会！我暂时就在这儿。
+Mind if I go solo for now?	介意我暂时单独行动吗？
+Supply me with enough of these components, and I'll be more than willing to fabricate and install more tech to your ships, like Skydrops for example.	给我足够的这类组件，我就非常乐意制造更多科技并安装到你的飞船上，比如空投。
+But you were correct, I can use these. So long as I'm duplicating proprietary Watchtower tech, I'll need authentic components, like these.	不过你说得对，我确实能用这些。只要我是在仿制瞭望塔的专有科技，我就需要像这样的原厂组件。
+We found some Watchtower hardware we think you can use.	我们找到了一些我们认为你能用上的瞭望塔硬件。
+O Captain! My Captain! Our voyage begins anew...	哦，船长！我的船长！我们的航程重新开始……
+Naturally! I am, after all, part of your crew.	当然！毕竟我是你船员中的一员。
+Okay, then! Shall we get going?	那好！我们出发吧？
+Hey, gotta say, you did a really great job with all that!	嘿，得说一句，这些你都干得非常漂亮！
+Hey, for the most part, besides one or two gaffes, you did a good job with all that!	嘿，大体上，除了一两处失手，这些你都干得不错！
+We know what's coming. We take the fight to Watchtower now.	我们知道会发生什么。我们现在就主动出击，打上门去。
+I'll be sure to let you know if I start seeing warning signs of Armillary Doomsday devices being built.	如果我发现有浑天仪末日装置正在建造的迹象，一定告诉你。
+But we can cross that bridge when we come to it! For now, we have the ability to build a fleet and keep safe.	但船到桥头自然直！眼下，我们有能力组建舰队并保全自身。
+Right you are! We know at some point Watchtower will figure out what we're doing, and try to bring out the big guns...	说得对！我们知道瞭望塔迟早会弄清我们在做什么，并试图动用大杀器……
+The universe will find a way to balance things out, likely putting you on the losing side in the process. So, best to just do things right! We play along. Mostly.	宇宙会想办法把一切拉回平衡，而这过程中很可能把你这方置于败局。所以，最好还是按规矩来！我们配合。基本上吧。
+But, if you try to get smart and brute force your way through every situation, try to play the universe against itself...	但如果你自作聪明，想用蛮力闯过每一个局面，想与宇宙本身对赌……
+The way I see it, sure, we can take a few shortcuts now and again.	在我看来，当然，我们偶尔可以走点捷径。
+Anyhow! I'd say we're at a good point! We're free to either carry on as before, or, start getting ready to take out this universe's Watchtower.	总之！我觉得我们处在一个不错的节点！我们可以照旧行事，也可以开始准备干掉这个宇宙的瞭望塔。
+I don't see the point in playing pretend just to fit in.	我看不出仅仅为了融入而装模作样有什么意义。
+Supply me with more of these components, I'll do my best to build useful things for you.	多给我些这种组件，我会尽力为你制造有用的东西。
+If you gather additional Watchtower parts, I'll fabricate whatever you need.	如果你收集到更多瞭望塔零件，我就为你制造任何你需要的东西。
+Bring me more Watchtower components, and I'll make what I can for you.	给我带更多瞭望塔组件，我就尽力为你制作。
+I imagine we'll get better at it as time goes on. If we Unity jump again, I reckon we can do the whole "meet and greet" in half the time, at least!	我想随着时间推移我们会越来越熟练。要是再跳一次归一，我估计至少能把整套"见面寒暄"缩短一半时间！
+They need to be kept in the loop, be presented with what's going on, and allowed to digest it in as natural a way as possible.	他们需要知情，需要被逐步告知发生了什么，并以尽可能自然的方式消化它。
+I fully acknowledge, it might get a little tedious, but it's important we do it.	我完全承认，这可能会有些乏味，但我们这么做很重要。
+You mean walk through introductions with Gren and Harper? Everytime, I would think.	你是说跟格伦和哈珀一遍遍走介绍流程？我想每次都得这样。
+But why must we "play our role?"	但我们为什么必须"扮演自己的角色"？
+Besides, the more we change, the less predictable things become. So we should at least pretend to do things in an order that makes sense.	再说，我们改变得越多，事情就越难预测。所以我们至少该假装按合理的顺序行事。
+Then, if we try to break the correct sequence of things, it just complicates matters! So, best we play our roles.	然后，如果我们试图打乱正确的顺序，只会让事情更复杂！所以，最好还是扮演好我们的角色。
+And then, in comes us, knowing pretty much everything that'll happen, because we've seen a version of it all before!	而后，我们登场，几乎知晓将要发生的一切，因为我们见过这一切的一个版本！
+Because... it's just... easier! Regular folks dont want to see causality flipped on its head! It's not something they're built to handle.	因为……就是……更省事！普通人可不想看到因果关系被掀个底朝天！那不是他们天生能承受的。
+How many more times will we have to do this?	我们还得这样来多少遍？
+I know it may seem silly, playing dumb, retracing the same steps as last time...	我知道装傻、重走上次的老路也许显得很蠢……
+You know, "introducing" yourself with Gren and Harper, getting them up to speed, integrating yourself into their version of the universe.	你知道，跟格伦和哈珀"初次相识"，让他们了解情况，把自己融入他们这个版本的宇宙。
+We play along, try not to disrupt the logical flow of things too much. ...Unless, you know, it's like, really funny or something.	我们配合，尽量不过多地扰乱事情合乎逻辑的流程。……除非，你知道，那真的特别好笑之类的。
+We're a disruptive force! The least we can do is try to blend in and not derail the lives of innocent bystanders.	我们是一股破坏性力量！我们至少能做到的是尽量融入，不去搅乱无辜旁观者的生活。
+Precisely! We're already monkeying with the fabric of reality! Unity jumps, crazy gravity powers, accumulating knowledge of "future" events.	正是！我们已经在拨弄现实的经纬了！归一跳跃、疯狂的重力能力、积累关于"未来"事件的知识。
+I understand, Starborn stand out enough as it is.	我明白，星裔本来就已经够显眼了。
+But that's just what you do when jumping through Unity. You play your role, and you "follow the script". That's just how it is.	但穿过归一时就是这么回事。你扮演你的角色，你"照着剧本走"。就是这样。
+But you've gone through a Unity jump before, you know how it goes. You play the role you're meant to, how you're meant to. That's just how it is.	但你经历过归一跳跃，你知道是怎么回事。你扮演你该扮演的角色，以该有的方式。就是这样。
+I'll hold onto this core for now.	这个核心我先收着。
+...I see. I have the feeling I'm not getting the full story. But whatever! You took care of the problem, and grabbed some intel too. Not bad.	……我明白了。我感觉你没把全部实情告诉我。但算了！你解决了问题，还弄到了些情报。不错。
+Assuming you can provide me with enough components, I'm willing to fabricate and install more Skydrops to your ships.	只要你能给我足够的组件，我愿意为你的飞船制造并安装更多空投。
+But yeah, I can use these. Watchtower uses proprietary hardware. As long as I'm duplicating their tech, I'll need authentic components, like these.	不过是的，我确实能用这些。瞭望塔用的是专有硬件。只要我还在仿制他们的科技，就需要像这样的原厂组件。
+Hah. Yep. You're a friend of Torin's, alright.	哈。对。你确实是托林的朋友。
+Don't worry, I know what he's like...	别担心，我知道他是什么样……
+Of course. If you bring me that Core, or others later, I'll be happy to extract what blueprints I can from them.	当然。如果你把那个核心带给我，或者以后带来别的，我很乐意从中提取出能提取的图纸。
+If that's what you prefer, here. You may have the core back. Keep hold of it for now.	如果你更愿意这样，那好。这个核心还给你。你暂时收着吧。
+Cores contain vast amounts of information. But, like almost all Watchtower technology, they have inbuilt safeguards...	核心中储存着海量信息。但和几乎所有瞭望塔科技一样，它们内置了防护措施……
+Eh, I won't ask where these came from...	呃，我就不问这些东西是从哪儿来的了……
+We found some Watchtower hardware, think you use this?	我们找到了些瞭望塔硬件，你觉得你能用上吗？
+Hurry up! We've not got all day, you know?	快点！我们可没一整天时间，你知道的？
+[Hand over Intel] We took care of it. Take a look at this Intel Slate we recovered.	[交出情报]我们搞定了。看看我们找回的这块情报数据板。
+Be aware, after pulling some data, the Slate will fry itself. Watchtower's paranoid like that.	注意，读取部分数据后，数据板会自行烧毁。瞭望塔就是这么偏执。
+Just so you know, once you grab some info, the Slate will cook itself. Watchtower fail-safe.	先跟你说一声，你一旦提取了信息，数据板就会自毁。瞭望塔的故障保护机制。
+FYI, that Slate's rigged to erase itself shortly after use. Watchtower designed it that way.	提醒一下，那块数据板被设定为使用后不久即自行擦除。瞭望塔就是这么设计的。
+Heads up! That Slate's a one-and-done deal. You get one pass at that data. Then poof! It's kinda like a self-destruct.	注意！那块数据板是一次性的。你只有一次读取数据的机会。然后就没了！差不多就是个自毁装置。
+Keep in mind, the Slate will wipe itself once you pull data from it. Watchtower security feature.	请记住，你一旦从数据板中提取数据，它就会自动擦除。这是瞭望塔的安全功能。
+Okay, gimme a sec... Let's see what we're dealing with...	好，稍等一下……看看我们面对的是什么……
+Hm, let's see. Loading up the Slate...	嗯，我看看。正在加载数据板……
+Hm. Alright, just give me a second. I'll see what I can get from this Slate...	嗯。好，给我一点时间。看看我能从这块数据板里弄到什么……
+That's how Watchtower keep finding me and Torin.	瞭望塔就是这样一直找到我和托林的。
+Take your time, there's no rush.	慢慢来，不急。
+Not much useful info for you personally on there, but you'll find it reveals some interesting tidbits about Watchtower.	那上面对你个人来说没什么有用的信息，但你会发现它揭示了一些关于瞭望塔的趣闻。
+You'll want to run that Slate through Gren's cracking algorithm at some point.	你迟早得把那块数据板用格伦的破解算法跑一遍。
+However, a small snag. That Intel Slate, once you start poking around in it, it'll delete its data. It's a Watchtower security feature.	不过，有个小麻烦。那块情报数据板，你一旦开始翻查，它就会删除数据。这是瞭望塔的安全功能。
+An excellent idea! After all, it would be in our best interest to find and shut down more of these Arrays. Stop Watchtower from tracking us as much.	好主意！毕竟，找到并关闭更多这种阵列最符合我们的利益。让瞭望塔少追踪我们一些。
+I see... Then I'll be sure to give the Slate a thorough going over! Maybe we can find out which Systems Watchtower is hiding these Arrays in.	我明白了……那我一定把数据板彻底研究一遍！也许我们能查出瞭望塔把这些阵列藏在哪些星系里。
+That's how Watchtower found me and Torin in the first place.	瞭望塔一开始就是这样找到我和托林的。
+Torin exaggerates, we just got lucky.	托林夸张了，我们只是运气好。
+The data on there highlights how Watchtower's got Arrays all over. Almost every system...	那上面的数据凸显出瞭望塔到处都有阵列。几乎每个星系……
+Yup. Slate reveals how Watchtower -- have set up Arrays for intel-gathering across countless systems.	对。数据板揭示了瞭望塔——在无数星系中设立了用于收集情报的阵列。
+Intel. It lays out how Watchtower's Arrays -- monitor just about every system...	情报。它说明了瞭望塔的阵列——监视着几乎每一个星系……
+The Slate outlines Watchtower's Array network. Multiple system side coverage.	数据板概述了瞭望塔的阵列网络。覆盖多个星系。
+You could say that! It explains how Watchtower uses Arrays for spying. They have 'em in most systems.	可以这么说！它说明了瞭望塔如何用阵列进行监视。大多数星系里都有。
+Like how Watchtower tracks and flags people for capture using those Posts and Surveillance Arrays, and how they have these Arrays in most systems.	比如瞭望塔如何利用那些哨站和监视阵列追踪并标记抓捕目标，以及他们在大多数星系里都有这些阵列。
+You seem confident. There something good on here?	你看起来很有把握。这上面有什么好东西吗？
+Oh yeah? Really think this thing's worth cracking open?	哦是嘛？你真觉得这东西值得撬开看看？
+That so? Something on here I should see?	是吗？这上面有什么我该看的吗？
+Oh yeah? Like what?	哦是嘛？比如什么？
+That would explain how you apparently did so well.	这就能解释你为什么看起来干得那么好了。
+Just shut the thing down and retrieve anything useful, and I'll make sure you're rewarded properly.	把那东西关掉，回收一切有用的东西，我保证你会得到应有的报酬。
+Take it offline and grab whatever intel you can. You'll get paid, got my word on that.	让它离线，尽可能获取情报。你会拿到报酬，我向你保证。
+When you find it, shut it down and retrieve any data it's collected. I'll be really grateful, and I'll pay you for your time!	找到之后，关掉它，并取回它收集的所有数据。我会非常感激，也会为你的时间付钱！
+It wasn't our first rodeo, experience was on our side.	这可不是我们头一回，经验在我们这边。
+We're just that good!	我们就是这么厉害！
+Can you quickly tell me about getting back at Watchtower?	你能简单跟我说说怎么报复瞭望塔吗？
+Good luck, you two! Let me know how it turns out.	祝你们好运，两位！结果如何告诉我一声。
+Could be wrong, but me and Gren think Watchtower have set up a Listening Post in the Altair system. I want it gone.	也许我错了，但我和格伦认为瞭望塔在牵牛星星系设了一处监听哨。我想把它除掉。
+Long story short, me and Gren caught wind of Watchtower activity in the Altair system. A Listening Post. Frankly, it's got me worried.	长话短说，我和格伦听说牵牛星星系有瞭望塔活动。一处监听哨。坦白说，这让我很担心。
+In short, me and Gren noticed some kinda Watchtower Listening Post in the Altair system, and I'm concerned. I'd like some help dealing with it.	总之，我和格伦注意到牵牛星星系里有个瞭望塔监听哨，我很担心。想请你帮忙处理一下。
+I don't care. I'd rather save the Core for something else.	我不介意。我更想把这个核心留着用在别处。
+Couldn't tell you exactly where, though. You'll probably have to investigate the planet to find that out.	不过具体位置我说不准。你大概得去行星上调查才能查出来。
+[Hand over Intel] We recovered this Intel Slate from a Surveillance Array's wreckage.	[交出情报]我们从一座监视阵列的残骸中找回了这块情报数据板。
+After that, do what you need to do to shut it down. Destroy any vital infrastructure they might have. We don't want them just flipping the power switch back on.	之后，用你需要的方式把它关掉。摧毁他们可能拥有的任何关键设施。我们可不想让他们随手把电闸又合上。
+We'll deal with this Listening Post for you.	我们会替你处理这个监听哨。
+We can grab any data it's collected, see what Watchtower have been poking their nose into, and then ensure the post is taken offline.	我们可以取走它收集的所有数据，看看瞭望塔在打探什么，然后确保这个哨站离线。
+Couldn't agree more! Tell you what, Harper. How about we go investigate this Listening Post?	完全同意！这样吧，哈珀。不如我们去调查一下这个监听哨？
+You don't know what a load off my shoulders that is. The Listening Post should be somewhere on Altair III.	你不知道这让我多松一口气。监听哨应该在牵牛星III上的某处。
+Whew, glad you're on board with this. You'll want to check out Altair III. That's where a Watchtower signal was coming from.	呼，很高兴你愿意接手。你该去牵牛星III看看。瞭望塔的信号就是从那里发出的。
+That's a relief to hear! You can find the Listening Post somewhere on Altair III.	听你这么说我就放心了！你可以在牵牛星III上找到那个监听哨。
+Perfect. Now we've got some backup if Watchtower shows up.	很好。这样瞭望塔出现时我们就有后援了。
+That's what I'm talking about! We can sleep easier with some fleet cover.	这才像话！有舰队掩护，我们能睡得更安稳。
+Good call! Now we're not sitting ducks for any opportunistic Watchtower attacks	好主意！现在我们就不会成为瞭望塔伺机袭击下的待宰羔羊了
+Nice! That should keep us safe for now.	不错！这暂时能保我们安全。
+Hey, you won't get any argument outta me!	嘿，我可不会跟你争！
+Would you believe that we found it by accident?	你信不信我们是碰巧发现的？
+Seems like something that needs dealing with.	看来这是件需要处理的事。
+Really? Hey, if you can do that, I'll pay for your time!	真的？嘿，要是你能做到，我会为你的时间付钱！
+I'll pay you for your time. A nice heap of Credits. More than enough to make it worth your while.	我会为你的时间付钱。一大笔信用点。足够让你觉得值得。
+So here's my proposition! I tell you where this Listening Post is, you download any data it's collected, then take it offline.	那么我的提议是这样！我告诉你这个监听哨在哪，你下载它收集的所有数据，然后让它离线。
+I-... What? How'd you even know to do that?	我——……什么？你怎么会知道要那么做？
+That seems... convenient. But I can't argue with results!	这似乎……挺方便。但我没法否认结果！
+I don't care if it's the Freestar Collective, pirates, or even this "Watchtower". I don't want anyone snooping around near my home. 	我不管是自由星系联盟、海盗，还是这个"瞭望塔"。我不想让任何人在我家附近打探。
+Thanks, Gren. Any chance you could upgrade the Fleet Command system and Skydrops...?	谢谢你，格伦。有没有可能把舰队指挥系统和空投升级一下……？
+Not really. But if you don't wanna spill the beans, I won't push.	不太算。但如果你不想说，我不会追问。
+I'll think about it. You can upgrade everything, right?	我会考虑。你什么都升级得了，对吧？
+This Listening Post? It's not good for any of us. It's got to go.	这个监听哨？它对我们谁都没好处。必须除掉。
+Okay, you got a Slate. Consider me interested. Spill it, what happened?	好，你弄到了一块数据板。算我感兴趣。说吧，发生了什么？
+So... what's the story behind the Slate? Gonna fill me in on the details?	那么……这块数据板背后有什么故事？要不要跟我细说？
+An Intel Slate, huh? You care to tell me what happened out there?	一块情报数据板，是吧？愿意跟我说说外面发生了什么吗？
+An Intel Slate? What exactly happened out there...?	情报数据板？外面到底发生了什么……？
+Huh. Well, thanks! I'm impressed! Things went smooth, right? You didn't run into any trouble... did you?	嗯。嗯，谢谢！我很佩服！一切顺利吧？你们没遇到什么麻烦……吧？
+We found it ourselves. It's not my first time dealing with Watchtower...	我们自己找到的。这可不是我第一次跟瞭望塔打交道……
+Don't you worry, Harper! You'll have no problems from either of us. Cross our hearts!	别担心，哈珀！我们俩都不会给你惹麻烦。我们发誓！
+In other words, we're not to start too much chaos! We hear you, loud and clear!	换句话说，我们别搞出太多乱子！我们听得清清楚楚！
+Thus, we act accordingly! So sayth I, to thee!	所以，我们照办！我此言，谨告于你！
+Relax, Harper, we'll keep things civil! Trust me.	放心，哈珀，我们会规规矩矩的！相信我。
+Therefore, we best behave ourselves! Hah, don't worry, Harper. We know not to cause any trouble.	所以，我们最好安分点！哈，别担心，哈珀。我们知道不该惹麻烦。
+So, when Gren tells me -- he detects some sorta "Watchtower Listening Post" in the Altair system, I can't say I'm too happy about that!	所以，当格伦告诉我——他在牵牛星星系探测到某种"瞭望塔监听哨"时，我可说不上高兴！
+They seem like the domineering type. Sticking their noses where they're not wanted!	他们看着就是那种霸道类型。哪里不欢迎他们，就往哪里凑！
+Oh, yeah. That makes sense.	哦，对。有道理。
+I see. Good.	我明白了。很好。
+Hm. Noted.	嗯。记下了。
+Very good.	很好。
+Gren contacted us, let us know.	格伦联系了我们，让我们知道的。
+Yeah, take it off! Why not? Get some fresh air.	是啊，摘了吧！为什么不呢？透透气。
+About giving Watchtower a bloody lip...	关于让瞭望塔吃点苦头……
+Oh yeah! Now, compared to Torin and Gren, I've no real grudge with Watchtower. But from what little I know of 'em, I don't think I like 'em very much!	哦对！跟托林和格伦比，我跟瞭望塔没什么真正的仇。但就我了解的那么一点，我觉得我不太喜欢他们！
+[Skip Tutorial] A Fleet Command system, I understand.	[跳过教程]舰队指挥系统，我明白。
+Good enough for me. Welcome to Stardock!	对我来说够了。欢迎来到星坞！
+I'll hold you to that. Anyway, welcome to Stardock.	我会记着你这句。总之，欢迎来到星坞。
+Hm, fair enough. In that case, welcome to Stardock!	嗯，说得有理。那这样的话，欢迎来到星坞！
+With that out of the way, welcome to Stardock! I... think that's what we ended up calling this place...	这事说开了，欢迎来到星坞！我……想我们最后是这么叫这地方的……
+Anyway, so long as you don't cause trouble, my docking bays are always open.	总之，只要你不惹麻烦，我的对接舱永远为你敞开。
+You better not! I got a long memory and no time for nonsense.	你最好别！我记性很长，也没工夫陪你胡闹。
+Yeah, yeah. I won't cause any trouble.	是，是。我不会惹麻烦的。
+Nevermind that, I just need to know if all this is still upgradable?	别说那个了，我只想知道这些东西还能升级吗？
+So I'd better behave myself!	所以我最好还是安分点！
+So-- Ah. Yeah... Did Torin prep you on this or something?	所以——啊。对……是托林提前跟你打过招呼还是怎么着？
+Yes, in theory. But I'd need specialized components. Watchtower Components.	是的，理论上可以。但我需要专门的组件。瞭望塔组件。
+Thanks Gren. And you could upgrade the Fleet Command system and Skydrops, right?	谢谢你，格伦。你能升级舰队指挥系统和空投，对吧？
+No need to keep the helmet on, Gren. I know it can be tough to talk in those things.	没必要一直戴着头盔，格伦。我知道戴着那东西说话挺难受的。
+Here's the recovered Control Node.	这是找回的控制节点。
+Go ahead, try it for yourself. Use the terminal and "Commission" one of your other ships to your fleet.	来吧，你自己试试。用终端把另一艘飞船"编入"你的舰队。
+This... "Fleet Command System" I've fabricated, you should find it fairly intuitive.	我制造的这套……"舰队指挥系统"，你应该会觉得挺直观。
+You told Torin about the Control Node? How'd you know where to find it?	你把控制节点的事告诉了托林？你怎么知道去哪儿找？
+Why did we need the Control Node?	我们为什么需要控制节点？
+[Repeat Tutorial] Could you show me how this "Fleet Command" system works?	[重看教程]你能给我演示一下这套"舰队指挥"系统怎么用吗？
+[Repeat Tutorial] Could you show me how it all works?	[重看教程]你能给我演示一下它怎么运作吗？
+Of course.	当然。
+[Skip Tutorial] Thanks. I'm sure I can figure it out myself.	[跳过教程]谢谢。我相信自己能弄明白。
+If that's what you'd prefer.	如果你更愿意这样。
+Hm. It's in decent condition. Should be an easy install...	嗯。状况还不错。安装应该不难……
+Ah, glad to see you got it. I'll just install it...	啊，很高兴你拿到了。我这就安装……
+Huh, so you managed to get it. Good. Just give me a moment...	嗯，你居然搞到手了。很好。稍等片刻……
+It's a voluntary procedure, but one that's required to move up the ranks.	这是自愿的程序，但想晋升就必须要做。
+My appearance is a result of genetic manipulation. Something that most members of Watchtower are subjected to.	我的外貌是基因改造的结果。大多数瞭望塔成员都要接受这种改造。
+I did, indeed. And just so you know, I explained your whole ex-Watchtower situation, so take off the helmet already!	我确实说了。顺便告诉你，我已经把你曾是瞭望塔的身份解释清楚了，所以快把头盗摘了吧！
+You bet! Hey, it's fine if you show your face, you know? I've covered how you're former Watchtower.	当然！嘿，露个脸没关系，你知道吗？你曾是瞭望塔的事我已经说明过了。
+Yup, one of us now! No need to keep the helmet on, they know all about you being an ex-member of Watchtower.	对，现在是自己人了！没必要戴着头盔，他们都知道你曾是个瞭望塔成员。
+Better in our hands, than Watchtower's. Right? No reason to keep your helmet on, they know you're ex-Watchtower.	在我们手里总比在瞭望塔手里好。对吧？没必要戴着头盔，他们知道你曾是瞭望塔的人。
+Sure did! And I've already explained how you're ex-Watchtower, so no need to be shy, you can remove the helmet.	当然说了！而且我已经解释过你曾是瞭望塔的人，所以不用害羞，可以把头盔摘了。
+What makes you think Harper likes me?	你凭什么觉得哈珀喜欢我？
+We have the Control Node, should we go speak to Gren?	我们拿到控制节点了，该去找格伦谈谈吗？
+Haha! Alright, calm down. There's nothing to worry about.	哈哈！好了，冷静。没什么可担心的。
+You know what? Sounds like a great idea.	你知道吗？听起来是个好主意。
+Ah! Oh no! It's Watchtower, run away!	啊！哦不！是瞭望塔，快跑！
+There's no need to keep that helmet on.	没必要一直戴着那个头盔。
+Hm. I suppose not....	嗯。我想是吧……
+Oh. Ah, thank you.	哦。啊，谢谢。
+Hey, Gren. It's very nice to meet you.	嘿，格伦。很高兴见到你。
+Your choice! Lead, and I'll follow.	你决定！你带路，我跟着。
+Good to see you again, Harper.	很高兴又见到你，哈珀。
+Works for me!	我没意见！
+I'll defer to your judgment on this one!	这事我听你的判断！
+I'm right behind you!	我就在你后面！
+No argument here. Lead on!	我没意见。带路吧！
+You're the boss!	你说了算！
+Or, we could go see Harper! Let her know we've already taken care of that Listening Post.	或者，我们可以去见哈珀！让她知道我们已经处理了那个监听哨。
+Or, we could go see Harper! Let her tell us all about the Listening Posts and spy arrays.	或者，我们可以去见哈珀！让她给我们好好讲讲监听哨和间谍阵列。
+Hey, ixnay on the Unity talk-ay...	嘿，别念叨归一的事……
+No! First time. I just told 'em about you is all! Haha...	不！第一次。我就只是跟他们说了说你而已！哈哈……
+So far, it seems to be! I've not noticed any major differences yet. But, still early days.	目前看来是！我还没注意到什么重大差异。不过，还早着呢。
+We should give Gren the Control Node and talk with Harper.	我们该把控制节点交给格伦，并和哈珀谈谈。
+Is this Stardock the same as our last one?	这个星坞和我们上一个星坞一样吗？
+It's not something you should do casually. Especially with those who likely aren't ready for it. Harper, and Gren? They're not ready. Not yet.	这不是你该随便做的事。尤其是对那些很可能还没准备好的人。哈珀，还有格伦？他们还没准备好。还不行。
+If they don't just outright dismiss you, it can make them a target, completely upend their life, or even break their entire sense of reality!	如果他们不当场把你当成胡言乱语，这也会让他们成为目标，彻底颠覆他们的生活，甚至击碎他们对现实的整体认知！
+Have we not talked about this before? Anyway...	我们之前没聊过这个吗？总之……
+It can be dangerous to just come out and tell people you're from another universe. And not just dangerous for you, but for them as well!	直接告诉别人你来自另一个宇宙可能很危险。而且不只是对你有危险，对他们也是！
+Why can't we tell Harper and Gren about being Starborn?	我们为什么不能告诉哈珀和格伦星裔的事？
+Sounds like a plan to me! Just remember, you've never met him before.	我觉得这计划不错！只要记住，你从没见过他。
+Huh? ...Sorry, I don't think I know you. Have we met before?	嗯？……抱歉，我想我不认识你。我们见过吗？
+What's wrong with the station's power core?	空间站的动力核心出了什么问题？
+It's just rundown and outdated. It runs mostly fine enough, providing you keep an eye on it. So... Who are you again?	只是老旧过时了。只要盯着点，大体还算能用。那么……你又是谁？
+Oh, right! The one Watchtower is after...	哦，对！瞭望塔追的那个人……
+I don't care. You pick something.	我不介意。你挑一个吧。
+But considering she offered you free use of Stardock, that tells me she's put some trust in you. That's not something she does easily.	但考虑到她让你免费使用星坞，这说明她对你有些信任。这可不是她轻易会做的事。
+Besides that, usually, Harper's willing to give most folks a chance. However, she always keeps things... professional.	除此之外，通常哈珀愿意给大多数人一个机会。不过，她总是把事情办得……很职业。
+Well, she didn't have B.A.B.S. hurl you out of an airlock when you first met. That was my first clue.	嗯，你们初次见面时，她没让B.A.B.S.把你扔出气闸。那是我的第一条线索。
+I'll make sure she receives the necessary updates to assist you. Otherwise, I'll be here to help however I can.	我会确保她收到必要的信息更新，以便协助你。除此之外，我会在这里尽我所能提供帮助。
+If you need to restock any Skydrops, or require any other ship services, just check in with B.A.B.S.	如果你需要补充任何空投，或需要其他飞船服务，找B.A.B.S.就行。
+I'm the person Torin was looking for.	我就是托林在找的那个人。
+Until then, I can offer to outfit your ships with the Skydrops we already have. Assuming you have enough Watchtower Components.	在那之前，我可以把我们已有的空投装到你的飞船上。前提是你有足够的瞭望塔组件。
+Now, I didn't think you actually WOULD kill him, but it's good to know you can show restraint!	嗯，我没想到你真会杀他，但很高兴知道你能克制自己！
+...Well, you know. He's got that whole... "Watchtower" thing going on.	……嗯，你知道。他带着那一整套……"瞭望塔"的做派。
+Well, the data you brought back didn't really have much value, at least to me. But I'm still happy that Listening Post is gone.	嗯，你带回来的数据其实没什么价值，至少对我而言。但我还是很高兴那个监听哨没了。
+Okay, onward to Gren!	好，去找格伦！
+Time to give Gren an update!	该给格伦更新情况了！
+Now that's done, let's go see Gren.	这事完了，我们去见格伦。
+Okay, let's go see Gren!	好，我们去见格伦！
+That went well! Let's check in with Gren.	进展不错！我们去找格伦。
+Time to clue Harper in.	该让哈珀知情了。
+Harper's next on the docket.	下一个是哈珀。
+Time to check in with Harper!	该去向哈珀报到了！
+Should follow Gren's advice, go talk with Harper.	该听格伦的建议，去和哈珀谈谈。
+Hah. Cool. More toys to play with! Gren made a good point though, we should go check in with Harper.	哈。酷。又有新玩具可以玩了！不过格伦说得有道理，我们该去找哈珀。
+We need to debrief Gren and Harper.	我们需要向格伦和哈珀汇报。
+Let's fill Harper and Gren in on our antics.	我们把我们的所作所为告诉哈珀和格伦吧。
+We'll need to get Gren and Harper up to speed. Who should we talk with first?	我们得让格伦和哈珀了解情况。先跟谁谈？
+Time to fill Harper and Gren in on what happened!	该把发生的事告诉哈珀和格伦了！
+Let's report in. Either Gren or Harper, order doesn't matter too much.	我们去汇报吧。格伦或哈珀，顺序不太重要。
+And maybe those guys will know what we can do with those "Computer Core" things we found.	也许那两位会知道我们能用找到的那些"计算机核心"做什么。
+We can either go fill Harper in on the details regarding the intel, or check in with Gren, pass on some of this Watchtower equipment we recovered.	我们要么去把情报的细节告诉哈珀，要么去找格伦，把我们回收的一些瞭望塔装备交给他。
+Phew! A lot sure happened out there...	呼！外面发生的事可真不少……
+Why would I kill Gren?	我为什么要杀格伦？
+You must make a decision. What Skydrop should we gain the ability to fabricate?	你必须做个决定。我们要获得制造哪种空投的能力？
+Ehh, don't worry, you didn't. Torin on the other hand...	呃，别担心，你没有。至于托林嘛……
+I'm sorry if we've caused you trouble.	如果我们给你添了麻烦，很抱歉。
+Oh. Um... yeah, hi. Nice to meet you too. Sorry, who are you...?	哦。呃……是，你好。也很高兴认识你。抱歉，你是……？
+Not injured, no. Not exactly... But, you have medical training? That could come in handy!	没受伤，没有。倒也不算……不过，你受过医疗训练？那可能派得上用场！
+Hello, nice to meet you.	你好，很高兴认识你。
+Surgeons? If someone's injured, maybe I can help.	外科医生？如果有人受伤，也许我能帮上忙。
+Someone else will have to take over the ship I was piloting. You should see to that as soon as you can.	得有人接手我驾驶的那艘飞船。你该尽快安排一下。
+I'll just hang out here at Stardock. If you need anything, me, Gren, Harper, we're here to help, alright?	我就待在星坞。如果你需要什么，我、格伦、哈珀，我们都在这儿帮忙，好吗？
+Fair enough! That's no problem.	有理！没问题。
+Actually, I'd rather we go our separate ways.	其实，我更希望我们各走各的。
+Don't you have other responsibilities?	你没有别的责任要担吗？
+Nope. Nothing tying me down! I am at your disposal.	没有。没什么拴得住我！我随你差遣。
+And no friends or family I need to worry about. Present company not included.	也没有需要牵挂的朋友或家人。在座的除外。
+What, you mean like... a job? I'm, uh, "between employment" right now. So that's not an issue!	什么，你是说……工作？我，呃，现在"处于待业状态"。所以那不是问题！
+Alright! Let's get going.	好！我们出发吧。
+Order me around, have me clean the toilets, put the fear of god in me. Whatever! It's your show. I'm just here to lend a hand.	随你差遣、让我刷马桶、让我怕你怕得不行。随便！这是你的舞台。我只是来搭把手的。
+Fantastic! Feel free to treat me as you would any other member of your crew!	太好了！就当我跟你其他船员一样对待我！
+Sure! It'll be good to stick together.	当然！待在一起是好事。
+But hey! We've got some of their tech figured out now. That's one step closer to turning the tables, right?	不过嘿！我们现在搞懂了他们的一些科技。离扭转局面又近了一步，对吧？
+No idea what constitutes the "right time". Maybe they're just waiting for the perfect moment to ruin our day.	不知道什么才算"合适的时机"。也许他们只是在等一个完美的时机来搅黄我们。
+Watchtower track, monitor, and when they think the time is right, spring an ambush.	瞭望塔追踪、监视，等他们觉得时机成熟，就发动伏击。
+But from what I can piece together, seems these Listening Posts are tuned to pick up... well, us!	但据我拼凑出来的，这些监听哨似乎是专门用来侦测……嗯，我们的！
+Sure looks that way. Of course, we still don't have the full picture...	看起来是。当然，我们仍没掌握全貌……
+So, the Listening Posts. That's how Watchtower tracks us?	那么，监听哨。瞭望塔就是这样追踪我们的？
+And honestly? Kinda hard to argue with the results so far!	而且说实话？目前的效果还真难反驳！
+But Gren seemed pretty confident there would be no issues. Said it's the best way to fight back! Use their own tricks against them.	但格伦似乎很有把握不会有问题。说这是最好的反击办法！以彼之道还施彼身。
+Huh, funny, I asked Gren the same thing. Y'know, are we just asking for trouble -- playing in their toybox, tinkering with their toys?	嗯，有意思，我也问过格伦同样的话。你知道，我们是不是在自找麻烦——在他们的玩具箱里玩，摆弄他们的玩具？
+Your doubts are reasonable, but unfounded. I've cut all ties with Watchtower. I won't turn on you, or Torin. Now...	你的疑虑合理，但没有根据。我已与瞭望塔断绝一切关系。我不会背叛你，或托林。那么……
+I'll only say this once. Don't cross me, Gren. If I find out you're still in league with Watchtower...	我只说一次。别骗我，格伦。如果我发现你还和瞭望塔有勾结……
+Is it wise to use Watchtower hardware against them?	用瞭望塔的硬件对付他们，明智吗？
+I've even heard of select personnel who are capable of "disintegration" so that they'll not leave traceable remains.	我甚至听说过有部分人员能"自解"，以免留下可追踪的遗骸。
+Data archives delete themselves. More valuable ships will often detonate, to leave salvage of little value.	数据归档会自行删除。较贵重的飞船往往会自爆，好让残骸毫无价值。
+Yes, most of their tech is designed to self-terminate. Though, each does so differently.	是的，他们大多数科技都设计成能自毁。不过方式各不相同。
+And if you don't mind the company, I think I'll stay on with you! You know, as an official part of your crew.	如果你不介意有人作伴，我想我就跟着你了！你知道，作为你船员的正式一员。
+And if you find yourself with some free time, you can always hunt down more Listening Posts! Or have Gren build and upgrade stuff for your fleet.	如果你有空闲时间，随时可以去猎杀更多监听哨！或者让格伦为你的舰队制造和升级装备。
+Watchtower are still a problem, but at least now you have a defence against them.	瞭望塔仍是个麻烦，但至少现在你有了防御他们的手段。
+I think for the time being, keep doing whatever it is you do.	我想眼下，你就继续做你该做的事吧。
+So what do you expect me to do now?	那你现在指望我做什么？
+Calls in a Model S "Shiva" bot to assist you. The Model S excels at close-quarters skirmishes and rapid response.	呼叫一台S型"湿婆"机器人前来协助你。S型擅长近距离遭遇战与快速反应。
+...We found out how Watchtower's been tracking us. And even figured out how to exploit more of their technology against them!	……我们查出了瞭望塔是怎么追踪我们的。甚至还弄清了如何更多地利用他们的科技反制他们！
+Well, that was productive! You met with Gren, and didn't kill him. Harper seems to like you...	嗯，这趟挺有收获！你见了格伦，还没杀他。哈珀似乎挺喜欢你……
+Should you find more, consider bringing them to me. In the meantime, I'll resume my duties.	如果你找到更多，可以考虑带给我。在此期间，我会恢复我的职责。
+Feel free to bring me Cores like this, and I'll do what I can. For now, I'll get back to my tasks.	以后有这种核心尽管拿来，我会尽力而为。现在，我回去干活了。
+If you find more, bring them to me. For now, I should return to work.	如果你找到更多，拿来给我。现在，我该回去工作了。
+I'll return to my work. But I will be here -- if you need my services.	我回去干活了。但我会在这里——如果你需要我的服务。
+You said you'd found two Computer Cores, correct? I'd suggest you take one to Harper. I'm sure she'll have ideas on how to utilize it...	你说你找到了两个计算机核心，对吧？我建议你带一个给哈珀。我相信她会有办法利用它……
+Your skepticism is noted. Trust is earned. In time, I hope my actions speak louder than your doubts.	已记下你的怀疑。信任需要赢得。但愿随着时间推移，我的行动能比你的疑虑更有说服力。
+I'm still not sure I fully trust you, Gren...	我还是不太确定能完全信任你，格伦……
+Flexibility often provides advantage. I suggest you make use of what's at hand.	灵活往往带来优势。我建议你善用眼前的资源。
+Well, I suppose it's good to have options.	嗯，我想有得选总是好的。
+Gratitude is unnecessary. However... it is appreciated.	不必言谢。不过……我很感激。
+Deploys a kinetic-fire turret, which anchors swiftly and provides sustained ballistic support.	部署一座动能火力炮塔，能迅速固定并提供持续的弹道支援。
+Thanks a lot Gren, I appreciate you doing all this.	非常感谢你，格伦，谢谢你做的这一切。
+Give me an overview of the Ballistic Turret.	给我讲讲弹道炮塔的概况。
+And what would that be...?	那会是什么呢……？
+I'm afraid those are your only options.	恐怕你就只有这些选项了。
+I don't want any of these.	这些我都不要。
+The Surface Smoke Bomb seems the best option.	地表烟幕弹似乎是最好的选择。
+I'd prefer the Shiva Robot.	我更想要湿婆机器人。
+Okay, I've made a choice.	好，我选好了。
+Let's go with the Ballistic Turret.	就选弹道炮塔吧。
+Then I'd suggest we extract the data for the Shiva Robot.	那我建议我们提取湿婆机器人的数据。
+Blankets the area in dense smoke, obscuring vision and creating tactical cover for maneuvers or retreats.	以浓烟覆盖该区域，遮蔽视野，为机动或撤退提供战术掩护。
+Explain to me the Surface Smoke Bomb.	给我讲讲地表烟幕弹。
+With data mined from a sufficient number of cores, I could raise the number of vessels you can coordinate. As well as other adaptations.	从足够多的核心中挖掘数据后，我能提升你可协调的飞船数量。以及做出其他改进。
+Indeed. I believe the Fleet Command System can be expanded upon. For example...	确实。我相信舰队指挥系统还能进一步扩展。比如……
+You think we can upgrade the Fleet Command System?	你觉得我们能升级舰队指挥系统？
+We can upgrade the Fleet Command System?	我们能升级舰队指挥系统？
+What can you tell me about the Shiva Unit?	关于湿婆单元，你能告诉我什么？
+Does all Watchtower technology self-destruct?	所有瞭望塔科技都会自毁吗？
+So does all Watchtower technology self-destruct?	那么所有瞭望塔科技都会自毁吗？
+Even I find them difficult to fully comprehend.	就连我也觉得它们难以完全理解。
+Their design is also remarkably resistant to intrusion. Attempts to hack or decode them are next to impossible.	它们的设计还异常抗入侵。想黑入或解密它们几乎不可能。
+The cores employ a crystal substrate that maximizes capacity, pushing data storage -- far beyond traditional computing.	这些核心采用晶体基板以最大化容量，将数据存储——远远推离了传统计算的范畴。
+What can you tell me about Computer Cores?	关于计算机核心，你能告诉我什么？
+Tell me more about these Computer Cores.	再多讲讲这些计算机核心。
+In this way, even members within their ranks -- are shielded from information that could compromise the organization's security.	如此一来，即便组织内部的成员——也被隔绝在可能危及组织安全的信息之外。
+By utilizing purge protocols, Watchtower ensures that no individual can freely learn data they deem "sensitive".	通过启用清除协议，瞭望塔确保没有任何个人能随意获知他们视为"敏感"的数据。
+I would think that self-evident.	我以为这是不言而喻的。
+Hm. I suspect we can mine Computer Cores -- to acquire blueprints for new types of Skydrops. Or even devise upgrades for your Fleet Command System.	嗯。我猜我们可以从计算机核心中挖掘——以获取新型空投的图纸。甚至设计出对你舰队指挥系统的升级。
+I suspect we can mine Computer Cores -- to acquire blueprints for new types of Skydrops. Or even devise upgrades for your Fleet Command System.	我猜我们可以从计算机核心中挖掘——以获取新型空投的图纸。甚至设计出对你舰队指挥系统的升级。
+So you understand? I can only extract a limited subset of information from a core. Even so, this is still useful.	所以你明白了？我只能从核心中提取有限的一部分信息。即便如此，这也仍然有用。
+If you lack proper credentials, you can't read specific data -- without triggering a purge protocol. Erasing all other data from the device.	如果你没有适当的凭证，就无法读取特定数据——除非触发清除协议。那会把设备中的其他数据全部擦除。
+Good. So you already understand. I can only extract limited information from a core.	很好。看来你已经明白了。我只能从核心中提取有限的信息。
+See what you can get from this core.	看看你能从这个核心中弄到什么。
+Tell me, why does Watchtower tech have erasure protocols?	告诉我，瞭望塔的科技为什么会有擦除协议？
+Why does Watchtower tech have purge protocols?	瞭望塔的科技为什么会有清除协议？
+Our available choices are drops for either a Ballistic Turret, a Shiva Unit, or a Surface Smoke Bomb...	我们可选的空投有弹道炮塔、湿婆单元，或地表烟幕弹……
+Connection confirmed. Hm... I see data for three Skydrop schematics, yet we can only extract one.	连接已确认。嗯……我看到三份空投图纸的数据，但我们只能提取其中一份。
+One moment, I will establish a link to the Core.	请稍候，我将与核心建立连接。
+Although the data we can retrieve from them will be limited...	虽然我们能从中取回的数据会很有限……
+Oh, we already know all about them! Found two of 'em! A real wealth of information. At least until they erase themselves that is.	哦，我们早就了解了！找到了两个！信息量真不小。至少在它们自我擦除之前是这样。
+We know. Harper already explained! We can only pull small amounts of information before these sorta things wipe themselves.	我们知道。哈珀已经解释过了！这种东西自我擦除之前，我们只能提取少量信息。
+However, what you suggest is theoretically possible. But it would require construction materials and know-how we currently don't possess.	不过，你提出的在理论上可行。但那需要我们现在并不具备的建造材料和专业知识。
+When it comes to their components, Watchtower's construction methods are a mystery to me, and not something I could reverse-engineer.	说到他们的组件，瞭望塔的制造方法对我来说是个谜，也不是我能逆向破解的东西。
+I think there's a way to fabricate our own Watchtower Components.	我觉得有办法制造我们自己的瞭望塔组件。
+Is there no way to fabricate our own Watchtower Components?	难道没办法制造我们自己的瞭望塔组件吗？
+Despite being trained to work on their ships, I couldn't begin to explain how even half of their technology actually works.	尽管我受过维护他们飞船的训练，我也说不清他们哪怕一半的科技到底是怎么运作的。
+Their tech is simply too advanced, and often even defies conventional logic.	他们的科技就是太先进了，甚至常常违背常理。
+No, I can't. Not if I'm to replicate Watchtower-level hardware. Standard components just won't cut it.	不，不行。要复刻瞭望塔级别的硬件就不行。标准组件根本不够用。
+Can't you just use non-Watchtower components to build?	你就不能用非瞭望塔的组件来造吗？
+Can't you use non-Watchtower components to build things?	你不能用非瞭望塔的组件来制造东西吗？
+[Give Computer Core] We also recovered this, take a look...	[交出计算机核心]我们还找回了这个，你看看……
+[Give Computer Core] I think you might find this interesting...	[交出计算机核心]我想你也许会觉得这个有意思……
+[Give Computer Core] Also, we found these Computer Cores...	[交出计算机核心]还有，我们找到了这些计算机核心……
+I've found some Watchtower hardware, can you use this?	我找到了些瞭望塔硬件，你能用上吗？
+Back already... Something wrong?	这就回来了……出什么事了？
+Well! I think we're done. Feel free to use Stardock for whatever you need! I think you've earned your spot here. Heh, I'll catch you later!	好了！我想我们完事了。星坞随你使用，需要什么尽管来！我想你在这里已经挣得了一席之地。嘿，回头见！
+You should bring that other Core to Gren! I'm sure he'll have something to say about it.	你该把另一个核心带给格伦！我相信他对此会有话说。
+A Watchtower Core... interesting. These often contain blueprints for Watchtower hardware. We could use these.	一个瞭望塔核心……有意思。这类东西往往含有瞭望塔硬件的图纸。我们能派上用场。
+You've found a Watchtower Computer Core. From these, I can extract data for upgrades or new Skydrops.	你找到了一个瞭望塔计算机核心。从这些里面，我能提取用于升级或新空投的数据。
+Is that... a Watchtower Computer Core...? Huh. With enough of these, I could pull blueprints to offer you upgrades, or even new Skydrops.	那是……一个瞭望塔计算机核心……？嗯。有足够多这种东西，我就能提取图纸，为你提供升级，甚至新空投。
+A Watchtower Computer Core... Huh. These units are exceedingly rare... Within them lie blueprints for Watchtower constructs. Things such as Skydrops.	一个瞭望塔计算机核心……嗯。这类单元极其罕见……其中含有瞭望塔造物的图纸。比如空投。
+Appreciate everything you've done. For this, far as I'm concerned, Stardock's your home too now. Door will always be open to you.	感谢你所做的一切。就此而言，对我来说，星坞现在也是你的家。大门永远为你敞开。
+Thanks for stepping up. You've more than earned the right to come and go as you like. Anytime you need it, you're welcome to call Stardock home.	谢谢你挺身而出。你早已赢得自由往来的权利。任何时候你需要，都可以把星坞当作你的家。
+Thanks for your help! Feel free to come and go as you please, Stardock's doors will always be open to you.	谢谢你的帮助！随时自由往来，星坞的大门永远为你敞开。
+Uh... This hardware's a little beyond my skill to crack. But leave it with me! I know someone who might be able to get something useful from it.	呃……这硬件有点超出我的破解能力。但交给我吧！我认识一个人，也许能从中弄出些有用的东西。
+Seen this kind of tech before, Gren's got a few. Bit above my paygrade, but let me hold onto it. Got some ideas...	见过这种科技，格伦那儿有几个。有点超出我的水平，但让我留着它。我有些想法……
+Gren showed me one of these. This sorta hardware's a bit outta my league... But give me time to make some calls. I might know someone...	格伦给我看过一个。这种硬件有点超出我的能力……但给我点时间打几个电话。我可能认识人……
+Yeah, I've seen these, Gren has some broken ones. But, I think this hardware's a little beyond my skill. Leave it with me though, I got some ideas...	是啊，我见过这些，格伦有几个坏的。不过，我觉得这硬件有点超出我的能力。但交给我吧，我有些想法……
+They work kinda like the Intel Slates, wiping itself after you pull data from it.	它们的运作有点像情报数据板，你提取数据后它就会自擦。
+...Right, yeah. I've seen one of these in Gren's workshop. He explained what it was.	……对，是啊。我在格伦的工坊里见过一个。他解释过那是什么。
+But like the Intel Slates, without the proper credentials, you can only pull a small amount of data before it wipes everything else.	但和情报数据板一样，没有适当的凭证，你只能提取少量数据，然后它就会擦掉其余一切。
+...You don't say. I think I've seen one of these in Gren's workshop. They store data on Watchtower schematics. It's how he built you those Skydrops.	……是吗。我想我在格伦的工坊里见过一个。它们储存关于瞭望塔构造图的数据。他就是这么做出来那些空投给你的。
+Yeah, we found two of them. Pretty weird, huh?	是啊，我们找到了两个。挺怪的，是吧？
+Yeah, found two of 'em! Already gave one to Gren. They hold data on how to build Watchtower tech, apparently!	是啊，找到了两个！已经给格伦一个了。看来它们存有建造瞭望塔科技的数据！
+Yeah, found two of 'em! No idea what they're for though.	是啊，找到了两个！不过不知道是干什么用的。
+Yeah, found two of 'em! Already gave one to Gren. Apparently they hold data on how to build Watchtower tech.	是啊，找到了两个！已经给格伦一个了。据说它们存有建造瞭望塔科技的数据。
+And now, you got one less system that's on their radar. No more surprise attacks there!	而现在，你好歹少了一个在他们雷达上的星系。那儿不会再有突然袭击了！
+The best part is: knock out a Post and its Array -- and it stops feeding intel back to Watchtower. Not to mention, you can grab some intel for yourself.	最妙的是：端掉一个哨站及其阵列——它就不再向瞭望塔回传情报了。更别说你还能给自己弄到些情报。
+Difference is, you're the one picking the fight. Now it's on your terms. You know when and where it's comin'.	不同之处在于，是你挑起了这场仗。现在按你的条件来。你知道它何时何地会来。
+You're not wrong. Tamper with their tech, and you're basically jingling keys right in their face. Watchtower's gonna react.	你说得没错。动他们的科技，基本上就是在他们脸前晃钥匙。瞭望塔会有反应的。
+But if I attack Listening Posts and Arrays, Watchtower will attack.	但如果我攻击监听哨和阵列，瞭望塔就会反击。
+If you don't take out their Listening Posts, then it's just a waiting game.	如果你不除掉他们的监听哨，那就只是坐等。
+You'll light up their scanners each time you enter a system. And once you hit a threshold, Watchtower will send in a fleet to try and grab you.	你每次进入一个星系都会点亮他们的扫描器。一旦达到某个阈值，瞭望塔就会派舰队来抓你。
+If you keep cruising around surveilled territory, then yeah, you can count on more ambushes.	如果你继续在被监视的地盘上晃悠，那么是的，你可以期待更多伏击。
+So if I do nothing, I can expect more Watchtower ambushes?	所以如果我什么都不做，就会遇到更多瞭望塔伏击？
+Eh, who knows! Maybe you're onto something. Just don't get too cocky, alright?	呃，谁知道呢！也许你说到了点子上。只是别太得意，行吗？
+But, when I think about it... I doubt Watchtower is used to being hunted. Usually, it would be the other way around.	不过，仔细想想……我不觉得瞭望塔习惯被人猎杀。通常，反过来的才是常态。
+...What, you do that kinda thing for a living or something? Tch... I dunno, seems like asking for trouble to me.	……怎么，你是靠干这个谋生的还是什么？啧……我不知道，在我看来像是在自找麻烦。
+I already have a few ideas on how to turn the tables on Watchtower.	我已经有几个扭转对瞭望塔局面的主意了。
+[Give Computer Core] One more thing, we recovered a Computer Core. It stores data on Watchtower schematics...	[交出计算机核心]还有一件事，我们找回了一个计算机核心。它储存着瞭望塔构造图的数据……
+[Give Computer Core] Before we go, you might want to see this Watchtower Computer Core...	[交出计算机核心]走之前，你也许想看看这个瞭望塔计算机核心……
+[Give Computer Core] One last thing, we found these Watchtower Computer Cores...	[交出计算机核心]最后一件事，我们找到了这些瞭望塔计算机核心……
+But, whatever. Bring me more Intel Slates, and I'll do what I can to help.	不过，算了。多带些情报数据板给我，我会尽力帮忙。
+Yeah, I suppose. Up to you if you wanna keep taking down Listening Posts. Just be ready for a Watchtower fleet to jump in and attack you.	嗯，我想是吧。你想继续端掉监听哨由你决定。只是要做好瞭望塔舰队跃迁进来攻击你的准备。
+That's right, but! Any system we clear of a Listening Post -- means Watchtower can't track us there!	没错，但是！我们清除了监听哨的任何一个星系——都意味着瞭望塔无法在那里追踪我们！
+Ah! But any system we clear of them, means Watchtower can't track us there!	啊！但只要是我们清除了它们的星系，瞭望塔就无法在那里追踪我们！
+Watchtower really is hunting you. These Listening Posts, any system that has one, makes you vulnerable to ambush.	瞭望塔确实在猎捕你。这些监听哨，任何有监听哨的星系，都会让你容易遭到伏击。
 Outlaw Station	法外之徒站
 Station Interior	站点内部
 This is choice 1	这是选项1
