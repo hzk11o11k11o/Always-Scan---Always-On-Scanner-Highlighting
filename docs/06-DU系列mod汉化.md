@@ -15,14 +15,13 @@
 | `du_takeover.esm` | 56 929 | 104 | 54 | **完成并部署** |
 | `du_overtime.esm` | 793 | 3 017 | 554 | **完成并部署** |
 | `du_retrograde.esm` | 85 323 | 5 819 | 2 417 | **完成并部署** |
-| `du_outlaws_01.esm` | 4 421 | 5 027 | 3 750 | **进行中**（名称/书籍/任务目标/**全部短串**已完成；3 类长文本未译） |
+| `du_outlaws_01.esm` | 4 421 | 5 027 | 3 750 | **进行中**（名称/书籍/任务目标/短串/**MESG DESC 讯息正文**已完成；剩 BOOK DESC + QUST CNAM） |
 
 五个 mod 都已写过 MO2 的 `overwrite\`（原位替换，原文件备份在 `tr/orig/`）。
-`du_outlaws_01.esm` 当前是**短串完整版**：4 421 条记录里改动 2 881 条、
-替换 3 753 条（74.7% 行 / 2 476 个唯一串），结构校验 `problems: 0`。
-剩余 **1 274 个唯一串**全部是长文本（`QUST CNAM` 460 / `BOOK DESC` 402 /
-`MESG DESC` 318）加 95 个刻意不译的占位串（71 个 `QUST FULL` 8 位十六进制
-占位名、24 个纯 hull 代号如 `PX-15`）。
+`du_outlaws_01.esm` 当前是**短串 + MESG DESC 完整版**：4 421 条记录里改动 3 134 条、
+替换 4 071 条（81.0% 行），结构校验 `problems: 0`。
+剩余 **956 行**全部是长文本（`QUST CNAM` 460 / `BOOK DESC` 401）加 95 个刻意不译的
+占位串（71 个 `QUST FULL` 8 位十六进制占位名、24 个纯 hull 代号如 `PX-15`）。
 
 ---
 
@@ -47,6 +46,7 @@
 | `enc_probe.py` | 判断插件内联字符串是 UTF-8 还是单字节代码页 |
 | `gen_poi_names.py` / `gen_outlaws_names.py` / `gen_outlaws_objectives.py` | 组合式名称、任务目标的批量生成 |
 | `tokstat.py` / `split_names.py` | 词元统计，用来发现"组合式命名" |
+| `tr_slice.py` | 按 `(recsig, subsig)` 从抽取文件里切出一类长文本，并**保留抽取文件行号**（长文本分批的唯一入口） |
 | `xedit-scripts/tr_export.pas` | 保留的 xEdit 版导出脚本（慢，仅作对照/应急） |
 
 > 2026-09-17 追加（做 `above and beyond` / `morelore_mantislegacy` 时写的通用小工具，
@@ -172,6 +172,7 @@ tr/lang/todo/                  # 各 mod 的"还没译"清单
 | `b36_outlaws_armo.tsv` | `ARMO FULL` 护甲名 | 99 |
 | `b37_outlaws_ships.tsv` | `GBFM FULL` 飞船显示名（纯 hull 代号保持原样） | 67 |
 | `b38_outlaws_misc.tsv` | 零散短串（开发占位、短提示） | 2 |
+| `b50`~`b70_outlaws_msg_desc_*.tsv` | `MESG DESC` 讯息正文（21 批，按字符数由短到长切分） | 318 |
 
 `dict.tsv` 是 `merge(tr/lang/batches/*.tsv, tr/lang/official_seed.tsv)` 的产物，
 **新增翻译只要往 `tr/lang/batches/` 加文件**，然后重跑 merge 即可。
@@ -231,16 +232,32 @@ Copy-Item tr/build/du_xfire.esm "$O\du_xfire.esm" -Force
 加上官方命中的其余条目 ⇒ **3 753 条 / 74.7% 的行、2 476 / 3 750 个唯一串**，
 已构建（`problems: 0`）并部署到 `overwrite\`。
 
-**未完成**：只剩三类长文本 + 刻意不译的占位串：
+**未完成**：只剩两类长文本 + 刻意不译的占位串（`MESG DESC` 已于 2026-09-17 完成）：
 
 | 子记录 | 条数 | 字符数 | 内容 |
 | --- | --- | --- | --- |
-| `BOOK DESC` | 402 | ~916 000 | 书籍/数据板正文（长篇小说式） |
-| `QUST CNAM` | 460 | ~382 000 | 任务简报 |
-| `MESG DESC` | 318 | ~175 000 | 讯息正文 |
+| `BOOK DESC` | 401 | ~916 000 | 书籍/数据板正文（长篇小说式） |
+| `QUST CNAM` | 460 | ~378 000 | 任务简报 |
+| ~~`MESG DESC`~~ | ~~318~~ | ~~~175 000~~ | ✅ 已完成（批次 `b50`~`b70`，318 条 ~175 000 字符） |
 | 不译占位 | 95 | — | `QUST FULL` 的 71 个 8 位十六进制占位名 + `GBFM FULL` 的 24 个纯 hull 代号（`PX-15`…） |
 
 继续做法（工具已就绪）：
+
+> **长文本分批的标准流程**（`MESG DESC` 就是照这个跑完的）：
+>
+> ```powershell
+> # 1) 切出一类长文本，带抽取文件行号，按字符数由短到长排序
+> python tools/re/tr_slice.py tr/out/du_outlaws_01.tsv --sig MESG --sub DESC `
+>        -o tr/lang/todo/outlaws/MESG_DESC.tsv
+>
+> # 2) 每批写一个 spec（<抽取文件行号>\t<译文>），由它生成词典批次
+> #    行号来自第 1 步的第 1 列，英文原文由工具回填 ⇒ 不用手抄长段落、也不可能抄错键
+> python tools/re/tr_mkbatch.py tr/out/du_outlaws_01.tsv `
+>        tr/lang/spec/mesg_desc_01.txt tr/lang/batches/b50_outlaws_msg_desc_01.tsv
+> ```
+>
+> 要点：**一篇长文一个批次**（第 21 批之后按约 1 万字符切）；译文里的换行要写成
+> `\n`（`apply` 会 `unesc`），键由 `tr_mkbatch.py` 从抽取文件里逐字符取，**不要手抄**。
 
 1. `tr/lang/todo/du_outlaws_01.tsv` 是当前完整的待译清单
    （按字符数排序，短的在前），可用 `--max-chars` 分批；
@@ -272,9 +289,10 @@ MO2 profile `Default`（`D:\Mod Organizer 2\starfield_mods\profiles\Default`）�
 | 生成的汉化 ESM | `tr/build/du_*.esm` |
 | 已部署（5 个） | `D:\Mod Organizer 2\starfield_mods\overwrite\du_{xfire,takeover,overtime,retrograde,outlaws_01}.esm` |
 
-> 2026-09-17：`du_outlaws_01.esm` 短串完整版已部署
-> （`tr/build/du_outlaws_01.esm` = `overwrite\du_outlaws_01.esm`，5 641 279 B，
-> MD5 `3ACBB69E0A5BC5AE932305E12E527D51`；反查确认新译文已写入）。
+> 2026-09-17：`du_outlaws_01.esm` **短串 + MESG DESC 完整版**已部署
+> （`tr/build/du_outlaws_01.esm` = `overwrite\du_outlaws_01.esm`，5 634 470 B，
+> MD5 `0B64F492C5F8F619F9F0F6D9D415D297`；反查 `extract` 只剩 956 条
+> `QUST CNAM` / `BOOK DESC` / 占位串，**`MESG DESC` 0 条残留**）。
 
 ### 游戏内验证清单
 
