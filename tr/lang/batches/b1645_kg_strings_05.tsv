@@ -1,0 +1,120 @@
+#en	zh
+Mark I	I型
+Mark II	II型
+Mark III	III型
+Combat Only	仅战斗
+Extract	提取
+Control Node Port	控制节点端口
+Far	远
+Medium	中
+Close	近
+NONE	无
+Phased Time	相位时间
+Hostility Detection	敌意检测
+Anti Mech	反机甲
+Gravity Wave	重力波
+Mech Drop	机甲空投
+Objective Updates	目标更新
+Fleet Cybernetic Propulsion Matrix	舰队赛博推进矩阵
+Fleet Cyberware Targeting Computer	舰队赛博瞄准计算机
+Fleet Cyberware Quark Stabilizer	舰队赛博夸克稳定器
+Fleet Cyberware Precision Module	舰队赛博精密模块
+Fleet Cybertech Magnetic Synchronizer	舰队赛博科技磁力同步器
+Fleet Cybertech Missile Guidance	舰队赛博科技导弹制导
+Fleet Cybertech Lightwave Accelerator	舰队赛博科技光波加速器
+Fleet Cybertech Beam Harmonizer	舰队赛博科技光束协调器
+Fleet Cyberware Trajectory Analyzer	舰队赛博弹道分析仪
+Fleet Cybernetic Diagnostic Suite	舰队赛博诊断套件
+AntiGravity Field	反重力场
+Anti Gravity Hazard	反重力危险
+Block Docking Door	封锁对接口舱门
+WT Energy Blast	瞭望塔能量冲击
+Fleet Cybertech Ballistic Calibrator	舰队赛博科技弹道校准器
+Fleet Cybernetic Tactical Jump Interface	舰队赛博战术跃迁接口
+Fleet Cybernetic Shield Amplifier	舰队赛博护盾放大器
+Block Perseverance Boarding	封锁坚毅号登船
+EM Damage	电磁伤害
+Gravity Well Hazard	重力井危险
+Fleet Cyberware Disruption Coordinator	舰队赛博干扰协调器
+Damage Health	伤害生命值
+Personnel Drop - Watchtower	人员空投 - 瞭望塔
+Bombardment Volley	炮击齐射
+Fleet Stat Handling	舰队属性处理
+Ship Options	舰船选项
+Cryo Mine	冷冻地雷
+Toxic Gas	毒气
+Cyberamp	赛博增幅
+Push Player	推动玩家
+Bazing Inferno	炽燃地狱火
+Slows time for <dur> seconds.	使时间减缓<dur>秒。
+Mech Killer	机甲杀手
+Increases max Star Power by <mag>	最大星辰力量+<mag>
+Block Boarding	封锁登船
+Grav Well Deploy	重力井部署
+Create a gravity anchor at a location, pulling nearby targets to itself.	在指定位置创建一个重力锚，将附近的目标拉向自身。
+Gravity Well: Damage	重力井：伤害
+Grav Wave Fail	重力波失败
+Armillary Anti Gravity Field	浑天仪反重力场
+Creates an area of zero-G for <dur> in a <area>m area.	在<area>米范围内创造一个持续<dur>的零重力区域。
+Anti Gravity Deploy	反重力部署
+Gravity Well Hazard Paralysis	重力井危险瘫痪
+Starborn Death VFX	星裔死亡特效
++<mag>% Ship Ballistic Weapon Damage	+<mag>% 飞船弹道武器伤害
++<mag>% Ship Particle Weapon Damage	+<mag>% 飞船粒子武器伤害
++<mag>% Ship Energy Weapon Damage	+<mag>% 飞船能量武器伤害
++<mag>% Ship Energy Weapon Recharge Rate	+<mag>% 飞船能量武器充能速度
++<mag>% Ship Ballistic Weapon Recharge Rate	+<mag>% 飞船弹道武器充能速度
+Cybertech Ballistic Calibrater	赛博科技弹道校准器
++<mag>% Grav Jump Calc	+<mag>% 重力跃迁计算
++<mag>% Ship Repair Speed	+<mag>% 飞船维修速度
++<mag>% Ship Top Speed	+<mag>% 飞船最高速度
+Place Toxic Gas Bomb NPC Damage Hazard	放置毒气弹NPC伤害区域
++<mag>% Ship EM Weapon Damage	+<mag>% 飞船电磁武器伤害
++<mag>% Ship Missile Weapon Damage	+<mag>% 飞船导弹武器伤害
+Damage Engine	伤害引擎
++<mag>% Ship Particle Weapon Recharge Rate	+<mag>% 飞船粒子武器充能速度
+Damage Weapon 1	伤害武器1
+Damage Weapon 2	伤害武器2
+Damage Shield	伤害护盾
+Damage Reactor	伤害反应堆
+Damage Grav Drive	伤害重力引擎
++<mag>% Ship Missile Weapon Recharge Rate	+<mag>% 飞船导弹武器充能速度
++<mag>% Ship EM Weapon Recharge Rate	+<mag>% 飞船电磁武器充能速度
+Damage Weapon 3	伤害武器3
++<mag>% Ship Shield Capacity	+<mag>% 飞船护盾容量
+80% Harder to detect	更难被探测 80%
+<mag> damage to targets around you in a <area>m radius.	对<area>米半径内的目标造成<mag>点伤害。
+Run and Sprint <mag>% slower	奔跑与冲刺速度降低<mag>%
+Armillary Gravity Well	浑天仪重力井
+Creates an area that re-animates corpses for <dur> in a <area>m area.	在<area>米范围内创造一个持续<dur>的复活尸体区域。
+Reanimation Field Deploy	复活力场部署
+Send out a powerful wave of gravity that knocks down foes in a radius.	释放一道强大的重力波，击倒半径内的敌人。
+Gravity Wave Push	重力波推击
+Player Fleet Docking Faction	玩家舰队对接口阵营
+Spacer Station Boss Faction	太空劫匪空间站首领阵营
+Hotel Services	酒店服务
+Trade Authority Services	贸易管理局服务
+Weapons Services	武器服务
+Outfitter Services	装备服务
+Harper's Services	哈珀的服务
+BABS's Services	BABS的服务
+Laine's Services	莱恩的服务
+Gren's Services	格伦的服务
+Watchtower Hostile Faction	瞭望塔敌对阵营
+Use this rather than the defaul playerFaction to prevent errors	使用此阵营而非默认的playerFaction，以避免出错
+Watchtower MQ01 Friendly Faction	瞭望塔MQ01友好阵营
+Stardock Faction	星坞阵营
+Watchtower Hostile Ship Faction	瞭望塔敌对舰船阵营
+Class M	M级
+Watchtower manufactured component. This item can be used as a component in crafting.	瞭望塔制造的组件。此物品可作为制作组件使用。
+Bot Activated Combat	机器人激活战斗
+Mining Complete	采矿完成
+LEVEL 15	等级15
+{0}: Watchtower can start in a system of level 15 or higher.	{0}：瞭望塔可在等级15或更高的星系中开始。
+LEVEL 55	等级55
+{0}: Watchtower can start in a system of level 55 or higher.	{0}：瞭望塔可在等级55或更高的星系中开始。
+PYRAAS SYSTEM	派拉斯星系
+{0}: Watchtower can only start in the Pyraas system.	{0}：瞭望塔只能在派拉斯星系中开始。
+Sets the system level required to first encounter Watchtower.\r\n\r\n{0}\r\n\r\n{1}\r\n\r\n{2}	设置首次遭遇瞭望塔所需的星系等级。\r\n\r\n{0}\r\n\r\n{1}\r\n\r\n{2}
+Start Level	起始等级
+You?	你呢？

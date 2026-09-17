@@ -1,0 +1,167 @@
+#en	zh
+Deepseeker Space Helmet	深海探索者太空头盔
+Matteo Khatri's Hat	马蒂奥·卡特里的帽子
+Genesis Spacesuit	创世纪太空服
+Starborn Spacesuit Astra	星裔太空服：阿斯特拉
+Conclave Directive #742	秘议会指令#742
+Conclave Directive #742:\r\n\r\nIn light of recent breaches and the release of the Mendori entity, immediate containment protocols are now in full effect. Its psychic influence and manipulative abilities present a severe threat to Genesis operations. Neutralization is imperative. All personnel are strictly forbidden from engaging without prior authorization. The entity is highly dangerous, capable of altering perceptions and controlling minds. Extreme caution is advised.\r\n\r\nThe entity's location has been traced to the coordinates attached below.\r\n\r\nEnd of Directive.	秘议会指令#742：\r\n\r\n鉴于近期发生多起入侵事件，以及门多里实体被释放，立即启动收容协议，现已全面生效。其精神影响力和操纵能力对创世纪的行动构成严重威胁，必须予以清除。未经事先授权，所有人员严禁与其接触。该实体极度危险，能够扭曲认知、控制心智，务必高度警惕。\r\n\r\n该实体的位置已追踪至下方所附坐标。\r\n\r\n指令结束。
+Clear Landscape - Circle	空旷地形 - 圆形
+Genesis Operative	创世纪特工
+Genesis Arbiter	创世纪仲裁者
+Genesis Overlord	创世纪霸主
+Agent Blue	蓝特工
+Lorcan Fyre	洛尔坎·法尔
+UC Command	联殖指挥部
+Arden Voss	阿登·沃斯
+Kholen	科伦
+Genesis Officer	创世纪军官
+Genesis Sentinel	创世纪哨兵
+Genesis Initiative Controller	创世纪组织控制器
+Emily Archer	艾米莉·阿彻
+Grace Narell	格蕾丝·纳雷尔
+Genesis Enforcer	创世纪执法者
+Genesis Commander	创世纪指挥官
+Dorian Skell	多里安·斯凯尔
+Genesis Recruit	创世纪新兵
+Genesis Guardian	创世纪守卫
+Science Facility Keycard	科研设施钥匙卡
+Orb	球体
+The Core	核心
+UC Navy A Combat	联殖海军A型战斗舰
+Genesis Capital Ship	创世纪主力舰
+Excavation Site	挖掘场
+Missile Turret	导弹炮塔
+Research Facility	科研设施
+Genesis Fleet	创世纪舰队
+Scientific Wing	科学区
+Cave	洞穴
+Genesis Initiative Base	创世纪组织基地
+Abandoned Shipping Depot	废弃航运仓库
+Groombridge III	格龙布里奇III
+Andromas I	安德罗玛I
+Maintenance Facility	维护设施
+Retrieve encrypted slate	取回加密数据板
+Agent Blue asked me to get an encrypted slate.	蓝特工要我取回一块加密数据板。
+Made it to the target location where the boss is	抵达首领所在的目标地点
+I have the slate.	我拿到数据板了。
+Go to <Alias=TargetLocation> at <Alias=TargetPlanetLocation>	前往<Alias=TargetPlanetLocation>的<Alias=TargetLocation>
+Get the slate from Benjamin Strom	从本杰明·斯特罗姆处取得数据板
+Return the slate to Agent Blue	将数据板交还给蓝特工
+The Veil	帷幕
+STAGE 0	阶段0
+ON START	开始时
+Playing distress call	播放求救信号
+Emily Archer is under siege by Ecliptic mercenaries on Andromas I and sent out a distress call. I should talk to her.	艾米莉·阿彻在安德罗玛I上遭到黄道佣兵团的围攻，她发出了求救信号。我应该去和她谈谈。
+Quick start - skips to the Core.	快速开始 - 跳至核心。
+Quick start - completes quest, enables radiant missions and Emily follower at MAST.	快速开始 - 完成任务，启用随机任务，并在三头同盟启用艾米莉随从。
+Talked to Emily, didn't accept mission.	与艾米莉交谈过，未接受任务。
+Got first mission.	接到第一个任务。
+Emily is locked out of the facility and tasked me with retrieving the key from Arden Quill.	艾米莉被锁在设施外，让我去阿登·奎尔那里取回钥匙。
+Turned in first mission.	交付了第一个任务。
+Player declined to see what's inside.	玩家拒绝查看内部。
+Emily invites player inside.	艾米莉邀请玩家进入。
+Emily has unlocked the facility with the key I retrieved. I should to follow her inside.	艾米莉用我取回的钥匙打开了设施。我应该跟着她进去。
+Emily reaches Barrier, starts scene.	艾米莉抵达屏障，开始场景。
+Emily has spoken about barrier.	艾米莉谈到了屏障。
+Emily spoke to player, asked them to stand back.	艾米莉与玩家交谈，让玩家退后。
+Enter cave, Emily follows.	进入洞穴，艾米莉跟随。
+Reached artifact, start explosion scene	抵达神器，开始爆炸场景
+Player wakes up in medbay	玩家在医疗舱醒来
+After an explosion in the cave, I woke up in a med bay. Agent Blue is waiting for me, and I should talk to him.	洞穴发生爆炸后，我在医疗舱醒来。蓝特工在等我，我应该去和他谈谈。
+Talk to Agent Blue	与蓝特工交谈
+Asked why he's there	询问了他为何在此
+Got Emily coordinates from Agent Blue	从蓝特工处获得艾米莉的坐标
+Emily was extracted by the Genesis Initiative. Agent Blue provided me with her location, I should try to find her.	艾米莉被创世纪组织带走了。蓝特工给了我她的位置，我应该试着找到她。
+Freed Emily, and Genesis showed up.	救出艾米莉，创世纪出现。
+Emily wants to go to location	艾米莉想去某个地点
+Emily mentioned feeling a pull toward specific coordinates after our encounter in the cave. I should travel to those coordinates.	艾米莉说在洞穴遭遇之后，她感觉到某种力量在牵引她前往特定坐标。我应该前往那些坐标。
+Entered Orbit of Lantana II-a. Explore star station.	进入马缨丹II-a轨道。探索星际站。
+-Choice: Takes genesis payoff, ends quest line.	-选择：接受创世纪的报酬，结束任务线。
+-Choice: Doesn't take Genesis offer, start fight.	-选择：不接受创世纪的提议，开始战斗。
+Enters Alien cage	进入异星生物牢笼
+I discovered a strange-looking being at the heart of the facility. I should wait for Emily to catch up.	我在设施的核心处发现了一个外形怪异的生命体。我应该等艾米莉跟上来。
+Alien released	异星生物被释放
+Alien and Emily gone, go to MAST.	异星生物和艾米莉消失，前往三头同盟。
+After Emily released the alien Kholen, he mysteriously teleported away, taking Emily with him. I need to speak with Agent Blue to figure out what to do next.	艾米莉释放异星生物科伦后，他神秘地传送离开，并带走了艾米莉。我需要和蓝特工谈谈，弄清下一步该怎么做。
+Got mission from Agent Blue	从蓝特工处接到任务
+Slate read.	已读取数据板。
+Slate read, go to the Core.	已读取数据板，前往核心。
+The encrypted slate contained a summons to meet the Genesis leaders, the Conclave. They are located on the Core, a place unknown to Agent Blue. I should travel there to investigate.	加密数据板中有一份召见令，要我会见创世纪的领导人——秘议会。他们位于核心，一个蓝特工也不知道的地方。我应该前往那里调查。
+Entered The Core location	进入核心区域
+Can decide to kill Conclave or leave.	可选择杀死秘议会或离开。
+Player agreed with the Conclave.	玩家同意了秘议会。
+Player started killing on the Core or in space.	玩家在核心或太空中开始杀戮。
+Got the slate with Kholen info	拿到载有科伦信息的数据板
+Find Emily	找到艾米莉
+-Choice: Won't help Alien	-选择：不会帮助异星生物
+Alien teleport out on bleedout.	异星生物在濒死时传送离开。
+-Choice: Will help Alien	-选择：会帮助异星生物
+Exit cave after meeting Alien	与异星生物会面后离开洞穴
+Enable terrormorph	启用骇变兽
+Start fight	开始战斗
+With Agent Blue's help, we successfully defeated the Genesis Initiative. I should talk to him.	在蓝特工的帮助下，我们成功击败了创世纪组织。我应该去和他谈谈。
+To space battle	前往太空战斗
+Agent Blue informed me that the Genesis Initiative is assembling a fleet for an all-out strike on the United Colonies. I should head to Hawley, where the UC Navy will meet me.	蓝特工告诉我，创世纪组织正在集结舰队，准备对联合殖民地发动全面进攻。我应该前往霍雷星，联殖海军会在那里与我会合。
+If Emilly is alive, get her.	如果艾米莉还活着，就去救她。
+After defeating the Genesis fleet, Kholen sent an ominous message, saying I had freed him from the chains that bound his kind and that the Mendori will rise again in time. He claimed the galaxy would soon understand their true power, but for now, he is departing to realms beyond reach. He also mentioned Emily, saying she fought well but is broken. I should get to her quickly.	击败创世纪舰队后，科伦发来一条不祥的讯息，说我已将他从束缚其族类的锁链中解放，门多里终将再度崛起。他声称星系很快就会明白他们真正的力量，但此刻他正前往遥不可及的领域。他还提到了艾米莉，说她战斗得很出色，但已经身心俱疲。我应该尽快赶到她身边。
+After defeating the Genesis fleet, Kholen sent an ominous message, saying I had freed him from the chains that bound his kind and that the Mendori will rise again in time. He claimed the galaxy would soon understand their true power, but for now, he is departing to realms beyond reach. I need to inform Agent Blue.	击败创世纪舰队后，科伦发来一条不祥的讯息，说我已将他从束缚其族类的锁链中解放，门多里终将再度崛起。他声称星系很快就会明白他们真正的力量，但此刻他正前往遥不可及的领域。我需要通知蓝特工。
+Credits added.	已添加信用点。
+Took Genesispayoff	接受了创世纪的报酬
+I chose to walk away from the Genesis Initiative in exchange for a sum of credits. However, this decision caused Emily to turn hostile towards me.	我选择以一笔信用点为代价离开创世纪组织。然而，这个决定让艾米莉对我产生了敌意。
+I met Emily Archer while responding to a distress call. Together, we uncovered a larger plot involving the alien Kholen and an organization called the Genesis Initiative. After battling the Genesis Initiative and destroying their fleet, Kholen sent an ominous message, warning of the Mendori's return in the future.	我在响应求救信号时遇见了艾米莉·阿彻。我们一同揭开了一桩更大的阴谋，牵涉到异星生物科伦和一个名为创世纪组织的势力。在击败创世纪组织并摧毁其舰队后，科伦发来一条不祥的讯息，警告门多里将在未来回归。
+Talk to Emily Archer on Andromas I	在安德罗玛I上与艾米莉·阿彻交谈
+Bring the key to Emily	把钥匙带给艾米莉
+Follow Emily	跟随艾米莉
+Talk to Emily	与艾米莉交谈
+Explore the cave	探索洞穴
+Wait for Emily	等待艾米莉
+Travel to the coordinates	前往坐标地点
+Investigate asteroid	调查小行星
+Retrieve the encrypted slate	取回加密数据板
+Travel to the Core	前往核心
+Obtain information on Emily's whereabouts.	获取艾米莉下落的情报。
+Read the slate	读取数据板
+Exit the cave	离开洞穴
+Defeat the Genesis Intiative	击败创世纪组织
+Defeat the Genesis fleet	击败创世纪舰队
+Get to Emily	赶到艾米莉身边
+DEBUG STAGE	调试阶段
+Emily available as Crew	艾米莉可作为船员
+Emily Hired	已雇佣艾米莉
+Wait until wave 1 is triggered.	等待第1波被触发。
+Wave 1	第1波
+Start enemy wave 1.	开始敌人第1波。
+Start enemy wave 2.	开始敌人第2波。
+Enable UC help, kill off Terrormorph	启用联殖援军，杀死骇变兽
+Start enemy wave 3.	开始敌人第3波。
+Waves Complete	波次完成
+all wave 3 enemies are dead, concluding the wave battle.	第3波敌人全部死亡，波次战斗结束。
+Misc dialogue	杂项对话
+Has asked about hunting down remaining Genesis members	已询问追捕剩余的创世纪成员
+Get the key from <Alias=BossRef>	从<Alias=BossRef>处取得钥匙
+Emily asked me to get a key card.	艾米莉让我去取一张钥匙卡。
+I have the key.	我拿到钥匙了。
+Return the key to Emily	把钥匙交还给艾米莉
+Operation Cleanup	清剿行动
+Agent Blue assigned me additional Genesis operatives to eliminate.	蓝特工又指派了几名创世纪特工让我清除。
+I have killed the mark.	我已杀死目标。
+Kill the Genesis operative	杀死创世纪特工
+Return to Agent Blue	返回蓝特工处
+Start	开始
+Genesis reinforcements 1	创世纪增援1
+Genesis reinforcements 2	创世纪增援2
+Genesis reinforcements 3	创世纪增援3
+UC reinforcements 1	联殖增援1
+UC reinforcements 2	联殖增援2
+UC reinforcements 3	联殖增援3
+UC reinforcements 4	联殖增援4
+Enable Capital ship	启用主力舰
+Fleet destroyed	舰队被摧毁
+Science Facility	科研设施
+The door's security protocol locks it down during hostilities.	舱门的安全协议会在交战期间将其锁定。
+Benjamin Strom	本杰明·斯特罗姆
+Arden Quill	阿登·奎尔
+Genesis Reaper	创世纪收割者
+Genesis Tempest	创世纪暴风雨
+Nesoi	内索伊星
+Indum II	天峥II

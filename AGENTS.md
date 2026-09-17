@@ -39,6 +39,17 @@ D:\Mod Organizer 2
 `tr_sid_probe.py`（按字符串 ID 取官方译名，用于「覆盖原版记录」的定名）、
 `tr_mkbatch.py`（按抽取文件行号生成词典批次，避免手抄长英文段落）。
 
+`ase3.esm` / `aseveil.esm` / `aseeverbright.esm` / `kinggathcreations_spaceship.esm`
+的汉化说明在 `docs/09-ASE系列与Kinggath汉化.md`：
+前三个是**内联字符串**插件，走老流水线，**已完成并部署**；
+`kinggathcreations_spaceship` 是**本地化插件（flags 0x81）**，文本在 BA2 的
+`STRINGS/` 里（自带 `_zhhans` 其实是英文副本）⇒ 新增
+`tools/re/tr_locpack.py`（三件套读写，**按原始字节保真**）与 `tools/re/kg_sanity.py`（自检），
+汉化包以**松散文件**部署到 `overwrite\Strings\`（**松散优先于归档，待游戏内实测确认**）；
+UI/终端/物品**已全译**，NPC 对白还剩约 4988 行未译（可增量续译）。
+另新增 `tools/re/tr_lookup.py`（官方对照表精确/前缀查词）、
+`tools/re/tr_check_keys.py`（手写批次英文键逐字命中校验）。
+
 ## 注意事项
 - Visual Studio 2026已安装，MSVC v143 生成工具已包含
 - 已完成内容要记录在：docs/99-当前项目进度.md，其他经验总结文档也可以记录在这个文件夹里，单个文件不得超过100KB，超过后可以简化或删除过老或已经不再重要的记录

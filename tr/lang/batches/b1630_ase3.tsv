@@ -1,0 +1,186 @@
+#en	zh
+Buff Ship System Power - Reactor	增强飞船系统功率 - 反应堆
+ASE3ShipAbilityBuffReactor 01	飞船能力：反应堆强化 01
+Door Control	舱门控制
+Shocktroop Spacesuit	突击队太空服
+Default	默认
+SEDA Space Helmet	SEDA太空头盔
+Hadrian's Outfit	哈德良的服装
+Starborn Spacesuit Avitus	星裔太空服：阿维图斯
+SEDA Crew Uniform	SEDA船员制服
+SEDA Spacesuit	SEDA太空服
+Encrypted Slate	加密数据板
+Storage	储物箱
+SEDA Power Cell	SEDA能量电池
+Cydonia Resident's ID Card	赛多尼亚居民身份证
+Giant Rocky Asteroid	巨型岩石小行星
+SEDA Agent	SEDA特工
+SEDA Officer	SEDA军官
+Pilot	飞行员
+Quinn	奎恩
+Maddox	马多克斯
+Charles	查尔斯
+April Jones	艾普莉尔·琼斯
+James Darnell	詹姆斯·达内尔
+SEDA Robot Model A	SEDA机器人A型
+Colton Wright	科尔顿·赖特
+Security Keycard	安保钥匙卡
+Station Terminal	空间站终端
+Computer	电脑
+SEDA Kismet III	SEDA天命III
+SEDA Terminus	SEDA终点站
+SEDA Kismet	SEDA天命
+Asteroid Structure	小行星建筑
+SEDA Halcyon III	SEDA宁静III
+SEDA Terminus II	SEDA终点站II
+SEDA Starstation	SEDA星站
+Farseer Drone Type 2	远见者无人机2型
+Farseer Drone Type 1	远见者无人机1型
+SEDA Command Ship	SEDA指挥舰
+SEDA Kismet II	SEDA天命II
+SEDA Halcyon	SEDA宁静
+SEDA Halcyon II	SEDA宁静II
+Attachment Test Cell	配件测试区域
+Test orb	测试球体
+SEDA Blacksite	SEDA秘密基地
+Debris Field	碎片带
+Sensor Contact	传感器接触信号
+Asteroid Starstation	小行星星际站
+Structure	建筑
+Storage Site	储存场
+Colton Wrigth's Outpost	科尔顿·赖特的哨站
+Farseer: Maddox	远见者：马多克斯
+Talked to Wright	与赖特交谈过
+Made it to the target location where the Ecliptic is	抵达黄道佣兵团所在的目标地点
+Talked to Ecliptic	与黄道佣兵团交谈过
+End	结束
+Find the Maddox on <Alias=TargetPlanetLocation>	在<Alias=TargetPlanetLocation>上找到马多克斯
+Find Maddox	找到马多克斯
+I have a special assignment for you, <Alias=Player>. Come talk to Diego Moreno. Trust me, you'll be interested.	我有个特别任务要交给你，<Alias=Player>。来找迭戈·莫雷诺谈谈。相信我，你会感兴趣的。
+Hit 1	触发1
+Hit 2	触发2
+Hit 3	触发3
+Hit 4	触发4
+Hit 5	触发5
+Hit 6	触发6
+Hit 7	触发7
+Msg 1	讯息1
+Msg 2	讯息2
+Msg 3	讯息3
+Msg 4	讯息4
+Disable	禁用
+Enable	启用
+Reset	重置
+Spawn new drone.	生成新无人机。
+Spawn new EMP drone.	生成新的电磁脉冲无人机。
+Start battle	开始战斗
+Wave 2	第2波
+Wave 3	第3波
+SEDA defeated	SEDA被击败
+Startup Stage	启动阶段
+Stop Stage	停止阶段
+Farseer	远见者
+Quest start	任务开始
+Dock with station	与空间站对接
+-Asked about logs	-询问了日志
+Go to Wright	前往赖特处
+-Asked about SEDA	-询问了SEDA
+-Asked about Tisserand	-询问了蒂斯朗
+Exit bunker having talked to Wright	与赖特交谈后离开掩体
+SEDA scene	SEDA场景
+-Asked what SEDA wants	-询问了SEDA想要什么
+-Asked about Project	-询问了项目
+-Won't help SEDA	-不会帮助SEDA
+Agreed to talk to Quinn.	同意与奎恩交谈。
+-Killed SEDA	-杀死了SEDA
+Rebel ship jumps in.	叛军飞船跃入。
+Rebel ship jumps out	叛军飞船跃出
+Go to rebel ship.	前往叛军飞船。
+-Asked about asteroid	-询问了小行星
+Activate robots. SEDA set to enemy. Search bodies.	激活机器人，将SEDA设为敌人，搜索尸体。
+Back to Quinn	返回奎恩处
+-Told about 1	-被告知1
+-Told about 2	-被告知2
+Asked to get help from Ecliptic	被要求向黄道佣兵团求援
+Return having gotten Ecliptic guard.	获得黄道佣兵团卫兵后返回。
+Go to blacksite	前往秘密基地
+Got powercell one. Back to Wright.	拿到第一块能量电池，返回赖特处。
+SEDA fleet attack at station	SEDA舰队攻击空间站
+Insert power cell	插入能量电池
+Inserted power cell	已插入能量电池
+Wait	等待
+Go for SEDA starstation	前往SEDA星站
+Starstation fleet defeated	星站舰队被击败
+Talk to Wright at Starstation	在星站与赖特交谈
+Gain entry	进入
+Fill up gas	加注燃料
+Locked up	已被锁定
+Maddox saved the day	马多克斯力挽狂澜
+Last power cell, back to Quinn	最后一块能量电池，返回奎恩处
+Insert power cell 2	插入能量电池2
+Remove gas	抽出燃料
+Talk to Quinn before asteroid	前往小行星前与奎恩交谈
+Wait before asteroid	在小行星前等待
+Go to asteroid, Quinn follows.	前往小行星，奎恩会跟随。
+Explore	探索
+Entered puzzle room	进入解谜房间
+Light it up, Talk to Quinn	点亮它，与奎恩交谈
+Move Quinn to position	将奎恩移动到指定位置
+Puzzle started	解谜开始
+Puzzle completed	解谜完成
+Post dialogue	对话后
+Post dialogue 2	对话后2
+-Option 1	-选项1
+Return to station	返回空间站
+Field shutdown, enable QuinnStation	力场关闭，启用奎恩空间站
+Find SEDA command ship	找到SEDA指挥舰
+Final battle	最终战斗
+2nd wave of drones	第二波无人机
+Return to the station	返回空间站
+Quest completed later	任务稍后完成
+Quest completed early, takes credits.	任务提前完成，收取报酬。
+Quest completed	任务完成
+Dock with the starstation	与星站对接
+Find Colton Wright on Lantana III	在马缨丹III上找到科尔顿·赖特
+Talk to the SEDA officer	与SEDA军官交谈
+Return to Quinn	返回奎恩处
+Talk to Quinn	与奎恩交谈
+Talk to the SEDA defectors	与SEDA叛逃者交谈
+Search the SEDA defectors	搜查SEDA叛逃者
+Return to Quinn and Wright	返回奎恩与赖特处
+Get help	寻求帮助
+Retrieve power cell from the SEDA blacksite	从SEDA秘密基地取回能量电池
+Defeat the SEDA fleet	击败SEDA舰队
+Insert the power cell	插入能量电池
+Talk to Maddox when you are ready	准备好后与马多克斯交谈
+Eliminate SEDA ships around the starstation	消灭星站周围的SEDA飞船
+Find the power cell	找到能量电池
+Talk to Wright	与赖特交谈
+Gain access to the secure room	进入安全房间
+Talk to Maddox	与马多克斯交谈
+Talked to Quinn when you're ready	准备好后与奎恩交谈
+Dock with the structure inside the asteroid	与小行星内部的建筑对接
+Explore the structure	探索该建筑
+Approach the sphere	接近球体
+Locate the SEDA command ship	定位SEDA指挥舰
+Destroy the SEDA fleet	摧毁SEDA舰队
+Speed	速度
+Reactor	反应堆
+Cargo	货舱
+Wright's shack	赖特的小屋
+Asteroid	小行星
+SEDA Command	SEDA指挥部
+Makeshift Camp	临时营地
+Second Floor	二楼
+All active drones will be replaced and their settings restored to default.	所有现役无人机都将被更换，其设置将恢复为默认值。
+If you see this message, the quest to find Maddox has failed to start.\r\n\r\nThis is most likely caused by another mod or creation that changes POIs.\r\n\r\nTo keep Farseer's story moving, the game will continue as if you had already recruited Maddox.	如果你看到此讯息，说明寻找马多克斯的任务未能启动。\r\n\r\n这很可能是由其他模组或创作修改了兴趣点所致。\r\n\r\n为了让远见者的故事得以继续，游戏将视同你已招募马多克斯，照常推进。
+Quest Start Error	任务启动错误
+First Floor	一楼
+Access denied. Ship controls are locked.	访问被拒绝。飞船控制已锁定。
+Lantana III	马缨丹III
+Al-Battani VIII-a	阿尔巴塔尼VIII-a
+Jaffa II	迦法II
+Messages	讯息
+Terminal	终端
+Drone Information	无人机信息
+System Integration	系统集成

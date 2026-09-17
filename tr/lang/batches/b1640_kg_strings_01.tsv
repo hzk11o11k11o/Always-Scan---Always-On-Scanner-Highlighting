@@ -1,0 +1,415 @@
+#en	zh
+Parent Group	父级分组
+Watchtower Options	瞭望塔选项
+HARD	困难
+{0}: Watchtower ambushes occur more frequently.	{0}：瞭望塔的伏击会更加频繁。
+NORMAL	普通
+{0}: Watchtower ambushes occur at the standard rate.	{0}：瞭望塔的伏击按标准频率发生。
+EASY	简单
+{0}: Watchtower ambushes occur infrequently.	{0}：瞭望塔的伏击较少发生。
+VERY EASY	非常简单
+{0}: Watchtower ambushes occur very rarely.	{0}：瞭望塔的伏击极少发生。
+Determines how frequently Watchtower ambushes occur.\r\n\r\n{0}\r\n\r\n{1}\r\n\r\n{2}\r\n\r\n{3}	决定瞭望塔伏击的发生频率。\r\n\r\n{0}\r\n\r\n{1}\r\n\r\n{2}\r\n\r\n{3}
+Ambush Chance	伏击几率
+LIMITED	有限
+{0}: Your fleet will only follow you into battle against Watchtower ships.	{0}：你的舰队只会跟随你投入与瞭望塔舰船的战斗。
+ALWAYS	始终
+{0}: Your fleet should always follow you into battle.	{0}：你的舰队会始终跟随你投入战斗。
+Determines when fleet ships should arrive to assist in combat.\r\n\r\n{0}\r\n\r\n{1}	决定舰队舰船何时前来协助战斗。\r\n\r\n{0}\r\n\r\n{1}
+Fleet Availability	舰队出勤
+Unmark for Salvage	取消拆解标记
+Mark for Salvage	标记拆解
+<Alias.CurrentName=SelectedShip> - <Alias.CurrentName=SelectedPilot>\r\n\r\nPlease confirm salvage selection. Ships marked for salvage will be destroyed.	<Alias.CurrentName=SelectedShip> - <Alias.CurrentName=SelectedPilot>\r\n\r\n请确认拆解选择。被标记拆解的舰船将被摧毁。
+Salvaging	拆解中
+Major Array link details removed from your mission log.\r\n	主阵列的链接详情已从任务日志中移除。\r\n
+Clear From Mission Log	从任务日志中清除
+Major Array link details downloaded to your mission log.	主阵列的链接详情已下载至任务日志。
+Download Linked System Details	下载已链接星系的详情
+Project Hermes\r\n\r\nGoal: Overcome limitations of FTL communications and increase response times to identified threats.\r\n\r\nOverview: The introduction of sentient drones in our fleets has opened the door to near realtime reaction to events across the known systems. Using fuel efficient, fast-spinning micro-grav drives, these drones can deliver communication bursts of data between jumps. Set to operate around the clock, these drones can relay data from local space to anywhere in the galaxy.\r\n\r\nDetails: Having an infinite number of drones blinking rapidly between every system would pose significant problems logistically - sourcing that much Helium alone would be impractical - and would risk exposing our operations to the broader zeitgeist.\r\n\r\nTo optimize this system, we've created the Major Array chain.\r\n\r\nA series of five large satellite arrays act as hub points throughout the galaxy. Each of these is linked to a series of small arrays in systems deemed to be of similar threat level. Each of these Major arrays is paired with an appropriate sized response fleet, and is equipped with its own independent intelligence which can handle local fleet dispatch as well as Drone management.\r\n\r\nDrones are then assigned to constant data-collection sweeps to transmit data from local monitoring arrays to their corresponding major array only. That major array will then dispatch appropriate fleet to the linked array to handle local threats or monitoring needs. It is also capable of reassigning portions of local response fleets to other Major Arrays or assignments as the general threat level of its linked systems changes or the linked system count is reduced (generally - reduction occurs naturally as the local intelligence determines better resource allocation is recommended).\r\n\r\nIn the case of an emergency - such as if significant damage is done to the Major Array or its local response fleet, the intelligence will redirect it's Drone fleet to the next Major Array, transferring its data up the chain. Of course, as is standard protocol, all linked arrays will be wiped and destroyed in such an event.\r\n\r\nNote the use of our threat monitoring system is color-coded, so that dispatched response teams, which are each headed by human fleets can take appropriate precautions.\r\n\r\nGreen: No significant or corroborated activity\r\nTeal: Some reported activity, specific location unknown\r\nYellow: Confirmed activity, threat identified, tracking ongoing\r\nOrange: High activity, threat confirmed and actively tracked\r\nRed: Extreme activity, threat verified, detainment recommended\r\n	赫尔墨斯计划\r\n\r\n目标：克服超光速通信的局限，提升对已识别威胁的响应速度。\r\n\r\n概述：我方舰队引入有感知能力的无人机后，我们得以近乎实时地应对已知星系中的各类事件。这些无人机采用节省燃料、高速旋转的微重力引擎，可在跃迁间隙传递通信数据包。它们全天候运转，可将数据从当地空间中继到银河系任何角落。\r\n\r\n详情：若让无限数量的无人机在各大星系间高速穿梭，后勤上将面临巨大难题——光是筹集所需的氦气就不切实际——还有可能让我们的行动暴露在更广泛的公众视野之下。\r\n\r\n为优化这一系统，我们构建了主阵列链条。\r\n\r\n五个大型卫星阵列构成遍布银河系的枢纽节点。每个主阵列都与一系列位于威胁等级相近星系的小型阵列相连。每个主阵列都配有一支规模相当的响应舰队，并搭载独立的智能系统，可负责本地舰队的调度以及无人机的管理。\r\n\r\n随后，无人机被指派执行持续的数据收集巡航，仅将数据从本地监测阵列传回对应的主阵列。主阵列再向相连的阵列派出适当的舰队，以应对本地威胁或监测需求。当其所辖星系的总体威胁等级发生变化，或相连星系数量减少时（通常——当本地智能判断建议进行更优的资源调配时，减少会自然发生），主阵列还能将部分本地响应舰队重新调配至其他主阵列或任务。\r\n\r\n遇到紧急情况时——例如主阵列或其本地响应舰队遭受重大损伤——智能系统会将其无人机舰队转向下一个主阵列，把数据沿链条向上传递。当然，按照标准协议，届时所有相连的阵列都将被抹除并摧毁。\r\n\r\n请注意，我们的威胁监测系统采用颜色编码，以便由人类舰队带领的派出响应队伍能够采取适当的防范措施。\r\n\r\n绿色：无重大或经证实的情报\r\n青色：有部分报告的活动，具体位置不明\r\n黄色：已确认活动，识别出威胁，持续追踪中\r\n橙色：活动频繁，威胁已确认并正在积极追踪\r\n红色：活动极为猖獗，威胁已核实，建议予以扣押\r\n
+Activate Astralgate	激活星界之门
+SYSTEM WARNING: ASTRALGATE INITIATION\r\nCaution: This is a one-way process. Temporal and spatial parameters will destabilize upon ignition.\r\n\r\nNo failsafe protocols detected.\r\nProceed with extreme caution.	系统警告：星界之门启动中\r\n警告：此过程不可逆。点火后时空参数将失去稳定。\r\n\r\n未检测到任何故障保护协议。\r\n请极度谨慎地继续操作。
+Astralgate Configuration	星界之门配置
+Codename: Ripple\r\nClassification: Low Priority\r\n\r\nSummary:\r\nFirst cataloged during minor localized conflict. Initial assessment, low-risk deviant. Displays typical characteristics, but with minimal escalation probability. Observation: Ninth version of this individual to enter universe. Prior iterations designated DS1089-A through DS1089-H.\r\n\r\nNotable Traits:\r\n- Demonstrates standard Deviant energy manipulation, though at a significantly lower than expected proficiency.\r\n- Has shown a tendency to "test the waters" by inserting self into smaller, inconsequential events, seemingly gathering information or subtly influencing outcomes without direct confrontation.\r\n- Does not demonstrate patterns of growth in power or influence.\r\n- Surveillance suggests primary purpose is passive observation rather than combative.\r\n\r\nCurrent Status:\r\nDeviant has remained on radar, though no immediate action has been deemed necessary. Multiple iterations of this deviant have entered and exited this universe, each time failing to establish any meaningful influence or present a risk beyond simple interference in minor affairs. Surveillance is ongoing, though this deviant is not considered a priority.\r\n\r\nCurrent Assessment:\r\n- Low risk; no escalation of threat expected.\r\n- Observational status remains; regular monitoring suggested, but no direct containment or action necessary.\r\n\r\nEnd Log	代号：涟漪\r\n分级：低优先级\r\n\r\n概要：\r\n首次记录于一场小规模地区冲突期间。初步评估为低风险异常体。表现出典型特征，但升级概率极低。观察记录：这是该个体第九次进入本宇宙。此前的迭代编号为DS1089-A至DS1089-H。\r\n\r\n显著特征：\r\n- 表现出标准的异常体能量操纵能力，但熟练度明显低于预期。\r\n- 有"试探水温"的倾向，会将自己置入较小、无关紧要的事件中，看似在收集情报，或在不直接对抗的情况下微妙地影响结果。\r\n- 未表现出力量或影响力增长的模式。\r\n- 监视表明其主要目的是被动观察，而非交战。\r\n\r\n当前状态：\r\n该异常体仍在监控范围内，但认为无需立即采取行动。该异常体的多个迭代曾进入并离开本宇宙，每次都未能建立起任何有意义的影响力，除对小事进行简单干涉外不构成威胁。监视仍在继续，但该异常体不被视为优先事项。\r\n\r\n当前评估：\r\n- 低风险；预计不会出现威胁升级。\r\n- 维持观察状态；建议定期监测，但无需直接收容或采取行动。\r\n\r\n日志结束
+Watchtower Internal Log -- Deviant DE1089-I	瞭望塔内部日志——异常体DE1089-I
+Codename: Phantasm\r\nClassification: High Priority\r\n\r\nSummary:\r\nFirst detected during excursion into a high-priority cultural zone. Demonstrated exceptional ability to manipulate political systems.\r\n\r\nNotable Traits:\r\n- Appears to operate with advanced stealth capabilities, making detection and tracking exceptionally difficult.\r\n- Has shown consistent ability to distort or phase through energy-based barriers.\r\n- Early reports suggest a tendency to operate independently.\r\n- Phantasm's presence has been linked to several high-value operations overlapping with Watchtower assets.\r\n- A powerful telepathic abilities speculated, though unconfirmed.\r\n\r\nCurrent Status:\r\nPhantasm's presence has been noted in multiple regions of high importance to Watchtower operations. The deviant is actively avoiding containment measures, has avoided direct confrontation, instead relying on indirect interference and manipulation.\r\n\r\nRecommendations:\r\n- Immediate classification upgrade to "High Priority."\r\n- Full-scale surveillance across multiple sectors, especially those tied to Watchtower's key assets and operations.\r\n- Further investigation into possible links with other deviants, especially those exhibiting similar anomalous behaviors.\r\n- Suggested additional resources for tracking and neutralizing Phantasm's telepathic influence on human collaborators and assets.\r\n\r\nEnd Log	代号：幻影\r\n分级：高优先级\r\n\r\n概要：\r\n首次发现于一次进入高优先级文化区的行动中。展现出操纵政治体系的非凡能力。\r\n\r\n显著特征：\r\n- 似乎具备高级隐形能力，使其探测与追踪异常困难。\r\n- 一贯表现出扭曲或穿透能量屏障的能力。\r\n- 早期报告显示其有独立行动的倾向。\r\n- 幻影的出现与多起与瞭望塔资产重叠的高价值行动有关。\r\n- 推测其拥有强大的心灵感应能力，但尚未证实。\r\n\r\n当前状态：\r\n幻影的身影已出现在多个对瞭望塔行动至关重要的区域。该异常体正积极规避收容措施，避免直接对抗，转而依靠间接干涉与操纵。\r\n\r\n建议：\r\n- 立即将分级提升为"高优先级"。\r\n- 在多个星区展开全面监视，尤其是与瞭望塔关键资产和行动相关的区域。\r\n- 深入调查其与其他异常体（尤其是表现出类似反常行为的个体）之间可能的联系。\r\n- 建议增拨资源，以追踪并消除幻影对人类合作者及资产的心灵感应影响。\r\n\r\n日志结束
+Watchtower Internal Log -- Deviant DA1234-C	瞭望塔内部日志——异常体DA1234-C
+Codename: Albatross\r\nClassification: Medium Priority\r\n\r\nSummary:\r\nInitially cataloged following conflict with criminal elements. At the time, deviant was assessed as low-risk. However, subsequent actions have necessitated a reevaluation of classification.\r\n\r\nNotable Traits:\r\n- Initially low-priority target due to the lack of direct interference with Watchtower operations.\r\n-Following multiple incidents, including widespread disruption to regional power structures, Albatross' actions now represent a growing threat.\r\n- Exhibits high levels of charisma and influence, particularly among non-Starborn individuals, often disrupting human affairs for personal gain or amusement.\r\n- Active involvement in high-risk operations, including direct assistance to Deviant DS1599-A ("Bastion").\r\n- Association with Bastion has notably increased the urgency of containment efforts, the pair have displayed cooperative tactics that exacerbate existing threats.\r\n\r\nCurrent Status:\r\nDeviation is escalating due to direct alignment and association with Bastion. Albatross now operates in tandem with Deviant DS1599-A, and both present an amplified risk to ongoing operations and interests. Active suppression and containment now considered urgent.\r\n\r\nRecommendations:\r\n- Immediate reassessment of Albatross' threat level; classification upgrade is advised.\r\n- Escalate retrieval operation in coordination with Bastion's capture.\r\n- Continue surveillance of known associates and influence networks; star station "Stardock" recorded residents: Aisyah Harper, RogueAsset-59c "Gren", MD Sofia Laine, robotic unit B.A.B.S.\r\n\r\nEnd Log	代号：信天翁\r\n分级：中优先级\r\n\r\n概要：\r\n最初是在与犯罪分子的冲突后记录的。当时，该异常体被评估为低风险。然而，其后续行为使得有必要重新评估分级。\r\n\r\n显著特征：\r\n- 最初因未直接干涉瞭望塔行动而被列为低优先级目标。\r\n- 在多起事件（包括对地区权力结构的大范围破坏）之后，信天翁的行为如今已成为日益严重的威胁。\r\n- 表现出极高的魅力与影响力，尤其是在非星裔个体中，常常为个人利益或消遣而扰乱人类事务。\r\n- 积极参与高风险行动，包括直接协助异常体DS1599-A（"堡垒"）。\r\n- 与堡垒的关联显著提升了收容工作的紧迫性，二者展现出协同战术，加剧了现有威胁。\r\n\r\n当前状态：\r\n由于与堡垒的直接结盟与关联，其偏离程度正在升级。信天翁如今与异常体DS1599-A协同行动，二者对当前行动与利益构成被放大的风险。现已认为主动镇压与收容十分紧迫。\r\n\r\n建议：\r\n- 立即重新评估信天翁的威胁等级；建议提升分级。\r\n- 配合对堡垒的抓捕，升级回收行动。\r\n- 继续监视已知同伙及影响力网络；星际站"星坞"记录在册的居民：艾莎·哈珀、流氓资产-59c"格伦"、医学博士索菲亚·莱恩、机器人单位B.A.B.S.。\r\n\r\n日志结束
+Watchtower Internal Log -- Deviant DA1596-B	瞭望塔内部日志——异常体DA1596-B
+Codename: Bastion\r\nClassification: High Priority\r\n\r\nSummary:\r\nInitially flagged after first contact with Astralgate fragment (referred to as "Artifact"). Passive monitoring commenced immediately. Predictive modeling indicating a high probability of Bastion becoming S-category deviant. Early containment authorized and attempted; logged deviation in exceeded projections, containment failed.\r\n\r\nNotable Traits:\r\n- Demonstrated extreme physical resilience beyond baseline profiles.\r\n- Accelerated growth patterns observed, suggesting anomalous energy absorption.\r\n- Rapid adaptation to environmental threats, including establishment of defensive fleet.\r\n- Established ties with other deviants, resulting in increased risk and complicating containment efforts.\r\n- Active disruption to Watchtower surveillance array networks.\r\n- Multiple incidents initiated by Bastion have resulted in high-risk exposure and collateral damage, necessitating substantial information suppression and operational redaction.\r\n\r\nCurrent Status:\r\nBastion's deviation continues to escalate. Actions and behaviors align with emergent S-category tendencies. Immediate retrieval remains a high-priority operation.\r\nRecommendations:\r\n- Continued surveillance of communication channels linked to DS1599-A.\r\n- Escalate retrieval operation with full force; further deviation is imminent, and the potential for catastrophic escalation is present.\r\n- Avoid direct contact without adequate containment measures. Potential for resistance is higher than initially projected.\r\n\r\nEnd Log	代号：堡垒\r\n分级：高优先级\r\n\r\n概要：\r\n在与星界之门碎片（被称为"神器"）首次接触后被标记。立即启动被动监视。预测模型显示堡垒成为S级异常体的概率很高。已授权并尝试早期收容；记录的偏离程度超出预测，收容失败。\r\n\r\n显著特征：\r\n- 表现出超出基准档案的极端物理韧性。\r\n- 观察到加速成长模式，提示存在异常能量吸收。\r\n- 对环境威胁的快速适应，包括建立防御舰队。\r\n- 与其他异常体建立了联系，导致风险上升并使收容工作更加复杂。\r\n- 对瞭望塔监视阵列网络进行主动干扰。\r\n- 堡垒引发的多起事件造成了高风险暴露与附带损害，需要大规模的信息压制与行动删减。\r\n\r\n当前状态：\r\n堡垒的偏离持续升级。其行动与行为符合新出现的S级倾向。立即回收仍属高优先级行动。\r\n建议：\r\n- 持续监视与DS1599-A相关的通信频道。\r\n- 全力升级回收行动；进一步的偏离迫在眉睫，且存在灾难性升级的可能。\r\n- 如无充分的收容措施，避免直接接触。其抵抗潜力高于最初的预测。\r\n\r\n日志结束
+Watchtower Internal Log -- Deviant DS1599-A	瞭望塔内部日志——异常体DS1599-A
+Watchtower Mainframe	瞭望塔主机
+In the event of threat detection, the designated security door will automatically seal to prevent unauthorized access.\r\n\r\nTo open the door manual override is required.\r\n\r\nEnsure all personnel are aware of the override procedure.	一旦检测到威胁，指定的安全门将自动封闭，以防止未经授权的进入。\r\n\r\n开启该门需要手动覆盖。\r\n\r\n请确保所有人员都了解这套覆盖流程。
+-STATION ALERT-	-空间站警报-
+Previous Page	上一页
+Next Page	下一页
+Assign <Alias.CurrentName=Crew08> (<Alias.CurrentName=CrewShip08>)	指派<Alias.CurrentName=Crew08>（<Alias.CurrentName=CrewShip08>）
+Assign <Alias.CurrentName=Crew07> (<Alias.CurrentName=CrewShip07>)	指派<Alias.CurrentName=Crew07>（<Alias.CurrentName=CrewShip07>）
+Assign <Alias.CurrentName=Crew06> (<Alias.CurrentName=CrewShip06>)	指派<Alias.CurrentName=Crew06>（<Alias.CurrentName=CrewShip06>）
+Assign <Alias.CurrentName=Crew05> (<Alias.CurrentName=CrewShip05>)	指派<Alias.CurrentName=Crew05>（<Alias.CurrentName=CrewShip05>）
+Assign <Alias.CurrentName=Crew04> (<Alias.CurrentName=CrewShip04>)	指派<Alias.CurrentName=Crew04>（<Alias.CurrentName=CrewShip04>）
+Assign <Alias.CurrentName=Crew03> (<Alias.CurrentName=CrewShip03>)	指派<Alias.CurrentName=Crew03>（<Alias.CurrentName=CrewShip03>）
+Assign <Alias.CurrentName=Crew02> (<Alias.CurrentName=CrewShip02>)	指派<Alias.CurrentName=Crew02>（<Alias.CurrentName=CrewShip02>）
+Assign <Alias.CurrentName=Crew01> (<Alias.CurrentName=CrewShip01>)	指派<Alias.CurrentName=Crew01>（<Alias.CurrentName=CrewShip01>）
+<Alias.CurrentName=SelectedShip> - <Alias.CurrentName=SelectedPilot>\r\n\r\nCrew Count: <Global=kgcShip_GLOB_CrewCount>/<Global=kgcShip_GLOB_CrewCount_Max>	<Alias.CurrentName=SelectedShip> - <Alias.CurrentName=SelectedPilot>\r\n\r\n船员数：<Global=kgcShip_GLOB_CrewCount>/<Global=kgcShip_GLOB_CrewCount_Max>
+Select Pilot	选择飞行员
+Confirm Selection	确认选择
+CYBERAMP SELECTION <Missile Guidance> - Tier MAX	赛博增幅选择 <导弹制导> - 最高等级
+CYBERAMP SELECTION <Missile Guidance> - Tier <Global=kgcShip_GLOB_CyberampUnlock_MissileGuidance>	赛博增幅选择 <导弹制导> - 等级<Global=kgcShip_GLOB_CyberampUnlock_MissileGuidance>
+Missile Guidance	导弹制导
+Watchtower Array Records	瞭望塔阵列记录
+CYBERAMP SELECTION <Deviant Field Resonator> - Tier MAX	赛博增幅选择 <异常体场域谐振器> - 最高等级
+CYBERAMP SELECTION <Deviant Field Resonator> - Tier <Global=kgcShip_GLOB_CyberampUnlock_DeviantFieldResonator>\r\n\r\nAdditional Requirements: Sentient AI Adapters	赛博增幅选择 <异常体场域谐振器> - 等级<Global=kgcShip_GLOB_CyberampUnlock_DeviantFieldResonator>\r\n\r\n附加需求：有感知AI适配器
+Deviant Field Resonator	异常体场域谐振器
+CYBERAMP SELECTION <Lightwave Accelerator> - Tier MAX	赛博增幅选择 <光波加速器> - 最高等级
+CYBERAMP SELECTION <Lightwave Accelerator> - Tier <Global=kgcShip_GLOB_CyberampUnlock_LightwaveAccelerator>	赛博增幅选择 <光波加速器> - 等级<Global=kgcShip_GLOB_CyberampUnlock_LightwaveAccelerator>
+Lightwave Accelerator	光波加速器
+Follow Distance Only Combat	仅战斗时保持跟随距离
+Follow Distance Long	跟随距离 远
+Follow Distance Medium	跟随距离 中
+Follow Distance Close	跟随距离 近
+Hold Position	保持位置
+<Alias.CurrentName=SelectedShip> - <Alias.CurrentName=SelectedPilot>\r\n\r\nCurrent follow distance is: <Alias.CurrentName=FollowDistance>	<Alias.CurrentName=SelectedShip> - <Alias.CurrentName=SelectedPilot>\r\n\r\n当前跟随距离：<Alias.CurrentName=FollowDistance>
+Follow Distance	跟随距离
+Defensive	防御
+Offensive	进攻
+<Alias.CurrentName=SelectedShip> - <Alias.CurrentName=SelectedPilot>\r\n\r\nCurrent combat behavior: <Alias.CurrentName=CombatBehavior>	<Alias.CurrentName=SelectedShip> - <Alias.CurrentName=SelectedPilot>\r\n\r\n当前战斗行为：<Alias.CurrentName=CombatBehavior>
+Combat Behavior	战斗行为
+CYBERAMP SELECTION <Diagnostic Suite> - Tier MAX	赛博增幅选择 <诊断套件> - 最高等级
+CYBERAMP SELECTION <Diagnostic Suite> - Tier <Global=kgcShip_GLOB_CyberampUnlock_DiagnosticSuite>	赛博增幅选择 <诊断套件> - 等级<Global=kgcShip_GLOB_CyberampUnlock_DiagnosticSuite>
+Diagnostic Suite	诊断套件
+CYBERAMP SELECTION <Magnetic Synchronizer> - Tier MAX	赛博增幅选择 <磁力同步器> - 最高等级
+CYBERAMP SELECTION <Magnetic Synchronizer> - Tier <Global=kgcShip_GLOB_CyberampUnlock_MagneticSynchronizer>	赛博增幅选择 <磁力同步器> - 等级<Global=kgcShip_GLOB_CyberampUnlock_MagneticSynchronizer>
+Magnetic Synchronizer	磁力同步器
+CYBERAMP SELECTION <Ballistic Calibrator> - Tier MAX	赛博增幅选择 <弹道校准器> - 最高等级
+CYBERAMP SELECTION <Ballistic Calibrator> - Tier <Global=kgcShip_GLOB_CyberampUnlock_BallisticCalibrater>	赛博增幅选择 <弹道校准器> - 等级<Global=kgcShip_GLOB_CyberampUnlock_BallisticCalibrater>
+Ballistic Calibrator	弹道校准器
+CYBERAMP SELECTION <Beam Harmonizer> - Tier MAX	赛博增幅选择 <光束协调器> - 最高等级
+CYBERAMP SELECTION <Beam Harmonizer> - Tier <Global=kgcShip_GLOB_CyberampUnlock_BeamHarmonizer>	赛博增幅选择 <光束协调器> - 等级<Global=kgcShip_GLOB_CyberampUnlock_BeamHarmonizer>
+Beam Harmonizer	光束协调器
+CYBERAMP SELECTION <Tactical Jump Interface> - Tier MAX	赛博增幅选择 <战术跃迁接口> - 最高等级
+CYBERAMP SELECTION <Tactical Jump Interface> - Tier <Global=kgcShip_GLOB_CyberampUnlock_TacticalJumpInterface>	赛博增幅选择 <战术跃迁接口> - 等级<Global=kgcShip_GLOB_CyberampUnlock_TacticalJumpInterface>
+Tactical Jump Interface	战术跃迁接口
+CYBERAMP SELECTION <Propulsion Matrix> - Tier MAX	赛博增幅选择 <推进矩阵> - 最高等级
+CYBERAMP SELECTION <Propulsion Matrix> - Tier <Global=kgcShip_GLOB_CyberampUnlock_PropulsionMatrix>	赛博增幅选择 <推进矩阵> - 等级<Global=kgcShip_GLOB_CyberampUnlock_PropulsionMatrix>
+Propulsion Matrix	推进矩阵
+CYBERAMP SELECTION <Shield Amplifier> - Tier MAX	赛博增幅选择 <护盾放大器> - 最高等级
+CYBERAMP SELECTION <Shield Amplifier> - Tier <Global=kgcShip_GLOB_CyberampUnlock_ShieldAmplifier>	赛博增幅选择 <护盾放大器> - 等级<Global=kgcShip_GLOB_CyberampUnlock_ShieldAmplifier>
+Shield Amplifier	护盾放大器
+CYBERAMP SELECTION <Precision Module> - Tier MAX	赛博增幅选择 <精密模块> - 最高等级
+CYBERAMP SELECTION <Precision Module> - Tier <Global=kgcShip_GLOB_CyberampUnlock_PrecisionModule>	赛博增幅选择 <精密模块> - 等级<Global=kgcShip_GLOB_CyberampUnlock_PrecisionModule>
+Precision Module	精密模块
+CYBERAMP SELECTION <Targeting Computer> - Tier MAX	赛博增幅选择 <瞄准计算机> - 最高等级
+CYBERAMP SELECTION <Targeting Computer> - Tier <Global=kgcShip_GLOB_CyberampUnlock_TargetingComputer>	赛博增幅选择 <瞄准计算机> - 等级<Global=kgcShip_GLOB_CyberampUnlock_TargetingComputer>
+Targeting Computer	瞄准计算机
+Date: 10.17.2328\r\nUser: Facility Security Admin -- J. Tamor\r\n\r\nSubject: Turret and Alarm Deployment\r\n\r\nEffective immediately, all personnel are reminded of the following protocols regarding Cargo Bay security systems:\r\n\r\n1. Turret Activation:\r\n\r\n- Automated turrets have been installed throughout the Cargo Bay to deter unauthorized access and neutralize potential threats. These systems are equipped with advanced IFF (Identification Friend or Foe) protocols. Ensure your clearance badge is visible at all times to avoid accidental targeting.\r\n\r\n2. Alarm Triggers:\r\n\r\n- Motion-activated alarms are linked to both external and internal sensor grids. Alarms will trigger if foreign entities breach the Cargo Bay perimeter. Immediate lockdown will follow.\r\n\r\nIncident Report Summary:\r\n\r\nDate: 07.04.2328\r\nIncident: External door left open during unloading operations.\r\nResult: Ingress of unidentified xenoforms.\r\n\r\n- 3 cargo handlers sustained injuries.\r\n- 1 shipment compromised (partial destruction).\r\n\r\nDue to this incident, external doors must remain sealed unless actively supervised by Security Personnel. Any deviation will result in immediate disciplinary review.\r\n\r\nNotice: The presence of alien creatures is a known hazard in this region. All personnel are required to report sightings immediately. Turrets and alarms are non-negotiable safety measures. Cooperation is mandatory for the continued safety of Watchtower operations.\r\n\r\nStay vigilant. Report breaches. Ensure containment.	日期：2328年10月17日\r\n用户：设施安保主管——J. 塔莫尔\r\n\r\n主题：炮塔与警报部署\r\n\r\n即刻起，提醒所有人员注意以下关于货舱安保系统的规程：\r\n\r\n1. 炮塔激活：\r\n\r\n- 货舱各处已安装自动炮塔，用于阻止未经授权的进入并消灭潜在威胁。这些系统配备先进的敌我识别（IFF）协议。请时刻佩戴并露出你的通行证，以免被误判为目标。\r\n\r\n2. 警报触发：\r\n\r\n- 动作感应警报与外部和内部传感器网相连。若有异类实体侵入货舱周边，警报将触发，随即实施封锁。\r\n\r\n事件报告摘要：\r\n\r\n日期：2328年7月4日\r\n事件：卸载作业期间外部舱门未关闭。\r\n结果：不明异形生物侵入。\r\n\r\n- 3名货物搬运工受伤。\r\n- 1批货物受损（部分损毁）。\r\n\r\n鉴于本次事件，外部舱门必须保持封闭，除非有安保人员全程监督。任何违规行为都将立即受到纪律审查。\r\n\r\n注意：此区域出现异形生物属已知风险。所有人员一旦目击必须立即上报。炮塔与警报是不可协商的安全措施。为了瞭望塔行动的持续安全，必须予以配合。\r\n\r\n保持警惕。上报入侵。确保收容。
+Cargo Bay Security Protocols	货舱安保协议
+Date: 09.05.2328\r\nUser: Logistics Control -- C. Harland\r\n\r\nIncoming Shipments:\r\n\r\n1. Shipment ID: B4-0923\r\nOrigin: Eudora Station (Unregistered Salvage)\r\nContents:\r\n3x Mech torsos (Type-Delta)\r\n8x Hydraulic actuator limbs (unknown model)\r\n1x Core processor unit (damaged)\r\nNotes: Additional shielding recommended for transport. Radiation readings exceeded safe levels.\r\n\r\n2. Shipment ID: T6-8471\r\nOrigin: Debris Field Theta-9\r\nContents:\r\n14x Starship plating fragments\r\n2x Prototype energy couplers\r\n1x Experimental grav-drive stabilizer\r\nNotes: Grav-drive stabilizer flagged for immediate transfer to Restricted Section B.\r\n\r\nOutgoing Shipments:\r\n\r\n1. Shipment ID: OX-1295\r\nDestination: Vault 7\r\nContents:\r\n12x Refined scrap bundles\r\n4x Decommissioned Mech weapon systems\r\nNotes: Cleared for civilian resale. Non-sensitive items only.\r\n\r\n1. Shipment ID: PR-3342\r\n\r\nDestination: Research Hub Zeta\r\nContents:\r\n2x Reconfigured AI cores\r\n3x Ship-mounted plasma arrays\r\nNotes: Plasma arrays require calibration prior to deployment.\r\nReminder: All undocumented salvage must be reported immediately to Logistics Control. Failure to comply will result in disciplinary action.	日期：2328年9月5日\r\n用户：后勤管制——C. 哈兰德\r\n\r\n入库货物：\r\n\r\n1. 货物编号：B4-0923\r\n来源：尤多拉站（未登记打捞物）\r\n内容：\r\n3具机甲躯干（德尔塔型）\r\n8条液压执行肢（型号不明）\r\n1台核心处理器单元（已损坏）\r\n备注：运输时建议增加屏蔽。辐射读数超出安全水平。\r\n\r\n2. 货物编号：T6-8471\r\n来源：碎片场西塔-9\r\n内容：\r\n14块星舰装甲碎片\r\n2个原型能量耦合器\r\n1个实验性重力引擎稳定器\r\n备注：重力引擎稳定器已标记，须立即转移至B级限制区。\r\n\r\n出库货物：\r\n\r\n1. 货物编号：OX-1295\r\n目的地：7号保险库\r\n内容：\r\n12捆精炼废料\r\n4套退役机甲武器系统\r\n备注：已获准供民用转售。仅限非敏感物资。\r\n\r\n1. 货物编号：PR-3342\r\n\r\n目的地：泽塔研究中心\r\n内容：\r\n2个重构AI核心\r\n3组舰载等离子阵列\r\n备注：等离子阵列部署前需要校准。\r\n提醒：所有未登记的打捞物必须立即上报后勤管制。违者将受到纪律处分。
+Shipping Logs & Inventory	货运日志与库存
+Watchtower Cargo Bay	瞭望塔货舱
+The injured agent who had arrived by corvette didn't make it. Thanks to the bay doors being frozen shut, it took too long to get him to medical.\r\n\r\nSo, orders from on high, the safehouse is to be mothballed. "No longer fit for purpose". All agents are to vacate immediately.\r\n\r\nIt's a shame. I was getting used to the quiet, the work, the rhythm of it all. Things were starting to feel routine, maybe even comfortable.\r\n\r\nHowever, on the upside, I've been offered a promotion. From Custodian to something... higher. They said I just need to go through a "physical." No real details on that, but I'm not going to question it. It's a step up!\r\nThis could be the start of something.	那名乘坐护卫舰送来的受伤特工没能挺过来。由于舱门被冻住打不开，把他送到医疗室耽误了太久。\r\n\r\n于是，上面下令将这座安全屋封存。"已不再适用"。所有特工必须立即撤离。\r\n\r\n真遗憾。我已经习惯了这里的安静、工作，还有那种节奏。一切开始变得按部就班，甚至有些舒适。\r\n\r\n不过往好处想，我得到了一个晋升的机会。从管理员升到……更高的职位。他们说我只需要通过一次"体检"。具体细节没说，我也不会多问。总归是升了！\r\n这也许是一切的开始。
+Entry 04: 12.23.2328	第04条：2328年12月23日
+A high-ranking agent arrived yesterday. Corvette landed in the main bay, though getting the doors open was a struggle, ice build-up's been severe. The temperature out there's dropped far faster than expected.\r\n\r\nThe agent was in bad shape. Ship was worse, heavy damage. Engineers are already at work, though we're running low on parts.\r\n\r\nHeard one of them mention "deviants." Not sure what that means, but the way they said it... sounded like something we don't want to deal with.\r\n\r\nSecurity's already on high alert. They've locked down access to the bay for now. Added extra safeguards.\r\n\r\nNone of this feels routine.	昨天来了一位高级特工。护卫舰停进了主舱，不过光是打开舱门就很费劲，结冰太严重了。外面的温度下降得比预期快得多。\r\n\r\n那名特工伤势很重。飞船更惨，损毁严重。工程师们已经在抢修了，只是我们的零件快用完了。\r\n\r\n听到他们中有人提到"异常体"。不清楚那是什么意思，但从他们说话的语气听来……像是我们不愿招惹的东西。\r\n\r\n安保已经进入高度戒备。他们暂时封锁了货舱的出入，还增加了额外的防护措施。\r\n\r\n这一切都让人觉得不对劲。
+Entry 03: 11.01.2328	第03条：2328年11月1日
+I'm starting to have second thoughts about my posting.\r\n\r\nThe engineers keep to themselves, barely exchanging a word. Security's no better. Cold, distant. Always performing ""training drills,"" training for what? What do they think is going to happen?\r\n\r\nThen there's the combat bots everywhere. They don't move much, just stand there, watching. Watching us? It may be protocol, but it's unsettling.\r\n\r\nI just have to stay focused, not make a fuss. They don't tolerate those that don't fall in line. They were very clear about that.	我开始对自己被派到这儿感到后悔了。\r\n\r\n工程师们独来独往，几乎不交谈。安保也好不到哪儿去。冷漠、疏远。总是搞那套""训练演习""，训练什么？他们觉得会发生什么事？\r\n\r\n还有到处都是战斗机器人。它们很少移动，只是站在那里，注视着。是在看着我们吗？也许这是规程，但让人不安。\r\n\r\n我只需要保持专注，别惹事。他们容不下不守规矩的人。这一点他们说得非常清楚。
+Entry 02: 07.20.2328	第02条：2328年7月20日
+Here I am. The place is bigger than I expected. I thought it would just be a small outpost.\r\n\r\nOnboarding was... intense. They don't waste time. A lot of forms, a lot of procedures I'm not meant to talk about, but nothing I couldn't handle.\r\n\r\nHaven't been briefed on the full scope of my role here yet. Everyone's walking around like they already know exactly what they're doing. No room for mistakes, no time for anything but the work.\r\n\r\nThe people here? Focused. More than that, controlled. They don't talk much. I thought it was just the work environment at first, but... it's more than that. It's like everyone's in sync. I can't put my finger on it, but I feel it.\r\n\r\nI'll just keep my head down, get the hang of things. I'm sure they'll open up eventually.	我到了。这地方比我想象的要大，本以为只是个小哨站。\r\n\r\n入职流程……很紧张。他们不浪费时间。签了一堆表格，还有一堆我不该谈论的流程，但都还在我能应付的范围内。\r\n\r\n还没有人向我通报这里的全部职责。每个人都走来走去，好像早就清楚自己在做什么。不容有错，除了工作没有别的事。\r\n\r\n这里的人？专注。不止如此，是克制。他们话不多。起初我以为只是工作氛围如此，但……不止于此。就好像所有人都步调一致。我说不清，但我能感觉到。\r\n\r\n我还是埋头做事，先熟悉起来吧。我相信他们迟早会敞开心扉的。
+Entry 01: 03.04.2328	第01条：2328年3月4日
+Watchtower Workstation	瞭望塔工作站
+CYBERAMP SELECTION <Trajectory Analyzer> - Tier MAX	赛博增幅选择 <弹道分析仪> - 最高等级
+CYBERAMP SELECTION <Trajectory Analyzer> - Tier <Global=kgcShip_GLOB_CyberampUnlock_TrajectoryAnalyzer>	赛博增幅选择 <弹道分析仪> - 等级<Global=kgcShip_GLOB_CyberampUnlock_TrajectoryAnalyzer>
+Trajectory Analyzer	弹道分析仪
+Opening door... done.	正在开门……完成。
+Open Door	开门
+Door Control Interface\r\nSTATUS: Closed	舱门控制界面\r\n状态：已关闭
+Door Control Interface\r\nSTATUS: Open	舱门控制界面\r\n状态：已打开
+Remote Security Door Control	远程安保舱门控制
+Override Automated Regulator	覆盖自动调节器
+Status: Deactivated	状态：已停用
+Status: Operational	状态：运行中
+Geothermal Regulator	地热调节器
+[Activate Mech Skydrop]	[启动机甲空投]
+Subject: Retrofit Complete -- Unable to Accept Final Delivery\r\n\r\nThe retrofit is complete. Although, we were unable to accept the final delivery of units. A blizzard picked up overnight and caused a small avalanche at the main intake doors. We're currently unable to clear the debris.\r\n\r\nI remain cautious about future mech "malfunctions". Safety measures and additional shutdown protocols have been implemented in case of unsanctioned activation.\r\n\r\nIn emergency, simply activate the attached shutdown overrides. Be advised, this will deactivate all robotic units on site. Only use in extreme emergency.\r\n\r\n                                  --Mech Skydrop AI Settings Reset--	主题：改装完成——无法接收最后一批交付\r\n\r\n改装已完成。不过，我们没能接收最后一批单元。夜里起了暴风雪，在主进气门处引发了小规模雪崩。我们目前无法清理掉这些碎石。\r\n\r\n我对今后机甲的"故障"仍持谨慎态度。已实施安全措施和额外的停机协议，以防出现未经许可的启动。\r\n\r\n紧急情况下，只需启动附带的停机覆盖开关。请注意，这将使现场所有机器人单元停用。仅在极端紧急情况下使用。\r\n\r\n                                  ——机甲空投AI设置重置——
+[Override Mech Skydrop]	[覆盖机甲空投]
+Subject: Issues with Deactivation/Activation of Mechs\r\n\r\nProgress on the retrofit has hit a snag. While I've managed to modify the racks to hold units, we're running into issues with constant mech reactivation.\r\n\r\nI've had two units wake up prematurely, one even activating its weapons systems before the safety locks were engaged. One junior agent was injured during the incident. Only minor injuries, but still concerning.\r\n\r\nFor now, I've instituted additional safety protocols and limited access to the area in an emergency. I'll need to keep a close watch on this.	主题：机甲停用/激活的问题\r\n\r\n改装进度遇到了麻烦。虽然我设法改造了存放架以容纳机甲单元，但我们遇到了机甲反复自行激活的问题。\r\n\r\n有两台单元提前苏醒，其中一台甚至在安全锁启用之前就启动了武器系统。事件中有一名初级特工受伤。伤势不重，但仍令人担忧。\r\n\r\n目前，我已增设了额外的安全协议，并在紧急情况下限制进入该区域。我会密切留意此事。
+Foreman's Log #2	工头日志#2
+Subject: Retrofit Orders Received\r\n\r\nI've received orders regarding the Skydrop storage area. We're required to retrofit the space to accommodate mech units. Specifically, storing multiple units for the long term.\r\n\r\nI'm not thrilled. Skydrop storage is optimized for the more modular payloads, not hulking pieces of combat tech. The logistics are inconvenient to say the least.\r\n\r\nI've started clearing out the less-used storage areas and sketching out a plan to reinforce the structure. It'll take some time to modify the storage racks and secure the tech properly, but we'll get there.	主题：收到改装命令\r\n\r\n我收到了关于空投储存区的命令。要求我们改造该空间以容纳机甲单元，具体来说，是长期存放多台单元。\r\n\r\n我对此不太乐意。空投储存区是为更模块化的载荷优化的，可不是为这些笨重的战斗机器准备的。后勤上的不便就不用说了。\r\n\r\n我已经开始清理使用较少的储存区，并草拟了一份加固结构的方案。改造存放架、妥当固定这些设备需要些时间，但我们能做到。
+Foreman's Log #1	工头日志#1
+Watchtower Assembly Hangar	瞭望塔装配机库
+Programming flares for Surface Missile.	正在为地表导弹编程曳光弹。
+Surface Missile (1)	地表导弹（1）
+Strikes	打击
+CYBERAMP SELECTION <Disruption Coordinator> - Tier MAX	赛博增幅选择 <干扰协调器> - 最高等级
+CYBERAMP SELECTION <Disruption Coordinator> - Tier <Global=kgcShip_GLOB_CyberampUnlock_DisruptionCoordinator>	赛博增幅选择 <干扰协调器> - 等级<Global=kgcShip_GLOB_CyberampUnlock_DisruptionCoordinator>
+Disruption Coordinator	干扰协调器
+Date: 09.03.2328\r\nAuthor: P. Vallas -- Power Moderator Manager\r\n\r\nTo: T. Bellamy\r\n\r\nOnce more: this is the procedure for routing power to the Assembly Hangar.\r\n\r\n- The moderator requires all generators to be activated in the correct sequence for proper power distribution. \r\n\r\n- Each generator has an indicator light. When activated in the correct order, the lights will cycle to green, signaling that the system is processing.\r\n\r\n- Activate out of sequence, and the system resets. You'll need to start over.\r\n\r\nDo not blame the switches when it resets. It's not the system. It's user error.\r\n\r\nSteps:\r\n1. Initialize the system.\r\n2. Power the turbine insulators, followed by the air circuit oscillators.\r\n3. Finally, flip the transformer distributors.\r\n\r\nIf you still cannot manage this, perhaps consider another position.	日期：2328年9月3日\r\n作者：P. 瓦拉斯——电力调节器主管\r\n\r\n致：T. 贝拉米\r\n\r\n再说一遍：这是向装配机库配电的流程。\r\n\r\n- 为保证配电正常，调节器要求所有发电机按正确顺序激活。\r\n\r\n- 每台发电机都有一个指示灯。按正确顺序激活时，灯会依次变为绿色，表示系统正在处理。\r\n\r\n- 若顺序错误，系统就会重置。你得从头再来。\r\n\r\n重置的时候别怪开关。问题不在系统，是操作失误。\r\n\r\n步骤：\r\n1. 初始化系统。\r\n2. 为涡轮绝缘器通电，然后是空气回路振荡器。\r\n3. 最后，扳动变压器分配器。\r\n\r\n如果你还是搞不定，或许该考虑换个岗位。
+*Reminder -- Reset Process	*提醒——重置流程
+Date: 11.02.2328\r\nAuthor: P. Vallas -- Power Moderator Manager\r\n\r\nUnresolved Issues Logged with Upper Management:\r\n\r\n1. Hangar Platform Power Draw:\r\n\r\n- Complaint: The platform's draw is so massive it impacts facility-wide power stability. Operations aboveground are too frequent and disrupt everything else.\r\n- Workaround: Temporarily routed power from subsystems. However, this comes with its own issues.\r\n\r\n2. Security's Frequent Power Reroutes:\r\n\r\n- Complaint: Security's constant exercises require us to reset routing almost weekly, creating instability across multiple departments.\r\n- Workaround: Installed secondary failsafe to reduce rerouting time, but this hasn't stopped the demands.\r\n\r\n3. Elevator Constant Operation:\r\n\r\n- Complaint: The elevator runs so often it's a strain on both power system and patience.\r\n- Workaround: Reallocated minor reserves from auxiliary systems to compensate. Not a permanent fix, but it's kept the elevator functional -- for now.\r\n\r\n\r\nRepeated proposals for a long-term solution to our power distribution issues have so far been met with silence.\r\n\r\nCurrently, we rely on a single moderator to handle three generators powering four transformers that supply two departments in constant conflict over priority. This is unsustainable.\r\n\r\nThe facility is only operational due to temporary fixes and a sheer unwillingness to fail. If there's no resolution soon, the system will collapse under its own weight.	日期：2328年11月2日\r\n作者：P. 瓦拉斯——电力调节器主管\r\n\r\n已向高层管理层登记但未解决的问题：\r\n\r\n1. 机库平台耗电：\r\n\r\n- 投诉：平台的耗电量极大，影响到全设施的电稳。地面作业过于频繁，扰乱了其他一切。\r\n- 变通方案：暂时从子系统调电。然而，这又带来了自身的问题。\r\n\r\n2. 安保频繁的电力改道：\r\n\r\n- 投诉：安保不停演练，几乎每周都要我们重置配电线路，造成多个部门的不稳定。\r\n- 变通方案：加装了次级故障保护以缩短改道时间，但这并没有让人少提要求。\r\n\r\n3. 电梯持续运行：\r\n\r\n- 投诉：电梯使用过于频繁，既折磨电力系统，也折磨人的耐心。\r\n- 变通方案：从辅助系统重新调配少量储备以补偿。这不是永久方案，但至少让电梯还能用——目前如此。\r\n\r\n\r\n关于我们配电问题的长期解决方案，多次提议至今仍无人回应。\r\n\r\n目前，我们仅靠一名调节器操作员来管理三台发电机，为四台变压器供电，而这些变压器又供应两个为优先级争个不停的部门。这不可持续。\r\n\r\n设施能运转，全靠临时的补丁和一股不服输的劲头。若再不解决，系统迟早会不堪重负而崩溃。
+Management Correspondence	管理层信函
+Date: 08.01.2328\r\nAuthor: P. Vallas -- Power Moderator Manager\r\n\r\nLog of Facility Power Requests [through Q3]\r\n\r\n1. Security Wing Power Reroute (4x):\r\n\r\n- Request Details: Temporary reroute needed for "training exercises."\r\n- Action Taken: Approved reroutes each time but warned Security that repeated resets strain the moderators. Ignored, as usual.\r\n\r\n2. Hangar Platform Lift Power Allocation (3x):\r\n\r\n- Request Details: Massive draw required to raise/lower platform for surface operations.\r\n- Action Taken: Reduced lighting in non-essential areas during operation. Received complaints from Living Quarters about dim hallways.\r\n\r\n3. Assembly Elevator Emergency Overrides (6x):\r\n\r\n- Request Details: Elevator stuck mid-operation requiring emergency power draw.\r\n- Action Taken: Added temporary energy reserves for elevator function but noted need for long-term solution. Engineers still haven't addressed the root issue.\r\n\r\n4. Robotics Testing Surge Allocation (2x):\r\n\r\n- Request Details: Significant power spike needed for "synchronization tests."\r\n- Action Taken: Approved at reduced capacity. Told them to stagger their tests. No follow-up received.\r\n\r\nWe keep duct-taping fixes to power demands that exceed this facility's capacity. Without additional moderation tech or stricter oversight, it's only a matter of time before something critical fails.	日期：2328年8月1日\r\n作者：P. 瓦拉斯——电力调节器主管\r\n\r\n设施电力申请日志［截至第三季度］\r\n\r\n1. 安保区电力改道（4次）：\r\n\r\n- 申请详情：因"训练演习"需要临时改道。\r\n- 所采取的行动：每次都批准改道，但警告安保，反复重置会让调节器不堪重负。一如既往，被无视了。\r\n\r\n2. 机库平台升降电力分配（3次）：\r\n\r\n- 申请详情：为地面作业升降平台需要极大耗电。\r\n- 所采取的行动：作业期间降低非必要区域的照明。收到生活区关于走廊昏暗的投诉。\r\n\r\n3. 装配电梯紧急覆盖（6次）：\r\n\r\n- 申请详情：电梯运行中卡住，需要紧急调电。\r\n- 所采取的行动：为电梯运行增加临时能量储备，但指出需要长期解决方案。工程师仍未解决根本问题。\r\n\r\n4. 机器人测试峰值电力分配（2次）：\r\n\r\n- 申请详情：因"同步测试"需要大幅电力峰值。\r\n- 所采取的行动：以降低的容量批准。告知他们错开测试时间。未收到后续回复。\r\n\r\n我们一直在用胶带把补丁往超出本设施承载能力的用电需求上贴。没有额外的调节技术或更严格的监管，某处关键系统迟早会出故障。
+Request Log -- Manager's Notes	申请日志——主管备注
+Watchtower Power Hub	瞭望塔电力枢纽
+                               --Printing Access Pass--	                              ——正在打印通行证——
+[Override Power Grid Firewall]	[覆盖电网防火墙]
+                                  --Set New Power Settings At Switch Panels--	                              ——在开关面板上设置新的电力配置——
+[Arm Power Routing Switches]	[启用电力线路开关]
+Date: 08.14.2328\r\nAuthor: M. Virat -- Head Engineer\r\n\r\nLog Entry: Power Box Protocol\r\n\r\nThe ongoing complaints about unlabeled power boxes are tiresome. The Armory Quartermaster brings it up daily, as if the issue hasn't been addressed repeatedly.\r\nLet me be clear:\r\n\r\n1. No, I will not label the switches unless ordered to.\r\n\r\n2. Yes, it's inconvenient for the uninformed.\r\n\r\n3. If you're incapable of remembering basic operations, you should reconsider your position here.\r\n\r\n\r\nThe system works as it should. Here's the breakdown:\r\n\r\n- One reroutes power to the worker floor.\r\n- One activates Combat Bot Security. (Use with discretion. A breach is the only acceptable justification.)\r\n- One lowers the Assembly Equipment elevator. (It's shorting. I know. Take the side ramp for now. It's a stopgap.)\r\n\r\nThis is not a daycare. Learn the system, document it, and stop wasting time on trivialities.	日期：2328年8月14日\r\n作者：M. 维拉特——总工程师\r\n\r\n日志条目：配电箱规程\r\n\r\n关于配电箱没有标签的抱怨没完没了，令人厌烦。军械库军需官天天提这事，好像这问题没被反复处理过一样。\r\n我把话说清楚：\r\n\r\n1. 不行，除非接到命令，否则我不会给开关贴标签。\r\n\r\n2. 对，这对外行来说是不方便。\r\n\r\n3. 如果你连基本操作都记不住，那该重新考虑你的岗位了。\r\n\r\n\r\n系统一直按它该有的方式运行。说明如下：\r\n\r\n- 一个把电改道到工人层。\r\n- 一个激活战斗机器人安保。（谨慎使用。只有遭到入侵才可动用。）\r\n- 一个降下装配设备电梯。（它在短路。我知道。暂时走侧坡道吧，这只是权宜之计。）\r\n\r\n这里不是托儿所。学会这套系统，把它记录下来，别再为鸡毛蒜皮浪费时间。
+Power Routing Complaints	配电线路投诉
+Date: 06.30.2328\r\nAuthor: M. Virat -- Head Engineer\r\n\r\nActive Projects and Notes:\r\n\r\nCombat Systems Integration:\r\n\r\n- Synchronization is stable, but response times still lag under stress. Minimal but unacceptable for operational standards. Need more collaboration with the upper teams.\r\n\r\nShield & Power Generation:\r\n\r\n- Core stability holds at 95%. However, overclock scenarios are causing overheating. Cooling system redesign needed but no resources available at present.\r\n\r\nMech Systems -- Storage Hangar:\r\n\r\n- Ongoing delays. The Storage Hangar keeps requesting more retrofits, but we're operating with limited parts. Time and resources are already stretched thin. Allocating additional hours, but it's taking from other critical systems.\r\n\r\nFacility Maintenance:\r\n\r\n- Maintenance is still on the back burner. Several temporary fixes in place, but the growing number of issues is becoming a liability. Lights on Level C flickering, Bay 2 assembly elevator malfunctioning. If questioned, it's ""in the queue.""\r\n\r\nIf we're expected to have these systems operational by the next checkin, we'll need additional personnel and materials.	日期：2328年6月30日\r\n作者：M. 维拉特——总工程师\r\n\r\n现行项目与备注：\r\n\r\n战斗系统整合：\r\n\r\n- 同步稳定，但在压力下响应时间仍然滞后。程度轻微，却达不到作战标准。需要与上层团队加强协作。\r\n\r\n护盾与发电：\r\n\r\n- 核心稳定性维持在95%。然而，超频情形正导致过热。需要重新设计冷却系统，但目前没有可用资源。\r\n\r\n机甲系统——储存机库：\r\n\r\n- 持续延误。储存机库不断要求更多改装，但我们可用的零件有限。时间和资源本已捉襟见肘。虽然追加了工时，却是从其他关键系统那里挪过来的。\r\n\r\n设施维护：\r\n\r\n- 维护仍被排在后面。已有多处临时修补，但问题越来越多，正成为一项负担。C层灯光闪烁，2号舱装配电梯故障。若有人问起，就是""在排队等候""。\r\n\r\n如果要求我们在下次检查前让这些系统全部可用，我们就需要额外的人手和材料。
+Project Assessments	项目评估
+Watchtower Engineering	瞭望塔工程部
+Terminal	终端
+Avoid Disabled Targets	避开已失能目标
+Destroy	摧毁
+<Alias.CurrentName=SelectedShip> - <Alias.CurrentName=SelectedPilot>\r\n\r\nCurrent lethality tactics: <Alias.CurrentName=LethalityTactics>	<Alias.CurrentName=SelectedShip> - <Alias.CurrentName=SelectedPilot>\r\n\r\n当前致命战术：<Alias.CurrentName=LethalityTactics>
+Lethality Tactics	致命战术
+                               -- Breach Alarm Shutdown --	                              —— 入侵警报关闭 ——
+[Override Security]	[覆盖安保]
+Date: 11.09.2328\r\nUser: Facility Security Admin -- J. Tamor\r\n\r\nSubject: Containment Protocol Advisory\r\n\r\nAttention Security Personnel:\r\n\r\nThis is a reminder that all incidents involving restricted projects must be reported directly to Command, no exceptions. The recent anomaly in the upper levels has triggered a temporary facility-wide lockdown. Security teams are to follow standard containment protocols until further notice.\r\n\r\nKey advisories:\r\n\r\n- Restricted Zones: Access to upper-level research areas is prohibited without Command-level clearance. Personnel attempting unauthorized entry will be detained.\r\n- Combat Bots: All active bots have been recalibrated to heightened security settings. Ensure your clearance badge is visible at all times.\r\n- Perimeter Lockdown: External access points are sealed until we receive further instructions. Do not open external doors for any reason.\r\n\r\nWe are still assessing the situation, but early indications suggest an internal systems malfunction tied to the AI integration trials. Personnel working in proximity to these systems are advised to report any unusual activity immediately.\r\n\r\nStay alert. Follow orders. We cannot afford further complications.\r\n\r\n(Note: This advisory is classified. Discussing its contents with unauthorized personnel will result in immediate disciplinary action.)	日期：2328年11月9日\r\n用户：设施安保主管——J. 塔莫尔\r\n\r\n主题：收容协议通告\r\n\r\n全体安保人员注意：\r\n\r\n在此提醒，所有涉及受限项目的事件都必须直接上报指挥部，绝无例外。近期上层区域出现的异常已触发全设施临时封锁。安保小队须遵循标准收容协议，直至另行通知。\r\n\r\n要点通告：\r\n\r\n- 限制区：未经指挥部级别许可，禁止进入上层研究区。试图擅自进入者将被扣押。\r\n- 战斗机器人：所有在役机器人已重新校准为更高的安保设置。请时刻佩戴并露出你的通行证。\r\n- 周边封锁：在与外界通道处实施封锁，直到收到进一步指示。无论任何理由，都不得打开外部舱门。\r\n\r\n我们仍在评估情况，但初步迹象表明，这是与AI整合试验相关的内部系统故障。建议在相关系统附近工作的人员一旦发现异常情况立即上报。\r\n\r\n保持警觉。服从命令。我们经不起更多波折。\r\n\r\n（注：本通告属机密。向未经授权人员透露其内容者将立即受到纪律处分。）
+Incident Advisory	事件通告
+Date: 12.16.2328\r\nIncident ID: SEC-0924\r\nFiled By: Chief Security Officer -- M. Grent\r\n\r\nIncident Summary:\r\n\r\nAt approximately 23:47 hours, a security alarm was triggered in the Mech Salvage Bay. Turret and bot response teams were deployed, neutralizing the perceived threat -- a rogue cargo loader operating without input or scheduled task.\r\n\r\nInvestigation Findings:\r\n- The cargo loader's internal systems showed signs of tampering. Unauthorized software modifications suggest external access to its controls.\r\n- Logs indicate the modifications originated from within the facility network, though the precise source remains unidentified.\r\n\r\nAction Taken:\r\n- A facility-wide diagnostic sweep has been initiated. All systems linked to the restricted zones are under review.\r\n- Increased patrols in and around restricted areas have been authorized.\r\n\r\nRecommendations:\r\n- Reinforce Network Security: Implement additional firewalls to prevent further system breaches.\r\n- Staff Re-Screening: Conduct background checks and digital audits on personnel with access to sensitive systems.\r\n- Internal Surveillance Expansion: Upgrade monitoring in key areas, especially restricted sections.\r\n\r\nThis incident underscores the importance of strict adherence to security protocols. Compromise is not an option.\r\n\r\n(Notice: Further details of this incident are classified. Unauthorized access to this file will result in termination of employment and immediate detainment.)	日期：2328年12月16日\r\n事件编号：SEC-0924\r\n提交人：首席安保官——M. 格伦特\r\n\r\n事件摘要：\r\n\r\n约23时47分，机甲打捞舱触发安保警报。炮塔与机器人响应小队随即出动，消灭了疑似威胁——一台在无输入、无计划任务的情况下自行运作的失控货物装载机。\r\n\r\n调查结果：\r\n- 该货物装载机的内部系统有被篡改的迹象。未经授权的软件改动表明其控制权被人从外部获取。\r\n- 日志显示改动源自设施网络内部，但确切来源仍未查明。\r\n\r\n所采取的行动：\r\n- 已启动全设施诊断扫描。所有与限制区相关联的系统均在审查之中。\r\n- 已授权在限制区内外增加巡逻。\r\n\r\n建议：\r\n- 强化网络安全：部署额外的防火墙，防止更多系统被入侵。\r\n- 人员重新筛查：对可接触敏感系统的人员进行背景审查与数字审计。\r\n- 扩大内部监视：升级关键区域（尤其是限制区段）的监控。\r\n\r\n本次事件凸显了严格遵守安保协议的重要性。绝不容许出现纰漏。\r\n\r\n（须知：本事件的更多细节属机密。擅自查阅本文件者将被解雇并立即扣押。）
+Incident Report Archive	事件报告存档
+Date: 12.19.2328\r\nUser: Facility Security Admin -- J. Tamor\r\n\r\nSubject: Unauthorized Breaches and Personnel Compliance\r\nAttention all security staff:\r\n\r\nRecent incidents involving unauthorized access attempts have highlighted the need for heightened vigilance at all checkpoints. The following protocols are to be strictly adhered to:\r\n\r\n1. Checkpoint Monitoring:\r\n\r\n- All personnel must present proper clearance badges upon request. No exceptions.\r\n- Random ID scans will be conducted throughout the facility.\r\n\r\n2. Turret & Bot Deployments:\r\n\r\n- Turrets and combat robots are calibrated to neutralize unauthorized intrusions. These systems operate on a three-strike IFF (Identification Friend or Foe) protocol. Ensure your badges are visible and functional at all times.\r\n\r\n3. Alarm Protocols:\r\n\r\n- Alarms are linked to facility lockdown procedures. Once triggered, manual override requires both biometric clearance and senior-level authorization. Do not tamper with alarm systems unless explicitly directed to do so.\r\n\r\nRecent anomalies include instances of external breaches from unknown entities, suspected industrial espionage attempts, and unexplained internal movements in restricted zones. Any suspicious activity must be reported immediately.\r\n\r\nStay alert. Stay secure.	日期：2328年12月19日\r\n用户：设施安保主管——J. 塔莫尔\r\n\r\n主题：未经授权的入侵与人员合规\r\n全体安保人员注意：\r\n\r\n近期多起未经授权进入的企图，凸显了各检查点提高警惕的必要性。须严格遵守以下规程：\r\n\r\n1. 检查点监控：\r\n\r\n- 所有人员在被要求时必须出示有效通行证。绝无例外。\r\n- 将在全设施范围内进行随机身份扫描。\r\n\r\n2. 炮塔与机器人部署：\r\n\r\n- 炮塔与战斗机器人均已校准，以消灭未经授权的入侵者。这些系统采用三振出局式敌我识别（IFF）协议。请确保你的通行证时刻可见且功能正常。\r\n\r\n3. 警报规程：\r\n\r\n- 警报与设施封锁程序相连。一旦触发，手动覆盖需要生物识别许可和高层授权两者兼具。除非接到明确指令，否则不得擅自改动警报系统。\r\n\r\n近期的异常情况包括不明实体的外部入侵、疑似商业间谍活动，以及限制区内无法解释的内部活动。任何可疑行为都必须立即上报。\r\n\r\n保持警觉。保持安全。
+Security Bulletin	安保简报
+Watchtower Security Post	瞭望塔安保岗
+> LOCATION ENCRYPTION BYPASSED.\r\n> INITIATING COORDINATE TRANSFER...	> 位置加密已绕过。\r\n> 正在启动坐标传输……
+Locate Broadcast Array Coordinates	定位广播阵列坐标
+> LOCAL DATA PURGE INITIATED... COMPLETE.	> 本地数据清除已启动……完成。
+> ALERT: SECURITY BREACH DETECTED. \r\n> LOCAL DATA PURGE INITIATED... COMPLETE. \r\n> EXTERNAL BACKUP DATA STANDING BY FOR RELAY. \r\n> SURVEILLANCE ARRAY BROADCAST SYSTEM PRIMED. \r\n> AWAITING FINAL AUTHORIZATION...	> 警报：检测到安保入侵。\r\n> 本地数据清除已启动……完成。\r\n> 外部备份数据待命中继。\r\n> 监视阵列广播系统已就绪。\r\n> 等待最终授权……
+Array Monitor	阵列监视器
+Next	下一个
+No charges available for <Alias.CurrentName=SkydropMenuOption05>.\r\n	<Alias.CurrentName=SkydropMenuOption05>没有可用次数。\r\n
+<Alias.CurrentName=SkydropMenuOption05> (<Global=kgcShip_GLOB_SkydropMenuControl_UsesAvailable05>)	<Alias.CurrentName=SkydropMenuOption05>（<Global=kgcShip_GLOB_SkydropMenuControl_UsesAvailable05>）
+Programming flares for <Alias.CurrentName=SkydropMenuOption05>.	正在为<Alias.CurrentName=SkydropMenuOption05>编程曳光弹。
+<Alias.CurrentName=SkydropMenuOption04> (<Global=kgcShip_GLOB_SkydropMenuControl_UsesAvailable04>)	<Alias.CurrentName=SkydropMenuOption04>（<Global=kgcShip_GLOB_SkydropMenuControl_UsesAvailable04>）
+No charges available for <Alias.CurrentName=SkydropMenuOption04>.	<Alias.CurrentName=SkydropMenuOption04>没有可用次数。
+Programming flares for <Alias.CurrentName=SkydropMenuOption04>.	正在为<Alias.CurrentName=SkydropMenuOption04>编程曳光弹。
+No charges available for <Alias.CurrentName=SkydropMenuOption03>.\r\n	<Alias.CurrentName=SkydropMenuOption03>没有可用次数。\r\n
+<Alias.CurrentName=SkydropMenuOption03> (<Global=kgcShip_GLOB_SkydropMenuControl_UsesAvailable03>)	<Alias.CurrentName=SkydropMenuOption03>（<Global=kgcShip_GLOB_SkydropMenuControl_UsesAvailable03>）
+Programming flares for <Alias.CurrentName=SkydropMenuOption03>.	正在为<Alias.CurrentName=SkydropMenuOption03>编程曳光弹。
+No charges available for <Alias.CurrentName=SkydropMenuOption02>.	<Alias.CurrentName=SkydropMenuOption02>没有可用次数。
+<Alias.CurrentName=SkydropMenuOption02> (<Global=kgcShip_GLOB_SkydropMenuControl_UsesAvailable02>)	<Alias.CurrentName=SkydropMenuOption02>（<Global=kgcShip_GLOB_SkydropMenuControl_UsesAvailable02>）
+Programming flares for <Alias.CurrentName=SkydropMenuOption02>.	正在为<Alias.CurrentName=SkydropMenuOption02>编程曳光弹。
+No charges available for <Alias.CurrentName=SkydropMenuOption01>.\r\n	<Alias.CurrentName=SkydropMenuOption01>没有可用次数。\r\n
+<Alias.CurrentName=SkydropMenuOption01> (<Global=kgcShip_GLOB_SkydropMenuControl_UsesAvailable01>)	<Alias.CurrentName=SkydropMenuOption01>（<Global=kgcShip_GLOB_SkydropMenuControl_UsesAvailable01>）
+Programming flares for <Alias.CurrentName=SkydropMenuOption01>.	正在为<Alias.CurrentName=SkydropMenuOption01>编程曳光弹。
+Previous	上一个
+Select Type	选择类型
+Armillaries	浑天仪
+Utility	通用
+Combat Support	战斗支援
+Strikes	打击
+Program Flare	编程曳光弹
+<Alias.CurrentName=RealShip09> (<Global=kgcShip_GLOB_Terminal_CrewCount_Ship09>/<Global=kgcShip_GLOB_Terminal_MaxCrewCount_Ship09>)	<Alias.CurrentName=RealShip09>（<Global=kgcShip_GLOB_Terminal_CrewCount_Ship09>/<Global=kgcShip_GLOB_Terminal_MaxCrewCount_Ship09>）
+<Alias.CurrentName=RealShip08> (<Global=kgcShip_GLOB_Terminal_CrewCount_Ship08>/<Global=kgcShip_GLOB_Terminal_MaxCrewCount_Ship08>)	<Alias.CurrentName=RealShip08>（<Global=kgcShip_GLOB_Terminal_CrewCount_Ship08>/<Global=kgcShip_GLOB_Terminal_MaxCrewCount_Ship08>）
+<Alias.CurrentName=RealShip07> (<Global=kgcShip_GLOB_Terminal_CrewCount_Ship07>/<Global=kgcShip_GLOB_Terminal_MaxCrewCount_Ship07>)	<Alias.CurrentName=RealShip07>（<Global=kgcShip_GLOB_Terminal_CrewCount_Ship07>/<Global=kgcShip_GLOB_Terminal_MaxCrewCount_Ship07>）
+<Alias.CurrentName=RealShip06> (<Global=kgcShip_GLOB_Terminal_CrewCount_Ship06>/<Global=kgcShip_GLOB_Terminal_MaxCrewCount_Ship06>)	<Alias.CurrentName=RealShip06>（<Global=kgcShip_GLOB_Terminal_CrewCount_Ship06>/<Global=kgcShip_GLOB_Terminal_MaxCrewCount_Ship06>）
+<Alias.CurrentName=RealShip05> (<Global=kgcShip_GLOB_Terminal_CrewCount_Ship05>/<Global=kgcShip_GLOB_Terminal_MaxCrewCount_Ship05>)	<Alias.CurrentName=RealShip05>（<Global=kgcShip_GLOB_Terminal_CrewCount_Ship05>/<Global=kgcShip_GLOB_Terminal_MaxCrewCount_Ship05>）
+<Alias.CurrentName=RealShip04> (<Global=kgcShip_GLOB_Terminal_CrewCount_Ship04>/<Global=kgcShip_GLOB_Terminal_MaxCrewCount_Ship04>)	<Alias.CurrentName=RealShip04>（<Global=kgcShip_GLOB_Terminal_CrewCount_Ship04>/<Global=kgcShip_GLOB_Terminal_MaxCrewCount_Ship04>）
+<Alias.CurrentName=RealShip03> (<Global=kgcShip_GLOB_Terminal_CrewCount_Ship03>/<Global=kgcShip_GLOB_Terminal_MaxCrewCount_Ship03>)	<Alias.CurrentName=RealShip03>（<Global=kgcShip_GLOB_Terminal_CrewCount_Ship03>/<Global=kgcShip_GLOB_Terminal_MaxCrewCount_Ship03>）
+<Alias.CurrentName=RealShip02> (<Global=kgcShip_GLOB_Terminal_CrewCount_Ship02>/<Global=kgcShip_GLOB_Terminal_MaxCrewCount_Ship02>)	<Alias.CurrentName=RealShip02>（<Global=kgcShip_GLOB_Terminal_CrewCount_Ship02>/<Global=kgcShip_GLOB_Terminal_MaxCrewCount_Ship02>）
+<Alias.CurrentName=RealShip01> (<Global=kgcShip_GLOB_Terminal_CrewCount_Ship01>/<Global=kgcShip_GLOB_Terminal_MaxCrewCount_Ship01>)	<Alias.CurrentName=RealShip01>（<Global=kgcShip_GLOB_Terminal_CrewCount_Ship01>/<Global=kgcShip_GLOB_Terminal_MaxCrewCount_Ship01>）
+OS Version: <Global=kgcShip_GLOB_AAA_ModVersion>\r\nAvailable Ships: <Global=kgcShip_GLOB_AvailableShipCount>\r\nAvailable Crew: <Global=kgcShip_GLOB_AvailableCrewCount>\r\nFleet Ships: <Global=kgcShip_GLOB_FleetCommand_Current>/<Global=kgcShip_GLOB_FleetCommand_Max>	系统版本：<Global=kgcShip_GLOB_AAA_ModVersion>\r\n可用舰船：<Global=kgcShip_GLOB_AvailableShipCount>\r\n可用船员：<Global=kgcShip_GLOB_AvailableCrewCount>\r\n舰队舰船：<Global=kgcShip_GLOB_FleetCommand_Current>/<Global=kgcShip_GLOB_FleetCommand_Max>
+Available Fleet	可用舰队
+CYBERAMP SELECTION <Quark Stabilizer> - Tier MAX	赛博增幅选择 <夸克稳定器> - 最高等级
+CYBERAMP SELECTION <Quark Stabilizer> - Tier <Global=kgcShip_GLOB_CyberampUnlock_QuarkStabilizer>	赛博增幅选择 <夸克稳定器> - 等级<Global=kgcShip_GLOB_CyberampUnlock_QuarkStabilizer>
+Quark Stabilizer	夸克稳定器
+Unassign Crew	解除船员指派
+Assign Crew	指派船员
+<Alias.CurrentName=SelectedShip> - <Alias.CurrentName=SelectedPilot>\r\n\r\nWARNING - This ship is currently marked to be salvaged for parts and will be destroyed.	<Alias.CurrentName=SelectedShip> - <Alias.CurrentName=SelectedPilot>\r\n\r\n警告——该舰船目前已被标记为拆解取件，将被摧毁。
+<Alias.CurrentName=SelectedShip> - <Alias.CurrentName=SelectedPilot>\r\n\r\nCrew Count: <Global=kgcShip_GLOB_CrewCount>/<Global=kgcShip_GLOB_CrewCount_Max>\r\nRegistration Status: <Alias.CurrentName=RegistrationStatus>\r\nFollow Distance: <Alias.CurrentName=FollowDistance>\r\nCombat Behavior: <Alias.CurrentName=CombatBehavior>	<Alias.CurrentName=SelectedShip> - <Alias.CurrentName=SelectedPilot>\r\n\r\n船员数：<Global=kgcShip_GLOB_CrewCount>/<Global=kgcShip_GLOB_CrewCount_Max>\r\n登记状态：<Alias.CurrentName=RegistrationStatus>\r\n跟随距离：<Alias.CurrentName=FollowDistance>\r\n战斗行为：<Alias.CurrentName=CombatBehavior>
+Ship Overview	舰船概览
+Unassign <Alias.CurrentName=Crew08>	解除<Alias.CurrentName=Crew08>的指派
+Unassign <Alias.CurrentName=Crew07>	解除<Alias.CurrentName=Crew07>的指派
+Unassign <Alias.CurrentName=Crew06>	解除<Alias.CurrentName=Crew06>的指派
+Unassign <Alias.CurrentName=Crew05>	解除<Alias.CurrentName=Crew05>的指派
+Unassign <Alias.CurrentName=Crew04>	解除<Alias.CurrentName=Crew04>的指派
+Unassign <Alias.CurrentName=Crew03>	解除<Alias.CurrentName=Crew03>的指派
+Unassign <Alias.CurrentName=Crew02>	解除<Alias.CurrentName=Crew02>的指派
+Unassign <Alias.CurrentName=Crew01>	解除<Alias.CurrentName=Crew01>的指派
+Assigned Crew	已指派船员
+Available Crew	可用船员
+Other Ships	其他舰船
+Pyraas II	派拉斯II
+Earth	地球
+kgcShipORBTStardock	kgcShipORBTStardock
+Eridani III	波江座III
+Freya II	芙蕾雅II
+Fleet	舰队
+Heimdall Station	海姆达尔站
+Watchtower Components	瞭望塔组件
+Runner's	迅跑者
+Rogue Skin	流氓涂装
+Increases max Star Power by 5	最大星辰力量+5
+Increases max Star Power by 15	最大星辰力量+15
+Increases max Star Power by 10	最大星辰力量+10
++15% Ship Missile Weapon Recharge Rate	+15% 飞船导弹武器充能速度
++15% Ship Ballistic Weapon Damage	+15% 飞船弹道武器伤害
++10% Ship Ballistic Weapon Damage	+10% 飞船弹道武器伤害
++5% Ship Ballistic Weapon Damage	+5% 飞船弹道武器伤害
++15% Ship EM Weapon Damage	+15% 飞船电磁武器伤害
++10% Ship EM Weapon Damage	+10% 飞船电磁武器伤害
++5% Ship Particle Weapon Damage	+5% 飞船粒子武器伤害
++15% Ship Energy Weapon Damage	+15% 飞船能量武器伤害
++10% Ship Energy Weapon Damage	+10% 飞船能量武器伤害
++5% Ship Energy Weapon Damage	+5% 飞船能量武器伤害
++10% Ship Missile Weapon Recharge Rate	+10% 飞船导弹武器充能速度
++5% Ship Missile Weapon Recharge Rate	+5% 飞船导弹武器充能速度
++15% Ship EM Weapon Recharge Rate	+15% 飞船电磁武器充能速度
++10% Ship EM Weapon Recharge Rate	+10% 飞船电磁武器充能速度
++10% Faster Grav Jump Calculation	+10% 重力跃迁计算速度
++20% Faster Grav Jump Calculation	+20% 重力跃迁计算速度
++10% Ship Particle Weapon Recharge Rate	+10% 飞船粒子武器充能速度
++5% Ship Particle Weapon Recharge Rate	+5% 飞船粒子武器充能速度
++15% Ship Energy Weapon Recharge Rate	+15% 飞船能量武器充能速度
++10% Ship Missile Weapon Damage	+10% 飞船导弹武器伤害
++5% Ship Energy Weapon Recharge Rate	+5% 飞船能量武器充能速度
++15% Ship Missile Weapon Damage	+15% 飞船导弹武器伤害
++10% Ship Ballistic Weapon Recharge Rate	+10% 飞船弹道武器充能速度
++5% Ship Ballistic Weapon Recharge Rate	+5% 飞船弹道武器充能速度
++30% Faster Grav Jump Calculation	+30% 重力跃迁计算速度
++15% Ship Particle Weapon Recharge Rate	+15% 飞船粒子武器充能速度
++5% Ship EM Weapon Recharge Rate	+5% 飞船电磁武器充能速度
++15% Ship Top Speed	+15% 飞船最高速度
++10% Ship Top Speed	+10% 飞船最高速度
++5% Ship Top Speed	+5% 飞船最高速度
++15% Ship Ballistic Weapon Recharge Rate	+15% 飞船弹道武器充能速度
++15% Ship Shield Capacity	+15% 飞船护盾容量
++10% Ship Shield Capacity	+10% 飞船护盾容量
++5% Ship Shield Capacity	+5% 飞船护盾容量
++10% Ship Particle Weapon Damage	+10% 飞船粒子武器伤害
++15% Ship Particle Weapon Damage	+15% 飞船粒子武器伤害
++5% Ship EM Weapon Damage	+5% 飞船电磁武器伤害
++5% Ship Missile Weapon Damage	+5% 飞船导弹武器伤害
++10% Ship Repair Speed	+10% 飞船维修速度
++10% Ship Energy Weapon Recharge Rate	+10% 飞船能量武器充能速度
+Watchtower Skin	瞭望塔涂装
++5% Ship Repair Speed	+5% 飞船维修速度
+Watchtower Cover	瞭望塔盖板
++15% Ship Repair Speed	+15% 飞船维修速度
+Warden Skin	守望者涂装
+Yes	是
+No	否
+Watchtower Array Hub Kappa	瞭望塔阵列枢纽卡帕
+Turbine Insulation	涡轮绝缘
+Watchtower Array Hub Omega	瞭望塔阵列枢纽奥米伽
+Watchtower Array Hub Upsilon	瞭望塔阵列枢纽宇普西隆
+Watchtower Array Hub Alpha	瞭望塔阵列枢纽阿尔法
+Unknown Vessel	不明舰船
+Apartments	公寓
+Air Circuit Oscillation	空气回路振荡
+Mysterious Individual	神秘人物
+System Initialization	系统初始化
+Watchtower Corvette	瞭望塔护卫舰
+Watchtower Array Hub Omicron	瞭望塔阵列枢纽奥米克戎
+Gren's Workshop	格伦的工坊
+Stardock	星坞
+Transformer Distribution	变压器配电
+Cargo Bay	货舱
+Salvage Ship	打捞船
+Watchtower	瞭望塔
+Stardock Epsilon	星坞艾普西隆
+Stardock Mi	星坞缪
+Warning!	警告！
+Stardock Omega	星坞奥米伽
+Stardock Psi	星坞普西
+Stardock Chi	星坞希
+Stardock Phi	星坞斐
+Stardock Upsilon	星坞宇普西隆
+Stardock Tau	星坞陶
+Stardock Eta	星坞伊塔
+Stardock Pi	星坞派
+Stardock Omicron	星坞奥米克戎
+Stardock Ksi	星坞克西
+Stardock Ni	星坞纽
+Stardock Sigma	星坞西格马
+Assembly Hanger	装配机库
+Stardock Iota	星坞约塔
+Stardock Theta	星坞西塔
+Stardock Rho	星坞柔
+Stardock Zeta	星坞泽塔
+Stardock Delta	星坞德尔塔
+Stardock Gamma	星坞伽马
+Stardock Beta	星坞贝塔
+Stardock Lamda	星坞兰布达
+Ship	飞船
+Starborn Prison	星裔监狱
+Your Fleet Location - Orbit	你的舰队位置 - 轨道
+Your Fleet Location - Outpost	你的舰队位置 - 哨站
+Your Fleet Location - System	你的舰队位置 - 星系
+Watchtower Safe House	瞭望塔安全屋
+Watchtower Array	瞭望塔阵列
+Watchtower Power Station	瞭望塔发电站
+Landing Area	着陆区域
+Your Fleet Location - Planet	你的舰队位置 - 行星
+Your Fleet Location - Surface	你的舰队位置 - 地表
+Nova Galactic Staryard	新星银河造船厂
+Watchtower Listening Post Echo	瞭望塔监听哨艾可
+Watchtower Listening Post Delta	瞭望塔监听哨德尔塔
+Watchtower Listening Post Charlie	瞭望塔监听哨查理
+Watchtower Listening Post Beta	瞭望塔监听哨贝塔
+Abandoned Watchtower Facility	废弃瞭望塔设施
+Holding Cell Ship	拘留舱船
+Watchtower Listening Post Alpha	瞭望塔监听哨阿尔法
+Bot Drop - Medic	机器人空投 - 医疗
+Bot Drop - Miner	机器人空投 - 采矿
+Cryo Bomb	冷冻炸弹
+EMP Blast	电磁脉冲冲击
+Bot Drop - Combat	机器人空投 - 战斗
+Turret Drop - Laser	炮塔空投 - 激光
+Turret Drop - Heavy Laser	炮塔空投 - 重型激光
+Turret Drop - Ballistic	炮塔空投 - 弹道
+Toxic Gas Bomb	毒气弹
+Surface Laser Cannon	地表激光炮
+Supply Drop	补给空投
+Smokescreen	烟幕
+Inferno Bomb	地狱火炸弹
+Bot Drop - Shiva	机器人空投 - 湿婆
+Bot Drop - AI Mech	机器人空投 - AI机甲
+Bombardment	炮击
+Reanimator	复活者
+Surface Gravity Well Bomb	地表重力井炸弹
+Surface Gravity Wave Bomb	地表重力波炸弹
+Surface Supernova Bomb	地表超新星炸弹
+Surface Anti-Gravity Bomb	地表反重力炸弹
+COM	COM
+Root	Root
+RightLeg	RightLeg
+RightArm	RightArm
+RightFoot	RightFoot
+ModelARoot	ModelARoot
+LeftLeg	LeftLeg
+LeftArm	LeftArm
+LeftFoot	LeftFoot
+Torso	Torso
+Head	Head
+lookAt	lookAt
+Cybertech Magnetic Synchronizer	赛博科技磁力同步器
+Cybernetic Tactical Jump Interface	赛博战术跃迁接口
+Cybertech Beam Harmonizer	赛博科技光束协调器
+Cyberware Quark Stabilizer	赛博夸克稳定器
+Cyberware Precision Module	赛博精密模块
+Cyberware Disruption Coordinator	赛博干扰协调器
+Cybertech Lightwave Accelerator	赛博科技光波加速器
+Cybertech Ballistic Calibrator	赛博科技弹道校准器
+Cyberware Trajectory Analyzer	赛博弹道分析仪
+Particle Beam Weapon Systems	粒子束武器系统
+Cybernetic Diagnostic Suite	赛博诊断套件
+Cyberware Targeting Computer	赛博瞄准计算机
+Ballistic Weapon Systems	弹道武器系统
+Salvage	打捞
+Cybertech Missile Guidance	赛博科技导弹制导
+Smokescreen Cover	烟幕掩护
+Piloting	驾驶
+Harper Discount	哈珀折扣
+Cybernetic Propulsion Matrix	赛博推进矩阵
+Missile Weapon Systems	导弹武器系统
+Astrodynamics	航天动力学
+Payloads	载荷
+Shield Systems	护盾系统
+Starship Engineering	星舰工程
+EM Weapon Systems	电磁武器系统
+Energy Weapon Systems	能量武器系统
+Cybernetic Shield Amplifier	赛博护盾放大器
+Aneutronic Fusion	无中子聚变
+Skydrop: Turret - Laser Variants	空投：炮塔 - 激光变体
+Watchtower Hab Variants 3L3W1H	瞭望塔起居舱变体 3L3W1H

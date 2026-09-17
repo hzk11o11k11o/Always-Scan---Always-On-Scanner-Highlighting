@@ -31,15 +31,17 @@ def parse(path: Path):
     count, data_size = struct.unpack_from("<II", buf, 0)
     base = 8 + count * 8
     out = {}
+    suffix = path.suffix.lower()
     for i in range(count):
         sid, off = struct.unpack_from("<II", buf, 8 + i * 8)
         p = base + off
-        if path.suffix in (".dlstrings", ".ilstrings"):
+        if suffix in (".dlstrings", ".ilstrings"):
             ln = struct.unpack_from("<I", buf, p)[0]
             raw = buf[p + 4:p + 4 + ln]
         else:
             end = buf.index(b"\x00", p)
             raw = buf[p:end]
+        raw = raw.rstrip(b"\x00")
         out[sid] = raw.decode("utf-8", "replace")
     return out
 

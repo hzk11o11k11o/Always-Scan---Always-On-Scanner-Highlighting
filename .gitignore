@@ -62,3 +62,7 @@ tr/loc/
 tr/build/
 tr/out/
 tr/*.sf1viewsettings
+
+# dict_full.tsv = merge(dict.tsv, official_seed.tsv, tr/loc/starfield_en_zh.tsv)
+# 含 15 万条官方对照，约 22 MB，一条命令即可再生 ⇒ 不入库
+tr/lang/dict_full.tsv

@@ -1,0 +1,229 @@
+#en	zh
+Ship Services Vendor Faction	飞船检修供应商阵营
+Power Override Control	电力覆盖控制
+Interface Node	接口节点
+Button	按钮
+Sari Dress	纱丽连衣裙
+Everbright Staff Uniform	永辉员工制服
+Everbright Staff Uniform Nr.2	永辉员工制服2号
+Log	日志
+Okay, I think I've got it!\r\n\r\nEvery time I hit that first button, one of three patterns lights up. I'm pretty sure it's setting the pattern the other three are supposed to match.\r\n\r\nSo I press that, then find the matching buttons on the other panels. Easy.\r\nOh, and I've only got ten seconds to do it...\r\n\r\nHere goes nothing...	好了，我想我搞明白了！\r\n\r\n每次我按下第一个按钮，三个图案中就会亮起一个。我基本可以确定，它是在设定另外三个需要匹配的图案。\r\n\r\n所以我按下那个按钮，然后在其他面板上找到匹配的按钮。简单。\r\n哦，而且我只有十秒钟来完成……\r\n\r\n管他呢，上吧……
+Lounge	休息室
+Theo Vendor Storage	西奥商贩库存
+Everbright Chunks Vendor Storage	永辉块餐商贩库存
+Ella Vendor Storage	埃拉商贩库存
+Prime Token	至尊代币
+Pilgrim	朝圣者
+Everbright Security	永辉安保
+Frostmarked	霜印
+Miranda Velez	米兰达·贝莱斯
+Fergus Newman	弗格斯·纽曼
+Ella Johnson	埃拉·约翰逊
+Theo Johnson	西奥·约翰逊
+Henry Straczynski	亨利·斯特拉琴斯基
+Sadie Straczynski	萨迪·斯特拉琴斯基
+David	大卫
+Lesley Jackson	莱斯利·杰克逊
+Blaze	布莱兹
+Construct	构造体
+Odo Wagner	奥多·瓦格纳
+Tobin Doherty	托宾·多尔蒂
+Alana Straczynski	阿兰娜·斯特拉琴斯基
+Frontier	开拓号
+Starstation RE-242	星际站RE-242
+Alana's ship	阿兰娜的飞船
+Frostmarked Hailbreaker	霜印·破冰号
+Everfrost	永冻
+Alpha Andraste III Orbit	阿尔法·安德拉斯特III轨道
+Everstorm	永暴
+Everbright Commons	永辉公共区
+Icy Asteroids	冰封小行星带
+The Vault	保险库
+Starstation RE-939	星际站RE-939
+Frostmarked Fleet	霜印舰队
+Gagarin Landing	加加林着陆点
+Everbright Sanctum	永辉圣所
+Trade House	贸易行
+Outpost	哨站
+Civilian Outpost	民用哨站
+Mech Graveyard	机甲坟场
+The Lock	船闸
+Everbright: Spacer activity	永辉：太空劫匪活动
+Mission Accepted	已接受任务
+Random reinforcement	随机增援
+Mission Complete	任务完成
+Mission Failed	任务失败
+Clear <Alias=TargetPlanetLocation> of Spacers	清除<Alias=TargetPlanetLocation>上的太空劫匪
+Tracker's Alliance Contract\r\nA known pirate ship has been reported in the <Alias=TargetSystemLocation> system. Locate the <Alias=PrimaryRef> and destroy it.	追踪者联盟合同\r\n据报有一艘已知的海盗飞船出现在<Alias=TargetSystemLocation>星系。找到<Alias=PrimaryRef>并将其摧毁。
+Target System	目标星系
+Target	目标
+Alana	阿兰娜
+Enables misc dialogue	启用杂项对话
+Recruitable as Crew	可作为船员招募
+Start recruit scene	开始招募场景
+Hired	已雇佣
+-From	-来自
+-Parents	-父母
+To parents	前往父母处
+Chat1	闲聊1
+Chat 2	闲聊2
+New recruit	新兵
+-Stage while waiting for interview	-等待面试期间的阶段
+Chat 3, if romance	闲聊3（若有恋情）
+Acceptable breakup	和平分手
+Commitment	承诺
+Start commit quest	开始承诺任务
+Bad breakup	糟糕的分手
+Dismiss Alana	遣散阿兰娜
+Over breakup	分手结束
+Commit HowYodoin complete	承诺任务完成
+Breakup	分手
+Everbright: Ecliptic activity	永辉：黄道佣兵团活动
+Clear <Alias=TargetPlanetLocation> of Ecliptic forces	清除<Alias=TargetPlanetLocation>上的黄道佣兵团
+Everbright: Va'ruun Zealot activity	永辉：瓦鲁狂徒活动
+The Interview	面试
+Interview the candidate	面试候选人
+Talk to Alana outside	在外面与阿兰娜交谈
+Hostile Activity: Alpha Andraste VI	敌对活动：阿尔法·安德拉斯特VI
+Neutralize threat at <Alias=TargetLocationCopy001>	清除<Alias=TargetLocationCopy001>的威胁
+Another blasted outlaw gang is on the rise. We need to put them down before they become more of a problem. If you take out the <Alias=PrimaryRef> the rest of the gang should fold. Target was last seen in the <Alias=TargetLocation> on <Alias=TargetPlanetLocation> in the <Alias=TargetSystemLocation> system.	又有一伙该死的亡命之徒在兴风作浪。我们得在他们造成更大麻烦之前将其铲除。只要干掉<Alias=PrimaryRef>，帮派的其余成员应该就会作鸟兽散。目标最后一次出现是在<Alias=TargetSystemLocation>星系<Alias=TargetPlanetLocation>的<Alias=TargetLocation>。
+Target Location	目标地点
+Target Planet	目标行星
+Quest start after MQ	主线后开始任务
+-enabled observation	-启用观测
+Collected all tokens	已收集全部代币
+Start scene	开始场景
+Origin done	起源完成
+Hostile Activity: Alpha Andraste I-a	敌对活动：阿尔法·安德拉斯特I-a
+Hostile Activity: Alpha Andraste II	敌对活动：阿尔法·安德拉斯特II
+Hostile Activity: Alpha Andraste III	敌对活动：阿尔法·安德拉斯特III
+Hostile Activity: Alpha Andraste IV	敌对活动：阿尔法·安德拉斯特IV
+Hostile Activity: Alpha Andraste V	敌对活动：阿尔法·安德拉斯特V
+Hostile Activity: Alpha Andraste I	敌对活动：阿尔法·安德拉斯特I
+Origin	起源
+Token 1	代币1
+Token 2	代币2
+Token 3	代币3
+Return to Overseer	返回监督者处
+Find the first token	找到第一块代币
+Find the second token	找到第二块代币
+Find the third token	找到第三块代币
+Return to the Overseer	返回监督者处
+Give Spacer mission	授予太空劫匪任务
+Give quest and start cooldown on bounty quest	授予任务并开始悬赏任务冷却
+Done with first radiant quest. Send to banker	完成第一个随机任务。发送给银行家
+Told about banker	被告知银行家
+Repeating quests.	重复任务。
+Alana's Commitment	阿兰娜的承诺
+Take Alana to the Everbright jetty	带阿兰娜去永辉码头
+Meeting the parents	见父母
+Enable mapmarker	启用地图标记
+Enter trigger	进入触发器
+Enable bad guys	启用敌人
+Baddies dead	敌人已死亡
+Quest done	任务完成
+Visit Alana's parents	拜访阿兰娜的父母
+Kill the Spacers	杀死太空劫匪
+Talk to Alana	与阿兰娜交谈
+Everbright Dialogue	永辉对话
+Everbright	永辉
+Entered Orbit, starts space battle	进入轨道，开始太空战斗
+The crippled ship's captain wants me to dock and board.	那艘受损飞船的船长想让我对接并登船。
+-Sanctum mentioned	-提到了圣所
+Go to Sanctum	前往圣所
+I'm heading down to the Everbright Sanctum.	我正前往永辉圣所。
+Arrived at Sanctum	抵达圣所
+Alana in position	阿兰娜就位
+I should hear what Alana has to say before we go any further.	在继续前进之前，我应该先听听阿兰娜怎么说。
+Go meet Tobin	去见托宾
+Arrived at Tobin	抵达托宾处
+Frostmarked at gate	霜印在大门
+-Delayed	-已拖延
+-Confront	-对峙
+-Killed frostmarked at gate.	-杀死了大门处的霜印成员。
+-Delay	-拖延
+Meet Lesley	见莱斯利
+Go to the Vault.	前往保险库。
+-Frostmarked mentioned	-提到了霜印
+Talk to Alana before going to Everfrost	前往永冻前与阿兰娜交谈
+I need to find Alana before I go any further.	在继续前进之前，我需要找到阿兰娜。
+Meet traders	见商人
+Traders introduced	已介绍商人
+Time to prepare. I can resupply here, or speak with Alana before we move on.	该做准备了。我可以在这里补给，或在继续前进前和阿兰娜谈谈。
+To frostmarked ships	前往霜印飞船
+Enable Everfrost loc	启用永冻位置
+Time to locate Everfrost on the surface of Alpha Andraste IV.	该在阿尔法·安德拉斯特IV表面定位永冻了。
+Entered Everfrost	进入永冻
+Puzzle solved	解谜完成
+Everfrost startup	永冻启动
+-Option 1	-选项1
+-Option 2	-选项2
+Find Everstorm	找到永暴
+Found Tobin	找到托宾
+-Bad path	-坏路线
+Begin purge	开始净化
+Everstorm purged	永暴已净化
+Back to Everbright Sanctum	返回永辉圣所
+To Everbright	前往永辉
+Everbright interface enabled	永辉接口已启用
+Check with Lesley	与莱斯利确认
+Get to Alana's ship	前往阿兰娜的飞船
+Alana's ship is finally ready. I'm taking her there myself.	阿兰娜的飞船终于准备好了。我亲自带她去。
+Return to sanctum	返回圣所
+I should return to the Sanctum and speak to Lesley.	我应该返回圣所，与莱斯利谈谈。
+Rewards given, talk to Alana	已发放奖励，与阿兰娜交谈
+Failed/bad path	失败/坏路线
+Main quest ends	主线结束
+Everbright has been restored. Everfrost and Everstorm are stable, and the Overseer is fully active. The system is whole again. Lesley says he has more work for me, and apparently the Overseer is a bit more talkative.	永辉已被修复。永冻和永暴恢复稳定，监督者完全启动。整个系统重归完整。莱斯利说他还有更多工作要交给我，而且监督者似乎也变得健谈了些。
+Dock with the damaged ship	与受损飞船对接
+Land at the Everbright Sanctum	在永辉圣所着陆
+Follow Alana	跟随阿兰娜
+Talk to Tobin	与托宾交谈
+Talk to Tobin at the gate	在大门处与托宾交谈
+Approach the Frostmarked	接近霜印成员
+Talk to Lesley	与莱斯利交谈
+Go to the Vault	前往保险库
+Find Alana	找到阿兰娜
+Talk to the traders	与商人交谈
+Stock up or talk to Alana	补给或与阿兰娜交谈
+Face the Frostmarked Fleet	面对霜印舰队
+Find Everfrost	找到永冻
+Return to Everbright Sanctum	返回永辉圣所
+Reset Everbright	重置永辉
+Activate interface node.	激活接口节点。
+Find Lesley	找到莱斯利
+Dock with Alana's ship	与阿兰娜的飞船对接
+The Ship Services Technician	飞船服务技术员
+Start after mq	主线后开始
+Got location	获得位置
+Return to Lesley	返回莱斯利处
+Done	完成
+Find Odo	找到奥多
+Ship Services Tech Dialogue	飞船服务技工对话
+Puzzle Explosion	解谜爆炸
+Everfrost Crucible	永冻熔炉
+Everstorm Dunes	永暴沙丘
+Andraste III Orbit	安德拉斯特III轨道
+Straczynski Outpost	斯特拉琴斯基哨站
+Andraste IV Orbit	安德拉斯特IV轨道
+More than 50,000 credits transferred.	已转账超过50,000信用点。
+Everbright Bank	永辉银行
+35,000 credits transferred.	已转账35,000信用点。
+Overseer Protocol	监督者协议
+25,000 credits transferred.	已转账25,000信用点。
+45,000 credits transferred.	已转账45,000信用点。
+40,000 credits transferred.	已转账40,000信用点。
+10,000 credits transferred.	已转账10,000信用点。
+20,000 credits transferred.	已转账20,000信用点。
+5,000 credits transferred.	已转账5,000信用点。
+15,000 credits transferred.	已转账15,000信用点。
+30,000 credits transferred.	已转账30,000信用点。
+Eridani V	波江座V
+Vega II-c	织女星II-c
+Van Maanen I	范马南星I
+Eridani III	波江座III
+Alpha Andraste II	阿尔法·安德拉斯特II
+Bradbury III	布拉德伯里III
+Alpha Andraste IV	阿尔法·安德拉斯特IV
+Eridani II	波江座II
+Alpha Andraste III	阿尔法·安德拉斯特III

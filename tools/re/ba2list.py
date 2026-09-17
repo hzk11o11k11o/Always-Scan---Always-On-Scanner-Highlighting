@@ -96,6 +96,9 @@ def main() -> int:
         shown += 1
         if a.extract:
             data = buf[f["offset"]:f["offset"] + (f["packed"] or f["unpacked"])]
+            if f["packed"] and f["packed"] != f["unpacked"]:
+                import zlib
+                data = zlib.decompress(data)
             dest = Path(a.extract) / f["name"]
             dest.parent.mkdir(parents=True, exist_ok=True)
             dest.write_bytes(data)
