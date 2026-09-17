@@ -1,7 +1,7 @@
 #en	zh
 # Dark Universe: Retrograde —— 任务简报 / 赏金任务名 / 战利品护甲 / 杂项
 # 官方术语：Crimson Fleet 深红舰队 / Ecliptic 黄道佣兵团 / Spacer 太空劫匪 /
-#          Va'ruun 瓦鲁 / UC 联殖 / SysDef 联殖防务 / Trackers Alliance 追踪者联盟 /
+#          Va'ruun 瓦鲁 / UC 联殖 / SysDef 星防队 / Trackers Alliance 追踪者联盟 /
 #          Constellation 星宿座 / Deimos 火卫二 / Cydonia 赛多尼亚 / LIST 独立盟
 Outlaw Station	法外之徒站
 Station Interior	站点内部
@@ -105,7 +105,7 @@ Va'ruun forces under <Alias=BountyNpc> are using <Alias=PrimaryRef> to refine fu
 Supply shipments to the <Alias=TargetSystemLocation> system are being intercepted by Spacers operating from <Alias=PrimaryRef> under <Alias=BountyNpc>. End the blockade.	运往<Alias=TargetSystemLocation>星系的补给船队屡遭<Alias=BountyNpc>手下、以<Alias=PrimaryRef>为基地的太空劫匪拦截。终结这场封锁。
 Weapons caches linked to <Alias=BountyNpc> have been tracked to <Alias=PrimaryRef> in the <Alias=TargetSystemLocation> system. Seize the station and confiscate the arms.	与<Alias=BountyNpc>有关的武器藏匿点被追踪到<Alias=TargetSystemLocation>星系的<Alias=PrimaryRef>。夺取该站并没收军火。
 Neon Viper's Va'ruun	霓虹蝮蛇的瓦鲁套装
-The Marauder's SysDef	劫掠者的联殖防务套装
+The Marauder's SysDef	劫掠者的星防队套装
 Gutter Snake's Cydonia	阴沟蛇的赛多尼亚套装
 The Plunderer's Cydonia	掠夺者的赛多尼亚套装
 The Specialist's Ranger	专家的游骑兵套装
@@ -118,7 +118,7 @@ Coil Priest's Mercenary Spacesuit	线圈祭司的佣兵宇航服
 Rust Devil's Va'ruun Space Helmet	锈魔的瓦鲁太空头盔
 Deadlock's Deep Recon Space Helmet	死锁的深空侦察太空头盔
 Freebooter's UC AntiXeno Spacesuit	掠夺船员的联殖反异种宇航服
-Hull Breach's SysDef Ace Spacesuit	破壳者的联殖防务王牌宇航服
+Hull Breach's SysDef Ace Spacesuit	破壳者的星防队王牌宇航服
 Scarlet Tide's Navigator Spacesuit	猩红潮汐的领航员宇航服
 Junkyard King's Deimos Space Helmet	废车场之王的火卫二太空头盔
 Void Rat's UC Ace Pilot Space Helmet	虚空鼠的联殖王牌飞行员太空头盔

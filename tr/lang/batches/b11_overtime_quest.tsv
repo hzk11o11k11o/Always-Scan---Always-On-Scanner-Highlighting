@@ -32,7 +32,7 @@ Collect the bounty at the <Alias=TargetLocation>	在<Alias=TargetLocation>领取
 Stolen Shipment: Antique on <Alias=targetPlanet>	失窃货物：<Alias=targetPlanet>上的古董
 TerraBrew Delivery: <Alias=TargetPlanetLocation>	地球酿酒递送：<Alias=TargetPlanetLocation>
 Collect Terrain Mapper at <Alias=DungeonLocation>	在<Alias=DungeonLocation>收集地形测绘仪
-Deliver <Alias=Evidence> to New Atlantis Galbank 	将<Alias=Evidence>送至新亚特兰蒂斯城银河银行
+Deliver <Alias=Evidence> to New Atlantis Galbank 	将<Alias=Evidence>送至新亚特兰蒂斯城盖尔银行
 Deliver Mail Consignment to <Alias=FinalLocation>	将邮件托运送至<Alias=FinalLocation>
 Deliver Medical Shipment to <Alias=FinalLocation>	将医疗货物送至<Alias=FinalLocation>
 Gastronomy Delivery: <Alias=TargetPlanetLocation>	美食递送：<Alias=TargetPlanetLocation>

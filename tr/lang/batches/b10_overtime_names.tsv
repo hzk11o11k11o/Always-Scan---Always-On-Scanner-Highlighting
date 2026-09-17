@@ -2,7 +2,7 @@
 # Dark Universe: Overtime —— 名称/物品/地点类
 # 官方术语：Crimson Fleet 深红舰队 / Ecliptic 黄道佣兵团 / Spacer 太空劫匪 /
 #          Va'ruun 瓦鲁 / UC 联殖 / Freestar 星联 / Trade Authority 贸易管理局 /
-#          GalBank 银河银行 / The Clinic 星际诊所号 / The Den 巢穴站 /
+#          GalBank 盖尔银行 / The Clinic 星际诊所号 / The Den 巢穴站 /
 #          Heatleech 热蛭 / Chunks 块餐 / LIST 独立盟
 Scanner	扫描仪
 Goliath	歌利亚
@@ -161,7 +161,7 @@ You don't have the items required	你没有所需的物品
 [Data Slate #A-471 | Secure Playback]	[数据板 #A-471 | 安全回放]
 Recovery: New Atlantis Reliant Medical	回收：新亚特兰蒂斯城信实医疗
 Starting repairs using some ship parts	正在使用部分飞船部件开始维修
-Claims Assessment: New Atlantis GalBank	理赔评估：新亚特兰蒂斯城银河银行
+Claims Assessment: New Atlantis GalBank	理赔评估：新亚特兰蒂斯城盖尔银行
 You don't have the ship parts to repair this.	你没有维修所需的飞船部件。
 Use this terminal to scan for nearby missions.	使用此终端扫描附近的任务。
 Use this terminal to scan for remote missions.	使用此终端扫描远程任务。

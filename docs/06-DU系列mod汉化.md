@@ -15,13 +15,21 @@
 | `du_takeover.esm` | 56 929 | 104 | 54 | **完成并部署** |
 | `du_overtime.esm` | 793 | 3 017 | 554 | **完成并部署** |
 | `du_retrograde.esm` | 85 323 | 5 819 | 2 417 | **完成并部署** |
-| `du_outlaws_01.esm` | 4 421 | 5 027 | 3 750 | **完成**（长文本 `MESG DESC` + `BOOK DESC` 均已译；剩 `QUST CNAM` 460 与 95 个占位串未译，见第六节） |
+| `du_outlaws_01.esm` | 4 421 | 5 027 | 3 750 | **完成**（短串 + 三类长文本 `MESG DESC` / `BOOK DESC` / `QUST CNAM` 全部译完；只剩 95 个刻意不译的占位串） |
 
 五个 mod 都已写过 MO2 的 `overwrite\`（原位替换，原文件备份在 `tr/orig/`）。
-`du_outlaws_01.esm` 当前是**短串 + 全部可译长文本完整版**：4 421 条记录里改动 3 154 条、
-替换 4 472 条（89.0% 行），结构校验 `problems: 0`。
-剩余 **555 行**全部是刻意不译的串：`QUST CNAM` 460（任务简报长文本，尚未动工）
-加 95 个占位串（71 个 `QUST FULL` 8 位十六进制占位名、24 个纯 hull 代号如 `PX-15`）。
+`du_outlaws_01.esm` 当前是**全量汉化完整版**（2026-09-17 完成 `QUST CNAM`）：4 421 条记录里
+改动 3 154 条、替换 **4 932** 条（98.1% 行），结构校验 `problems: 0`。
+剩余 **95 行**全部是刻意不译的串：71 个 `QUST FULL` 8 位十六进制占位名
+加 24 个纯 hull 代号（`PX-15`…）。
+
+> **术语更正（2026-09-17）**：本文档早期把 `GalBank` 记作「银河银行」、`SysDef` 记作
+> 「联殖防务」，**都与官方串不符** —— 以 `tr/loc/starfield_en_zh.tsv` 为准，
+> 官方分别是 **`GalBank` = 盖尔银行**（`GalBank Statement` → 盖尔银行声明）、
+> **`SysDef` = 星防队**（`UC SysDef Mission Board` → 联殖星防队任务板）。
+> 已把 `tr/lang/batches/*.tsv` 里的两种旧译**全量替换**（60 个批次文件），
+> 并重建 + 重新部署了 `du_outlaws_01.esm`。
+> ⚠️ `du_overtime.esm` / `du_retrograde.esm` 的**已部署文件**仍含旧译（未重建，原因见第七节）。
 
 ---
 
@@ -47,6 +55,8 @@
 | `gen_poi_names.py` / `gen_outlaws_names.py` / `gen_outlaws_objectives.py` | 组合式名称、任务目标的批量生成 |
 | `tokstat.py` / `split_names.py` | 词元统计，用来发现"组合式命名" |
 | `tr_slice.py` | 按 `(recsig, subsig)` 从抽取文件里切出一类长文本，并**保留抽取文件行号**（长文本分批的唯一入口） |
+| `tr_plan.py` | 把切出的长文本按字符数切成 N 批，输出 `row_from`/`row_to`（可直接喂 `read_file` 取正文） |
+| `tr_check_specs.py` | **spec 行号防御性校验**：逐条核对行号确实属于本类 `(recsig, subsig)`，防「抄错行号静默错配」 |
 | `xedit-scripts/tr_export.pas` | 保留的 xEdit 版导出脚本（慢，仅作对照/应急） |
 
 > 2026-09-17 追加（做 `above and beyond` / `morelore_mantislegacy` 时写的通用小工具，
@@ -104,7 +114,7 @@ tools/re/ststrings.py dict tr/loc/strings/starfield_en.strings \
 | Spacer | 太空劫匪 | |
 | Va'ruun | 瓦鲁 | 不是"瓦鲁恩" |
 | Trade Authority | 贸易管理局 | |
-| GalBank | 银河银行 | |
+| GalBank | **盖尔银行** | 2026-09-17 更正：早期误记作「银河银行」 |
 | Trackers Alliance | 追踪者联盟 | |
 | Constellation | 星宿座 | |
 | Chunks | 块餐 | |
@@ -113,7 +123,7 @@ tools/re/ststrings.py dict tr/loc/strings/starfield_en.strings \
 | Terrormorph | **骇变兽** | ⚠️ 2026-09-17 更正：此前本条记的“惊惧兽”是错的，官方串是骇变兽（见 `docs/07` 第三节） |
 | LIST | 独立盟 | |
 | The Clinic / The Den / Neon / Cydonia / Akila | 星际诊所号 / 巢穴站 / 霓虹城 / 赛多尼亚 / 阿基拉城 | |
-| SysDef | 联殖防务 | |
+| SysDef | **星防队**（`UC SysDef` = 联殖星防队） | 2026-09-17 更正：早期误记作「联殖防务」 |
 
 ---
 
@@ -233,11 +243,11 @@ Copy-Item tr/build/du_xfire.esm "$O\du_xfire.esm" -Force
 加上官方命中的其余条目 ⇒ **3 753 条 / 74.7% 的行、2 476 / 3 750 个唯一串**，
 已构建（`problems: 0`）并部署到 `overwrite\`。
 
-**未完成**：只剩 `QUST CNAM` 任务简报一类（两类长文本 `MESG DESC` / `BOOK DESC` 均已完成）：
+**全部完成（截至 2026-09-17）**：短串 + 三类长文本（`MESG DESC` / `BOOK DESC` / `QUST CNAM`）：
 
 | 子记录 | 条数 | 字符数 | 内容 |
 | --- | --- | --- | --- |
-| `QUST CNAM` | 460 | ~378 000 | 任务简报（尚未动工） |
+| ~~`QUST CNAM`~~ | ~~460~~ | ~~~378 869~~ | ✅ 已完成（批次 `b151`~`b1620`，**24 批 462 条** ~378 869 字符，2026-09-17） |
 | ~~`MESG DESC`~~ | ~~318~~ | ~~~175 000~~ | ✅ 已完成（批次 `b50`~`b70`，318 条 ~175 000 字符） |
 | ~~`BOOK DESC`~~ | ~~401~~ | ~~~916 000~~ | ✅ 已完成（批次 `b71`~`b150`，80 批 **403** 条 ~916 000 字符） |
 | 不译占位 | 95 | — | `QUST FULL` 的 71 个 8 位十六进制占位名 + `GBFM FULL` 的 24 个纯 hull 代号（`PX-15`…） |
@@ -260,10 +270,27 @@ Copy-Item tr/build/du_xfire.esm "$O\du_xfire.esm" -Force
 > 要点：**一篇长文一个批次**（第 21 批之后按约 1 万字符切）；译文里的换行要写成
 > `\n`（`apply` 会 `unesc`），键由 `tr_mkbatch.py` 从抽取文件里逐字符取，**不要手抄**。
 
-1. `tr/lang/todo/du_outlaws_01.tsv` 是当前完整的待译清单
-   （按字符数排序，短的在前），可用 `--max-chars` 分批；
-2. 把译文写进新的 `tr/lang/batches/bXX_*.tsv`；
-3. 重跑第五节第 2~5 步（`du_outlaws_01` 那一条）即可。
+`QUST CNAM` 的实际做法（**新增两个通用小工具**：`tools/re/tr_plan.py` 按字符数分批、
+`tools/re/tr_check_specs.py` 校验 spec 行号类别）：
+
+1. `python tools/re/tr_slice.py tr/out/du_outlaws_01.tsv --sig QUST --sub CNAM -o tr/lang/todo/outlaws/QUST_CNAM.tsv`
+   ⇒ **462 行 / 378 869 字符**（去重后的唯一串）；
+2. `python tools/re/tr_plan.py tr/lang/todo/outlaws/QUST_CNAM.tsv --target 16000 -o tr/lang/todo/outlaws/QUST_CNAM.plan.tsv`
+   ⇒ 按约 16 000 字符/批切成 **24 批**（计划里的 `row_from`/`row_to` 可直接喂 `read_file`）；
+3. 每批写一个 spec `tr/lang/spec/qust_cnam_NN.txt`（`<抽取文件行号>\t<译文>`，
+   换行写成 `\n`），再用 `tr_mkbatch.py` 生成批次 `b151`~`b1620_outlaws_qust_cnam_NN.tsv`；
+4. **每批跑完后执行防御性校验**（把第七节那条坑自动化）：
+   ```
+   python tools/re/tr_check_specs.py tr/out/du_outlaws_01.tsv QUST CNAM ^
+          (Get-ChildItem tr/lang/spec/qust_cnam_*.txt).FullName
+   ```
+   ⇒ 必须 `bad=0`，全部写完时 `checked lines=462 unique=462`；
+5. 重跑第五节第 2~5 步（`du_outlaws_01` 那一条）。
+
+**结果**：`dict.tsv` 4 291 → **4 751** 条；`map` 5 027 行 → 译出 **4 932**（98.1%），
+未译 **95**（全部是刻意不译的占位串）；`apply`（从 `tr/orig` 整份重建）替换 4 932 条、
+未应用 0；`tr_verify.py` = `problems: 0`；对构建产物再 `extract` 只剩 **95 条**、
+**`QUST CNAM` 0 条残留**。
 
 ⚠️ 三个已踩过的坑：
 
@@ -301,11 +328,24 @@ MO2 profile `Default`（`D:\Mod Organizer 2\starfield_mods\profiles\Default`）�
 | 生成的汉化 ESM | `tr/build/du_*.esm` |
 | 已部署（5 个） | `D:\Mod Organizer 2\starfield_mods\overwrite\du_{xfire,takeover,overtime,retrograde,outlaws_01}.esm` |
 
-> 2026-09-17：`du_outlaws_01.esm` **短串 + MESG DESC + BOOK DESC 完整版**已部署
-> （`tr/build/du_outlaws_01.esm` = `overwrite\du_outlaws_01.esm`，5 575 493 B，
-> MD5 `191ABBB93FFD4A61F3E6CBA8AEB3805E`；从 `tr/orig/du_outlaws_01.esm` 整份重建，
-> 替换 4 472 条 / 改动 3 154 条记录、`problems: 0`；反查 `extract` 只剩 555 条
-> `QUST CNAM` 460 + 占位串 95，**`MESG DESC` 与 `BOOK DESC` 均 0 条残留**）。
+> 2026-09-17（最新）：`du_outlaws_01.esm` **全量汉化版**（短串 + `MESG DESC` + `BOOK DESC`
+> + `QUST CNAM`）已部署 —— `tr/build/du_outlaws_01.esm` = `overwrite\du_outlaws_01.esm`，
+> **5 563 835 B**，MD5 **`74FB0E81B2FB9E2AB52DD12A1F184E5E`**；从 `tr/orig/du_outlaws_01.esm`
+> 整份重建，替换 **4 932** 条 / 改动 3 154 条记录、`problems: 0`；反查 `extract` 只剩 **95 条**
+> 占位串，**三类长文本均 0 条残留**。
+> （上一版：`QUST CNAM` 未译，5 575 493 B，MD5 `191ABBB93FFD4A61F3E6CBA8AEB3805E`。
+> 本次 MD5 变了是因为**同时把全批次词典里的 `银河银行`→`盖尔银行`、`联殖防务`→`星防队`
+> 统一成官方译名后重跑**。）
+
+### 术语统一「没跟着重建」的另外两个 mod（如实记录）
+
+| mod | 用旧 map 重建能否复现已部署文件 | 结论 |
+| --- | --- | --- |
+| `du_retrograde.esm` | **能，逐字节一致**（重建成 5 519 条、MD5 `C7E99DF3125CE2597EF0AFA906C5E299` = 已部署 MD5） | 重建属于**纯术语替换**，安全；但本次任务范围只是 `du_outlaws_01`，**未做** |
+| `du_overtime.esm` | **不能**。已部署 1 531 161 B；用旧 map 重建成 1 531 177 B（且 `not applied=4`）、用新 map 重建成 1 531 177 B，两者都不等于已部署 MD5 | ⚠️ **`tr/orig/du_overtime.esm` 与已部署文件不同源**（旧 map 里那 4 条 `BOOK ENAM` 在当前 `tr/orig` 里已找不到）⇒ 重建有回归风险，**本次不动** |
+
+⇒ 待办：先核对 `du_overtime` 的「原始 / 已部署」版本关系（`tr/orig` 是否被覆盖过），
+确认后再决定是否统一它的术语；`du_retrograde` 则随时可以安全重跑。
 
 ### 游戏内验证清单
 
