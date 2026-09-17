@@ -6,50 +6,45 @@
 //    ② 高亮不再受原版那个「屏幕中央圆圈」限制，改成玩家周围一个半径；
 //    ③ 一个快捷键开关。
 //
-//  分工（沿用上一代项目验证过的架构）：
-//    · **原生侧（本文件）**：遍历玩家所在 cell 的引用数组（引擎自带的
-//      TESObjectCELL::ForEachReference，带 BSAutoReadLock，几千个引用只有微秒级），
-//      按「距离 + base form 类型白名单」筛出该亮的对象，把结果追加进 FormList 信箱。
-//      没有关键词、没有 120 上限、不调用任何引擎函数。
-//    · **Papyrus 侧（SAS_Bridge.psc）**：只负责把信箱里的引用逐个 Play/Stop。
-//      「给引用播 EFSH」这个能力目前只有 Papyrus 暴露（EffectShader.Play/Stop）,
-//      所以保留一个极轻的桥；它不做任何搜索、不做任何判断。
+//  ★ v4.0 架构（旧方案已整体删除，见下）：
+//    · **本文件（C++ / SFSE）**：从头到尾一个人干完 —— 遍历玩家所在 cell 的引用数组
+//      （引擎自带的引用数组，几千个引用只有微秒级）、按「距离 + base form 类型」
+//      筛出该亮的对象、然后**直接驱动引擎原生的 outline 高亮**（和原版手持扫描仪
+//      走的是同一套渲染，见 docs/03）。
+//    · **Papyrus 侧（SAS_Bridge.psc）**：只剩两件事，且都跟「高亮」无关 ——
+//      ① 老存档里 v2.4~v3.0 留下的面包屑珠子做一次性清理；
+//      ② 按 DLL 写进 `SAS_Notify` (GLOB) 的标记弹一条 HUD 提示（开/关）。
+//      它**不再参与任何视觉**（EFSH / 信箱 / 游标全部删除）。
 //
-//  跨语言通道（两个信箱 + 游标）：
-//      SAS_OpList   (FLST) ← DLL 追加「该亮」的引用
-//      SAS_OpCursor (GLOB) → 脚本发布「已处理到第几个」
-//      SAS_StopList (FLST) ← DLL 追加「该灭」的引用（只在关掉开关时用）
-//      SAS_StopCursor(GLOB)→ 同上
-//      SAS_Epoch    (GLOB) → 脚本读档时 +1，DLL 看到变化就整批重置
-//    DLL 只在 cursor == size（**相等**判定，防读档回滚）时才清表。
+//  为什么还留着 ESM 与这个脚本（而不是变成纯 DLL）：
+//    老存档里 SAS_AlwaysScanQuest 的脚本实例是**按 FormID 归档**的。一旦 quest 的
+//    FormID 位移，那个实例就对不上，`GuideArrayReady` 读回来永远是 False ⇒
+//    一次性清理不会再跑 ⇒ 老存档地上的珠子永久残留。
+//    所以 0x800..0x806 那几条旧记录**保持创建顺序不动**（它们现在只是 FormID 占位），
+//    新记录一律**追加在最后**（0x807 SAS_Notify）。见 build_sas.pas 顶部说明。
 //
 //  几个「不要再踩」的坑（全部来自上一代项目的实测）：
 //    ① **绝不缓存 BSTArray 的 data()/capacity()**：清表可能释放/搬移缓冲，
 //       缓存下来就是悬空指针，往那儿写 8 字节 → HEAP_CORRUPTION 延迟崩溃。
 //       本文件每次现读，运行期零缓存。
-//    ② **换 cell / 读档时不能立刻释放发光集合**：那批 ref 的 NiPointer 是它们
-//       唯一的保活来源，而信箱里可能还有桥没读的 op → 立刻释放就是 Play 野指针。
-//       所以走「退役队列」，继续保活 2.5 秒再释放。
-//    ③ **只看主线程**：SFSE 的 AddPermanentTask 挂在 Command_Process 上，
+//    ② **只看主线程**：SFSE 的 AddPermanentTask 挂在 Command_Process 上，
 //       读档期间加载线程也会调它；非主线程直接返回。
-//    ④ **游标必须早于 Play/Stop 推进**（这条在脚本侧）。
 // ============================================================================
 
 #include "PCH.h"
 
 #include "AlwaysScan.h"
 
-#include "RE/B/BGSListForm.h"
 #include "RE/F/FormTypes.h"
 #include "RE/N/NiAVObject.h"
 #include "RE/N/NiPoint.h"
 #include "RE/N/NiSmartPointer.h"
 #include "RE/P/PlayerCharacter.h"
 #include "RE/T/TESForm.h"
-#include "RE/U/UI.h"
 #include "RE/T/TESGlobal.h"
 #include "RE/T/TESObjectCELL.h"
 #include "RE/T/TESObjectREFR.h"
+#include "RE/U/UI.h"
 
 #include <Windows.h>
 
@@ -77,25 +72,24 @@ namespace SAS
 		// 官方脚本 HumanHeight 4.0 ≈ 1.2 米 → 1 米 ≈ 3.4286 单位（上一代项目实测标定）
 		constexpr float kUnitsPerMeter = 3.4286f;
 
-		// ESM 里的局部 FormID（低 24 位）。运行时前缀由 quest 的 FormID 高字节推出，
-		// 所以这里的顺序必须与 tools\xedit-scripts\build_sas.pas 完全一致。
-		constexpr std::uint32_t kLocalOpList     = 0x801;
-		constexpr std::uint32_t kLocalOpCursor   = 0x802;
-		constexpr std::uint32_t kLocalStopList   = 0x803;
-		constexpr std::uint32_t kLocalStopCursor = 0x804;
-		constexpr std::uint32_t kLocalEpoch      = 0x805;
-		// ★ v3.1：任务引导线功能已整体移除，为它加过的记录全部从 ESM 里去掉：
-		//   0x807 SAS_GuideHb / 0x808 SAS_GuideState（原版引导法术的观测通道）、
-		//   0x809 SAS_On / 0x80A SAS_GuideMarkers（自制面包屑）、
-		//   0x80B SAS_DoorBases（找门用的门基础列表）。
-		//   它们原本都是最后创建的一批，删掉不会让 0x800..0x806 的低 24 位位移。
+		// ★ v4.0：旧方案（EFSH + FormList 信箱 + 游标 + Epoch）已整体删除，
+		//   本 MOD 现在**只用一条 DLL → Papyrus 的通道**：一个 GLOB。
+		//
+		//   0x807 SAS_Notify —— DLL 写（1 = 刚打开 / 2 = 刚关闭），桥脚本轮询到之后
+		//   弹一条 HUD 提示并立刻归零。**只用于游戏内提示**，不参与任何逻辑。
+		constexpr std::uint32_t kLocalNotify = 0x807;
+		// 为什么不用引擎的 `RE::DebugNotification`：commonlibsf 里它的 REL::ID 是 0
+		// （未移植；实测该 ID 在 1.16.244.0 的 Address Library 里指向的不是它），
+		// 调用等于 call 到模块基址。所以走「GLOB + 脚本轮询」这条零风险的路。
 
+		// 运行时前缀由 quest 的 FormID 高字节推出（quest 的 EDID 实测可查）。
 		constexpr const char* kBindQuestEdid = "SAS_AlwaysScanQuest";
 
-		constexpr std::size_t kMaxMailbox = 512;  // 信箱硬上限，超过就背压
-
-		// 换 cell / 读档时把已点亮的引用继续保活这么久再释放（见文件头坑②）
-		constexpr std::uint64_t kRetireKeepAliveMs = 2500;
+		// ★ 0x800..0x806 是旧方案的记录与桥任务，**保留在 ESM 里不动**（只是占位）：
+		//   0x800 EFSH SAS_HighlightFXS / 0x801 FLST SAS_OpList / 0x802 GLOB SAS_OpCursor
+		//   0x803 FLST SAS_StopList      / 0x804 GLOB SAS_StopCursor
+		//   0x805 GLOB SAS_Epoch         / 0x806 QUST SAS_AlwaysScanQuest
+		//   理由见文件头「为什么还留着 ESM 与这个脚本」。
 
 		// ================================================================
 		// ★★★ 绝不能信 commonlibsf 声明的 TESObjectCELL 成员偏移 ★★★
@@ -173,6 +167,28 @@ namespace SAS
 		// ====================================================================
 		// 配置（Data\SFSE\Plugins\SAS_AlwaysScan.ini）
 		// ====================================================================
+		// ====================================================================
+		// ★ v4.0：类别（决定用哪个 outline 状态 = 哪种配色）
+		// --------------------------------------------------------------------
+		// 分类只依赖 base form 的类型（`RE::TESForm::GetFormType()`），零成本。
+		// 下标顺序 = INI 里 StateLoot / StateContainer / ... 的顺序。
+		// ====================================================================
+		enum class Category : std::uint8_t
+		{
+			kLoot = 0,   // 可拾取：MISC/BOOK/ARMO/WEAP/AMMO/ALCH/INGR/KEYM/NOTE/SLGM
+			kContainer,  // 容器：CONT
+			kDevice,     // 可交互设备：ACTI / TERM
+			kDoor,       // 门：DOOR
+			kFlora,      // 植物：FLOR
+			kOther,      // 其它（MSTT 一类）
+			kCount
+		};
+		constexpr std::size_t kCategoryCount = static_cast<std::size_t>(Category::kCount);
+
+		constexpr const char* kCategoryName[kCategoryCount] = {
+			"loot", "container", "device", "door", "flora", "other"
+		};
+
 		struct Config
 		{
 			bool          startEnabled    = true;
@@ -183,20 +199,11 @@ namespace SAS
 			//   所以做成 INI 可调：改完重进游戏即可，不用重新编译。
 			//   日志里会同时打出「米」和「游戏单位」两个数，方便按实际观感校准。
 			float         unitsPerMeter   = 3.4286f;
-			float         glowDurationSec = 90.0f;
 			int           maxTargets      = 256;
-			double        opsPerSecond    = 8.0;
-			double        bucketSize      = 80.0;
 			int           scanIntervalMs  = 200;
 			bool          logStats        = true;
 
-			// --- 视觉层（见 docs/03-原生outline高亮实现.md）---
-			//  1 = 原生 outline 高亮（引擎自带，和原版扫描仪同一套渲染）
-			//  0 = 旧方案：走 Papyrus 桥 Play 一条 EFSH（上一代 mod 的做法）
-			int           highlightMode   = 1;
-			// 原生高亮使用的 outline 状态 0..11（对应 GMST 里 12 种配色/样式）。
-			//  0/1 = Generic（未扫描/已扫描），2/3 = Scannable 系，7/8 = 另一组，9 = 追踪
-			int           outlineState    = 0;
+			// --- 视觉层：原生 outline（见 docs/03-原生outline高亮实现.md）---
 			// 1 = 只高亮玩家正前方的目标（水平夹角在 FrontFovDeg 之内）
 			bool          onlyInFront     = true;
 			float         frontFovDeg     = 110.0f;
@@ -233,23 +240,25 @@ namespace SAS
 			// 换场景 / 读档一次会积压几百条待办，一口气做完就是一个长卡顿
 			// （实测日志里出现过 18 秒的空档），这里摊到后面几轮里慢慢做。
 			int           maxOutlineOpsPerScan = 64;
+
+			// ================================================================
+			// ★ v4.0：分类分色
+			// ================================================================
+			// 每个类别用一个 outline 状态（0..11；引擎按状态取不同配色/粗细）。
+			// 状态语义（docs/03 第三节，从引擎算法反推）：
+			//   0/1 = 通用（未扫描/已扫描）  2/3 = 可扫描组  7/8 = 另一组  9 = 追踪
+			//   12 = 无高亮（管理器只有 0..10 共 11 个）
+			// 下标 = Category，默认 可拾取0 / 容器1 / 设备2 / 门3 / 植物7 / 其它0。
+			// ★ 想换配色只改 INI 的 StateXxx；改完重进游戏生效。
+			std::array<int, kCategoryCount> stateByCategory{ 0, 1, 2, 3, 7, 0 };
+
+			// ★ v4.0：按热键切换时弹一条 HUD 提示（DLL 写 GLOB → 桥脚本轮询）。
+			bool          notifyOnToggle  = true;
 		};
 
 		// ====================================================================
 		// 运行期状态
 		// ====================================================================
-		struct GlowEntry
-		{
-			RE::NiPointer<RE::TESObjectREFR> ref;
-			std::uint64_t                    dueMs = 0;  // 该重新 Play 的时刻(ms)
-		};
-
-		struct RetiredBatch
-		{
-			std::uint64_t                                 releaseMs = 0;
-			std::vector<RE::NiPointer<RE::TESObjectREFR>> refs;
-		};
-
 		// 原生 outline：一个已挂高亮的引用 + 下次该重申的时刻
 		struct OutlineEntry
 		{
@@ -258,32 +267,29 @@ namespace SAS
 			// 0 = 还在选中集合里；非 0 = 掉队时刻（到这个时刻之后才真正摘除）。
 			// 见 Config::unhighlightGraceMs 的说明。
 			std::uint64_t                    dropAt     = 0;
+			// ★ v4.0：挂上去时用的 outline 状态（分类分色），只作诊断/日志用。
+			//   摘除时**不读它** —— 先读引擎状态表里的真实值（原版可能覆盖过），
+			//   这是 v2.3 起就守着的做法。
+			std::uint32_t                    state      = 0xFF;
 		};
 
 		struct State
 		{
-			// --- 表单绑定 ---
-			bool             bound      = false;
-			std::uint32_t    prefix     = 0;
-			RE::BGSListForm* opList     = nullptr;
-			RE::TESGlobal*   opCursor   = nullptr;
-			RE::BGSListForm* stopList   = nullptr;
-			RE::TESGlobal*   stopCursor = nullptr;
-			RE::TESGlobal*   epoch      = nullptr;
+			// --- 表单绑定（★ v4.0：只剩「游戏内提示」用的一个 GLOB）---
+			bool           bound         = false;
+			std::uint32_t  prefix        = 0;
+			RE::TESGlobal* notify        = nullptr;  // 0x807 SAS_Notify（DLL 写、脚本读）
+			int            pendingNotify = 0;        // 0 = 无；1 = 刚开；2 = 刚关（Tick 里写走）
 
 			// --- 开关 ---
 			bool on      = true;
 			bool keyDown = false;
 
-			// --- 发光集合 ---
-			std::unordered_map<RE::TESObjectREFR*, GlowEntry> glowing;
-
 			// --- 原生 outline：已挂上高亮的引用 ---
-			//   （原生模式下不再需要令牌桶/信箱，只在「新目标」和「周期性重申」时动手）
+			//   （只在「新目标」和「周期性重申」时动手）
 			//
-			// ★ 这里存的是 NiPointer 而不是裸指针：摘高亮时要调引擎的
-			//   ClearOutlineState，而它会解引用引用取 3D —— 裸指针在引用被销毁后
-			//   就是野指针。用 NiPointer 保活（和 glowing / retired 同一套做法）。
+			// ★ 这里存的是 NiPointer 而不是裸指针：摘高亮时要调引擎的函数，而它会
+			//   解引用引用取 3D —— 裸指针在引用被销毁后就是野指针。
 			std::unordered_map<RE::TESObjectREFR*, OutlineEntry> outlined;
 			bool          nativeReady      = false;  // 核心三个引擎函数都已按签名校验通过
 			// 「摘除」两个函数（Remove / Deactivate）是否可用。不可用时退化成
@@ -299,34 +305,25 @@ namespace SAS
 			std::uint32_t lastLiveManagers = 0;      // 上一轮存活的管理器数（下跌 = 引擎清过表）
 			std::uint64_t outlineResyncs   = 0;      // 自动重挂次数（诊断：应该只在用扫描仪后 +1）
 
-			// --- 关掉开关时要熄灭的那批（分批喂给 StopList，避免一次性灌爆）---
-			// ★ 这些 NiPointer **必须留到信箱被桥消费完**才能释放：信箱里存的是裸指针
-			//   （FormList 不持引用计数），提前释放会让桥 Stop 一个已销毁对象。
-			std::vector<RE::NiPointer<RE::TESObjectREFR>> pendingStop;
-			std::size_t                                   pendingStopSent = 0;
-
-			// --- 退役队列（保活用）---
-			std::vector<RetiredBatch> retired;
-
 			// --- 节流 / 统计 ---
 			std::uint64_t lastScanMs    = 0;
-			std::uint64_t lastOpMs      = 0;
 			std::uint64_t lastStatsMs   = 0;
 			std::uint64_t lastBindWarnMs = 0;
 			std::uint64_t lastMapDiagMs = 0;
-			double        tokens        = 0.0;
 			std::uint64_t scanCount     = 0;
-			std::uint64_t playedCount   = 0;
-			std::uint64_t stoppedCount  = 0;
 			std::uint64_t tickCount     = 0;
 			std::uint64_t candCount     = 0;
 			std::uint64_t selCount      = 0;
-			std::uint64_t backpressure  = 0;
+			// ★ v4.0：分类命中数（诊断：每个类别实际挂了多少个）+ 提示通道计数
+			std::array<std::uint32_t, kCategoryCount> categoryCounts{};
+			std::uint64_t notifyWrites   = 0;  // 写进 SAS_Notify 的次数
+			std::uint64_t loadGameResets = 0;  // 「载入画面由开变关」触发的重置次数
+			bool          loadingSeen    = false;  // 上一帧载入画面是否开着（每帧都更新）
 
 			// --- 诊断：半径内、但 base form 类型不在白名单而被跳过的类型统计 ---
 			//   统计窗口 = 两条统计日志之间，打完之后清空。
 			//   用途：如果游戏里发现「某个东西该亮却没亮」，看这条日志就知道它的
-			//   formType 是多少，再决定要不要加进 IsHighlightableBase 的白名单。
+			//   formType 是多少，再决定要不要加进 ClassifyBase 的白名单。
 			//   ★ v2.2：从 unordered_map 换成定长数组 —— 这段代码对**每个被拒的
 			//   引用**都要执行一次，密集场景里每秒 2 万次哈希表操作，纯属白烧主线程。
 			//   现在下标就是 formType，一次自增完事。
@@ -357,9 +354,7 @@ namespace SAS
 			std::uint64_t vqCalls   = 0;
 
 			// --- 场景跟踪 ---
-			RE::TESObjectCELL* lastCell    = nullptr;
-			std::uint32_t      lastEpoch   = 0;
-			bool               epochSeen   = false;
+			RE::TESObjectCELL* lastCell = nullptr;
 
 			// --- cell 引用数组的稳定性判据（见 Rescan 顶部）---
 			std::size_t   cellRefsOff   = 0;  // 形状校验通过的偏移（0 = 还没定）
@@ -374,6 +369,20 @@ namespace SAS
 		std::mutex           g_tickLock;
 		std::atomic_uint32_t g_mainThreadId{ 0 };
 		std::string          g_iniPath;
+
+		// ====================================================================
+		// ★ v4.0：读档信号 = 「载入画面由开变关」
+		// --------------------------------------------------------------------
+		// 旧方案靠 Papyrus 脚本在 OnPlayerLoadGame 里把 SAS_Epoch +1，DLL 轮询那个
+		// GLOB 才知道「玩家读档了」。现在直接看引擎自己的 LoadingMenu / FaderMenu
+		// —— 那条 Papyrus 依赖（以及 Epoch GLOB 与脚本里的 OnPlayerLoadGame）删掉。
+		//
+		// ★ 为什么不用 `RE::TESLoadGameEvent`：它定义在 `RE/E/Events.h`，而那个头
+		//   依赖「在 umbrella 头里被按顺序包含」，单独 include 会在 DamageImpactData /
+		//   HitData 那一段因为缺类型而编译失败（实测）。为一个信号把整个
+		//   `RE/Starfield.h` 拖进来不值得，而载入画面这个信号**同样覆盖**读档，
+		//   还顺带覆盖快速旅行 / 进出建筑（与「换 cell」判据重复触发是无害的）。
+		// ====================================================================
 
 		// 前置声明：定义在后面的「原生 outline」小节里（SetOn / ResetForNewScene 要先用到）
 		void ClearAllNativeOutline();
@@ -652,12 +661,6 @@ namespace SAS
 			g_cfg.logStats       = getInt("LogStats", 1) != 0;
 			g_cfg.radiusMeters   = std::clamp(getFloat("RadiusMeters", 50.0f), 5.0f, 500.0f);
 			g_cfg.unitsPerMeter  = std::clamp(getFloat("UnitsPerMeter", 3.4286f), 0.1f, 200.0f);
-			g_cfg.glowDurationSec = std::clamp(getFloat("GlowDurationSecs", 90.0f), 5.0f, 600.0f);
-			g_cfg.opsPerSecond   = std::clamp(static_cast<double>(getFloat("OpsPerSecond", 8.0f)), 0.5, 60.0);
-			g_cfg.bucketSize     = std::clamp(static_cast<double>(getFloat("BucketSize", 80.0f)), 4.0, 512.0);
-
-			g_cfg.highlightMode = std::clamp(getInt("HighlightMode", 1), 0, 1);
-			g_cfg.outlineState  = std::clamp(getInt("OutlineState", 0), 0, 11);
 			g_cfg.onlyInFront   = getInt("OnlyInFront", 1) != 0;
 			g_cfg.frontFovDeg   = std::clamp(getFloat("FrontFovDeg", 110.0f), 20.0f, 360.0f);
 			g_cfg.reassertMs    = std::clamp(getInt("ReassertMs", 0), 0, 60000);  // 0 = 不重申
@@ -666,158 +669,119 @@ namespace SAS
 			g_cfg.unhighlightGraceMs = std::clamp(getInt("UnhighlightGraceMs", 1500), 0, 60000);
 			g_cfg.maxOutlineOpsPerScan = std::clamp(getInt("MaxOutlineOpsPerScan", 64), 0, 4096);
 
-			REX::INFO("config: radius={:.1f}m duration={:.0f}s targets={} hotkeyVK=0x{:X} startEnabled={}",
-				g_cfg.radiusMeters, g_cfg.glowDurationSec, g_cfg.maxTargets,
-				g_cfg.hotkeyVk, g_cfg.startEnabled);
+			// --- ★ v4.0：分类分色（每个类别一个 outline 状态 0..11）---
+			const char* const kStateKeys[kCategoryCount] = {
+				"StateLoot", "StateContainer", "StateDevice", "StateDoor", "StateFlora", "StateOther"
+			};
+			const int kStateDef[kCategoryCount] = { 0, 1, 2, 3, 7, 0 };
+			for (std::size_t i = 0; i < kCategoryCount; ++i) {
+				g_cfg.stateByCategory[i] = std::clamp(getInt(kStateKeys[i], kStateDef[i]), 0, 11);
+			}
+			g_cfg.notifyOnToggle = getInt("NotifyOnToggle", 1) != 0;
+
+			REX::INFO("config: radius={:.1f}m targets={} hotkeyVK=0x{:X} startEnabled={}",
+				g_cfg.radiusMeters, g_cfg.maxTargets, g_cfg.hotkeyVk, g_cfg.startEnabled);
 			REX::INFO("config: unitsPerMeter={:.4f} -> 半径 {:.1f}m = {:.1f} 游戏单位",
 				g_cfg.unitsPerMeter, g_cfg.radiusMeters, g_cfg.radiusMeters * g_cfg.unitsPerMeter);
-			REX::INFO("config: highlightMode={} outlineState={} onlyInFront={} frontFov={:.0f}deg reassert={} autoEnsure={} resyncOnScannerClose={}",
-				g_cfg.highlightMode == 1 ? "native-outline" : "legacy-efsh",
-				g_cfg.outlineState, g_cfg.onlyInFront, g_cfg.frontFovDeg,
+			REX::INFO("config: onlyInFront={} frontFov={:.0f}deg reassert={} autoEnsure={} resyncOnScannerClose={} notifyOnToggle={}",
+				g_cfg.onlyInFront, g_cfg.frontFovDeg,
 				g_cfg.reassertMs ? std::to_string(g_cfg.reassertMs) + "ms" : std::string{ "off" },
-				g_cfg.autoEnsureManagers, g_cfg.resyncOnScannerClose);
+				g_cfg.autoEnsureManagers, g_cfg.resyncOnScannerClose, g_cfg.notifyOnToggle);
 			REX::INFO("config: unhighlightGrace={}ms maxOutlineOpsPerScan={}",
 				g_cfg.unhighlightGraceMs, g_cfg.maxOutlineOpsPerScan);
+
+			// 分类分色：把「类别 → outline 状态」逐条打出来（调配色时一眼能对上）
+			{
+				std::string s;
+				for (std::size_t i = 0; i < kCategoryCount; ++i) {
+					if (i) {
+						s += ", ";
+					}
+					s += kCategoryName[i];
+					s += '=';
+					s += std::to_string(g_cfg.stateByCategory[i]);
+				}
+				REX::INFO("config: stateByCategory: {}", s);
+			}
 		}
 
 		// ====================================================================
-		// 表单绑定
+		// 表单绑定（★ v4.0：只剩「游戏内提示」用的一个 GLOB）
 		// ====================================================================
 		// 只用一条通道：先按 EDID 拿 quest（上一代实测「QUST 的 EDID 能查到」），
-		// 再从它的 FormID 取本 ESM 的 load order 前缀，其余表单全用 LookupByID。
-		// 这样不依赖 TESDataHandler 的内存布局，也不依赖 FLST/GLOB 的 EDID 是否驻留。
-		bool BindForms()
+		// 再从它的 FormID 取本 ESM 的 load order 前缀，最后 LookupByID 拿那个 GLOB。
+		// 这样不依赖 TESDataHandler 的内存布局，也不依赖 GLOB 的 EDID 是否驻留。
+		// ★ 绑定失败**不影响高亮**（高亮完全在 DLL 里），只是没有热键提示。
+		bool BindNotify()
 		{
 			auto* quest = RE::TESForm::LookupByEditorID(RE::BSFixedString{ kBindQuestEdid });
 			if (!quest) {
 				const auto now = NowMs();
 				if (now - g_state.lastBindWarnMs > kBindWarnIntervalMs) {
 					g_state.lastBindWarnMs = now;
-					REX::WARN("BindForms: quest '{}' not found yet (plugin not loaded? wrong load order?)", kBindQuestEdid);
+					REX::WARN("BindNotify: quest '{}' not found yet (plugin not loaded? wrong load order?)", kBindQuestEdid);
 				}
 				return false;
 			}
 
-			const std::uint32_t prefix     = quest->GetFormID() & 0xFF000000u;
-			auto*               opList     = RE::TESForm::LookupByID<RE::BGSListForm>(prefix | kLocalOpList);
-			auto*               opCursor   = RE::TESForm::LookupByID<RE::TESGlobal>(prefix | kLocalOpCursor);
-			auto*               stopList   = RE::TESForm::LookupByID<RE::BGSListForm>(prefix | kLocalStopList);
-			auto*               stopCursor = RE::TESForm::LookupByID<RE::TESGlobal>(prefix | kLocalStopCursor);
-			auto*               epoch      = RE::TESForm::LookupByID<RE::TESGlobal>(prefix | kLocalEpoch);
-
-			if (!opList || !opCursor || !stopList || !stopCursor || !epoch) {
-				REX::WARN("BindForms: incomplete (prefix={:08X} play={} cur={} stop={} stopcur={} epoch={})",
-					prefix, static_cast<bool>(opList), static_cast<bool>(opCursor),
-					static_cast<bool>(stopList), static_cast<bool>(stopCursor), static_cast<bool>(epoch));
+			const std::uint32_t prefix = quest->GetFormID() & 0xFF000000u;
+			auto*               notify = RE::TESForm::LookupByID<RE::TESGlobal>(prefix | kLocalNotify);
+			if (!notify) {
+				REX::WARN("BindNotify: SAS_Notify (prefix|0x{:X}) not found -> 热键提示不可用（高亮不受影响）",
+					kLocalNotify);
 				return false;
 			}
 
-			g_state.prefix     = prefix;
-			g_state.opList     = opList;
-			g_state.opCursor   = opCursor;
-			g_state.stopList   = stopList;
-			g_state.stopCursor = stopCursor;
-			g_state.epoch      = epoch;
-			g_state.bound      = true;
-
-			REX::INFO("forms bound: prefix={:08X} quest={:08X} arrayOfForms@0x{:X} (checked against sizeof(TESForm)=0x38)",
-				prefix, quest->GetFormID(),
-				static_cast<unsigned>(offsetof(RE::BGSListForm, arrayOfForms)));
-
-			// 上一次异常退出可能在信箱里留东西；启动时清干净
-			if (!opList->arrayOfForms.empty() || !stopList->arrayOfForms.empty()) {
-				REX::WARN("mailbox not empty at bind (play={} stop={}) -> clearing",
-					opList->arrayOfForms.size(), stopList->arrayOfForms.size());
-				opList->arrayOfForms.clear();
-				stopList->arrayOfForms.clear();
-			}
+			g_state.prefix = prefix;
+			g_state.notify = notify;
+			g_state.bound  = true;
+			REX::INFO("forms bound: prefix={:08X} quest={:08X} notify={:08X} -> 热键提示通道就绪",
+				prefix, quest->GetFormID(), notify->GetFormID());
 			return true;
 		}
 
-		bool ReadGlobalValue(RE::TESGlobal* a_glob, double& a_out)
+		// 把「刚开 / 刚关」写进 SAS_Notify（桥脚本轮询到之后弹一条 HUD 提示并归零）。
+		// ★ 为什么不让 DLL 自己弹提示：
+		//   commonlibsf 的 `RE::DebugNotification` 的 REL::ID 是 0（未移植；实测该 ID
+		//   在 1.16.244.0 的 Address Library 里指向的根本不是它），调用等于 call 到
+		//   模块基址；走 VM 的 DispatchStaticCall 又要碰 BSTThreadScrapFunction 那一层，
+		//   风险与收益不成比例。GLOB + 脚本轮询是零风险的等价做法。
+		void FlushNotify()
 		{
-			if (!a_glob) {
-				return false;
+			if (g_state.pendingNotify == 0 || !g_state.notify) {
+				return;
 			}
-			const float v = a_glob->value;
-			if (!std::isfinite(v) || v < -1.0f || v > 1.0e7f) {
-				return false;  // 读到垃圾时宁可不动作
-			}
-			a_out = static_cast<double>(v);
-			return true;
+			g_state.notify->value = static_cast<float>(g_state.pendingNotify);
+			g_state.pendingNotify = 0;
+			++g_state.notifyWrites;
 		}
 
 		// ====================================================================
-		// 信箱
-		// ====================================================================
-		bool PushTo(RE::BGSListForm* a_list, RE::TESObjectREFR* a_ref)
-		{
-			if (!a_list || !a_ref) {
-				return false;
-			}
-			auto& arr = a_list->arrayOfForms;
-			if (arr.size() >= kMaxMailbox) {
-				++g_state.backpressure;
-				return false;
-			}
-			arr.push_back(a_ref);
-			return true;
-		}
-
-		void ClearMailbox(RE::BGSListForm* a_list)
-		{
-			if (a_list) {
-				a_list->arrayOfForms.clear();  // 元素是裸指针、平凡析构；绝不缓存 data()
-			}
-		}
-
-		// 桥脚本消费完之后才清表：cursor == size（**相等**，不是 >=）
-		bool MaybeClear(RE::BGSListForm* a_list, RE::TESGlobal* a_cursor)
-		{
-			if (!a_list || !a_cursor) {
-				return false;
-			}
-			const std::size_t size = a_list->arrayOfForms.size();
-			if (size == 0) {
-				return false;
-			}
-			double cur = 0.0;
-			if (!ReadGlobalValue(a_cursor, cur)) {
-				return false;
-			}
-			if (static_cast<std::size_t>(cur) == size) {
-				ClearMailbox(a_list);
-				return true;
-			}
-			return false;
-		}
-
-		// ====================================================================
-		// 过滤规则（base form 类型白名单）
+		// 过滤规则（base form 类型 → 类别；-1 = 不高亮）
 		// ====================================================================
 		// NPC_ / ACHR / LVLN 一律排除 —— 「活人不亮」是红线。
-		bool IsHighlightableBase(const RE::TESForm* a_base)
+		int ClassifyBase(const RE::TESForm* a_base)
 		{
 			if (!a_base) {
-				return false;
+				return -1;
 			}
 			// ★「Glow*」家族（原版 MSTT 自发光网格）一律不高亮。
 			//   它们本来是环境装饰用的自发光体（球 / 方块 / 圆盘 / 光锥），不是拾取物；
 			//   另外 v2.4~v3.0 的自制面包屑珠子用的正是这几个形态 ——
-			//   老存档里可能还留着几颗（v3.1 起脚本会做一次性清理，见 SAS_Bridge.psc），
+			//   老存档里可能还留着几颗（脚本会做一次性清理，见 SAS_Bridge.psc），
 			//   这里排除掉就不会把它们描上一圈。
 			//   这几条 FormID 全在 Starfield.esm（高 8 位是 load order index，所以不会误伤）。
 			switch (a_base->GetFormID()) {
 			case 0x00098105u:  // MSTT GlowCube10x10
-			case 0x00098106u:  // MSTT GlowBall10x10  <- 当前使用的形态
+			case 0x00098106u:  // MSTT GlowBall10x10  <- v2.8 起面包屑用的形态
 			case 0x0009811Cu:  // MSTT GlowDisc10x10
 			case 0x0001760Fu:  // MSTT GlowLightCone36
-				return false;
+				return -1;
 			default:
 				break;
 			}
 			switch (a_base->GetFormType()) {
-			// 可拾取
+			// ---- 可拾取 ----
 			case RE::FormType::kMISC:
 			case RE::FormType::kBOOK:
 			case RE::FormType::kARMO:
@@ -828,65 +792,35 @@ namespace SAS
 			case RE::FormType::kKEYM:
 			case RE::FormType::kNOTE:
 			case RE::FormType::kSLGM:
-			// 可交互
+				return static_cast<int>(Category::kLoot);
+			// ---- 容器（搜刮的主要目标，值得单独一个颜色）----
 			case RE::FormType::kCONT:
+				return static_cast<int>(Category::kContainer);
+			// ---- 可交互设备 ----
 			case RE::FormType::kACTI:
-			case RE::FormType::kDOOR:
 			case RE::FormType::kTERM:
+				return static_cast<int>(Category::kDevice);
+			// ---- 门 ----
+			case RE::FormType::kDOOR:
+				return static_cast<int>(Category::kDoor);
+			// ---- 植物（可采集）----
 			case RE::FormType::kFLOR:
+				return static_cast<int>(Category::kFlora);
+			// ---- 其它（MSTT 一类可交互静态物）----
 			case RE::FormType::kMSTT:
-				return true;
+				return static_cast<int>(Category::kOther);
 			default:
-				return false;
+				return -1;  // NPC_ / ACHR / LVLN 等一律不亮（红线）
 			}
 		}
 
 		// ====================================================================
 		// 状态重置
 		// ====================================================================
-		// 把发光集合整批搬进退役队列（继续保活），不清信箱里的 op（它们本来就该发出去）。
-		void RetireGlowTable(std::uint64_t a_nowMs)
-		{
-			if (g_state.glowing.empty()) {
-				return;
-			}
-			RetiredBatch batch;
-			batch.releaseMs = a_nowMs + kRetireKeepAliveMs;
-			batch.refs.reserve(g_state.glowing.size());
-			for (auto& [key, entry] : g_state.glowing) {
-				if (entry.ref) {
-					batch.refs.push_back(std::move(entry.ref));
-				}
-			}
-			g_state.glowing.clear();
-			const auto n = batch.refs.size();
-			g_state.retired.push_back(std::move(batch));
-			REX::INFO("glow table retired (retired={})", n);
-		}
-
-		void TickRetired(std::uint64_t a_nowMs)
-		{
-			while (!g_state.retired.empty() && g_state.retired.front().releaseMs <= a_nowMs) {
-				g_state.retired.erase(g_state.retired.begin());
-			}
-		}
-
-		// 换 cell / 读档：清空两个信箱 + 退役发光集合
+		// 换 cell / 读档：把这批引用从引擎的高亮表里摘掉（分批，见下）。
 		void ResetForNewScene(std::uint64_t a_nowMs, const char* a_reason)
 		{
-			REX::INFO("reset ({}) play={} stop={} glow={} outline={}",
-				a_reason,
-				g_state.opList ? g_state.opList->arrayOfForms.size() : 0,
-				g_state.stopList ? g_state.stopList->arrayOfForms.size() : 0,
-				g_state.glowing.size(),
-				g_state.outlined.size());
-
-			// 顺序很重要：先丢信箱（裸指针），再释放保活引用，否则桥可能 Stop 到悬空对象
-			ClearMailbox(g_state.opList);
-			ClearMailbox(g_state.stopList);
-			g_state.pendingStop.clear();
-			g_state.pendingStopSent = 0;
-			RetireGlowTable(a_nowMs);
+			REX::INFO("reset ({}) outline={}", a_reason, g_state.outlined.size());
 
 			// 换场景 / 读档：把这批引用从引擎的高亮表里摘掉。
 			// ★ v2.2 改成**不立刻动手**：这一步原本会在一帧里发出 200~300 条引擎调用，
@@ -909,28 +843,16 @@ namespace SAS
 			g_state.on = a_on;
 			REX::INFO("AlwaysScan {} (hotkey)", a_on ? "ON" : "OFF");
 
-			if (!a_on && g_cfg.highlightMode == 1) {
-				// 原生 outline：把这批引用从引擎的高亮表里**真正摘掉**
+			if (!a_on) {
+				// 把这批引用从引擎的高亮表里**真正摘掉**
 				// （Remove(managers[state]+0x18, &id) → Deactivate(id) → 状态写回 12）
 				ClearAllNativeOutline();
 			}
 
-			if (!a_on && g_cfg.highlightMode != 1) {
-				// 把已经点亮的整批交给桥去熄灭（分批喂，避免一次灌爆信箱）。
-				// 如果上一轮还有没走完的，先把它们并进来（不清空 —— 清空会释放
-				// 那些还被 StopList 里的裸指针引用的对象）。
-				g_state.pendingStop.reserve(g_state.pendingStop.size() + g_state.glowing.size());
-				for (auto& [key, entry] : g_state.glowing) {
-					if (entry.ref) {
-						g_state.pendingStop.push_back(std::move(entry.ref));
-					}
-				}
-				g_state.glowing.clear();
-				REX::INFO("pending stop queued: {} (sent={})",
-					g_state.pendingStop.size(), g_state.pendingStopSent);
+			// ★ v4.0：游戏内提示（Tick 里写进 SAS_Notify，桥脚本轮询到之后弹 HUD）
+			if (g_cfg.notifyOnToggle) {
+				g_state.pendingNotify = a_on ? 1 : 2;
 			}
-			// 重新打开时**不动** pendingStop：让它按原顺序排空，
-			// 否则信箱里那批裸指针会被提前释放（见 pendingStop 的注释）。
 			(void)a_nowMs;
 		}
 
@@ -951,10 +873,13 @@ namespace SAS
 		// ====================================================================
 		struct Candidate
 		{
-			RE::TESObjectREFR* ref = nullptr;
-			float              d2  = 0.0f;  // 世界单位平方距离
-			bool               lit = false; // 已经在高亮里
-			float              key = 0.0f;  // 排序键
+			RE::TESObjectREFR* ref   = nullptr;
+			float              d2    = 0.0f;  // 世界单位平方距离
+			bool               lit   = false; // 已经在高亮里
+			float              key   = 0.0f;  // 排序键
+			// ★ v4.0：这个目标该用哪个 outline 状态（= 分类分色），由 ClassifyBase 决定
+			std::uint32_t      state = 0;
+			std::uint8_t       cat   = 0;  // Category（诊断：分类命中数）
 		};
 
 		// ====================================================================
@@ -1161,6 +1086,7 @@ namespace SAS
 
 		// 前置声明（定义在 ResolveNativeOutline 之后）
 		std::uintptr_t OutlineManagerFor(std::uint32_t a_state);
+		std::uint32_t  PrimaryState();
 		void           LogManagerDiagnostics(const char* a_tag);
 		void           LogManagerMapDiag(const char* a_tag, std::uint32_t a_state);
 		bool           EnsureManagerFor(std::uint32_t a_state);
@@ -1279,7 +1205,7 @@ namespace SAS
 					g_outlineUnhighlightReady ? "ok" : "unavailable");
 			}
 			LogManagerDiagnostics("install");
-			LogManagerMapDiag("install", static_cast<std::uint32_t>(g_cfg.outlineState));
+			LogManagerMapDiag("install", PrimaryState());
 		}
 
 		// 读「第 a_state 个 HighlightManager」指针；0 = 现在不存在
@@ -1306,11 +1232,27 @@ namespace SAS
 			return n;
 		}
 
+		// ★ v4.0：配置里用到的「代表状态」= 可拾取那一类（旧版这里是全局 OutlineState）。
+		//   分类分色之后每个类别各有状态，诊断行里逐个列出来更有用。
+		std::uint32_t PrimaryState()
+		{
+			return static_cast<std::uint32_t>(std::clamp(g_cfg.stateByCategory[0], 0, 11));
+		}
+
 		void LogManagerDiagnostics(const char* a_tag)
 		{
-			REX::INFO("native outline managers[{}] = {}/{} alive (state {} -> {})",
-				a_tag, CountLiveManagers(), kOutlineManagerUsed,
-				g_cfg.outlineState, OutlineManagerFor(static_cast<std::uint32_t>(g_cfg.outlineState)) ? "ok" : "NULL");
+			std::string per;
+			for (std::size_t i = 0; i < kCategoryCount; ++i) {
+				if (i) {
+					per += ' ';
+				}
+				per += kCategoryName[i];
+				per += '=';
+				per += std::to_string(g_cfg.stateByCategory[i]);
+				per += OutlineManagerFor(static_cast<std::uint32_t>(g_cfg.stateByCategory[i])) ? "(ok)" : "(null)";
+			}
+			REX::INFO("native outline managers[{}] = {}/{} alive | stateByCategory: {}",
+				a_tag, CountLiveManagers(), kOutlineManagerUsed, per);
 		}
 
 		// --------------------------------------------------------------------
@@ -1532,15 +1474,25 @@ namespace SAS
 			//   是在补救「怎么都删不掉」——而每一次尝试都是一次真的引擎调用
 			//   （虚调用 + 哈希查找 + **整棵 3D 图递归遍历**），单轮最多 11 倍代价。
 			//   实测 `timing max=438ms / ops=64` 里有一大半就是它。
-			//   现在只调「状态表里记的那个」和「配置的那个」各一次，第一次几乎必然命中。
+			// ★ v4.0：分类分色之后没有「唯一的那个配置状态」了，改成
+			//   「状态表里记的」+「配置里用到的每一种状态（去重）」各试一次。
 			if (g_outlineGraphRemoveReady) {
-				const auto cfgState = static_cast<std::uint32_t>(g_cfg.outlineState);
-				bool       done     = false;
+				bool done = false;
 				if (stateInTable < kOutlineManagerUsed) {
 					done = OutlineUnhighlightRef(a_ref, stateInTable);
 				}
-				if (!done && cfgState != stateInTable) {
-					done = OutlineUnhighlightRef(a_ref, cfgState);
+				if (!done) {
+					bool tried[kOutlineManagerUsed]{};
+					if (stateInTable < kOutlineManagerUsed) {
+						tried[stateInTable] = true;
+					}
+					for (std::size_t i = 0; i < kCategoryCount && !done; ++i) {
+						const auto s = static_cast<std::uint32_t>(g_cfg.stateByCategory[i]);
+						if (s < kOutlineManagerUsed && !tried[s]) {
+							tried[s] = true;
+							done     = OutlineUnhighlightRef(a_ref, s);
+						}
+					}
 				}
 				if (done) {
 					++g_state.outlineRemoved;
@@ -1646,9 +1598,10 @@ namespace SAS
 			}
 
 			// ---- 3) 新目标 / 到重申时刻的（同样受预算限制）----
-			const auto wantState = static_cast<std::uint32_t>(g_cfg.outlineState);
-			const auto reassert  = static_cast<std::uint64_t>(g_cfg.reassertMs);
-			const auto nextMs    = reassert ? a_nowMs + reassert : UINT64_MAX;
+			// ★ v4.0：状态不再是全局一个 —— 每个候选带自己的 state（分类分色，
+			//   由 Rescan 里的 ClassifyBase + g_cfg.stateByCategory 算好）。
+			const auto reassert = static_cast<std::uint64_t>(g_cfg.reassertMs);
+			const auto nextMs   = reassert ? a_nowMs + reassert : UINT64_MAX;
 			PhaseTimer tAdd{ &g_state.tAddMs };
 			for (auto* c : a_chosen) {
 				auto it = g_state.outlined.find(c->ref);
@@ -1659,10 +1612,11 @@ namespace SAS
 					}
 					--budget;
 					++g_state.opsThisScan;
-					if (OutlineRef(c->ref, wantState)) {
+					if (OutlineRef(c->ref, c->state)) {
 						OutlineEntry e;
 						e.ref        = RE::NiPointer<RE::TESObjectREFR>{ c->ref };
 						e.reassertMs = nextMs;
+						e.state      = c->state;
 						g_state.outlined[c->ref] = std::move(e);
 					}
 				} else if (a_nowMs >= it->second.reassertMs) {
@@ -1672,8 +1626,14 @@ namespace SAS
 					}
 					--budget;
 					++g_state.opsThisScan;
-					if (OutlineRef(c->ref, wantState)) {
+					// 状态变了（理论上只在 INI 改过之后才会发生）：先把旧的摘掉，
+					// 否则同一个引用会同时留在两个管理器里 ⇒ 两层描边。
+					if (it->second.state != c->state) {
+						UnoutlineRef(c->ref);
+					}
+					if (OutlineRef(c->ref, c->state)) {
 						it->second.reassertMs = nextMs;
+						it->second.state      = c->state;
 					} else {
 						// 挂不上（管理器又没了）：本轮撤账，下轮重新试
 						it = g_state.outlined.erase(it);
@@ -1744,23 +1704,35 @@ namespace SAS
 
 		// 把「已经在表里、但引擎侧可能已经丢了」的目标标成「下轮重申」。
 		// 只改两个时间戳：dropAt=0（别把它当掉队摘掉）、reassertMs=0（下一轮就重挂）。
+		//
+		// ★ v4.0：**只重申「还在选中集合里」的条目**（dropAt == 0）。
+		//   已经被 ResetForNewScene / MarkAllForRemoval 标成「待摘」的（dropAt != 0）
+		//   属于**上一个世界**的引用 —— 读档后如果把它们又挂回去，就是白做一轮
+		//   Set（而且会拖到它们掉出选中集合才被摘掉）。
 		void MarkAllForReassert(const char* a_reason)
 		{
 			if (g_state.outlined.empty()) {
 				return;  // 没有已挂的东西，无所谓
 			}
+			std::size_t touched = 0;
 			for (auto& [key, entry] : g_state.outlined) {
-				entry.dropAt     = 0;
+				if (entry.dropAt != 0) {
+					continue;  // 已标「待摘」= 上个世界的遗留，不要复活它
+				}
 				entry.reassertMs = 0;
+				++touched;
+			}
+			if (touched == 0) {
+				return;
 			}
 			++g_state.outlineResyncs;
 			REX::INFO("native outline: 引擎侧高亮疑似丢失（{}）-> {} 个已挂目标转入「待重申」"
 					  "（按每轮 {} 条预算重挂，累计 {} 次）",
-				a_reason, g_state.outlined.size(), g_cfg.maxOutlineOpsPerScan,
+				a_reason, touched, g_cfg.maxOutlineOpsPerScan,
 				g_state.outlineResyncs);
 		}
 
-		void DetectEngineOutlineLoss()
+		void DetectEngineOutlineLoss(std::uint64_t a_nowMs)
 		{
 			// MonocleMenu 的开/关状态**每帧都跟踪**（即使功能关着），
 			// 这样开关功能不会造成一次假的「由开变关」。
@@ -1768,7 +1740,16 @@ namespace SAS
 			const bool justClosed  = g_state.monocleOpen && !monocleOpen;
 			g_state.monocleOpen    = monocleOpen;
 
-			if (g_cfg.highlightMode != 1 || !g_state.nativeReady || !g_state.on) {
+			if (!g_state.nativeReady || !g_state.on) {
+				g_state.lastLiveManagers = CountLiveManagers();
+				return;
+			}
+
+			// ★ v4.0：换场景 / 读档之后的「静置期」内不重挂。
+			//   那段时间 `outlined` 里记的是**上一个世界**的引用，ResetForNewScene
+			//   已经把它们标成「待摘」；此时再触发「重挂」会把它们又挂回去
+			//   （白白多一轮 Set，而且会拖到它们掉出选中集合才被摘掉）。
+			if (a_nowMs < g_state.settleUntilMs) {
 				g_state.lastLiveManagers = CountLiveManagers();
 				return;
 			}
@@ -1895,7 +1876,8 @@ namespace SAS
 				}
 
 				const auto* base = ref->data.objectReference.get();
-				if (!IsHighlightableBase(base)) {
+				const int   cat  = ClassifyBase(base);
+				if (cat < 0) {
 					// 诊断：半径内、类型不在白名单 → 记一笔类型直方图（见统计日志 rejTypes=）
 					if (base) {
 						++g_state.rejectTypes[static_cast<std::uint8_t>(base->GetFormType()) & 0xFF];
@@ -1919,12 +1901,11 @@ namespace SAS
 				Candidate c;
 				c.ref = ref;
 				c.d2  = d2;
-				if (g_cfg.highlightMode == 1) {
-					// 原生模式：已经在 outline 表里就是「亮着」（黏性靠它）
-					c.lit = g_state.outlined.find(ref) != g_state.outlined.end();
-				} else if (const auto it = g_state.glowing.find(ref); it != g_state.glowing.end()) {
-					c.lit = it->second.dueMs > a_nowMs;
-				}
+				// 已经在 outline 表里就是「亮着」（黏性靠它）
+				c.lit = g_state.outlined.find(ref) != g_state.outlined.end();
+				// ★ v4.0：分类分色 —— 类别 → 该用哪个 outline 状态
+				c.state = static_cast<std::uint32_t>(g_cfg.stateByCategory[static_cast<std::size_t>(cat)]);
+				c.cat   = static_cast<std::uint8_t>(cat);
 				// 已发光的按 0.5 折扣参与排序 = 黏性：站着不动目标不抖，
 				// 走动时近的新目标仍然能顶掉远的旧目标。
 				c.key = c.lit ? d2 * 0.5f : d2;
@@ -1950,90 +1931,21 @@ namespace SAS
 				chosen.push_back(&c);
 			}
 			g_state.selCount = chosen.size();
+
+			// ★ v4.0：分类命中数（诊断）—— 本轮选中的目标按类别计数
+			for (auto* c : chosen) {
+				++g_state.categoryCounts[c->cat];
+			}
 			}  // ← tLoop 计时块结束
 			// ------------------------------------------------------------------
-			// ★ 视觉层
+			// ★ 视觉层：唯一的一条路 —— 原生 outline
+			//   （引擎自己画描边，和原版手持扫描仪同一套渲染；不需要 Papyrus、
+			//    不需要 EFSH、也不需要令牌桶）
 			// ------------------------------------------------------------------
-			if (g_cfg.highlightMode == 1) {
-				// 原生 outline：引擎自己画描边（和原版扫描仪同一套），
-				// 不需要 Papyrus、不需要 EFSH、也不需要令牌桶。
-				{
-					PhaseTimer tSync{ &g_state.tSyncMs, &g_state.tSyncMax };
-					SyncNativeOutline(chosen, a_nowMs);
-				}
-				return;
+			{
+				PhaseTimer tSync{ &g_state.tSyncMs, &g_state.tSyncMax };
+				SyncNativeOutline(chosen, a_nowMs);
 			}
-
-			// ---- 旧方案（HighlightMode=0）：走 Papyrus 桥 Play 一条 EFSH ----
-			if (cands.empty()) {
-				return;
-			}
-
-			// 令牌桶：稳态 opsPerSecond 条/秒，桶容量 bucketSize（换场景时的快速铺满额度）
-			const double dt = (a_nowMs - g_state.lastOpMs) / 1000.0;
-			g_state.lastOpMs = a_nowMs;
-			g_state.tokens   = std::min(g_cfg.bucketSize, g_state.tokens + std::max(0.0, dt) * g_cfg.opsPerSecond);
-
-			for (auto* c : chosen) {
-				if (c->lit) {
-					continue;  // 还在有效期内，完全不碰（零 op）
-				}
-				if (g_state.tokens < 1.0) {
-					break;
-				}
-				if (!PushTo(g_state.opList, c->ref)) {
-					break;  // 背压
-				}
-				g_state.tokens -= 1.0;
-				++g_state.playedCount;
-
-				// 记进发光集合（同时保活）。到期时刻向前抖 0~30 秒：
-				// 向后抖会让每个目标出现一段黑暗期，向前抖只是偶尔两个实例重叠（有界）。
-				GlowEntry e;
-				e.ref   = RE::NiPointer<RE::TESObjectREFR>{ c->ref };
-				e.dueMs = a_nowMs +
-				          static_cast<std::uint64_t>((g_cfg.glowDurationSec + 2.0f) * 1000.0f) -
-				          static_cast<std::uint64_t>(std::rand() % 30000);
-				g_state.glowing[c->ref] = std::move(e);
-			}
-
-			// 清掉已经过期的表项（只删表项，不发 Stop —— 走远的目标由 effect 自行过期）
-			for (auto it = g_state.glowing.begin(); it != g_state.glowing.end();) {
-				if (it->second.dueMs + 60000 < a_nowMs || !it->second.ref) {
-					it = g_state.glowing.erase(it);
-				} else {
-					++it;
-				}
-			}
-		}
-
-		// 关掉开关时，把待熄灭的那批分批喂给 StopList。
-		// ★ 只推进「已推送」的下标，**不释放 NiPointer** —— 释放的时机是
-		//   「信箱被桥消费完（MaybeClear 返回真）且全部推完」，见 ReleaseSatisfiedStops()。
-		void PumpPendingStop()
-		{
-			if (!g_state.stopList || g_state.pendingStopSent >= g_state.pendingStop.size()) {
-				return;
-			}
-			auto& arr = g_state.stopList->arrayOfForms;
-			while (g_state.pendingStopSent < g_state.pendingStop.size() && arr.size() < kMaxMailbox) {
-				const auto& p = g_state.pendingStop[g_state.pendingStopSent];
-				if (p) {
-					arr.push_back(p.get());
-					++g_state.stoppedCount;
-				}
-				++g_state.pendingStopSent;
-			}
-		}
-
-		// 熄灭这批彻底走完之后才释放保活引用
-		void ReleaseSatisfiedStops(bool a_stopMailboxCleared)
-		{
-			if (!a_stopMailboxCleared || g_state.pendingStopSent < g_state.pendingStop.size()) {
-				return;
-			}
-			g_state.pendingStop.clear();
-			g_state.pendingStopSent = 0;
 		}
 
 		// ====================================================================
@@ -2053,57 +1965,46 @@ namespace SAS
 			++g_state.tickCount;
 			const std::uint64_t now = NowMs();
 
-			TickRetired(now);
 			PollHotkey(now);
 
-			// ★ v3.2：检测「引擎把我们的高亮清掉了」的时机并自动重挂
-			//   （核心场景 = 玩家用原版手持扫描仪；见 DetectEngineOutlineLoss 的说明）。
-			//   放在扫描节流之前：切换要即时被看到，不能等 200ms 的扫描窗口。
-			DetectEngineOutlineLoss();
+			// ★ v4.0：热键提示（写 GLOB，桥脚本轮询后弹 HUD）。
+			//   放在各种提前 return 之前，保证「关掉功能」那一刻的提示也发得出去。
+			FlushNotify();
 
-			// 原生模式下视觉完全在引擎里，**不需要** ESM / FLST 信箱 / Papyrus 桥，
-			// 所以绑定失败也照跑（少一个能坏的地方）；旧方案必须有信箱。
-			const bool legacy = (g_cfg.highlightMode != 1);
+			// 绑定（只用于热键提示）。**失败不影响高亮** —— 高亮完全在 DLL 里，
+			// 所以这里不像旧版那样「绑不上就整轮 return」。
 			if (!g_state.bound) {
-				if (!BindForms() && legacy) {
-					return;
-				}
+				BindNotify();
 			}
 
-			// 读档自愈：脚本把 Epoch +1，这里看到变化就整批重置
-			double epochVal = 0.0;
-			if (ReadGlobalValue(g_state.epoch, epochVal)) {
-				const auto cur = static_cast<std::uint32_t>(epochVal);
-				if (!g_state.epochSeen) {
-					g_state.epochSeen = true;
-					g_state.lastEpoch = cur;
-				} else if (cur != g_state.lastEpoch) {
-					g_state.lastEpoch = cur;
-					// 读档：引用数组此刻正在被重建，重置稳定性判据并静置
+			// ★ v4.0：读档 / 大重建信号 =「载入画面由开变关」（替代旧的 SAS_Epoch GLOB）。
+			//   每帧都看一眼（两次 IsMenuOpen，成本可忽略），这样才能在
+			//   「扫完这一轮就 return」的路径之外也捕捉到。
+			//   与「换 cell」判据重复触发是无害的：ResetForNewScene 只是重新打
+			//   「待摘」时间戳，本来就会在下一轮被覆盖。
+			{
+				const bool loading = IsLoadingScreenUp();
+				if (g_state.loadingSeen && !loading) {
+					++g_state.loadGameResets;
 					g_state.cellRefsOff   = 0;
 					g_state.lastRefsSize  = 0;
 					g_state.stableRounds  = 0;
 					g_state.settleUntilMs = now + kSettleAfterSceneChangeMs;
 					InvalidateReadRegions();
-					ResetForNewScene(now, "epoch changed (load game)");
+					ResetForNewScene(now, "载入画面关闭（读档 / 换场景）");
 				}
+				g_state.loadingSeen = loading;
 			}
 
-			// 清表（两个信箱都只在桥消费完之后清）—— 原生模式下没有信箱
-			if (legacy) {
-				MaybeClear(g_state.opList, g_state.opCursor);
-				ReleaseSatisfiedStops(MaybeClear(g_state.stopList, g_state.stopCursor));
-			}
+			// ★ v3.2：检测「引擎把我们的高亮清掉了」的时机并自动重挂
+			//   （核心场景 = 玩家用原版手持扫描仪；见 DetectEngineOutlineLoss 的说明）。
+			//   放在扫描节流之前：切换要即时被看到，不能等 200ms 的扫描窗口。
+			//   ★ v4.0：放在读档处理**之后** —— 读档会把已挂目标标成「待摘」，
+			//     顺序反了会被「重挂」覆盖掉（见 DetectEngineOutlineLoss 里的静置期判断）。
+			DetectEngineOutlineLoss(now);
 
 			if (!g_state.on) {
-				if (legacy) {
-					PumpPendingStop();
-				}
 				return;
-			}
-
-			if (legacy) {
-				PumpPendingStop();
 			}
 
 			// 扫描节流
@@ -2158,35 +2059,42 @@ namespace SAS
 
 			if (g_cfg.logStats && now - g_state.lastStatsMs > kStatsLogIntervalMs) {
 				g_state.lastStatsMs = now;
-				REX::INFO("scan#{} cell={:08X} off=0x{:X} refs={} cand={} sel={} lit={} outline={}/{}/{} played={} stopped={} play={}/{} stop={}/{} tok={:.1f} bp={} rej={} on={} retired={} resync={} monocle={}",
+				REX::INFO("scan#{} cell={:08X} off=0x{:X} refs={} cand={} sel={} outline={}/{}/{} rej={} on={} resync={} monocle={} load={} notify={}",
 					g_state.scanCount,
 					cell->GetFormID(),
 					g_state.cellRefsOff,
 					g_state.lastRefsSize,
 					g_state.candCount,
 					g_state.selCount,
-					g_state.glowing.size(),
 					g_state.outlined.size(),
 					g_state.nativeReady ? 1 : 0,
 					CountLiveManagers(),
-					g_state.playedCount,
-					g_state.stoppedCount,
-					g_state.opList ? g_state.opList->arrayOfForms.size() : 0,
-					g_state.opCursor ? g_state.opCursor->value : 0.0f,
-					g_state.stopList ? g_state.stopList->arrayOfForms.size() : 0,
-					g_state.stopCursor ? g_state.stopCursor->value : 0.0f,
-					g_state.tokens,
-					g_state.backpressure,
 					g_state.refsRejected,
 					g_state.on ? 1 : 0,
-					g_state.retired.size(),
 					g_state.outlineResyncs,
-					g_state.monocleOpen ? 1 : 0);
+					g_state.monocleOpen ? 1 : 0,
+					g_state.loadGameResets,
+					g_state.notifyWrites);
+
+				// ★ v4.0：分类命中数 —— 每个类别本轮各挂了多少个（配色不对时靠它定位）
+				{
+					std::string cats;
+					for (std::size_t i = 0; i < kCategoryCount; ++i) {
+						if (i) {
+							cats += ", ";
+						}
+						cats += kCategoryName[i];
+						cats += "=";
+						cats += std::to_string(g_state.categoryCounts[i]);
+					}
+					g_state.categoryCounts.fill(0);
+					REX::INFO("  category (本轮选中): {}", cats);
+				}
 
 				// 摘除计数（诊断）：rmOk 应随 sel/outline 变化一起增长，
 				// unhMiss 长期增长 = 连引擎自己的摘除函数都没动到管理器里的东西。
 				// ★ v2.3：graphRemove=1 才说明「3D 图 visitor」那条路可用（这是唯一真正
-				//   有效的摘除路径）。mapCnt = 当前状态管理器哈希表里的元素数，它应该
+				//   有效的摘除路径）。mapCnt = 代表状态的管理器哈希表元素数，它应该
 				//   跟着 outline 一起涨落 —— 只涨不落就说明还有摘不掉的残留。
 				REX::INFO("  outline remove: rmOk={} unhMiss={} removeMiss={} removeReady={} unhighlightReady={} graphRemove={} mapCnt={}",
 					g_state.outlineRemoved, g_state.outlineUnhighlightMiss,
@@ -2194,7 +2102,7 @@ namespace SAS
 					g_state.nativeRemoveReady ? 1 : 0,
 					g_outlineUnhighlightReady ? 1 : 0,
 					g_outlineGraphRemoveReady ? 1 : 0,
-					ManagerMapCount(OutlineManagerFor(static_cast<std::uint32_t>(g_cfg.outlineState))));
+					ManagerMapCount(OutlineManagerFor(PrimaryState())));
 
 				// 性能窗口：每轮扫描耗时（max 才是「卡顿」的感觉来源）与单轮引擎调用数。
 				REX::INFO("  timing: scan avg={}ms max={}ms ops={} deferred={} loading={}",
@@ -2266,7 +2174,7 @@ namespace SAS
 				// 管理器哈希表的家底（每 30 秒一次就够，用于确认「键到底是什么」）。
 				if (now - g_state.lastMapDiagMs > 30000) {
 					g_state.lastMapDiagMs = now;
-					LogManagerMapDiag("runtime", static_cast<std::uint32_t>(g_cfg.outlineState));
+					LogManagerMapDiag("runtime", PrimaryState());
 				}
 			}
 		}
@@ -2286,14 +2194,17 @@ namespace SAS
 
 		LoadConfig();
 		g_state.on = g_cfg.startEnabled;
-		g_state.tokens = g_cfg.bucketSize;
 
-		// 原生 outline 的三个引擎函数（RVA 是 1.16.244.0 实测值，会做签名校验）
+		// 原生 outline 的几个引擎函数（RVA 是 1.16.244.0 实测值，会做签名校验）
 		ResolveNativeOutline();
-		if (g_cfg.highlightMode == 1 && !g_state.nativeReady) {
-			REX::WARN("HighlightMode=native 但原生 outline 不可用（签名不匹配）"
-					  " -> 本次运行不会高亮。可把 INI 的 HighlightMode 改成 0 走旧方案。");
+		if (!g_state.nativeReady) {
+			REX::WARN("原生 outline 不可用（签名不匹配）-> 本次运行不会高亮。"
+					  "按 docs/03 第七节重新核对 RVA 后再构建。");
 		}
+
+		// ★ v4.0：读档自愈不再需要任何 Papyrus / ESM 通道 —— 直接看载入画面
+		//   （见 Tick 里的「载入画面由开变关」），另有「换 cell」与
+		//   「HighlightManager 数量下跌」两路判据兜底。
 
 		task->AddPermanentTask(Tick);
 

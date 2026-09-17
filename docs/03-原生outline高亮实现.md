@@ -653,3 +653,46 @@ UI 大重建」这类时点可能触发。**一旦触发**，MOD 的 `outlined` 
 **不要做了** —— 自愈正是靠「真的再 `Set` 一次」。若将来有人按那条建议去做，
 「表里状态还对但管理器里已经没了」这种情况会被静默跳过，本 bug 会原样复活。
 
+---
+
+## 十四、v4.0：分类分色（每个类别一个状态）
+
+### 14.1 机制
+
+第三节说过状态值 `0..11` 分成 `0..1` / `2..3` / `7..8` / `9` 几组，各组配色不同。
+v4.0 把「全局一个 `OutlineState`」换成**按物品类别分别指定状态**：
+
+```
+ClassifyBase(base)            // base form 类型 → Category（-1 = 不高亮）
+  → Candidate.state = cfg.stateByCategory[Category]
+  → SyncNativeOutline：OutlineRef(ref, candidate.state)
+```
+
+`OutlineEntry` 也记了挂上去时用的 `state`（**只作诊断**）。★ 摘除时仍然
+**先读引擎状态表里的真实值**（`UnoutlineRef` 里的 `stateInTable`），不是读我们记的那个 ——
+原版扫描仪可能把重叠目标改成别的状态，用我们记的值会摘不干净。这一点从 v2.3 起就没变。
+
+类别划分（`Category` 枚举）与默认状态见 `docs/99` 的 v4.0 段 / INI 注释。
+
+### 14.2 两个容易踩的点
+
+1. **状态变了要先把旧的摘掉**：重申时若发现 `entry.state != candidate.state`
+   （正常只在改过 INI 之后才会发生），必须先 `UnoutlineRef` 再挂新的。直接挂新的会让
+   同一个引用同时留在**两个管理器**里 ⇒ 两层描边，而且旧的那层要到掉出选中集合才消失。
+2. **管理器是按需创建的**：`OutlineRef` 里的 `EnsureManagerFor(state)` 一旦发现目标状态
+   的管理器不存在，就会调用引擎自己的重建函数 —— 那个函数是**一次性建满 11 个**的
+   （见第 2.5 节），所以第一次挂任何一个类别都会让 `CountLiveManagers()` 由 0 跳到 11。
+   ★ 这会影响 v3.2 那个「管理器数量下跌 = 引擎清过表」的判据：启动初期是**上涨**，
+   不触发，正常。
+
+### 14.3 诊断（对着日志调颜色）
+
+| 日志 | 含义 |
+| --- | --- |
+| `config: stateByCategory: loot=0, container=1, ...` | 启动时实际生效的「类别 → 状态」映射 |
+| `native outline managers[install] = 11/11 alive \| stateByCategory: loot=0(ok) ...` | 每个类别的管理器是否已存在 |
+| `category (本轮选中): loot=N, container=N, ...` | 每 5 秒统计：本轮选中的目标按类别各多少个 |
+
+颜色不理想时**只改 INI** 的 `StateLoot`…`StateOther`（`0/1/2/3/7/8/9` 各试一遍最直观），
+不用改代码、不用重新编译。
+

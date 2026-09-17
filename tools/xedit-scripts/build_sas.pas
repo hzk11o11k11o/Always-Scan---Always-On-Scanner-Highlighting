@@ -17,26 +17,29 @@ unit SAS_BuildPlugin;
 //  any brace character, so these two can no longer waste a 5 minute build.
 //
 // ---------------------------------------------------------------------------
-//  Record table. Creation order == FormID order (low 24 bits) and it MUST match
-//  the kLocal* constants in plugin/src/AlwaysScan.cpp:
+//  Record table. Creation order == FormID order (low 24 bits).
 //
-//    0x800  EFSH SAS_HighlightFXS      <- clone of vanilla ReconTargetingFXS
-//    0x801  FLST SAS_OpList            (play mailbox, empty)
-//    0x802  GLOB SAS_OpCursor
-//    0x803  FLST SAS_StopList          (stop mailbox, empty)
-//    0x804  GLOB SAS_StopCursor
-//    0x805  GLOB SAS_Epoch
+//    0x800  EFSH SAS_HighlightFXS      <- PLACEHOLDER (old EFSH visual layer)
+//    0x801  FLST SAS_OpList            <- PLACEHOLDER (old play mailbox)
+//    0x802  GLOB SAS_OpCursor          <- PLACEHOLDER
+//    0x803  FLST SAS_StopList          <- PLACEHOLDER (old stop mailbox)
+//    0x804  GLOB SAS_StopCursor        <- PLACEHOLDER
+//    0x805  GLOB SAS_Epoch             <- PLACEHOLDER (old load-game counter)
 //    0x806  QUST SAS_AlwaysScanQuest   (Start Game Enabled + Starts Enabled)
+//    0x807  GLOB SAS_Notify            <- v4.0: DLL writes 1/2, script pops HUD
 //
-//  v3.1 note: the quest guide line feature is GONE (both the home-made
-//  breadcrumbs and the vanilla SpellScannerGuide spell), so every record that
-//  existed for it was removed: 0x807 SAS_GuideHb / 0x808 SAS_GuideState (v2.2),
-//  0x809 SAS_On / 0x80A SAS_GuideMarkers (v2.4) and 0x80B SAS_DoorBases (v2.6).
-//  They were all created AFTER 0x806, so the low-24 ids of 0x800..0x806 (which
-//  the DLL constants rely on) never shift.
+//  v4.0 note: every legacy bridge record is now UNUSED -- the DLL drives the
+//  engine's native outline directly and no longer needs any of them, and the
+//  Papyrus script only (a) cleans up old breadcrumb beads and (b) polls
+//  SAS_Notify. They are deliberately KEPT, in this exact order, as FormID
+//  placeholders: the quest's FormID must stay 0x806, because a saved game
+//  archives the quest's script instance BY FORMID. If it shifted, the restored
+//  instance would be dropped and `GuideArrayReady` would read back False ->
+//  the one-time bead cleanup would never run again for old saves.
+//  New records MUST be appended at the END (0x807+).
 //
 //  VMAD (bound on the quest):
-//    OpList / OpCursor / StopList / StopCursor / Epoch / ShaderPrimary
+//    NotifyFlag   (-> 0x807 SAS_Notify)
 //
 // ---------------------------------------------------------------------------
 //  Known traps:
@@ -48,6 +51,7 @@ unit SAS_BuildPlugin;
 //  4. The only writable colour on an EFSH is the named struct member
 //     DNAM \ Color. Do NOT touch its 4th byte (xEdit calls it 'Unused').
 //  5. Quest Flags: 0x01 Start Game Enabled + 0x10 Starts Enabled = 17.
+//  6. The .pas must stay PURE ASCII with NO brace characters.
 // ===========================================================================
 
 const
@@ -65,7 +69,7 @@ var
   srcFile: IwbFile;
   questRec: IInterface;
   esmShader, flstOp, flstStop: IInterface;
-  globOpCur, globStopCur, globEpoch: IInterface;
+  globOpCur, globStopCur, globEpoch, globNotify: IInterface;
 
 procedure Log(s: string);
 begin
@@ -332,20 +336,24 @@ begin
   Flush('02_globtpl');
 
   // ------- 0x800 -------
+  // PLACEHOLDER: keeps the low-24 id 0x800 occupied so the quest stays at 0x806.
   esmShader := MakeEFSH(newFile, 'SAS_HighlightFXS', 'ReconTargetingFXS', ShaderR, ShaderG, ShaderB);
   Flush('03_efsh');
 
   // ------- 0x801 / 0x802 -------
+  // PLACEHOLDER (old play mailbox / cursor).
   flstOp := MakeEmptyFLST(newFile, 'SAS_OpList');
   globOpCur := MakeGlobal(newFile, 'SAS_OpCursor', globTpl, 0.0);
   Flush('04_play');
 
   // ------- 0x803 / 0x804 -------
+  // PLACEHOLDER (old stop mailbox / cursor).
   flstStop := MakeEmptyFLST(newFile, 'SAS_StopList');
   globStopCur := MakeGlobal(newFile, 'SAS_StopCursor', globTpl, 0.0);
   Flush('05_stop');
 
   // ------- 0x805 -------
+  // PLACEHOLDER (old load-game epoch counter; replaced by TESLoadGameEvent).
   globEpoch := MakeGlobal(newFile, 'SAS_Epoch', globTpl, 0.0);
   Flush('06_epoch');
 
@@ -353,14 +361,15 @@ begin
   questRec := MakeQuestSkeleton(newFile, 'SAS_AlwaysScanQuest', ScriptBridge);
   Flush('07_quest');
 
+  // ------- 0x807 ---- (MUST be after 0x806: new records are appended last) ----
+  globNotify := MakeGlobal(newFile, 'SAS_Notify', globTpl, 0.0);
+  Flush('08_notify');
+
   // VMAD properties: added only after all target records exist.
-  AddQuestProp(questRec, 'OpList', flstOp);
-  AddQuestProp(questRec, 'OpCursor', globOpCur);
-  AddQuestProp(questRec, 'StopList', flstStop);
-  AddQuestProp(questRec, 'StopCursor', globStopCur);
-  AddQuestProp(questRec, 'Epoch', globEpoch);
-  AddQuestProp(questRec, 'ShaderPrimary', esmShader);
-  Flush('08_vmad');
+  // v4.0: the DLL no longer touches the mailbox forms, so the only remaining
+  // binding is the HUD-notification flag.
+  AddQuestProp(questRec, 'NotifyFlag', globNotify);
+  Flush('09_vmad');
 
   try
     SortMasters(newFile);
@@ -392,6 +401,7 @@ begin
   Log('  0x804 SAS_StopCursor      ' + IntToHex(GetLoadOrderFormID(globStopCur) and $FFFFFF, 6));
   Log('  0x805 SAS_Epoch           ' + IntToHex(GetLoadOrderFormID(globEpoch) and $FFFFFF, 6));
   Log('  0x806 SAS_AlwaysScanQuest ' + IntToHex(GetLoadOrderFormID(questRec) and $FFFFFF, 6));
+  Log('  0x807 SAS_Notify          ' + IntToHex(GetLoadOrderFormID(globNotify) and $FFFFFF, 6));
 
   Log('=== Always Scan build done ===');
   Flush('99_done');
