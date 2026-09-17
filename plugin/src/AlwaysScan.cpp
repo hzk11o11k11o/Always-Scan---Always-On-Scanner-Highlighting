@@ -209,6 +209,18 @@ namespace SAS
 			//     「重建管理器」函数把它们建出来（不开扫描仪时引擎就不会建）。
 			bool          autoEnsureManagers = true;
 
+			// --- ★ v3.2：用原版手持扫描仪之后**自动重挂** ---
+			// 1 = 玩家放下扫描仪（`MonocleMenu` 关闭）时，把已挂的高亮整批转入
+			//     「待重申」，由 SyncNativeOutline 按每轮预算重新挂一遍。
+			//   ★ 为什么需要（实测症状，见 docs/03 第十三节）：
+			//     引擎在扫描仪的生命周期里会拆掉 Monocle HUD（RVA 0x17D4B30：
+			//     **销毁 11 个 HighlightManager + 清空「引用→状态」表**），
+			//     于是 g_state.outlined 里的记录全部变成「悬空记录」——
+			//     我们以为还挂着、引擎那边其实已经没了。默认 ReassertMs=0 下
+			//     没有任何自愈机制 ⇒ 表现为「用完原版扫描仪后高亮全灭，
+			//     要按两下 F8（先关再开）才回来」。
+			bool          resyncOnScannerClose = true;
+
 			// --- ★ v2.2：治「轻微卡顿」的两个闸门 ---
 			// 「掉队」宽限期（毫秒）：一个目标掉出选中集合后，先留着高亮这么久，
 			// 到期还没回到集合里才真正摘掉。
@@ -281,6 +293,11 @@ namespace SAS
 			std::uint64_t outlineRemoveMiss = 0;     // 调了 Remove 但一个管理器里都没有（诊断）
 			std::uint64_t outlineUnhighlightMiss = 0; // 引擎的 0x653F60 也没动到任何管理器（诊断）
 			std::uint64_t lastOutlineErrMs = 0;
+
+			// --- ★ v3.2：扫描仪生命周期 → 自动重挂（诊断 + 检测状态）---
+			bool          monocleOpen      = false;  // 上一轮 MonocleMenu 是否打开（= 举着扫描仪）
+			std::uint32_t lastLiveManagers = 0;      // 上一轮存活的管理器数（下跌 = 引擎清过表）
+			std::uint64_t outlineResyncs   = 0;      // 自动重挂次数（诊断：应该只在用扫描仪后 +1）
 
 			// --- 关掉开关时要熄灭的那批（分批喂给 StopList，避免一次性灌爆）---
 			// ★ 这些 NiPointer **必须留到信箱被桥消费完**才能释放：信箱里存的是裸指针
@@ -586,6 +603,26 @@ namespace SAS
 			return ui->IsMenuOpen(kLoadingMenu) || ui->IsMenuOpen(kFaderMenu);
 		}
 
+		// ----------------------------------------------------------------
+		// 「玩家此刻有没有举着手持扫描仪」
+		// ----------------------------------------------------------------
+		// ★ v3.2 新增。依据是 B 社自己的脚本（`ScanTempleScript.psc` /
+		//   `MQ_Temple_SubScript.psc`）：它们用 `RegisterForMenuOpenCloseEvent("MonocleMenu")`
+		//   + `abOpening` 判断「扫描仪是否举着」，注释原话是
+		//   *we'll need a way to check if you have the scanner up or not*。
+		//   也就是说**举着扫描仪 == `MonocleMenu` 处于 open 状态**。
+		//   我们只需要「开/关切换」这个时机，不需要每帧知道值，所以直接轮询即可。
+		//   菜单没注册时 IsMenuOpen 返回 false（不会崩）。
+		bool IsMonocleMenuOpen()
+		{
+			static const RE::BSFixedString kMonocleMenu{ "MonocleMenu" };
+			auto*                           ui = RE::UI::GetSingleton();
+			if (!ui) {
+				return false;
+			}
+			return ui->IsMenuOpen(kMonocleMenu);
+		}
+
 		void LoadConfig()
 		{
 			g_iniPath          = ModuleDir() + "\\SAS_AlwaysScan.ini";
@@ -625,6 +662,7 @@ namespace SAS
 			g_cfg.frontFovDeg   = std::clamp(getFloat("FrontFovDeg", 110.0f), 20.0f, 360.0f);
 			g_cfg.reassertMs    = std::clamp(getInt("ReassertMs", 0), 0, 60000);  // 0 = 不重申
 			g_cfg.autoEnsureManagers = getInt("AutoEnsureManagers", 1) != 0;
+			g_cfg.resyncOnScannerClose = getInt("ResyncOnScannerClose", 1) != 0;
 			g_cfg.unhighlightGraceMs = std::clamp(getInt("UnhighlightGraceMs", 1500), 0, 60000);
 			g_cfg.maxOutlineOpsPerScan = std::clamp(getInt("MaxOutlineOpsPerScan", 64), 0, 4096);
 
@@ -633,11 +671,11 @@ namespace SAS
 				g_cfg.hotkeyVk, g_cfg.startEnabled);
 			REX::INFO("config: unitsPerMeter={:.4f} -> 半径 {:.1f}m = {:.1f} 游戏单位",
 				g_cfg.unitsPerMeter, g_cfg.radiusMeters, g_cfg.radiusMeters * g_cfg.unitsPerMeter);
-			REX::INFO("config: highlightMode={} outlineState={} onlyInFront={} frontFov={:.0f}deg reassert={} autoEnsure={}",
+			REX::INFO("config: highlightMode={} outlineState={} onlyInFront={} frontFov={:.0f}deg reassert={} autoEnsure={} resyncOnScannerClose={}",
 				g_cfg.highlightMode == 1 ? "native-outline" : "legacy-efsh",
 				g_cfg.outlineState, g_cfg.onlyInFront, g_cfg.frontFovDeg,
 				g_cfg.reassertMs ? std::to_string(g_cfg.reassertMs) + "ms" : std::string{ "off" },
-				g_cfg.autoEnsureManagers);
+				g_cfg.autoEnsureManagers, g_cfg.resyncOnScannerClose);
 			REX::INFO("config: unhighlightGrace={}ms maxOutlineOpsPerScan={}",
 				g_cfg.unhighlightGraceMs, g_cfg.maxOutlineOpsPerScan);
 		}
@@ -1686,6 +1724,73 @@ namespace SAS
 		}
 
 		// ====================================================================
+		// ★ v3.2：引擎把我们的高亮清掉之后的「自愈」
+		// ====================================================================
+		// 起因（用户实测）：**打开原版扫描仪再关闭后，MOD 的高亮全灭，且不会自己回来**
+		// —— 得按两下 F8（先关再开）才行。根因是引擎在扫描仪生命周期里会拆掉 Monocle
+		// HUD（RVA 0x17D4B30：销毁 11 个 HighlightManager + 清空「引用→状态」表 +
+		// 摘掉渲染侧的高亮），而我们的 `g_state.outlined` 里还记着那些引用 ⇒
+		// `SyncNativeOutline` 认为「已经挂着」，于是**永远不再重挂**。
+		//
+		// 这与 docs/03 第 12.4 节预判的「低概率整表清空」是同一件事，只是它其实
+		// 在正常开关扫描仪时就会发生（当初的结论说「不触发」，这次实测推翻了）。
+		//
+		// 防御分两路（都**不做任何引擎调用**，只改我们自己的时间戳，
+		// 真正的重挂交给 SyncNativeOutline 按 MaxOutlineOpsPerScan 分批做 ⇒ 零突发）：
+		//   ① **`MonocleMenu` 由开变关的那一刻** —— 直接对应「放下扫描仪」；
+		//   ② **存活管理器数下跌** —— 「整表清空」必伴随 11 个管理器被销毁
+		//      （0x17D4B30 会把槽清 0），这条同时兜住「读档 / 回主菜单 / UI 大重建」。
+		// ====================================================================
+
+		// 把「已经在表里、但引擎侧可能已经丢了」的目标标成「下轮重申」。
+		// 只改两个时间戳：dropAt=0（别把它当掉队摘掉）、reassertMs=0（下一轮就重挂）。
+		void MarkAllForReassert(const char* a_reason)
+		{
+			if (g_state.outlined.empty()) {
+				return;  // 没有已挂的东西，无所谓
+			}
+			for (auto& [key, entry] : g_state.outlined) {
+				entry.dropAt     = 0;
+				entry.reassertMs = 0;
+			}
+			++g_state.outlineResyncs;
+			REX::INFO("native outline: 引擎侧高亮疑似丢失（{}）-> {} 个已挂目标转入「待重申」"
+					  "（按每轮 {} 条预算重挂，累计 {} 次）",
+				a_reason, g_state.outlined.size(), g_cfg.maxOutlineOpsPerScan,
+				g_state.outlineResyncs);
+		}
+
+		void DetectEngineOutlineLoss()
+		{
+			// MonocleMenu 的开/关状态**每帧都跟踪**（即使功能关着），
+			// 这样开关功能不会造成一次假的「由开变关」。
+			const bool monocleOpen = IsMonocleMenuOpen();
+			const bool justClosed  = g_state.monocleOpen && !monocleOpen;
+			g_state.monocleOpen    = monocleOpen;
+
+			if (g_cfg.highlightMode != 1 || !g_state.nativeReady || !g_state.on) {
+				g_state.lastLiveManagers = CountLiveManagers();
+				return;
+			}
+
+			// ① 放下扫描仪的那一刻：引擎很可能刚刚把整张表清过 ⇒ 直接重挂。
+			bool fired = false;
+			if (justClosed && g_cfg.resyncOnScannerClose) {
+				MarkAllForReassert("MonocleMenu 关闭");
+				fired = true;
+			}
+
+			// ② 管理器数量下跌：`0x17D4B30` 的「销毁 + 清表」一定会让这个数掉下来
+			//    （11 → 0）。举着扫描仪期间不判断（那期间引擎自己在管管理器）；
+			//    ① 已经命中时不重复（同一次「清表」两个判据会同时成立）。
+			const auto live = CountLiveManagers();
+			if (!fired && !monocleOpen && g_state.lastLiveManagers != 0 && live < g_state.lastLiveManagers) {
+				MarkAllForReassert("HighlightManager 数量下跌");
+			}
+			g_state.lastLiveManagers = live;
+		}
+
+		// ====================================================================
 		// 扫描
 		// ====================================================================
 		void Rescan(std::uint64_t a_nowMs, RE::PlayerCharacter* a_player)
@@ -1951,6 +2056,11 @@ namespace SAS
 			TickRetired(now);
 			PollHotkey(now);
 
+			// ★ v3.2：检测「引擎把我们的高亮清掉了」的时机并自动重挂
+			//   （核心场景 = 玩家用原版手持扫描仪；见 DetectEngineOutlineLoss 的说明）。
+			//   放在扫描节流之前：切换要即时被看到，不能等 200ms 的扫描窗口。
+			DetectEngineOutlineLoss();
+
 			// 原生模式下视觉完全在引擎里，**不需要** ESM / FLST 信箱 / Papyrus 桥，
 			// 所以绑定失败也照跑（少一个能坏的地方）；旧方案必须有信箱。
 			const bool legacy = (g_cfg.highlightMode != 1);
@@ -2048,7 +2158,7 @@ namespace SAS
 
 			if (g_cfg.logStats && now - g_state.lastStatsMs > kStatsLogIntervalMs) {
 				g_state.lastStatsMs = now;
-				REX::INFO("scan#{} cell={:08X} off=0x{:X} refs={} cand={} sel={} lit={} outline={}/{}/{} played={} stopped={} play={}/{} stop={}/{} tok={:.1f} bp={} rej={} on={} retired={}",
+				REX::INFO("scan#{} cell={:08X} off=0x{:X} refs={} cand={} sel={} lit={} outline={}/{}/{} played={} stopped={} play={}/{} stop={}/{} tok={:.1f} bp={} rej={} on={} retired={} resync={} monocle={}",
 					g_state.scanCount,
 					cell->GetFormID(),
 					g_state.cellRefsOff,
@@ -2069,7 +2179,9 @@ namespace SAS
 					g_state.backpressure,
 					g_state.refsRejected,
 					g_state.on ? 1 : 0,
-					g_state.retired.size());
+					g_state.retired.size(),
+					g_state.outlineResyncs,
+					g_state.monocleOpen ? 1 : 0);
 
 				// 摘除计数（诊断）：rmOk 应随 sel/outline 变化一起增长，
 				// unhMiss 长期增长 = 连引擎自己的摘除函数都没动到管理器里的东西。
