@@ -17,17 +17,43 @@ Usage
     python tools/re/tr_slice.py <extract.tsv> --sig MESG --sub DESC [-o out.tsv]
                                [--min-chars N] [--max-chars N]
                                [--limit N] [--sort chars|line] [--all]
+                               [--dict dict.tsv]
 
 Output columns:  #line  chars  hits  recsig/subsig  text
 
 ``line`` is the 1 based raw line number inside <extract.tsv> (header line = 1),
 i.e. exactly what ``tr_mkbatch.py``'s spec file expects.  Duplicate strings are
 collapsed and their hit count reported; the line number kept is the first one.
+
+``--dict`` drops every string the dictionary already covers (same exact / strip /
+case-folded fallbacks as ``tr_pipeline.py``), so the output is the *remaining work
+list* of one class, still carrying the raw line numbers.
 """
 from __future__ import annotations
 
 import argparse
 from pathlib import Path
+
+
+def load_lookup(path):
+    lookup = {}
+    for line in Path(path).read_text(encoding="utf-8").splitlines():
+        if not line or line.startswith("#"):
+            continue
+        p = line.split("\t")
+        if len(p) < 2 or not p[0]:
+            continue
+        k, v = p[0], p[1]
+        lookup.setdefault(k, v)
+        lookup.setdefault(k.strip(), v)
+        lookup.setdefault(k.lower(), v)
+        lookup.setdefault(k.strip().lower(), v)
+    return lookup
+
+
+def translated(lookup, t):
+    return (lookup.get(t) or lookup.get(t.strip()) or lookup.get(t.lower())
+            or lookup.get(t.strip().lower())) is not None
 
 
 def main() -> int:
@@ -42,8 +68,12 @@ def main() -> int:
     ap.add_argument("--sort", choices=["chars", "line"], default="chars")
     ap.add_argument("--all", action="store_true",
                     help="keep duplicate strings as separate rows (default: unique)")
+    ap.add_argument("--dict", default=None,
+                    help="drop strings already covered by this dictionary (remaining work list)")
     a = ap.parse_args()
 
+    lookup = load_lookup(a.dict) if a.dict else None
+    skipped = 0
     rows = []          # (line_no, text)
     for i, line in enumerate(Path(a.extract).read_text(encoding="utf-8").splitlines(), start=1):
         if not line or line.startswith("#"):
@@ -56,6 +86,9 @@ def main() -> int:
         if len(p[5]) < a.min_chars:
             continue
         if a.max_chars and len(p[5]) > a.max_chars:
+            continue
+        if lookup is not None and translated(lookup, p[5]):
+            skipped += 1
             continue
         rows.append((i, p[5]))
 
@@ -89,7 +122,8 @@ def main() -> int:
         print(f"slice: {a.sig}/{a.sub} rows={len(rows)} chars={total_chars} -> {a.out}")
     else:
         print(body, end="")
-    print(f"slice {a.sig}/{a.sub}: rows={len(rows)} chars={sum(len(t) for _, t in rows)}",
+    extra = f" skipped_translated={skipped}" if a.dict else ""
+    print(f"slice {a.sig}/{a.sub}: rows={len(rows)} chars={sum(len(t) for _, t in rows)}{extra}",
           flush=True)
     return 0
 
