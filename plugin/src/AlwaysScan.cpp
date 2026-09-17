@@ -189,6 +189,9 @@ namespace SAS
 			"loot", "container", "device", "door", "flora", "other"
 		};
 
+		// ★ v4.0.1：INI 没写自定义颜色时用的哨兵值（写 0 表示「用引擎原生配色」）
+		constexpr std::uint32_t kColorUnset = 0xFFFFFFFFu;
+
 		struct Config
 		{
 			bool          startEnabled    = true;
@@ -251,6 +254,14 @@ namespace SAS
 			// 下标 = Category，默认 可拾取0 / 容器1 / 设备2 / 门3 / 植物7 / 其它0。
 			// ★ 想换配色只改 INI 的 StateXxx；改完重进游戏生效。
 			std::array<int, kCategoryCount> stateByCategory{ 0, 1, 2, 3, 7, 0 };
+
+			// ★ v4.0.1：可选的「自定义类别颜色」（INI 里写 ColorLoot=RRGGBB 之类）。
+			//   kColorUnset = 不覆盖，完全用引擎那个状态的原生配色。
+			//   设了就把 RGB 写进引擎的两张每状态配色表（alpha 保持原值），
+			//   再让引擎刷新管理器 + 整批重挂（详见 ApplyColorOverrides）。
+			std::array<std::uint32_t, kCategoryCount> colorOverride{
+				kColorUnset, kColorUnset, kColorUnset, kColorUnset, kColorUnset, kColorUnset
+			};
 
 			// ★ v4.0：按热键切换时弹一条 HUD 提示（DLL 写 GLOB → 桥脚本轮询）。
 			bool          notifyOnToggle  = true;
@@ -319,6 +330,7 @@ namespace SAS
 			std::uint64_t notifyWrites   = 0;  // 写进 SAS_Notify 的次数
 			std::uint64_t loadGameResets = 0;  // 「载入画面由开变关」触发的重置次数
 			bool          loadingSeen    = false;  // 上一帧载入画面是否开着（每帧都更新）
+			bool          paramsRefreshed = false; // ★ v4.0.1：进世界后是否已做过一次配色刷新
 
 			// --- 诊断：半径内、但 base form 类型不在白名单而被跳过的类型统计 ---
 			//   统计窗口 = 两条统计日志之间，打完之后清空。
@@ -387,6 +399,7 @@ namespace SAS
 		// 前置声明：定义在后面的「原生 outline」小节里（SetOn / ResetForNewScene 要先用到）
 		void ClearAllNativeOutline();
 		void MarkAllForRemoval(std::uint64_t a_deadlineMs);
+		void MarkAllForReassert(const char* a_reason);
 
 		// ====================================================================
 		// 小工具
@@ -679,6 +692,44 @@ namespace SAS
 			}
 			g_cfg.notifyOnToggle = getInt("NotifyOnToggle", 1) != 0;
 
+			// --- ★ v4.0.1：可选的自定义类别颜色（ColorLoot=RRGGBB …，留空 = 用引擎原生配色）---
+			{
+				const char* const kColorKeys[kCategoryCount] = {
+					"ColorLoot", "ColorContainer", "ColorDevice", "ColorDoor", "ColorFlora", "ColorOther"
+				};
+				std::string colorLog;
+				for (std::size_t i = 0; i < kCategoryCount; ++i) {
+					char hex[32]{};
+					::GetPrivateProfileStringA("General", kColorKeys[i], "", hex, sizeof(hex), ini);
+					char* p = hex;
+					if (*p == '#') {
+						++p;
+					}
+					if (*p == '\0') {
+						continue;  // 没写 = 不覆盖
+					}
+					char*        end = nullptr;
+					const auto   v   = std::strtoul(p, &end, 16);
+					if (end == p || v > 0xFFFFFFu) {
+						REX::WARN("config: {}='{}' 解析失败（要 6 位十六进制，例如 ColorLoot=FF8000）-> 忽略",
+							kColorKeys[i], p);
+						continue;
+					}
+					g_cfg.colorOverride[i] = static_cast<std::uint32_t>(v) & 0xFFFFFFu;
+					if (!colorLog.empty()) {
+						colorLog += ", ";
+					}
+					colorLog += kCategoryName[i];
+					colorLog += "=#";
+					char buf[8];
+					std::snprintf(buf, sizeof(buf), "%06X", g_cfg.colorOverride[i]);
+					colorLog += buf;
+				}
+				if (!colorLog.empty()) {
+					REX::INFO("config: colorOverride: {}", colorLog);
+				}
+			}
+
 			REX::INFO("config: radius={:.1f}m targets={} hotkeyVK=0x{:X} startEnabled={}",
 				g_cfg.radiusMeters, g_cfg.maxTargets, g_cfg.hotkeyVk, g_cfg.startEnabled);
 			REX::INFO("config: unitsPerMeter={:.4f} -> 半径 {:.1f}m = {:.1f} 游戏单位",
@@ -921,6 +972,22 @@ namespace SAS
 		constexpr std::uintptr_t kRvaOutlineEnsureManagers = 0x17D47B0;
 
 		// ================================================================
+		// ★ v4.0.1：每状态「高亮参数」的两张静态表（颜色就住在这里）
+		// ----------------------------------------------------------------
+		// 逆向推导见 docs/03 第十四节。每张表 stride = 0xA0，颜色在 +0x00 / +0x20
+		// 两个 dword（引擎按脉冲相位在 High/Low 之间插值），字节序 = R,G,B,A。
+		//   · 0x591E088：建/刷新 HighlightManager 时读（`0x17D47B0` 里的
+		//     `movsxd rbp, r8d ... vmovd xmm0,[rax + r15 + 0x5919b08]` 同族）
+		//   · 0x5919B08：把引用挂进管理器时读（`0x17D4CD0` 里
+		//     `lea rax,[rbx+rbx*4]; shl rax,5; vmovd xmm0,[rax+r15+0x5919b08]`）
+		// ★ 这两张表**不是 0 初始化**：进程启动的静态初始化函数就把原版默认配色写进去了
+		//   （反汇编实证：0xF2AD3E 橙、0xFFE872 金、0x695B11 橄榄 …），之后由
+		//   `:Monocle` / `aHighlightScannableOutlineColorHigh|Low_<变体>` 设置刷新。
+		//   动态调试时用 `LogOutlineColors()` 直接把 11 个状态的颜色打出来对着看。
+		constexpr std::uintptr_t kRvaOutlineMgrParams = 0x591E088;
+		constexpr std::uintptr_t kRvaOutlineRefParams = 0x5919B08;
+
+		// ================================================================
 		// ★★★ 摘掉高亮真正需要的两个引擎函数（v2.1 修正「F8 关不掉」的根因）★★★
 		//
 		// 上一版以为「把状态写回 12 + 调 0x17D4F10」就是摘高亮。2026-09-16 复核发现**错**：
@@ -1089,6 +1156,7 @@ namespace SAS
 		std::uint32_t  PrimaryState();
 		void           LogManagerDiagnostics(const char* a_tag);
 		void           LogManagerMapDiag(const char* a_tag, std::uint32_t a_state);
+		void           LogOutlineColors(const char* a_tag);
 		bool           EnsureManagerFor(std::uint32_t a_state);
 		bool           OutlineUnhighlightRef(RE::TESObjectREFR* a_ref, std::uint32_t a_state);
 
@@ -1206,6 +1274,8 @@ namespace SAS
 			}
 			LogManagerDiagnostics("install");
 			LogManagerMapDiag("install", PrimaryState());
+			// ★ v4.0.1：把 11 个状态的实际配色打出来（分类分色出问题时的第一手证据）
+			LogOutlineColors("install");
 		}
 
 		// 读「第 a_state 个 HighlightManager」指针；0 = 现在不存在
@@ -1253,6 +1323,137 @@ namespace SAS
 			}
 			REX::INFO("native outline managers[{}] = {}/{} alive | stateByCategory: {}",
 				a_tag, CountLiveManagers(), kOutlineManagerUsed, per);
+		}
+
+		// ====================================================================
+		// ★ v4.0.1：每状态配色表（诊断 + 可选覆盖）
+		// --------------------------------------------------------------------
+		// 逆向结论（1.16.244.0，见 docs/03 第十四节）：
+		//   引擎为「每个 outline 状态」各存一组高亮参数（0xA0 字节），颜色是**两个
+		//   dword**（低/高，引擎按脉冲相位在两者之间插值），字节序 = R,G,B,A：
+		//
+		//     表 A（管理器参数）RVA 0x591E088 + state*0xA0  —— `0x17D47B0` 建/刷新
+		//          HighlightManager 时读它（+0x00 = High、+0x20 = Low、+0x40 = 插值除数）
+		//     表 B（引用参数）  RVA 0x5919B08 + state*0xA0  —— `0x17D4CD0` 把引用挂进
+		//          管理器时读它（+0x00）
+		//
+		//   这两张表**都不是 0 初始化**：进程启动时的静态初始化函数就把原版默认配色
+		//   写进去了（反汇编实证：0xF2AD3E 橙 / 0xFFE872 金 / 0x695B11 橄榄 …），
+		//   之后由 `:Monocle` 那 11 组 `aHighlightScannableOutlineColorHigh/Low_<变体>`
+		//   设置刷新。
+		//
+		//   所以「每个状态本来就是不同颜色」，本 MOD 只需要把类别映射到不同的状态
+		//   （或进一步用 INI 覆盖成自己想要的颜色）。
+		// ====================================================================
+		constexpr std::size_t kOutlineParamStride = 0xA0;
+		// 顺序 = 引擎静态初始化函数里的写入顺序（docs/03 第十四节有推导）。
+		constexpr const char* kOutlineStateName[kOutlineManagerUsed] = {
+			"Generic", "Scanned", "FullyScanned", "Tracked", "Bounty",
+			"Social", "TargetGeneric", "TargetScannable", "TargetScanned",
+			"TargetFullyScanned", "?"
+		};
+
+		std::uint8_t* OutlineParamTable(std::uintptr_t a_rva)
+		{
+			auto* p = reinterpret_cast<std::uint8_t*>(ModuleBase() + a_rva);
+			if (!IsReadable(p, kOutlineManagerUsed * kOutlineParamStride)) {
+				return nullptr;
+			}
+			return p;
+		}
+
+		void LogOutlineColors(const char* a_tag)
+		{
+			auto* mgrTab = OutlineParamTable(kRvaOutlineMgrParams);
+			auto* refTab = OutlineParamTable(kRvaOutlineRefParams);
+			if (!mgrTab || !refTab) {
+				REX::WARN("outline colors[{}]: 配色表不可读（RVA 0x{:X}/0x{:X} 在这个版本上变了？）",
+					a_tag, kRvaOutlineMgrParams, kRvaOutlineRefParams);
+				return;
+			}
+			for (std::uint32_t i = 0; i < kOutlineManagerUsed; ++i) {
+				const auto rd = [](const std::uint8_t* p) {
+					return *reinterpret_cast<const std::uint32_t*>(p);
+				};
+				const auto hi = rd(mgrTab + i * kOutlineParamStride);
+				const auto lo = rd(mgrTab + i * kOutlineParamStride + 0x20);
+				const auto rf = rd(refTab + i * kOutlineParamStride);
+				char buf[128];
+				std::snprintf(buf, sizeof(buf),
+					"  state=%2u %-18s ref=#%06X mgrHigh=#%06X mgrLow=#%06X (alpha %02X/%02X)",
+					i, kOutlineStateName[i],
+					rf & 0xFFFFFFu, hi & 0xFFFFFFu, lo & 0xFFFFFFu,
+					(hi >> 24) & 0xFFu, (lo >> 24) & 0xFFu);
+				REX::INFO("outline colors[{}]: {}", a_tag, buf);
+			}
+		}
+
+		// 把 INI 里的自定义颜色写进引擎的两张配色表（只对「被类别用到的状态」）。
+		//   dword 布局 = R | G<<8 | B<<16 | A<<24；alpha 保留引擎原值（我们不懂它的语义，
+		//   不改动最安全 —— 只换 RGB）。
+		//   写完调一次 `0x17D47B0` 让引擎把新参数刷进渲染器，并把已挂的目标整批重申
+		//   （引用参数表是「挂的时候读一次」，所以必须重新 Set 才会生效）。
+		void ApplyColorOverrides()
+		{
+			auto* mgrTab = OutlineParamTable(kRvaOutlineMgrParams);
+			auto* refTab = OutlineParamTable(kRvaOutlineRefParams);
+			if (!mgrTab || !refTab) {
+				return;
+			}
+			std::uint32_t applied = 0;
+			for (std::size_t c = 0; c < kCategoryCount; ++c) {
+				const auto rgb = g_cfg.colorOverride[c];
+				if (rgb == kColorUnset) {
+					continue;
+				}
+				const auto st = static_cast<std::uint32_t>(std::clamp(g_cfg.stateByCategory[c], 0, 11));
+				if (st >= kOutlineManagerUsed) {
+					continue;
+				}
+				auto* mgr = mgrTab + st * kOutlineParamStride;
+				auto* ref = refTab + st * kOutlineParamStride;
+				const auto patch = [rgb](std::uint8_t* p) {
+					auto v = *reinterpret_cast<std::uint32_t*>(p);
+					v = (v & 0xFF000000u) | (rgb & 0xFFFFFFu);
+					*reinterpret_cast<std::uint32_t*>(p) = v;
+				};
+				patch(mgr + 0x00);  // High
+				patch(mgr + 0x20);  // Low（一起改，脉冲时不会变色）
+				patch(ref + 0x00);
+				++applied;
+				char buf[96];
+				std::snprintf(buf, sizeof(buf), "outline colors: 覆盖 %s 的颜色 -> state=%u #%06X",
+					kCategoryName[c], st, rgb & 0xFFFFFFu);
+				REX::INFO("{}", buf);
+			}
+			if (applied == 0) {
+				return;
+			}
+			if (g_outlineEnsure) {
+				g_outlineEnsure(nullptr);  // 让引擎拿新配色刷新 11 个管理器
+			}
+			// 引用参数是「挂的时候读一次」⇒ 已挂的必须重新 Set 才会用上新颜色
+			MarkAllForReassert("颜色覆盖后重刷");
+			REX::INFO("outline colors: 已覆盖 {} 个类别的颜色（并触发一次重挂）", applied);
+		}
+
+		// ★ v4.0.1：进入世界后**再做一次**配色刷新（只做一次）。
+		//   为什么需要：我们的管理器是在第一次扫描时建的，而 `:Monocle` 那 11 组配色
+		//   有可能在那之前还没被引擎刷进参数表（那就会「11 个状态一个颜色」）。
+		//   而 `0x17D47B0` 对**已存在**的管理器是「只刷新参数」（docs/03 第九节 9.4）
+		//   ⇒ 再调一次即可把正确的每状态配色补上。
+		//   两行 `outline colors[...]` 日志（install / world-ready）可以用来对比。
+		void RefreshOutlineParamsOnce()
+		{
+			if (g_state.paramsRefreshed) {
+				return;
+			}
+			g_state.paramsRefreshed = true;
+			LogOutlineColors("world-ready");
+			if (g_outlineEnsure) {
+				g_outlineEnsure(nullptr);  // 幂等：已有管理器只刷新参数
+			}
+			ApplyColorOverrides();
 		}
 
 		// --------------------------------------------------------------------
@@ -2046,6 +2247,10 @@ namespace SAS
 			if (now < g_state.settleUntilMs) {
 				return;  // 静置期内不扫描
 			}
+
+			// ★ v4.0.1：进入世界后的第一次扫描 —— 做一次性「配色刷新」
+			//   （引擎设置此时肯定已加载完；详见 RefreshOutlineParamsOnce 的说明）
+			RefreshOutlineParamsOnce();
 
 			const auto scanT0 = NowMs();
 			Rescan(now, player);
