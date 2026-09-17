@@ -28,8 +28,8 @@
 > 官方分别是 **`GalBank` = 盖尔银行**（`GalBank Statement` → 盖尔银行声明）、
 > **`SysDef` = 星防队**（`UC SysDef Mission Board` → 联殖星防队任务板）。
 > 已把 `tr/lang/batches/*.tsv` 里的两种旧译**全量替换**（60 个批次文件），
-> 并重建 + 重新部署了 `du_outlaws_01.esm`。
-> ⚠️ `du_overtime.esm` / `du_retrograde.esm` 的**已部署文件**仍含旧译（未重建，原因见第七节）。
+> 并重建 + 重新部署了**三个受影响的 mod**（`du_outlaws_01` / `du_overtime` / `du_retrograde`，
+> 明细与体积逐字节核对见第七节）。
 
 ---
 
@@ -335,17 +335,35 @@ MO2 profile `Default`（`D:\Mod Organizer 2\starfield_mods\profiles\Default`）�
 > 占位串，**三类长文本均 0 条残留**。
 > （上一版：`QUST CNAM` 未译，5 575 493 B，MD5 `191ABBB93FFD4A61F3E6CBA8AEB3805E`。
 > 本次 MD5 变了是因为**同时把全批次词典里的 `银河银行`→`盖尔银行`、`联殖防务`→`星防队`
-> 统一成官方译名后重跑**。）
+> 统一成官方译名后重跑**；`du_overtime` / `du_retrograde` 也已按同样方式重建部署，
+> 见下一节。）
 
-### 术语统一「没跟着重建」的另外两个 mod（如实记录）
+> 2026-09-17（术语统一后的另外两个）：`overwrite\du_overtime.esm`（1 531 177 B，
+> MD5 `5745AD2FAEE3F60D3755EEAD7CD41D96`）、`overwrite\du_retrograde.esm`（28 462 996 B，
+> MD5 `68D80E2EBC0EAF73C05B04964B44FA16`），均从 `tr/orig` 整份重建、`problems: 0`。
 
-| mod | 用旧 map 重建能否复现已部署文件 | 结论 |
-| --- | --- | --- |
-| `du_retrograde.esm` | **能，逐字节一致**（重建成 5 519 条、MD5 `C7E99DF3125CE2597EF0AFA906C5E299` = 已部署 MD5） | 重建属于**纯术语替换**，安全；但本次任务范围只是 `du_outlaws_01`，**未做** |
-| `du_overtime.esm` | **不能**。已部署 1 531 161 B；用旧 map 重建成 1 531 177 B（且 `not applied=4`）、用新 map 重建成 1 531 177 B，两者都不等于已部署 MD5 | ⚠️ **`tr/orig/du_overtime.esm` 与已部署文件不同源**（旧 map 里那 4 条 `BOOK ENAM` 在当前 `tr/orig` 里已找不到）⇒ 重建有回归风险，**本次不动** |
+### 术语统一：三个受影响 mod 全部重建并重新部署（2026-09-17）
 
-⇒ 待办：先核对 `du_overtime` 的「原始 / 已部署」版本关系（`tr/orig` 是否被覆盖过），
-确认后再决定是否统一它的术语；`du_retrograde` 则随时可以安全重跑。
+| mod | 重建结果 | MD5 | 体积变化 |
+| --- | --- | --- | --- |
+| `du_outlaws_01.esm` | 替换 4 932 条 / `problems: 0` | `74FB0E81B2FB9E2AB52DD12A1F184E5E` | 5 575 493 → **5 563 835** |
+| `du_overtime.esm` | 替换 2 558 条 / `problems: 0` | `5745AD2FAEE3F60D3755EEAD7CD41D96` | 1 531 161 → **1 531 177**（**+16**） |
+| `du_retrograde.esm` | 替换 5 519 条 / `problems: 0` | `68D80E2EBC0EAF73C05B04964B44FA16` | 28 463 002 → **28 462 996**（**−6**） |
+
+体积差可以**逐字节解释**，说明重建没有夹带任何意外改动：
+
+- `du_retrograde` **−6 B** = 2 条 `联殖防务`（4 汉字 = 12 B）→ `星防队`（3 汉字 = 9 B），每条 −3 B；
+- `du_overtime` **+16 B** = 6 条术语替换（`盖尔银行` 比 `银河银行` 短 1 B，共 −6 B）
+  与 **4 条 `BOOK ENAM` 回退为英文**（每条 +4 B，共 +16 B）相抵后的净值。
+  ⚠️ 这 4 条回退是**刻意且符合现行政策**的：`BOOK ENAM` 已从 `trtool.py` 白名单移除
+  （`du_outlaws_01` 的 `ENAM` 是 8 位十六进制 ID，翻译等于改真实标识符），
+  而旧 `du_overtime.esm` 是**白名单收紧之前**构建的，所以那 4 条此前是中文。
+  由于 `extract` 已不再输出 `ENAM`，**残留串计数两者都是 460 条不变**
+  （`du_retrograde` 前后都是 301 条）。
+
+其余 mod（`above and beyond` / `morelore_mantislegacy` / `du_takeover` / `du_xfire`）的 map 里
+**本来就没有**这两个术语，无需重建：`grep '银河银行|联殖防务' tr/out/*.map.tsv` ⇒ **0 命中**。
+重建前的旧 ESM 备份在 `out/backup-manual/`（不入库）。
 
 ### 游戏内验证清单
 
