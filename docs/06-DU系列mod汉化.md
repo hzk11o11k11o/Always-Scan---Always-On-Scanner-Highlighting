@@ -49,6 +49,12 @@
 | `tokstat.py` / `split_names.py` | 词元统计，用来发现"组合式命名" |
 | `xedit-scripts/tr_export.pas` | 保留的 xEdit 版导出脚本（慢，仅作对照/应急） |
 
+> 2026-09-17 追加（做 `above and beyond` / `morelore_mantislegacy` 时写的通用小工具，
+> 详见 `docs/07`）：`tr_official_hits.py`（mod 串逐条查官方逐字命中）、
+> `tr_term_probe.py` / `tr_zh_probe.py`（按英文/中文子串查官方对照表）、
+> `tr_sid_probe.py`（按字符串 ID 取官方 en/zh）、
+> `tr_mkbatch.py`（按抽取文件行号生成词典批次，省掉手抄长英文段落的风险）。
+
 ### 写回 ESM 的三个硬坑（都已踩过并修好）
 
 1. **子记录长度字段**：替换文本后必须重写子记录头里的 `u16 size`，否则记录
@@ -104,7 +110,7 @@ tools/re/ststrings.py dict tr/loc/strings/starfield_en.strings \
 | Chunks | 块餐 | |
 | Xenowarfare | 异兽作战部 | |
 | Heatleech | 热蛭 | |
-| Terrormorph | 惊惧兽 | |
+| Terrormorph | **骇变兽** | ⚠️ 2026-09-17 更正：此前本条记的“惊惧兽”是错的，官方串是骇变兽（见 `docs/07` 第三节） |
 | LIST | 独立盟 | |
 | The Clinic / The Den / Neon / Cydonia / Akila | 星际诊所号 / 巢穴站 / 霓虹城 / 赛多尼亚 / 阿基拉城 | |
 | SysDef | 联殖防务 | |

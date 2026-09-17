@@ -29,6 +29,15 @@ D:\Mod Organizer 2
 词典成果在 `tr/lang/`（**必须入库**，可增量续译）。
 4 个已完成并部署，`du_outlaws_01` 的长文本仍在进行中。
 
+## 其他 mod 汉化
+
+`above and beyond.esm` / `morelore_mantislegacy.esm` 的汉化说明在
+`docs/07-AboveAndBeyond与MantisMoreLore汉化.md`（**已全部完成并部署**）。
+同一套流水线；新增辅助工具 `tools/re/tr_official_hits.py`（mod 串查官方逐字命中）、
+`tr_term_probe.py` / `tr_zh_probe.py`（按英文/中文子串查官方对照表）、
+`tr_sid_probe.py`（按字符串 ID 取官方译名，用于「覆盖原版记录」的定名）、
+`tr_mkbatch.py`（按抽取文件行号生成词典批次，避免手抄长英文段落）。
+
 ## 注意事项
 - Visual Studio 2026已安装，MSVC v143 生成工具已包含
 - 已完成内容要记录在：docs/99-当前项目进度.md，其他经验总结文档也可以记录在这个文件夹里，单个文件不得超过100KB，超过后可以简化或删除过老或已经不再重要的记录
