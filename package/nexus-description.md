@@ -19,10 +19,10 @@
 | --- | --- |
 | **Mod name** | `Always Scan - Always-On Scanner Highlighting (SFSE)` |
 | **Summary**（约 250 字符以内） | `Keep the scanner highlight on at all times. No need to hold the handheld scanner: everything inside a configurable radius gets the vanilla outline, color-coded by category. Full-radius highlighting, one toggle hotkey, fully configurable via INI. SFSE plugin.` |
-| **Version** | `4.2.0` |
+| **Version** | `4.2.1` |
 | **Category** | `Gameplay`（Alternate suggestion: `Items and Objects - Gameplay`） |
 | **Requirements（依赖）** | `Starfield Script Extender (SFSE) 0.2.21+`、`(1.16.244.0) SFSE Address Library`、游戏版本 `1.16.244.0` |
-| **主文件（Main file）** | `StarfieldAlwaysScan-4.2.0.zip` |
+| **主文件（Main file）** | `StarfieldAlwaysScan-4.2.1.zip` |
 | **Permissions** | 允许转载需注明出处？建议：**不得重新上传（No re-uploading）**；允许个人修改（源码已含 Papyrus 部分） |
 
 ---
@@ -47,12 +47,12 @@ In the vanilla game you have to equip the handheld scanner to see which objects 
   | --- | --- | --- |
   | Lootable items | medkits, books, armor, weapons, ammo | blue |
   | Containers | crates, safes, lockers | orange |
-  | Bodies / corpses | dead people **and creatures** you can search | orange |
+  | Bodies / corpses | dead people, creatures, and wrecked robots / turrets | orange |
   | Interactive devices | switches, terminals, workbenches | green |
   | Doors | — | red |
   | Flora | harvestable plants | green |
 
-- **Bodies are highlighted** — both pre-placed corpses and everything you kill, humans and creatures alike. They behave like containers: empty them and the outline goes away.
+- **Bodies are highlighted** — pre-placed corpses and everything you kill: humans, creatures, robots and turrets alike (including the wrecked machines already lying around). They behave like containers: empty them and the outline goes away.
 - **Looted means dark** — a container or a body that has nothing left to take stops being outlined (about a second later), so an outline always means "there is still something in there".
 
 - **Toggle hotkey** — press **F8** (any key can be configured) to switch everything on or off, with a short HUD confirmation (`Always Scan: ON / OFF`). You can also choose to start with the feature disabled.
@@ -96,7 +96,7 @@ Most used options:
 - `EnableLoot=1` … `EnableOther=0` — per-category on/off switches. `EnableOther` covers movable statics (cardboard boxes, tables, crates). It is **off by default** because they cannot be picked up and the vanilla scanner does not outline them either.
 - `EnableCorpse=1` — outline dead bodies (people and creatures); `StateCorpse=9` sets their color.
 - `SkipEmptyLoot=1` — stop outlining containers / bodies once they are empty (see below).
-- `CorpseUnconscious=0` — set to 1 to also outline NPCs that are merely knocked out / unconscious.
+- `CorpseUnconscious=1` — also outline "unconscious" units. In the vanilla data most of those are **wrecked robots and turrets you can loot** (that is why it is on by default); a handful are knocked-out living characters, which are lootable as well. Set it to 0 if you ever see a *walking* NPC outlined.
 - `MaxTargets=256` — how many objects can be outlined at once
 - `OnlyInFront=0` — if you prefer "only what you actually face", set to 1 (original scanner-like behaviour)
 
@@ -121,11 +121,13 @@ At startup the log prints the active config and whether the native outline funct
 - Objects are outlined inside the current cell / loading space, same as the vanilla scanner. When you cross a loading door, the new area is highlighted within about a second.
 - "Empty" is decided by reading the reference's inventory (item stacks whose count is zero do not count), which needs a one-time offset calibration per session. If that calibration ever fails, the mod simply keeps outlining containers / bodies as before (the log says so) — it never crashes and never hides something that still has loot.
 - Quest objects are not marked specially.
-- Unconscious (still living) NPCs are not outlined unless you enable `CorpseUnconscious`.
+- Outlines can only appear inside the current cell / space (engine limit) — bodies in another loading area are not highlighted.
+- `CorpseUnconscious=1` (default) also lights up the rare knocked-out *living* character. They are lootable while they are down; if one ever stands up while staying outlined, set the option to 0 in the INI.
 - `ColorXxx=RRGGBB` lets you set exact colors, but be aware this writes into the engine's global color table, so the vanilla scanner's color for the same state changes too. Leaving the `ColorXxx` lines empty (default) changes nothing.
 
 ### Version history
 
+- **4.2.1** — Wrecked robots and turrets (the "unconscious" units you can loot) are highlighted too.
 - **4.2.0** — Bodies are highlighted now (pre-placed corpses and anything you kill, people and creatures alike), and both bodies and containers stop being outlined once you have looted them empty.
 - **4.1.0** — Movable statics (cardboard boxes, tables, bars) are no longer outlined by default; added per-category enable switches.
 - **4.0.2** — Category colors retuned to the five visually distinct native colors (blue / orange / green / red / pale blue), doors switched to red.
@@ -153,7 +155,7 @@ Built with **SFSE** and **CommonLibSF**. Huge thanks to their authors and to eve
 - **常驻高亮**：跑动、战斗、搜刮时一直有效，不需要掏出扫描仪；
 - **全半径**：半径内四周所有方向都亮（5~500 米可配）；
 - **分类分色**：可拾取物品（蓝）、容器（橙）、**尸体（橙，含怪物尸体）**、可交互设备（绿）、门（红）、植物（绿），全部可配；
-- **尸体高亮**：预置的尸体和你打死的敌人都亮（人类与怪物一视同仁，两者在游戏数据里同构）；
+- **尸体高亮**：预置的尸体和你打死的敌人都亮 —— **人类、怪物、机器人、炮塔一视同仁**（在游戏数据里它们同构），连地图上原本就躺着的机器报废体也会亮；
 - **搜空即熄灭**：容器 / 尸体被拿空后约 1 秒熄灭 —— 有描边就代表「里面还有东西」；
 - **开关热键**：默认 **F8**，按一下开/关，HUD 弹一行提示（`Always Scan: ON / OFF`），可改键或关闭提示；
 - **与原版扫描仪完全不冲突**：你自己举扫描仪扫完放下，MOD 的高亮会在 1 秒内自动重挂回来；

@@ -3,7 +3,7 @@
  Always-on scanner highlighting for Starfield
 ========================================================================
 
-Version  : 4.2.0
+Version  : 4.2.1
 Author   : (fill in your Nexus username before uploading)
 Game     : Starfield 1.16.244.0 (matching version required)
 Requires : SFSE (Starfield Script Extender) 0.2.21+
@@ -25,7 +25,8 @@ feature, just always on.
 Highlights are color-coded by category (all values configurable):
   * Lootable items (misc / books / armor / weapons / ammo / aid ...)  blue
   * Containers (loot the good stuff)                                 orange
-  * Bodies / corpses - people AND creatures you can search           orange
+  * Bodies / corpses - people, creatures and wrecked robots / turrets
+    (anything you can search)                                        orange
   * Interactive devices / computers                                  green
   * Doors                                                            red
   * Flora (harvestable plants)                                       green
@@ -84,8 +85,11 @@ Most useful options:
   SkipEmptyLoot=1       stop outlining containers / bodies once they are
                         empty (default on; see "corpses and empty
                         containers" in the INI for the details)
-  CorpseUnconscious=0   also outline NPCs that are only knocked out /
-                        unconscious (default off - they are still alive)
+  CorpseUnconscious=1   also outline "unconscious" units (default on).
+                        In the vanilla data most of those are wrecked
+                        robots and turrets you can loot; a few are
+                        knocked-out living characters (also lootable).
+                        Set to 0 if you ever see a walking NPC outlined.
   NotifyOnToggle=1      show a HUD message on toggle
   LogStats=1            write a stats line to the log every 5 seconds
 
@@ -112,12 +116,12 @@ categories).
     uses; change the StateXxx values and restart.
 * A specific body is not highlighted:
     - it may be empty (nothing left to take) - that is intended;
-    - it may be an unconscious NPC that is still alive: the log line
-      starts with "corpse probe:" and says so; set CorpseUnconscious=1
-      if you want those highlighted as well;
     - a container / body stays lit when the inventory cannot be read
       (the log then says "搜空判空**关闭**" in the calibration line);
-      that is a safe fallback, not a crash.
+      that is a safe fallback, not a crash. Send me that log line.
+* A walking NPC is outlined (should not happen):
+    set CorpseUnconscious=0 in the INI - the log line starting with
+    "corpse probe:" will tell you which reference it was.
 
 ------------------------------------------------------------------------
  NOTES

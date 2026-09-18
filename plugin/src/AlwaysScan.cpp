@@ -153,9 +153,14 @@ namespace SAS
 		//   ★ 为什么「Starts Dead」这个**记录标志**也要看：它是静态数据，
 		//     不依赖引擎在运行期有没有把 kDead 位置上（上一代项目实测过一具
 		//     明确可搜刮、却没读到 kDead 位的身体 —— 日志 `corpse=21/0`）。
-		//   ★ 「Starts Unconscious」默认**不算尸体**：那是倒地/昏迷的**活人**
-		//     （会自己站起来），点亮它就破了「活人不亮」这条红线。
-		//     想让它们也亮：INI 里 `CorpseUnconscious=1`。
+		//   ★ 「Starts Unconscious」（0x2000）**默认也算尸体**（v4.2.1 起，用户要求）：
+		//     离线统计这 193 条引用的 26 个唯一 base，**22 个是炮塔 / 机器人的报废体**
+		//     （`LvlRobotModelA_*` / `LvlTurretShort_*` / `LvlTurretCompact` /
+		//      `LvlTurretQuadrapod` / `LvlMiniBotA` / `JasmineRobot` / `LvlSecurity_UC` …）
+		//     —— 就是玩家说的「炮塔 / 机器人尸体」，能搜刮；
+		//     代价是另外 4 个活物 base（MS01 的两个伤员、一个 UC 平民、一只 swarmer）
+		//     也会被点亮 —— 它们倒地时同样能搜刮，观感上可接受；
+		//     真要关掉：INI 里 `CorpseUnconscious=0`（不用换 DLL）。
 		constexpr std::size_t   kOffFormFlags = 0x20;      // TESForm::formFlags（u32）
 		constexpr std::uint32_t kFormFlagStartsDead        = 0x00000200u;  // ACHR: Starts Dead
 		constexpr std::uint32_t kFormFlagStartsUnconscious = 0x00002000u;  // ACHR: Starts Unconscious
@@ -369,10 +374,18 @@ namespace SAS
 			// ================================================================
 			// ★ v4.2：尸体 / 搜空
 			// ================================================================
-			// 1 = 把「Starts Unconscious」（倒地 / 昏迷，但**还活着**）的 ACHR 也当尸体点亮。
-			//   ★ 默认 0 —— 那是活人（会自己站起来），点亮它会破「活人不亮」这条红线。
-			//     真的想连昏迷者一起亮（它们同样能搜刮）再打开。
-			bool          corpseUnconscious = false;
+			// 1 = 把「Starts Unconscious（0x2000）」的 ACHR 也当尸体点亮（**默认 1**）。
+			//
+			//   ★ v4.2.1 用户反馈后把默认从 0 改成 1：这一位在数据里的**主体是
+			//     炮塔 / 机器人的报废体**（离线统计：193 条引用 / 26 个唯一 base，
+			//     其中 22 个是 `LvlRobotModelA_*` / `LvlTurretShort_*` / `LvlTurretCompact` /
+			//     `LvlTurretQuadrapod` / `LvlMiniBotA` / `JasmineRobot` / `LvlSecurity_UC` …），
+			//     **它们就是玩家说的「炮塔 / 机器人尸体」，可以搜刮**；
+			//   ★ 代价（如实记录）：另外 4 个 base 是活物 —— `MS01WoundedSoldier`、
+			//     `MS01WoundedScientist`（任务里受伤倒地的两人）、`LvlCitizen_UC_Male`、
+			//     `RL039_LvlSwarmerCritter`。它们被打倒 / 昏迷时点亮是合理的（能搜刮），
+			//     万一有哪个站起来后还亮着，把这里设成 0 即可（不用换 DLL）。
+			bool          corpseUnconscious = true;
 			// 1 = 容器 / 尸体「库存为空」就不高亮 —— 搜空即熄灭（默认 1）。
 			//   依赖 `inventoryList` 偏移的运行时标定；标定失败会自动降级成旧行为
 			//   （不判空，容器 / 尸体照常亮），日志里有明确警告。
@@ -470,6 +483,7 @@ namespace SAS
 			std::uint64_t corpseByBit      = 0;  // 其中靠运行时 kDead 位判定的
 			std::uint64_t corpseByFlag     = 0;  // 其中靠记录标志 Starts Dead 判定的
 			std::uint64_t corpseProps      = 0;  // 其中是「base = NPC_/LVLN 的普通 REFR」尸体道具
+			std::uint64_t corpseUncSeen    = 0;  // 其中是「Starts Unconscious」（炮塔/机器人报废体、倒地者）
 			std::uint64_t corpseUncSkipped = 0;  // 因为「Starts Unconscious 且没开 CorpseUnconscious」被跳过的
 			std::uint32_t corpseProbes     = 0;  // 本会话已经打过的尸体探针数（上限 kCorpseProbeMax）
 
@@ -851,8 +865,8 @@ namespace SAS
 
 			g_cfg.notifyOnToggle = getInt("NotifyOnToggle", 1) != 0;
 
-			// --- ★ v4.2：尸体 / 搜空 ---
-			g_cfg.corpseUnconscious = getInt("CorpseUnconscious", 0) != 0;
+			// --- ★ v4.2：尸体 / 搜空（v4.2.1 起 CorpseUnconscious 默认 1，理由见 Config 里的说明）---
+			g_cfg.corpseUnconscious = getInt("CorpseUnconscious", 1) != 0;
 			g_cfg.skipEmptyLoot     = getInt("SkipEmptyLoot", 1) != 0;
 			REX::INFO("config: corpseUnconscious={} skipEmptyLoot={}", g_cfg.corpseUnconscious, g_cfg.skipEmptyLoot);
 
@@ -1113,12 +1127,13 @@ namespace SAS
 					if (g_cfg.corpseUnconscious) {
 						a_corpse = true;
 						++g_state.corpseSeen;
+						++g_state.corpseUncSeen;
 						CorpseProbe(a_ref, a_base, flags, bits,
-							"尸体（Starts Unconscious；已开 CorpseUnconscious）");
+							"尸体（Starts Unconscious：炮塔/机器人报废体、倒地可搜刮者）");
 						return static_cast<int>(Category::kCorpse);
 					}
 					CorpseProbe(a_ref, a_base, flags, bits,
-						"跳过：Starts Unconscious（倒地可搜刮但**还活着**；要亮就设 CorpseUnconscious=1）");
+						"跳过：Starts Unconscious（倒地可搜刮，但被 CorpseUnconscious=0 关掉了）");
 					return -1;
 				}
 				// 活着的 Actor（正在行动的 NPC / 生物）—— 红线：不亮
@@ -2776,14 +2791,16 @@ namespace SAS
 					} else {
 						std::snprintf(invOff, sizeof(invOff), "%s", "未标定");
 					}
-					REX::INFO("  corpse (窗口内累加): 尸体={} (kDead位={} StartsDead标志={} 道具={}) "
+					REX::INFO("  corpse (窗口内累加): 尸体={} (kDead位={} StartsDead标志={} 道具={} 炮塔/机器人/倒地={}) "
 							  "| StartsUnconscious跳过={} | 搜空: empty={} unknown={} invOff={}",
-						g_state.corpseSeen, g_state.corpseByBit, g_state.corpseByFlag, g_state.corpseProps,
+						g_state.corpseSeen, g_state.corpseByBit, g_state.corpseByFlag,
+						g_state.corpseProps, g_state.corpseUncSeen,
 						g_state.corpseUncSkipped, g_state.emptySkips, g_state.lootUnknown, invOff);
 					g_state.corpseSeen       = 0;
 					g_state.corpseByBit      = 0;
 					g_state.corpseByFlag     = 0;
 					g_state.corpseProps      = 0;
+					g_state.corpseUncSeen    = 0;
 					g_state.corpseUncSkipped = 0;
 					g_state.emptySkips       = 0;
 					g_state.lootUnknown      = 0;
