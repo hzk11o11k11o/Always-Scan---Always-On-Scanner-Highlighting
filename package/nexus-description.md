@@ -19,10 +19,10 @@
 | --- | --- |
 | **Mod name** | `Always Scan - Always-On Scanner Highlighting (SFSE)` |
 | **Summary**（约 250 字符以内） | `Keep the scanner highlight on at all times. No need to hold the handheld scanner: everything inside a configurable radius gets the vanilla outline, color-coded by category. Full-radius highlighting, one toggle hotkey, fully configurable via INI. SFSE plugin.` |
-| **Version** | `4.2.1` |
+| **Version** | `4.3.0` |
 | **Category** | `Gameplay`（Alternate suggestion: `Items and Objects - Gameplay`） |
 | **Requirements（依赖）** | `Starfield Script Extender (SFSE) 0.2.21+`、`(1.16.244.0) SFSE Address Library`、游戏版本 `1.16.244.0` |
-| **主文件（Main file）** | `StarfieldAlwaysScan-4.2.1.zip` |
+| **主文件（Main file）** | `StarfieldAlwaysScan-4.3.0.zip` |
 | **Permissions** | 允许转载需注明出处？建议：**不得重新上传（No re-uploading）**；允许个人修改（源码已含 Papyrus 部分） |
 
 ---
@@ -96,7 +96,9 @@ Most used options:
 - `EnableLoot=1` … `EnableOther=0` — per-category on/off switches. `EnableOther` covers movable statics (cardboard boxes, tables, crates). It is **off by default** because they cannot be picked up and the vanilla scanner does not outline them either.
 - `EnableCorpse=1` — outline dead bodies (people and creatures); `StateCorpse=9` sets their color.
 - `SkipEmptyLoot=1` — stop outlining containers / bodies once they are empty (see below).
+- `TreatNullInvAsEmpty=1` — a reference whose inventory was never created counts as empty (default on). Only relevant if you ever find a body / container you never looted staying dark; set it to 0 to revert to "always outline".
 - `CorpseUnconscious=1` — also outline "unconscious" units. In the vanilla data most of those are **wrecked robots and turrets you can loot** (that is why it is on by default); a handful are knocked-out living characters, which are lootable as well. Set it to 0 if you ever see a *walking* NPC outlined.
+- `ActorProbeMax=24` — diagnostic only: how many per-actor lines (`actor probe:`) the log prints per session (0 = off). Leave it alone unless you are reporting a highlight bug.
 - `MaxTargets=256` — how many objects can be outlined at once
 - `OnlyInFront=0` — if you prefer "only what you actually face", set to 1 (original scanner-like behaviour)
 
@@ -119,7 +121,8 @@ At startup the log prints the active config and whether the native outline funct
 ### Notes / known limitations
 
 - Objects are outlined inside the current cell / loading space, same as the vanilla scanner. When you cross a loading door, the new area is highlighted within about a second.
-- "Empty" is decided by reading the reference's inventory (item stacks whose count is zero do not count), which needs a one-time offset calibration per session. If that calibration ever fails, the mod simply keeps outlining containers / bodies as before (the log says so) — it never crashes and never hides something that still has loot.
+- "Empty" is decided by reading the reference's inventory (item stacks whose count is zero do not count). This needs a one-time memory-offset calibration, which **keeps retrying until it succeeds** (it samples nearby containers and actors) — so it also starts working if the area you started in had nothing to sample from. Until it succeeds the mod simply keeps outlining containers / bodies as before (the log says so) — it never crashes and never hides something that still has loot.
+- A reference whose inventory list was **never created** by the engine counts as empty (`TreatNullInvAsEmpty=1`) — such a reference has nothing to loot by definition. If you ever meet a body / container that stays dark but should glow, set that option to 0.
 - Quest objects are not marked specially.
 - Outlines can only appear inside the current cell / space (engine limit) — bodies in another loading area are not highlighted.
 - `CorpseUnconscious=1` (default) also lights up the rare knocked-out *living* character. They are lootable while they are down; if one ever stands up while staying outlined, set the option to 0 in the INI.
@@ -127,6 +130,7 @@ At startup the log prints the active config and whether the native outline funct
 
 ### Version history
 
+- **4.3.0** — "Looted means dark" is now much more reliable: the inventory-offset calibration retries until it succeeds instead of giving up on the first area (so an empty body no longer keeps glowing just because you started the game in space or in a small room), and a reference whose inventory was never created by the engine counts as empty. Added per-actor diagnostic log lines (`actor probe:`) that make "this body should / should not glow" bug reports verifiable in one log.
 - **4.2.1** — Wrecked robots and turrets (the "unconscious" units you can loot) are highlighted too.
 - **4.2.0** — Bodies are highlighted now (pre-placed corpses and anything you kill, people and creatures alike), and both bodies and containers stop being outlined once you have looted them empty.
 - **4.1.0** — Movable statics (cardboard boxes, tables, bars) are no longer outlined by default; added per-category enable switches.
@@ -170,5 +174,10 @@ Built with **SFSE** and **CommonLibSF**. Huge thanks to their authors and to eve
 **配置**：`Data\SFSE\Plugins\SAS_AlwaysScan.ini`（注释齐全，改完重进游戏生效）：
 半径、热键、各类颜色、每类是否高亮、目标上限、只亮正前方 等，全部可调。
 其中 `EnableOther`（纸箱 / 桌椅这类搬得动但捡不起来的物件）**默认关闭**，与「原版扫描仪不亮它们」保持一致 —— 想复原改 1 即可。
+
+> **4.3.0 起「搜空即熄灭」更可靠**：判定所需的内存标定会**一直重试直到成功**（采样附近的容器与角色），
+> 所以就算你开局在太空 / 小房间里（附近没样本）也不会整局失效；另外「引擎从未建过库存」的引用直接算空
+> （`TreatNullInvAsEmpty=1`，若遇到「没搜过的身体不亮」可设 0 退回）。
+> 新增 `actor probe:` 诊断日志（每会话 ≤ `ActorProbeMax`=24 行），反馈问题时带上它即可精确定位。
 
 **日志**：`文档\My Games\Starfield\SFSE\Logs\SAS_AlwaysScan.log`，启动打配置、游戏中每 5 秒打一行统计，排查问题看它即可。

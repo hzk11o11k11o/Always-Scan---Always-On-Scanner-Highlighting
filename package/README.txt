@@ -3,7 +3,7 @@
  Always-on scanner highlighting for Starfield
 ========================================================================
 
-Version  : 4.2.1
+Version  : 4.3.0
 Author   : (fill in your Nexus username before uploading)
 Game     : Starfield 1.16.244.0 (matching version required)
 Requires : SFSE (Starfield Script Extender) 0.2.21+
@@ -85,11 +85,19 @@ Most useful options:
   SkipEmptyLoot=1       stop outlining containers / bodies once they are
                         empty (default on; see "corpses and empty
                         containers" in the INI for the details)
+  TreatNullInvAsEmpty=1 a reference whose inventory list was never created
+                        counts as empty (default on). Set it to 0 only if
+                        you ever find a body / container you never looted
+                        staying dark - that reverts to "always outline".
   CorpseUnconscious=1   also outline "unconscious" units (default on).
                         In the vanilla data most of those are wrecked
                         robots and turrets you can loot; a few are
                         knocked-out living characters (also lootable).
                         Set to 0 if you ever see a walking NPC outlined.
+  ActorProbeMax=24      how many per-actor diagnostic lines ("actor
+                        probe:") the log prints per session. Set to 0 to
+                        turn them off; they are only useful when reporting
+                        a "this one should/should not be highlighted" bug.
   NotifyOnToggle=1      show a HUD message on toggle
   LogStats=1            write a stats line to the log every 5 seconds
 
@@ -116,9 +124,16 @@ categories).
     uses; change the StateXxx values and restart.
 * A specific body is not highlighted:
     - it may be empty (nothing left to take) - that is intended;
-    - a container / body stays lit when the inventory cannot be read
-      (the log then says "搜空判空**关闭**" in the calibration line);
-      that is a safe fallback, not a crash. Send me that log line.
+    - the log's "actor probe:" lines list every actor around you (dead or
+      alive) with its raw flags and the verdict - send me the line for
+      that body;
+    - if the inventory offset calibration has not succeeded yet, containers
+      and bodies are always outlined (the log says so). That is a safe
+      fallback, not a crash - it retries until it succeeds.
+* A looted (empty) body / container is still highlighted:
+    the log's "corpse (window)" line has the counters
+    (empty / notEmpty / unknown / null / shapeBad). Send me that line
+    together with the calibration line.
 * A walking NPC is outlined (should not happen):
     set CorpseUnconscious=0 in the INI - the log line starting with
     "corpse probe:" will tell you which reference it was.
@@ -131,6 +146,9 @@ categories).
 * Living NPCs and creatures are never outlined. Dead bodies - humans and
   creatures alike - are, and they stop glowing once you have taken
   everything from them.
+* Since 4.3 the inventory calibration keeps retrying until it succeeds
+  (it samples nearby containers or actors), so "looted means dark" also
+  starts working when your first area had nothing to sample from.
 * Using the vanilla handheld scanner is fine: when you put it down, the
   mod automatically re-applies its highlights (ResyncOnScannerClose=1).
 * Objects are highlighted inside the current cell / loading space, the
