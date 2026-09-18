@@ -59,6 +59,7 @@
 #include <mutex>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -171,6 +172,49 @@ namespace SAS
 		constexpr std::uint32_t kCorpseProbeMax = 12;
 
 		// ================================================================
+		// ★★ v4.4：引擎自己的「生命状态」枚举 —— 判死的**权威判据**
+		// ================================================================
+		// 起因：用户 v4.3 实测两条 ——「打死的敌人（有东西）不亮」「拿空的尸体还亮」。
+		//   日志里 `kDead位=0` 全程为 0（450 次尸体判定里没有一个读到 kDead 位），
+		//   ⇒ 与上一代项目 v35 的实测完全一致：**引擎对「可搜刮的倒地者」不置 kDead 位**。
+		//
+		// 2026-09-18 反汇编实证（Starfield.exe 1.16.244.0，脚本 `out/probe_literal*.py`）：
+		//   `[Actor + 0xF8]` 是一个 u32，**bits 17..20（掩码 0x1E0000）就是一个 4 位枚举**，
+		//   而 Papyrus 三个 native 判死函数读的全是它：
+		//
+		//   · `IsUnconscious()`  实现 @ RVA 0x1FD1470：
+		//       `mov eax,[r8+0xF8]; and eax,0x1E0000; cmp eax,0x60000; sete al`
+		//       ⇒ **(v == 3) 即昏迷**
+		//   · `IsDead()`         实现 @ RVA 0x1FC7FB0 → `jmp qword ptr [rax+0x868]`
+		//       （= Actor vtable slot **0x10D**，实现 @ RVA 0x18E4540，参数 dl=1）：
+		//       严格的 `dl=1` 分支：`v ∈ {1(0x20000), 2(0x40000), 5(0xA0000)}` ⇒ 死
+		//       宽松的 `dl=0` 分支：再加 `7(0xE0000)`
+		//   · `IsBleedingOut()`  实现 @ RVA 0x1FC7F50：
+		//       `v ∈ {7(0xE0000), 8(0x100000)}` ∨ `middleHigh(+0x59C) != 0` ⇒ 出血（返回 1/2）
+		//
+		//   （这三个 native 的注册点在同一段代码里：`lea r9,[rip+实现]` +
+		//     `lea rdx,[rip+名字]` + `call`，名字池在 .rdata 0x4D12390 一带。）
+		//
+		// ⇒ 从此判死**不再只看 kDead 位**（它只是「引擎某一时刻的缓存」），
+		//   而是直接读引擎用来判死的那个枚举 —— 三路取或：
+		//     死（1/2/5） ∨ 昏迷（3） ∨ 出血（7/8） ∨ kDead 位 ∨ Starts Dead 标志
+		//   其中「昏迷 / 出血」共用 INI 开关（`CorpseUnconscious` / `CorpseBleedout`），
+		//   万一将来发现某个状态不该亮，改 INI 即可，不用换 DLL。
+		//
+		//   ★ 为什么 5（0xA0000）也算死：它是引擎 `IsDead()` 严格分支的成员；
+		//     7（0xE0000）只在宽松分支算死，但 `IsBleedingOut` 认它 ⇒ 归到「出血」开关下。
+		constexpr std::size_t   kOffActorLifeState   = 0xF8;       // [Actor+0xF8]：lifeState 所在 u32
+		constexpr std::uint32_t kActorLifeStateMask  = 0x1E0000u;  // bits 17..20
+		constexpr unsigned      kActorLifeStateShift = 17;
+		// 枚举值（引擎三函数实证）
+		constexpr std::uint32_t kLifeStateDeadA      = 1;  // 0x20000  ┐
+		constexpr std::uint32_t kLifeStateDeadB      = 2;  // 0x40000  ├ IsDead(dl=1) ⇒ 死
+		constexpr std::uint32_t kLifeStateDeadC      = 5;  // 0xA0000  ┘
+		constexpr std::uint32_t kLifeStateUnconscious = 3; // 0x60000    IsUnconscious ⇒ 昏迷
+		constexpr std::uint32_t kLifeStateBleedA     = 7;  // 0xE0000  ┐ IsBleedingOut ⇒ 出血
+		constexpr std::uint32_t kLifeStateBleedB     = 8;  // 0x100000 ┘
+
+		// ================================================================
 		// ★ v4.3（诊断）：Actor 的「AI 进程 → 状态对象」链路
 		// ================================================================
 		// 背景：v4.2 的判死只看 `boolBits.kDead` + 两个记录标志，而上一代项目
@@ -183,13 +227,27 @@ namespace SAS
 		//   **探针**（`actor probe:` 行）——进游戏对「活人 / 该亮的尸体 / 该亮没亮的
 		//   尸体」各看一眼，用数据定语义之后再进判定。★ 探针是纯内存读 + 形状校验，
 		//   读不到就打 `-`，绝不参与过滤。
-		constexpr std::size_t   kOffActorProcess     = 0x228;
-		constexpr std::size_t   kOffProcessStatePtr  = 0x10;
-		constexpr std::size_t   kOffProcessLifeState = 0x264;
+		constexpr std::size_t   kOffActorProcess = 0x228;  // Actor::currentProcess（AIProcess*）
+		// ★ v4.4：`IsBleedingOut()` 的第二个条件 —— `AIProcess::middleHigh(+0x08) + 0x59C`
+		//   是个 bool（反汇编 0x1FC7F50 实证）。只作**探针**，先不进判定：
+		//   它是「出血动画中」的瞬时标志，怕在活人身上短暂为真（红线是「活人一个都不亮」）。
+		constexpr std::size_t   kOffMiddleHigh  = 0x08;
+		constexpr std::size_t   kOffMhBleedFlag = 0x59C;
 		// 每个会话最多打几条「半径内所有 ACHR（不论死活）」的探针。
 		//   比 corpse probe 宽：那个只覆盖「已判定为尸体」的，这个覆盖全部 ACHR ——
 		//   「该亮没亮」的样本（被判成活人）只有这个探针能看到。
 		constexpr std::uint32_t kActorProbeMax = 32;
+
+		// ★ v4.4：每个会话最多打几条「ACHR 判决发生变化」的探针（活人→尸体、尸体→活人…）。
+		//   用途：用户打死了敌人之后，「那一刻」的状态会被立刻记下来 ——
+		//   一次实测就能定死「引擎到底给没给它置位 / lifeState 到底变成什么」。
+		constexpr std::uint32_t kActorChangeProbeMax = 32;
+		// ★ v4.4：每个会话最多打几条「库存明细」探针（只打近距离的尸体）。
+		//   用途：「拿空还亮」的根因 —— 把判 notEmpty 的那具尸体身上的**残留条目**
+		//   （object / 类型 / count / item flags）直接打出来。
+		constexpr std::uint32_t kLootProbeMax = 16;
+		// 库存明细探针只对「玩家多近」的目标打（米）。
+		constexpr float kLootProbeRangeMeters = 20.0f;
 
 		// 【判空】容器 / 尸体的「库存列表」——
 		//   `TESObjectREFR::inventoryList` 是 `BSGuarded<BGSInventoryList*, BSReadWriteLock>`，
@@ -205,6 +263,10 @@ namespace SAS
 		constexpr std::size_t   kOffInvItemSize     = 0x28;    // sizeof(BGSInventoryItem)
 		constexpr std::size_t   kOffInvItemStacks   = 0x10;    // BGSInventoryItem::stacks（BSTArray<Stack>）
 		constexpr std::size_t   kOffInvItemObject   = 0x00;    // BGSInventoryItem::object
+		// ★ v4.4：BGSInventoryItem::flags（u32 @+0x20）—— 低 3 位 = 装备槽（非 0 = 装备中）、
+		//   bit3 = kEquipStateLocked、bit5 = kTemporary。只作**探针**用（见 LootProbe）：
+		//   「拿空还亮」十有八九是库存里残留了面板不显示的条目，这一格是分辨它们的钥匙。
+		constexpr std::size_t   kOffInvItemFlags    = 0x20;
 		constexpr std::size_t   kOffStackSize       = 0x10;    // sizeof(BGSInventoryItem::Stack)
 		constexpr std::size_t   kOffStackCount      = 0x08;    // BGSInventoryItem::Stack::count
 		constexpr std::uint32_t kInvMaxItems        = 4096;    // 条目数超过它 = 一定读错了
@@ -439,6 +501,26 @@ namespace SAS
 			//   ⚠️ 这是本轮**唯一**带假设的改动：万一实测发现「从没搜过的身体 / 容器
 			//     因此不亮」，把它设 0 即可退回旧行为（null = 未知 ⇒ 照常亮）。
 			bool          treatNullInvAsEmpty = true;
+
+			// ================================================================
+			// ★★ v4.4：判死改用**引擎自己的 lifeState 枚举**（背景见文件顶部常量区的长注释）
+			// ================================================================
+			// `CorpseLifeState`（默认 1）：读 `[Actor+0xF8]` 的 bits17..20，
+			//   把引擎 `IsDead()` 认可的 {1,2,5} 当作「尸体」——**这是本轮修
+			//   「打死的敌人不亮」的核心**（kDead 位不可靠，实测 450 次尸体判定里
+			//   一个都没读到它）。设 0 = 退回只看 kDead 位 + Starts Dead 标志。
+			bool          corpseLifeState   = true;
+			// `CorpseBleedout`（默认 1）：把 lifeState ∈ {7,8}（引擎 `IsBleedingOut()`）
+			//   也算「尸体」。**依据**：上一代项目 v35 的判定就是
+			//   `IsDead() ∨ IsUnconscious() ∨ IsBleedingOut()`，用户实测确认
+			//   「现在尸体会高亮了」⇒ 7/8（倒地出血）那一批是可搜刮的倒地者。
+			//   设 0 = 严格模式（只认 1/2/5）。
+			bool          corpseBleedout    = true;
+			// ★ v4.4 诊断：`actor probe` 里那套链路（v4.3 的 life=）已被 lifeState 取代；
+			//   这里控制「判决变化探针」的条数上限（0 = 关）。
+			int           actorChangeProbeMax = static_cast<int>(kActorChangeProbeMax);
+			// ★ v4.4 诊断：库存明细探针 `loot probe:` 的条数上限（0 = 关）。
+			int           lootProbeMax      = static_cast<int>(kLootProbeMax);
 		};
 
 		// ====================================================================
@@ -538,6 +620,17 @@ namespace SAS
 			std::uint64_t corpseUncSeen    = 0;  // 其中是「Starts Unconscious」（炮塔/机器人报废体、倒地者）
 			std::uint64_t corpseUncSkipped = 0;  // 因为「Starts Unconscious 且没开 CorpseUnconscious」被跳过的
 			std::uint32_t corpseProbes     = 0;  // 本会话已经打过的尸体探针数（上限 kCorpseProbeMax）
+			// ★ v4.4：判死的「新来源」各自的计数（诊断：一眼看出是哪条路在起作用）
+			std::uint64_t corpseByLife     = 0;  // 靠 lifeState ∈ {1,2,5}（引擎 IsDead()）判定的
+			std::uint64_t corpseByBleed    = 0;  // 靠 lifeState ∈ {7,8}（引擎 IsBleedingOut()）判定的
+			// ★ v4.4：判决缓存与探针节流
+			//   achrVerdict：ref → 判决码（0=活 1=死 2=昏迷 3=出血）。**判决变化**时打一条
+			//   `actor probe (changed)`（先只记录不打，避免新进入半径的 ACHR 刷屏）。
+			std::unordered_map<const RE::TESObjectREFR*, std::uint8_t> achrVerdict;
+			//   lootProbed：已经打过「库存明细」探针的引用（每个 ref 只打一次）。
+			std::unordered_set<const RE::TESObjectREFR*> lootProbed;
+			std::uint32_t lootProbes        = 0;  // 本会话已打的库存明细探针数（上限 cfg.lootProbeMax）
+			std::uint32_t actorChangeProbes = 0;  // 本会话已打的「判决变化」探针数
 			// ★ v4.3：ACHR 判决全景（「该亮没亮」时最有用的一对数）
 			std::uint64_t achrSeen         = 0;  // 窗口内半径内的 ACHR 数（不论死活）
 			std::uint64_t achrLive         = 0;  // 其中被判成「活人」跳过的（红线；「尸体不亮」先看这里）
@@ -960,12 +1053,22 @@ namespace SAS
 			// --- ★ v4.2：尸体 / 搜空（v4.2.1 起 CorpseUnconscious 默认 1，理由见 Config 里的说明）---
 			g_cfg.corpseUnconscious = getInt("CorpseUnconscious", 1) != 0;
 			g_cfg.skipEmptyLoot     = getInt("SkipEmptyLoot", 1) != 0;
+			// ★ v4.4：判死改用引擎自己的 lifeState 枚举（理由见常量区与 Config 的长注释）
+			g_cfg.corpseLifeState   = getInt("CorpseLifeState", 1) != 0;
+			g_cfg.corpseBleedout    = getInt("CorpseBleedout", 1) != 0;
 			// ★ v4.3：ACHR 探针条数上限（0 = 关掉那组 `actor probe:` 日志）
 			g_cfg.actorProbeMax = std::clamp(getInt("ActorProbeMax", static_cast<int>(kActorProbeMax)), 0, 256);
+			// ★ v4.4：判决变化探针 / 库存明细探针的条数上限
+			g_cfg.actorChangeProbeMax =
+				std::clamp(getInt("ActorChangeProbeMax", static_cast<int>(kActorChangeProbeMax)), 0, 256);
+			g_cfg.lootProbeMax =
+				std::clamp(getInt("LootProbeMax", static_cast<int>(kLootProbeMax)), 0, 256);
 			// ★ v4.3：库存指针是 null 时算「空」（默认 1；理由见 Config 里的说明）
 			g_cfg.treatNullInvAsEmpty = getInt("TreatNullInvAsEmpty", 1) != 0;
-			REX::INFO("config: corpseUnconscious={} skipEmptyLoot={} actorProbeMax={} treatNullInvAsEmpty={}",
-				g_cfg.corpseUnconscious, g_cfg.skipEmptyLoot, g_cfg.actorProbeMax, g_cfg.treatNullInvAsEmpty);
+			REX::INFO("config: corpseUnconscious={} corpseLifeState={} corpseBleedout={} skipEmptyLoot={}",
+				g_cfg.corpseUnconscious, g_cfg.corpseLifeState, g_cfg.corpseBleedout, g_cfg.skipEmptyLoot);
+			REX::INFO("config: actorProbeMax={} actorChangeProbeMax={} lootProbeMax={} treatNullInvAsEmpty={}",
+				g_cfg.actorProbeMax, g_cfg.actorChangeProbeMax, g_cfg.lootProbeMax, g_cfg.treatNullInvAsEmpty);
 
 			// --- ★ v4.0.1：可选的自定义类别颜色（ColorLoot=RRGGBB …，留空 = 用引擎原生配色）---
 			{
@@ -1164,6 +1267,55 @@ namespace SAS
 				reinterpret_cast<const std::uint8_t*>(a_ref) + kOffActorBoolBits);
 		}
 
+		// ★★ v4.4：读**引擎自己的 lifeState 枚举**（`[Actor+0xF8]` 的 bits 17..20，0..15）。
+		//   `IsDead()` / `IsUnconscious()` / `IsBleedingOut()` 三个 Papyrus native 读的都是它
+		//   （反汇编实证见文件顶部常量区的长注释），所以这是「引擎怎么判」的**权威来源**。
+		std::uint32_t RefActorLifeState(const RE::TESObjectREFR* a_ref)
+		{
+			return (*reinterpret_cast<const std::uint32_t*>(
+						reinterpret_cast<const std::uint8_t*>(a_ref) + kOffActorLifeState) &
+					   kActorLifeStateMask) >>
+				   kActorLifeStateShift;
+		}
+
+		// ★ v4.4：读「出血动画中」标志（`AIProcess::middleHigh(+0x08) + 0x59C`，bool）。
+		//   `IsBleedingOut()` 的第二个条件。**只作探针**（理由见常量区注释）。
+		//   读不到返回 -1。
+		int RefMhBleedFlag(const RE::TESObjectREFR* a_ref)
+		{
+			const auto* raw  = reinterpret_cast<const std::uint8_t*>(a_ref);
+			const auto  proc = *reinterpret_cast<const std::uint64_t*>(raw + kOffActorProcess);
+			if (!IsPlausiblePointer(proc) ||
+				!IsReadable(reinterpret_cast<const void*>(proc), kOffMiddleHigh + 8)) {
+				return -1;
+			}
+			const auto mh = *reinterpret_cast<const std::uint64_t*>(
+				reinterpret_cast<const std::uint8_t*>(proc) + kOffMiddleHigh);
+			if (!IsPlausiblePointer(mh) ||
+				!IsReadable(reinterpret_cast<const void*>(mh), kOffMhBleedFlag + 1)) {
+				return -1;
+			}
+			return reinterpret_cast<const std::uint8_t*>(mh)[kOffMhBleedFlag] ? 1 : 0;
+		}
+
+		// ★ v4.4：ACHR 的「判决码」—— 判决变化探针（见 NoteAchrVerdict）用。
+		//   0=活人 1=死/尸体 2=昏迷 3=出血。判定集合与 ClassifyRef 保持一致
+		//   （这里不看 INI 开关：探针要能反映**引擎侧事实**）。
+		std::uint8_t AchrVerdictCode(std::uint32_t a_ls, bool a_deadBit, bool a_startsDead, bool a_startsUnc)
+		{
+			if (a_deadBit || a_startsDead || a_ls == kLifeStateDeadA || a_ls == kLifeStateDeadB ||
+				a_ls == kLifeStateDeadC) {
+				return 1;
+			}
+			if (a_ls == kLifeStateUnconscious || a_startsUnc) {
+				return 2;
+			}
+			if (a_ls == kLifeStateBleedA || a_ls == kLifeStateBleedB) {
+				return 3;
+			}
+			return 0;
+		}
+
 		// ★ v4.3：前向声明 —— `ActorProbe` 要把「判空结果」也打进日志，而判空的
 		//   实现（`g_invOff` / `RefLootState`）写在文件更下面（和 CalibrateInventory
 		//   放在一起方便对照阅读）。同一个 TU 内前置声明即可。
@@ -1192,39 +1344,32 @@ namespace SAS
 		// ★ v4.3 诊断：`actor probe:` —— 半径内**每一个 ACHR**（不论死活）的判决明细。
 		//   为什么不止 corpse probe：用户报「有东西的尸体不亮」时，那具身体多半
 		//   被判成了「活人」⇒ corpse probe 根本不会打它 ⇒ 日志里什么都看不到。
-		//   这一条把 ACHR 的原始数据（formFlags / boolBits / lifeState 链路 / 库存指针）
+		//   这一条把 ACHR 的原始数据（formFlags / boolBits / lifeState / 库存指针）
 		//   与最终结论一起打出来，和画面里的身体按 FormID 对号入座。
 		//   ★ 纯内存读 + 形状校验；任何一步不过就打 `-`，**不影响判定**。
-		//   ★ lifeState 链路（actor+0x228 → +0x10 → +0x264）只作参考：
-		//     2026-09-18 反汇编确认 +0x264 是个被 `cmp ..., 3/4/7` 比较的状态枚举，
-		//     但 0..7 的语义还没有实证 ⇒ 先收集数据（活人 / 尸体 / 该亮没亮 各看一遍）。
-		void ActorProbe(const RE::TESObjectREFR* a_ref, float a_distSq, const char* a_verdict)
+		//   ★ v4.4：v4.3 那条 `life=`（actor+0x228 → +0x10 → +0x264）已被**实证过的**
+		//     `lifeState=`（[+0xF8] bits17..20）取代 —— 前者永远读不到（-1），因为
+		//     真正的枚举在 Actor 自己身上，不在 AIProcess 里。另外把
+		//     `IsBleedingOut()` 的第二个条件 `mh=`（middleHigh+0x59C）也带上。
+		//   ★ `a_force = true` 时不受 `ActorProbeMax` 限制（判决变化探针专用）。
+		void ActorProbe(const RE::TESObjectREFR* a_ref, float a_distSq, const char* a_verdict,
+			bool a_force = false, const char* a_tag = "actor probe")
 		{
-			if (g_cfg.actorProbeMax <= 0) {
-				return;
+			if (!a_force) {
+				if (g_cfg.actorProbeMax <= 0) {
+					return;
+				}
+				if (g_state.actorProbes >= static_cast<std::uint32_t>(g_cfg.actorProbeMax)) {
+					return;
+				}
+				++g_state.actorProbes;
 			}
-			if (g_state.actorProbes >= static_cast<std::uint32_t>(g_cfg.actorProbeMax)) {
-				return;
-			}
-			++g_state.actorProbes;
 
 			const auto  bits  = RefActorBoolBits(a_ref);
 			const auto  flags = RefFormFlags(a_ref);
+			const auto  ls    = RefActorLifeState(a_ref);
+			const int   mh    = RefMhBleedFlag(a_ref);
 			const auto* raw   = reinterpret_cast<const std::uint8_t*>(a_ref);
-
-			int life = -1;  // -1 = 读不到（链路断在哪一段都不打假数据）
-			{
-				const auto proc = *reinterpret_cast<const std::uint64_t*>(raw + kOffActorProcess);
-				if (IsPlausiblePointer(proc) && IsReadable(reinterpret_cast<const void*>(proc), kOffProcessStatePtr + 8)) {
-					const auto state = *reinterpret_cast<const std::uint64_t*>(
-						reinterpret_cast<const std::uint8_t*>(proc) + kOffProcessStatePtr);
-					if (IsPlausiblePointer(state) &&
-						IsReadable(reinterpret_cast<const void*>(state), kOffProcessLifeState + 4)) {
-						life = static_cast<int>(*reinterpret_cast<const std::uint32_t*>(
-							reinterpret_cast<const std::uint8_t*>(state) + kOffProcessLifeState));
-					}
-				}
-			}
 
 			std::uint64_t invPtr = 0;
 			int           loot   = -3;
@@ -1234,19 +1379,63 @@ namespace SAS
 			}
 			const auto* base = a_ref->data.objectReference.get();
 
-			REX::INFO("actor probe: ref={:08X} base={:08X} d={:.1f}m formFlags=0x{:08X} boolBits=0x{:08X} "
-					  "dead={} startsDead={} startsUnc={} life={} inv={} loot={} -> {}",
+			REX::INFO("{}: ref={:08X} base={:08X} d={:.1f}m formFlags=0x{:08X} boolBits=0x{:08X} "
+					  "lifeState={} dead={} startsDead={} startsUnc={} mh={} inv={} loot={} -> {}",
+				a_tag,
 				a_ref->GetFormID(),
 				base ? base->GetFormID() : 0u,
 				std::sqrt(std::max(a_distSq, 0.0f)) / g_cfg.unitsPerMeter,
 				flags, bits,
+				ls,
 				(bits & kActorDeadBit) ? 1 : 0,
 				(flags & kFormFlagStartsDead) ? 1 : 0,
 				(flags & kFormFlagStartsUnconscious) ? 1 : 0,
-				life,
+				mh,
 				invPtr ? "ok" : "null",
 				loot,
 				a_verdict);
+		}
+
+		// ★ v4.4 诊断：`actor probe (changed):` —— ACHR 的判决**发生变化**时打一条。
+		//   为什么需要它（这是本轮诊断的关键设计）：v4.3 的 `actor probe` 是
+		//   「每会话前 N 条」，而它在**进入世界的第一轮**就被打了 24 条 ⇒ 用户之后
+		//   打死敌人时，那具身体早就没有探针额度了 —— 日志里永远看不到「那一刻」。
+		//   现在改成**事件驱动**：只在判决真的变了（活人→尸体 / 尸体→活人）时打，
+		//   于是「开枪打死一个海盗」会立刻在日志里留下它当时的
+		//   boolBits / lifeState / StartsDead 状态 —— 一眼就能分辨是「判死漏了」
+		//   还是「判空误判」。
+		//   ★ 首次见到某个 ACHR 只记录不打（否则新进入半径的单位会刷屏）。
+		//   ★ 额度独立（`ActorChangeProbeMax`），不受 `ActorProbeMax` 影响。
+		void NoteAchrVerdict(const RE::TESObjectREFR* a_ref, float a_distSq, std::uint8_t a_code,
+			std::uint32_t a_ls, bool a_deadBit, bool a_startsDead, bool a_startsUnc)
+		{
+			auto it = g_state.achrVerdict.find(a_ref);
+			if (it == g_state.achrVerdict.end()) {
+				if (g_state.achrVerdict.size() > 8192) {
+					g_state.achrVerdict.clear();  // 保险：正常换场景会清，这里兜住异常增长
+				}
+				g_state.achrVerdict.emplace(a_ref, a_code);
+				return;
+			}
+			if (it->second == a_code) {
+				return;
+			}
+			const auto prev = it->second;
+			it->second      = a_code;
+			if (g_cfg.actorChangeProbeMax <= 0 ||
+				g_state.actorChangeProbes >= static_cast<std::uint32_t>(g_cfg.actorChangeProbeMax)) {
+				return;
+			}
+			++g_state.actorChangeProbes;
+			// 判决码 0=活人 1=死/尸体 2=昏迷 3=出血（与 AchrVerdictCode 一致）
+			const char* const kCodeName[4] = { "活人", "尸体", "昏迷", "出血" };
+			const auto        p            = prev < 4 ? kCodeName[prev] : "?";
+			const auto        c            = a_code < 4 ? kCodeName[a_code] : "?";
+			char              why[192];
+			std::snprintf(why, sizeof(why),
+				"判决变化：%s -> %s（lifeState=%u dead=%d startsDead=%d startsUnc=%d）",
+				p, c, a_ls, a_deadBit ? 1 : 0, a_startsDead ? 1 : 0, a_startsUnc ? 1 : 0);
+			ActorProbe(a_ref, a_distSq, why, /*a_force=*/true, "actor probe (changed)");
 		}
 
 		// ★ v4.2：按**引用自己**（而不是只看 base）分类。
@@ -1272,12 +1461,25 @@ namespace SAS
 			if (refType == kFormTypeACHR) {
 				const std::uint32_t bits       = RefActorBoolBits(a_ref);
 				const std::uint32_t flags      = RefFormFlags(a_ref);
+				const std::uint32_t ls         = RefActorLifeState(a_ref);
 				const bool          deadBit    = (bits & kActorDeadBit) != 0;
 				const bool          startsDead = (flags & kFormFlagStartsDead) != 0;
 				const bool          startsUnc  = (flags & kFormFlagStartsUnconscious) != 0;
+				// ★★ v4.4：引擎自己的生命状态（**权威判据** —— 反汇编实证见常量区注释）。
+				//   这是本轮修「打死的敌人不亮」的核心：`kDead` 位不可靠（实测 450 次
+				//   尸体判定里一个都没读到它），而 `lifeState` 是引擎 `IsDead()` 自己读的东西。
+				const bool lsDead  = g_cfg.corpseLifeState &&
+									(ls == kLifeStateDeadA || ls == kLifeStateDeadB || ls == kLifeStateDeadC);
+				const bool lsUnc   = g_cfg.corpseUnconscious && (ls == kLifeStateUnconscious);
+				const bool lsBleed = g_cfg.corpseBleedout &&
+									 (ls == kLifeStateBleedA || ls == kLifeStateBleedB);
 
 				++g_state.achrSeen;
-				if (deadBit || startsDead) {
+				// ★ v4.4：判决变化探针（先记录，只有变化时才打日志；见 NoteAchrVerdict）
+				NoteAchrVerdict(a_ref, a_distSq, AchrVerdictCode(ls, deadBit, startsDead, startsUnc),
+					ls, deadBit, startsDead, startsUnc);
+
+				if (deadBit || startsDead || lsDead || lsUnc || lsBleed) {
 					a_corpse = true;
 					++g_state.corpseSeen;
 					if (deadBit) {
@@ -1286,10 +1488,30 @@ namespace SAS
 					if (startsDead) {
 						++g_state.corpseByFlag;
 					}
-					CorpseProbe(a_ref, a_base, flags, bits,
-						deadBit ? "尸体（运行时 kDead 位）" : "尸体（记录标志 Starts Dead）");
-					ActorProbe(a_ref, a_distSq,
-						deadBit ? "尸体（kDead 位）" : "尸体（Starts Dead 标志）");
+					if (lsDead) {
+						++g_state.corpseByLife;
+					}
+					if (lsBleed) {
+						++g_state.corpseByBleed;
+					}
+					if (lsUnc) {
+						++g_state.corpseUncSeen;
+					}
+					// 探针的文案按「优先级」给出最可能的来源（多路同时成立时按重要性取一条）
+					const char* kind = "尸体";
+					if (deadBit) {
+						kind = "尸体（运行时 kDead 位）";
+					} else if (lsDead) {
+						kind = "尸体（lifeState = 引擎 IsDead）";
+					} else if (startsDead) {
+						kind = "尸体（记录标志 Starts Dead）";
+					} else if (lsBleed) {
+						kind = "尸体（lifeState = 引擎 IsBleedingOut：倒地出血）";
+					} else if (lsUnc) {
+						kind = "尸体（lifeState = 引擎 IsUnconscious：昏迷/报废体）";
+					}
+					CorpseProbe(a_ref, a_base, flags, bits, kind);
+					ActorProbe(a_ref, a_distSq, kind);
 					return static_cast<int>(Category::kCorpse);
 				}
 				if (startsUnc) {
@@ -1310,6 +1532,8 @@ namespace SAS
 				}
 				// 活着的 Actor（正在行动的 NPC / 生物）—— 红线：不亮
 				//   ★ v4.3：「某具尸体该亮却没亮」十有八九落在这里 ⇒ 计一笔 + 打探针。
+				//   ★ v4.4：如果这一条**发生了 lifeState 变化**（比如刚被打死），
+				//     NoteAchrVerdict 已经在上面把当时的完整状态打进日志了。
 				++g_state.achrLive;
 				ActorProbe(a_ref, a_distSq, "活人（不进候选）");
 				return -1;
@@ -1329,6 +1553,110 @@ namespace SAS
 				}
 			}
 			return ClassifyBase(a_base);
+		}
+
+		// ★★ v4.4 诊断：`loot probe:` —— 「库存明细」探针（本轮的**判空取证主力**）。
+		//   背景：用户报「预先放置的尸体拿空了物品还在高亮」。判空链路（RefLootState）
+		//   只会给出「有/空/未知」，看不到**残留的是什么** —— 而这正是关键：
+		//     · 若残留条目的 count 真的 > 0 ⇒ 引擎库存里确实还有东西（面板空只是
+		//       「玩家拿不走 / 面板不显示」），要把它们从判定里排除（下一轮按这份数据修）；
+		//     · 若读到的 count 全是 0 却仍返回「有」⇒ 是我们自己的读取 bug（这一行能证伪）。
+		//   触发条件：**近距离（≤ kLootProbeRangeMeters）的尸体**、判 notEmpty、
+		//   每个 ref 只打一次、每会话上限 `LootProbeMax`。
+		//   打印：`ref / d / size（条目数）/ nonEmpty（有 count>0 的条目数）/ total（count 之和）`
+		//   + 前 4 个非空条目的 `[ft=类型 id=FormID n=stack数 c=count]`。
+		//   ★ 纯内存读 + 形状校验；读不到就打原因，**绝不改判定**。
+		void LootProbe(const RE::TESObjectREFR* a_ref, float a_distSq)
+		{
+			if (g_cfg.lootProbeMax <= 0 || g_invOff == 0) {
+				return;
+			}
+			if (g_state.lootProbes >= static_cast<std::uint32_t>(g_cfg.lootProbeMax)) {
+				return;
+			}
+			const float limitUnits = kLootProbeRangeMeters * g_cfg.unitsPerMeter;
+			if (a_distSq > limitUnits * limitUnits) {
+				return;
+			}
+			if (g_state.lootProbed.find(a_ref) != g_state.lootProbed.end()) {
+				return;
+			}
+			g_state.lootProbed.insert(a_ref);
+			++g_state.lootProbes;
+
+			const auto* raw = reinterpret_cast<const std::uint8_t*>(a_ref);
+			const auto  fid = a_ref->GetFormID();
+			const auto  dM  = std::sqrt(std::max(a_distSq, 0.0f)) / g_cfg.unitsPerMeter;
+
+			const auto ptrRaw = *reinterpret_cast<const std::uint64_t*>(raw + g_invOff);
+			if (ptrRaw == 0) {
+				REX::INFO("loot probe: ref={:08X} d={:.1f}m inv=null（引擎没给这个引用建过库存）", fid, dM);
+				return;
+			}
+			if (!IsPlausiblePointer(ptrRaw)) {
+				REX::INFO("loot probe: ref={:08X} d={:.1f}m inv=垃圾指针 0x{:X}", fid, dM, ptrRaw);
+				return;
+			}
+			const auto* inv  = reinterpret_cast<const std::uint8_t*>(ptrRaw);
+			const auto  size = *reinterpret_cast<const std::uint32_t*>(inv + kOffInvData);
+			const auto  cap  = *reinterpret_cast<const std::uint32_t*>(inv + kOffInvData + 4);
+			const auto  data = *reinterpret_cast<const std::uint64_t*>(inv + kOffInvData + 8);
+			if (size > kInvMaxItems || cap < size || cap > (1u << 20) ||
+				(size != 0 && !IsPlausiblePointer(data))) {
+				REX::INFO("loot probe: ref={:08X} d={:.1f}m 形状不对（size={} cap={} data=0x{:X}）",
+					fid, dM, size, cap, data);
+				return;
+			}
+
+			std::string   detail;
+			std::uint32_t nonEmpty = 0;
+			std::uint64_t total    = 0;
+			const auto    items    = std::min<std::uint32_t>(size, kInvWalkItemsMax);
+			for (std::uint32_t i = 0; i < items; ++i) {
+				const auto* item = reinterpret_cast<const std::uint8_t*>(data) + i * kOffInvItemSize;
+				const auto  obj  = *reinterpret_cast<const std::uint64_t*>(item + kOffInvItemObject);
+				if (!IsPlausibleFormPtr(obj)) {
+					continue;
+				}
+				const auto sn = *reinterpret_cast<const std::uint32_t*>(item + kOffInvItemStacks);
+				if (sn == 0) {
+					continue;
+				}
+				const auto sd = *reinterpret_cast<const std::uint64_t*>(item + kOffInvItemStacks + 8);
+				if (!IsPlausiblePointer(sd)) {
+					continue;
+				}
+				std::uint64_t sum = 0;
+				for (std::uint32_t j = 0; j < sn; ++j) {
+					sum += *reinterpret_cast<const std::uint32_t*>(
+						reinterpret_cast<const std::uint8_t*>(sd) + j * kOffStackSize + kOffStackCount);
+				}
+				if (sum == 0) {
+					continue;
+				}
+				++nonEmpty;
+				total += sum;
+				if (nonEmpty <= 4) {
+					const auto* objRaw  = reinterpret_cast<const std::uint8_t*>(obj);
+					const auto  objType = objRaw[kOffFormType];
+					const auto  objFid  = reinterpret_cast<const RE::TESForm*>(obj)->GetFormID();
+					// item flags（BGSInventoryItem::flags @+0x20，u32）：
+					//   低 3 位 = 装备槽（非 0 = 正在装备中），bit3 = kEquipStateLocked，
+					//   bit5 = kTemporary —— 打出来供下一轮判定「哪些算可搜刮」
+					const auto itemFlags = *reinterpret_cast<const std::uint32_t*>(
+						item + kOffInvItemFlags);
+					char buf[96];
+					std::snprintf(buf, sizeof(buf), " [ft=%02X id=%08X n=%u c=%llu fl=%X]",
+						static_cast<unsigned>(objType),
+						static_cast<unsigned>(objFid),
+						static_cast<unsigned>(sn),
+						static_cast<unsigned long long>(sum),
+						static_cast<unsigned>(itemFlags));
+					detail += buf;
+				}
+			}
+			REX::INFO("loot probe: ref={:08X} d={:.1f}m size={} nonEmpty={} total={}{}",
+				fid, dM, size, nonEmpty, static_cast<unsigned long long>(total), detail);
 		}
 
 		// 【v4.2 / v4.3】标定「库存列表指针」在 TESObjectREFR 里的真实偏移（0xA0 / 0xA8）。
@@ -1563,6 +1891,11 @@ namespace SAS
 		void ResetForNewScene(std::uint64_t a_nowMs, const char* a_reason)
 		{
 			REX::INFO("reset ({}) outline={}", a_reason, g_state.outlined.size());
+
+			// ★ v4.4：换场景 / 读档 ⇒ 判决缓存与探针去重集合都作废
+			//   （旧世界的引用随时可能被销毁，留着它们只会是野键）。
+			g_state.achrVerdict.clear();
+			g_state.lootProbed.clear();
 
 			// 换场景 / 读档：把这批引用从引擎的高亮表里摘掉。
 			// ★ v2.2 改成**不立刻动手**：这一步原本会在一帧里发出 200~300 条引擎调用，
@@ -2820,6 +3153,12 @@ namespace SAS
 						//     empty 不涨 + notEmpty 一直涨  ⇒ 库存里真有引擎条目（不可见物品）
 						if (loot == 1) {
 							++g_state.lootNotEmpty;
+							// ★ v4.4：「判到有东西」的尸体 ⇒ 打一份**库存明细**
+							//   （只对近距离的、每个 ref 只打一次；上限 LootProbeMax）。
+							//   这是「拿空还亮」的取证主力：残留条目会被逐条列出。
+							if (isCorpse) {
+								LootProbe(ref, d2);
+							}
 						} else if (loot == -2) {
 							++g_state.lootNullInv;
 						} else if (loot == -1) {
@@ -3065,11 +3404,16 @@ namespace SAS
 					} else {
 						std::snprintf(invOff, sizeof(invOff), "%s", "未标定");
 					}
-					REX::INFO("  corpse (窗口内累加): 尸体={} (kDead位={} StartsDead标志={} 道具={} 炮塔/机器人/倒地={}) "
+					// ★ v4.4：`kDead位` 一路在实测里恒为 0（引擎不给倒地者置位），所以
+					//   新增 `life死=`（lifeState ∈ {1,2,5}）与 `life出血=`（∈ {7,8}）
+					//   两路来源计数 —— 「打死的敌人亮没亮」看这两行就知道走通了没有。
+					REX::INFO("  corpse (窗口内累加): 尸体={} (kDead位={} StartsDead标志={} life死={} life出血={} "
+							  "道具={} 炮塔/机器人/昏迷={}) "
 							  "| ACHR: 见到={} 判活跳过={} | StartsUnconscious跳过={} "
 							  "| 前置过滤: deleted/disabled={} 非本cell={} "
 							  "| 搜空: empty={} notEmpty={} unknown={} null={} shapeBad={} invOff={}",
 						g_state.corpseSeen, g_state.corpseByBit, g_state.corpseByFlag,
+						g_state.corpseByLife, g_state.corpseByBleed,
 						g_state.corpseProps, g_state.corpseUncSeen,
 						g_state.achrSeen, g_state.achrLive,
 						g_state.corpseUncSkipped,
@@ -3079,6 +3423,8 @@ namespace SAS
 					g_state.corpseSeen       = 0;
 					g_state.corpseByBit      = 0;
 					g_state.corpseByFlag     = 0;
+					g_state.corpseByLife     = 0;
+					g_state.corpseByBleed    = 0;
 					g_state.corpseProps      = 0;
 					g_state.corpseUncSeen    = 0;
 					g_state.corpseUncSkipped = 0;
