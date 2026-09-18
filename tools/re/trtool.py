@@ -51,6 +51,11 @@ WHITELIST: dict[str, set[str]] = {
     # holds 8 hex digit ids, i.e. translating it would rewrite a real
     # identifier. Flagged as "do not touch" rather than risking data loss.
     "BOOK": {"DESC"},
+    # PERK: DESC is the perk description; EPF2 is the "Button Label" of an
+    # "Add Activate Choice" perk entry point (the text shown in the activation
+    # menu). Both are plain inline strings in non-localized plugins.
+    # (Added for Simple Immersive Looting: buttons "Strip" / "Transfer".)
+    "PERK": {"DESC", "EPF2"},
     "MESG": {"DESC", "ITXT"},
     "COBJ": {"DESC"},
     "ARMO": {"DESC"},

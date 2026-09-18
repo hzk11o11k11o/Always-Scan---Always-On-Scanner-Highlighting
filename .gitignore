@@ -18,6 +18,9 @@ compile_commands.json
 __pycache__/
 *.pyc
 
+# 兼容性核查用的临时工作目录（解压、xDump 日志等中间物）
+tools/re/_sil_tmp/
+
 # 第三方源码树 / 工具下载目录（体积大，不入库）
 tools/commonlibsf-main/
 tools/vendor/
