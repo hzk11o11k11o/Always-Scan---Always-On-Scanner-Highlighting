@@ -542,6 +542,10 @@ namespace SAS
 			std::uint64_t achrSeen         = 0;  // 窗口内半径内的 ACHR 数（不论死活）
 			std::uint64_t achrLive         = 0;  // 其中被判成「活人」跳过的（红线；「尸体不亮」先看这里）
 			std::uint32_t actorProbes      = 0;  // 本会话已经打过的 actor 探针数（上限 cfg.actorProbeMax）
+			// ★ v4.3：第一层过滤的计数 —— 「某具尸体从没出现过」时用来确认它没被
+			//   挡在更前面（Deleted/Disabled、或 parentCell 不是当前 cell）。
+			std::uint64_t skipDeleted      = 0;
+			std::uint64_t skipParentCell   = 0;
 
 			// --- ★ v4.2：库存列表偏移的标定状态（见 CalibrateInventory）---
 			//   ★ v4.3：改成「跨轮累计」——每轮最多采样 kInvCalibPerRound 个，
@@ -2764,9 +2768,11 @@ namespace SAS
 					continue;
 				}
 				if (ref == a_player || ref->IsDeleted() || ref->IsDisabled() || ref->IsPlayerRef()) {
+					++g_state.skipDeleted;
 					continue;
 				}
 				if (ref->parentCell != cell) {
+					++g_state.skipParentCell;
 					continue;
 				}
 				// ★ 先判距离再判类型：这样「白名单没通过」的统计只在半径内做，
@@ -3061,11 +3067,13 @@ namespace SAS
 					}
 					REX::INFO("  corpse (窗口内累加): 尸体={} (kDead位={} StartsDead标志={} 道具={} 炮塔/机器人/倒地={}) "
 							  "| ACHR: 见到={} 判活跳过={} | StartsUnconscious跳过={} "
+							  "| 前置过滤: deleted/disabled={} 非本cell={} "
 							  "| 搜空: empty={} notEmpty={} unknown={} null={} shapeBad={} invOff={}",
 						g_state.corpseSeen, g_state.corpseByBit, g_state.corpseByFlag,
 						g_state.corpseProps, g_state.corpseUncSeen,
 						g_state.achrSeen, g_state.achrLive,
 						g_state.corpseUncSkipped,
+						g_state.skipDeleted, g_state.skipParentCell,
 						g_state.emptySkips, g_state.lootNotEmpty, g_state.lootUnknown,
 						g_state.lootNullInv, g_state.lootBadShape, invOff);
 					g_state.corpseSeen       = 0;
@@ -3081,6 +3089,8 @@ namespace SAS
 					g_state.lootBadShape     = 0;
 					g_state.achrSeen         = 0;
 					g_state.achrLive         = 0;
+					g_state.skipDeleted      = 0;
+					g_state.skipParentCell   = 0;
 				}
 
 				// 摘除计数（诊断）：rmOk 应随 sel/outline 变化一起增长，
