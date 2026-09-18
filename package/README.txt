@@ -3,7 +3,7 @@
  Always-on scanner highlighting for Starfield
 ========================================================================
 
-Version  : 4.3.0
+Version  : 4.6.0
 Author   : (fill in your Nexus username before uploading)
 Game     : Starfield 1.16.244.0 (matching version required)
 Requires : SFSE (Starfield Script Extender) 0.2.21+
@@ -33,6 +33,9 @@ Highlights are color-coded by category (all values configurable):
 
 Looted containers and looted bodies stop glowing as soon as they are
 empty, so the outline always means "there is still something to take".
+(What a body still carries but you cannot take - the invisible NPC-only
+gear it wears, or clothing that is still equipped - does not count as
+loot.)
 
 Press the toggle hotkey (default: F8) to switch the whole thing on or
 off at any moment. A short HUD message confirms the new state.
@@ -94,10 +97,32 @@ Most useful options:
                         robots and turrets you can loot; a few are
                         knocked-out living characters (also lootable).
                         Set to 0 if you ever see a walking NPC outlined.
+  CorpseLifeState=1     decide "is it dead?" through the engine's own
+                        life-state check (this is what makes enemies you
+                        kill light up the moment they die). Set to 0 only
+                        for debugging.
+  CorpseBleedout=1      also outline units that are downed / bleeding out
+                        (default on; they are lootable)
+  SkipNonPlayableLoot=1 bodies carry invisible NPC-only gear that you
+                        cannot take and the loot panel does not show.
+                        Ignoring those entries is what lets a fully
+                        looted body go dark (default on). Set to 0 only
+                        for debugging.
+  SkipEquippedLoot=1    same for gear the dead actor is still wearing -
+                        it cannot be taken either, so it does not count
+                        as loot (default on). This is what makes enemies
+                        killed in combat go dark once looted. Set to 0
+                        only for debugging.
   ActorProbeMax=24      how many per-actor diagnostic lines ("actor
                         probe:") the log prints per session. Set to 0 to
                         turn them off; they are only useful when reporting
                         a "this one should/should not be highlighted" bug.
+  ActorChangeProbeMax=32  diagnostic: one line whenever an actor's verdict
+                        changes (for example the moment you kill it)
+  LootProbeMax=16       diagnostic: for bodies that still count as "has
+                        loot", list what is left inside them. This is the
+                        line to send when reporting a "still glowing after
+                        looting" bug. 0 = off.
   NotifyOnToggle=1      show a HUD message on toggle
   LogStats=1            write a stats line to the log every 5 seconds
 
@@ -132,8 +157,18 @@ categories).
       fallback, not a crash - it retries until it succeeds.
 * A looted (empty) body / container is still highlighted:
     the log's "corpse (window)" line has the counters
-    (empty / notEmpty / unknown / null / shapeBad). Send me that line
-    together with the calibration line.
+    (empty / notEmpty / unknown / null / shapeBad), and the
+    "loot probe:" line lists exactly what is still inside. Worn gear
+    and NPC-only gear are expected to appear there - they cannot be
+    taken and are ignored on purpose (the log's counters
+    "判空跳过: np=... eq=..." show the rule working). If a loot probe
+    still lists playable items, send me that line plus the calibration
+    line.
+* An enemy you killed stays highlighted after you loot it:
+    same as above - send me the "loot probe:" and the
+    "actor probe (changed):" lines. Killing is detected through the
+    engine's own life state, so the log also shows the moment the
+    verdict changed.
 * A walking NPC is outlined (should not happen):
     set CorpseUnconscious=0 in the INI - the log line starting with
     "corpse probe:" will tell you which reference it was.
@@ -145,7 +180,13 @@ categories).
   touches activation, pick up, dialogue or any other interaction.
 * Living NPCs and creatures are never outlined. Dead bodies - humans and
   creatures alike - are, and they stop glowing once you have taken
-  everything from them.
+  everything from them. What cannot be taken (invisible NPC-only gear,
+  and clothing a killed actor is still wearing) does not count as loot.
+* With "Simple Immersive Looting" (Nexus 12677) installed, using its
+  "Strip" option unequips a body's gear - the body starts glowing again
+  because the gear is takeable now; loot it and the outline goes away.
+* The log is capped at 1 MiB: once it grows past that it is emptied and
+  starts over, so it can never fill up your disk.
 * Since 4.3 the inventory calibration keeps retrying until it succeeds
   (it samples nearby containers or actors), so "looted means dark" also
   starts working when your first area had nothing to sample from.
