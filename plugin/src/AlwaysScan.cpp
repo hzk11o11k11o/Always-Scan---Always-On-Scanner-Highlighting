@@ -137,6 +137,57 @@ namespace SAS
 		constexpr std::uint8_t kFormTypeREFR = static_cast<std::uint8_t>(RE::FormType::kREFR);
 		constexpr std::uint8_t kFormTypeACHR = static_cast<std::uint8_t>(RE::FormType::kACHR);
 
+		// ================================================================
+		// ★ v4.2：尸体 / 搜空（判死 + 判空）
+		// ================================================================
+		// 【判死】「预先放置的尸体」在数据里的形态（离线实证：扫全量 Starfield.esm，
+		//   脚本 out/achr_flags_scan.py，1.16.244.0）：
+		//     · ACHR 记录 flags 0x00000200 'Starts Dead'        —— **2283 条**（占 9530 个 ACHR 的 24%）
+		//       （其中 1044 条同时带 0x800 'Initially Disabled'，会被 IsDisabled() 跳过）
+		//     · ACHR 记录 flags 0x00002000 'Starts Unconscious' —— 193 条（默认**不当尸体**，见下）
+		//   运行时还有第三个信号：`Actor::boolBits @+0x208` 的 kDead 位 —— 打死敌人时由
+		//   引擎的战死路径置位（上一代项目用 tools/re/scan_disp.py 反查过
+		//   `or dword ptr [reg+0x208], 0x800` / Resurrect 清位，语义吻合）。
+		//   三者**取或**：任一成立就是「可搜刮的尸体」。
+		//
+		//   ★ 为什么「Starts Dead」这个**记录标志**也要看：它是静态数据，
+		//     不依赖引擎在运行期有没有把 kDead 位置上（上一代项目实测过一具
+		//     明确可搜刮、却没读到 kDead 位的身体 —— 日志 `corpse=21/0`）。
+		//   ★ 「Starts Unconscious」默认**不算尸体**：那是倒地/昏迷的**活人**
+		//     （会自己站起来），点亮它就破了「活人不亮」这条红线。
+		//     想让它们也亮：INI 里 `CorpseUnconscious=1`。
+		constexpr std::size_t   kOffFormFlags = 0x20;      // TESForm::formFlags（u32）
+		constexpr std::uint32_t kFormFlagStartsDead        = 0x00000200u;  // ACHR: Starts Dead
+		constexpr std::uint32_t kFormFlagStartsUnconscious = 0x00002000u;  // ACHR: Starts Unconscious
+		constexpr std::size_t   kOffActorBoolBits = 0x208;                 // Actor::boolBits（u32）
+		constexpr std::uint32_t kActorDeadBit     = 1u << 11;              // Actor::BOOL_BITS::kDead
+		// 诊断：每个会话最多打几条尸体探针（一个 cell 也就几十个 Actor，够对号入座）
+		constexpr std::uint32_t kCorpseProbeMax = 12;
+
+		// 【判空】容器 / 尸体的「库存列表」——
+		//   `TESObjectREFR::inventoryList` 是 `BSGuarded<BGSInventoryList*, BSReadWriteLock>`，
+		//   而 commonlibsf 头文件里 BSGuarded 的成员顺序标着 "??"（data 在前还是锁在前
+		//   不确定），所以**两个候选偏移都探测**（0xA0 / 0xA8），谁通过形状校验就用谁。
+		//   ★ 绝不调用 `BSGuarded::LockRead()` / `ForEachInventoryItem()`：那会按
+		//     「猜的成员顺序」去加锁，猜错就是往真正的数据指针里写线程号（灾难）。
+		//     我们只**读指针**，然后自己按形状校验解引用。
+		//   ★ 标定不通过 → 永久降级（不判空，容器/尸体照常亮），
+		//     绝不让没验证过的偏移进热路径（上一代 v32 的教训）。
+		constexpr std::size_t   kOffInvCand[2]{ 0xA0, 0xA8 };  // BSGuarded<BGSInventoryList*>::m_data 候选
+		constexpr std::size_t   kOffInvData         = 0x28;    // BGSInventoryList::data（BSTArray）
+		constexpr std::size_t   kOffInvItemSize     = 0x28;    // sizeof(BGSInventoryItem)
+		constexpr std::size_t   kOffInvItemStacks   = 0x10;    // BGSInventoryItem::stacks（BSTArray<Stack>）
+		constexpr std::size_t   kOffInvItemObject   = 0x00;    // BGSInventoryItem::object
+		constexpr std::size_t   kOffStackSize       = 0x10;    // sizeof(BGSInventoryItem::Stack)
+		constexpr std::size_t   kOffStackCount      = 0x08;    // BGSInventoryItem::Stack::count
+		constexpr std::uint32_t kInvMaxItems        = 4096;    // 条目数超过它 = 一定读错了
+		constexpr std::uint32_t kInvMaxStacks       = 64;      // 单个条目的 stack 数上限
+		constexpr std::uint32_t kInvWalkItemsMax    = 128;     // 判空最多逐条走多少个条目
+		constexpr std::uint32_t kInvCalibNeedOk     = 3;       // 标定：至少 3 个容器通过形状校验
+		constexpr std::uint32_t kInvCalibMaxBad     = 2;       // 且坏样本不超过 2 个
+		constexpr std::uint32_t kInvCalibBudget     = 6;       // 单轮标定允许的采样数（每次采样可能一次 VirtualQuery）
+		constexpr std::uint32_t kInvCalibScanCap    = 1500;    // 单轮标定最多看多少个引用去找容器样本
+
 		// ---- 偏移探针 ----
 		// 这两个 static_assert 记录的是「commonlibsf 声明算出来的值」，它们和真实值
 		// **差 8 字节**，正是本 bug 的根源（TESObjectCELL 的基类 TESHandleForm 在声明
@@ -147,6 +198,17 @@ namespace SAS
 			"commonlibsf 的 TESObjectCELL 偏移又变了：请重新核对 kOffCellRefs（真实应为 0x80）");
 		static_assert(offsetof(RE::TESObjectCELL, lock) == 0x120 + 0x08,
 			"commonlibsf 的 TESObjectCELL 偏移又变了：请重新核对（真实 lock 应为 0x120）");
+
+		// ★ v4.2：TESForm 基类 / Actor 的成员偏移探针（判死那条路要用）。
+		//   这几个成员都在 **TESForm 基类**或 Actor 自己里（不受上面那个 +8 位移影响），
+		//   而且本项目已长期实测「formType @+0x2E / formID @+0x28」的读法是对的。
+		//   commonlibsf 哪天改了声明这里会编译失败 ⇒ 提醒重新核对。
+		static_assert(offsetof(RE::TESForm, formFlags) == 0x20,
+			"commonlibsf 的 TESForm::formFlags 偏移变了：请重新核对 kOffFormFlags（应为 0x20）");
+		static_assert(offsetof(RE::TESForm, formType) == 0x2E,
+			"commonlibsf 的 TESForm::formType 偏移变了：请重新核对 kOffFormType（应为 0x2E）");
+		static_assert(offsetof(RE::Actor, boolBits) == 0x208,
+			"commonlibsf 的 Actor::boolBits 偏移变了：请重新核对 kOffActorBoolBits（应为 0x208）");
 
 		// 合理性上限：一个 cell 的引用数不可能超过这个数（落到这里就是读到垃圾了）
 		constexpr std::uint32_t kMaxRefsSanity = 200000;
@@ -185,12 +247,20 @@ namespace SAS
 			//   飞船模块 …），原版扫描仪也不会高亮它们，所以**默认关闭**
 			//   （`EnableOther=0`，见 Config::categoryEnabled 的完整说明）。
 			kOther,
+			// ★ v4.2：尸体（可搜刮的「身体」）。
+			//   两种形态都归这一类：
+			//     ① **ACHR 引用**（= Actor 对象）—— 打死的敌人、预先摆放的尸体；
+			//     ② **base 是 NPC_ / LVLN 的普通 REFR** —— Starfield 用来摆
+			//        「姿势固定的尸体道具」（它不是 Actor，不会动，只能搜刮）。
+			//   判死/判活见 ClassifyRef()；活着的 NPC / 生物**一个都不亮**（红线）。
+			//   容器 / 尸体都要「搜空即熄灭」——见 RefLootState()。
+			kCorpse,
 			kCount
 		};
 		constexpr std::size_t kCategoryCount = static_cast<std::size_t>(Category::kCount);
 
 		constexpr const char* kCategoryName[kCategoryCount] = {
-			"loot", "container", "device", "door", "flora", "other"
+			"loot", "container", "device", "door", "flora", "other", "corpse"
 		};
 
 		// ★ v4.0.1：INI 没写自定义颜色时用的哨兵值（写 0 表示「用引擎原生配色」）
@@ -262,7 +332,9 @@ namespace SAS
 			//   （v4.0.1 的默认 0/1/2/3 实测全是蓝色系，看起来「颜色都一样」——
 			//     3 与 2 的 ref 色值完全相同。实测表见 docs/03 第十四节 14.5 / INI 注释。）
 			// ★ v4.0.3：门从 0 青改为 10 红 —— 可拾取是 2 蓝，青/蓝对比太弱，红拉开最大。
-			std::array<int, kCategoryCount> stateByCategory{ 2, 9, 4, 10, 5, 1 };
+			// ★ v4.2：尸体（下标 6）默认也是 **9 橙**（和容器同色，两者都是「搜刮目标」）；
+			//   想区分开就改 INI 的 `StateCorpse`（可用的其它色见 INI 里那张实测配色表）。
+			std::array<int, kCategoryCount> stateByCategory{ 2, 9, 4, 10, 5, 1, 9 };
 
 			// ================================================================
 			// ★ v4.1：每个类别一个「是否高亮」开关
@@ -281,18 +353,30 @@ namespace SAS
 			// ★ 想恢复高亮 MSTT（或只想留其中几类）就改 INI 的
 			//   `EnableLoot / EnableContainer / EnableDevice / EnableDoor /
 			//    EnableFlora / EnableOther`，改完重进游戏生效。
-			std::array<bool, kCategoryCount> categoryEnabled{ true, true, true, true, true, false };
+			std::array<bool, kCategoryCount> categoryEnabled{ true, true, true, true, true, false, true };
 
 			// ★ v4.0.1：可选的「自定义类别颜色」（INI 里写 ColorLoot=RRGGBB 之类）。
 			//   kColorUnset = 不覆盖，完全用引擎那个状态的原生配色。
 			//   设了就把 RGB 写进引擎的两张每状态配色表（alpha 保持原值），
 			//   再让引擎刷新管理器 + 整批重挂（详见 ApplyColorOverrides）。
 			std::array<std::uint32_t, kCategoryCount> colorOverride{
-				kColorUnset, kColorUnset, kColorUnset, kColorUnset, kColorUnset, kColorUnset
+				kColorUnset, kColorUnset, kColorUnset, kColorUnset, kColorUnset, kColorUnset, kColorUnset
 			};
 
 			// ★ v4.0：按热键切换时弹一条 HUD 提示（DLL 写 GLOB → 桥脚本轮询）。
 			bool          notifyOnToggle  = true;
+
+			// ================================================================
+			// ★ v4.2：尸体 / 搜空
+			// ================================================================
+			// 1 = 把「Starts Unconscious」（倒地 / 昏迷，但**还活着**）的 ACHR 也当尸体点亮。
+			//   ★ 默认 0 —— 那是活人（会自己站起来），点亮它会破「活人不亮」这条红线。
+			//     真的想连昏迷者一起亮（它们同样能搜刮）再打开。
+			bool          corpseUnconscious = false;
+			// 1 = 容器 / 尸体「库存为空」就不高亮 —— 搜空即熄灭（默认 1）。
+			//   依赖 `inventoryList` 偏移的运行时标定；标定失败会自动降级成旧行为
+			//   （不判空，容器 / 尸体照常亮），日志里有明确警告。
+			bool          skipEmptyLoot     = true;
 		};
 
 		// ====================================================================
@@ -375,6 +459,25 @@ namespace SAS
 			std::array<std::uint32_t, 256> candTypes{};
 			// ★ v4.1：窗口内因为「类别开关 = 0」而被跳过的引用数（诊断：确认开关真的生效）。
 			std::uint64_t disabledSkips = 0;
+
+			// --- ★ v4.2：尸体 / 搜空（诊断）---
+			//   窗口内累加，统计日志打完后清空。这些计数每轮扫描都会累加
+			//   （同一个尸体在半径内待 5 秒 ≈ 25 轮 ⇒ 计数会是它的 ~25 倍），
+			//   所以只用来回答「有没有、大概多少」，精确数量看探针行。
+			std::uint64_t emptySkips       = 0;  // 因为「库存为空」被跳过的候选数（容器 + 尸体）
+			std::uint64_t lootUnknown      = 0;  // 想判空但读不到（未知 ⇒ 按「有东西」处理，照常亮）
+			std::uint64_t corpseSeen       = 0;  // 判定为尸体的引用数（ACHR 尸体 + 尸体道具）
+			std::uint64_t corpseByBit      = 0;  // 其中靠运行时 kDead 位判定的
+			std::uint64_t corpseByFlag     = 0;  // 其中靠记录标志 Starts Dead 判定的
+			std::uint64_t corpseProps      = 0;  // 其中是「base = NPC_/LVLN 的普通 REFR」尸体道具
+			std::uint64_t corpseUncSkipped = 0;  // 因为「Starts Unconscious 且没开 CorpseUnconscious」被跳过的
+			std::uint32_t corpseProbes     = 0;  // 本会话已经打过的尸体探针数（上限 kCorpseProbeMax）
+
+			// --- ★ v4.2：库存列表偏移的标定状态（每会话一次，见 CalibrateInventory）---
+			bool          invCalibDone = false;
+			std::uint32_t invVotes[2]{};  // 两个候选偏移各自通过形状校验的样本数
+			std::uint32_t invBad[2]{};    // 各自形状校验失败的样本数
+			std::uint32_t invChecks    = 0;  // 一共采样了多少个容器
 
 			// --- v2.2：耗时统计（每次统计日志之间重置，用来定位卡顿）---
 			std::uint64_t scanMsTotal     = 0;  // 窗口内 Sum(每轮 Rescan 耗时)
@@ -718,10 +821,11 @@ namespace SAS
 			g_cfg.maxOutlineOpsPerScan = std::clamp(getInt("MaxOutlineOpsPerScan", 64), 0, 4096);
 
 			// --- ★ v4.0：分类分色（每个类别一个 outline 状态 0..11）---
+			//   （★ v4.2 追加 corpse，默认 9 = 与容器同色，理由见 Config::stateByCategory）
 			const char* const kStateKeys[kCategoryCount] = {
-				"StateLoot", "StateContainer", "StateDevice", "StateDoor", "StateFlora", "StateOther"
+				"StateLoot", "StateContainer", "StateDevice", "StateDoor", "StateFlora", "StateOther", "StateCorpse"
 			};
-			const int kStateDef[kCategoryCount] = { 2, 9, 4, 10, 5, 1 };
+			const int kStateDef[kCategoryCount] = { 2, 9, 4, 10, 5, 1, 9 };
 			for (std::size_t i = 0; i < kCategoryCount; ++i) {
 				g_cfg.stateByCategory[i] = std::clamp(getInt(kStateKeys[i], kStateDef[i]), 0, 11);
 			}
@@ -729,9 +833,9 @@ namespace SAS
 			// --- ★ v4.1：类别开关（默认只有 kOther = MSTT 关着，理由见 Config 里的长注释）---
 			{
 				const char* const kEnableKeys[kCategoryCount] = {
-					"EnableLoot", "EnableContainer", "EnableDevice", "EnableDoor", "EnableFlora", "EnableOther"
+					"EnableLoot", "EnableContainer", "EnableDevice", "EnableDoor", "EnableFlora", "EnableOther", "EnableCorpse"
 				};
-				const int kEnableDef[kCategoryCount] = { 1, 1, 1, 1, 1, 0 };
+				const int kEnableDef[kCategoryCount] = { 1, 1, 1, 1, 1, 0, 1 };
 				std::string s;
 				for (std::size_t i = 0; i < kCategoryCount; ++i) {
 					g_cfg.categoryEnabled[i] = getInt(kEnableKeys[i], kEnableDef[i]) != 0;
@@ -747,10 +851,15 @@ namespace SAS
 
 			g_cfg.notifyOnToggle = getInt("NotifyOnToggle", 1) != 0;
 
+			// --- ★ v4.2：尸体 / 搜空 ---
+			g_cfg.corpseUnconscious = getInt("CorpseUnconscious", 0) != 0;
+			g_cfg.skipEmptyLoot     = getInt("SkipEmptyLoot", 1) != 0;
+			REX::INFO("config: corpseUnconscious={} skipEmptyLoot={}", g_cfg.corpseUnconscious, g_cfg.skipEmptyLoot);
+
 			// --- ★ v4.0.1：可选的自定义类别颜色（ColorLoot=RRGGBB …，留空 = 用引擎原生配色）---
 			{
 				const char* const kColorKeys[kCategoryCount] = {
-					"ColorLoot", "ColorContainer", "ColorDevice", "ColorDoor", "ColorFlora", "ColorOther"
+					"ColorLoot", "ColorContainer", "ColorDevice", "ColorDoor", "ColorFlora", "ColorOther", "ColorCorpse"
 				};
 				std::string colorLog;
 				for (std::size_t i = 0; i < kCategoryCount; ++i) {
@@ -919,8 +1028,260 @@ namespace SAS
 			case RE::FormType::kMSTT:
 				return static_cast<int>(Category::kOther);
 			default:
-				return -1;  // NPC_ / ACHR / LVLN 等一律不亮（红线）
+				return -1;  // 其余（NPC_ / LVLN / …）一律不亮（红线）
 			}
+		}
+
+		// ====================================================================
+		// ★ v4.2：尸体 / 搜空
+		// ====================================================================
+		// 读 TESForm::formFlags（u32 @ +0x20）。
+		//   ★ 只读**基类 TESForm 自己的成员**：本项目已验证 formType(+0x2E) / formID(+0x28)
+		//     的运行期读法是准的（整个分类逻辑都建在它上面），formFlags 与它们同属 TESForm
+		//     基类；而 ACHR 的「Starts Dead / Starts Unconscious」正是记录标志位。
+		//     （下面有一条 static_assert 把 commonlibsf 声明的偏移钉死。）
+		std::uint32_t RefFormFlags(const RE::TESObjectREFR* a_ref)
+		{
+			return *reinterpret_cast<const std::uint32_t*>(
+				reinterpret_cast<const std::uint8_t*>(a_ref) + kOffFormFlags);
+		}
+
+		// 读 Actor::boolBits（u32 @ +0x208，bit11 = kDead）；只对 ACHR 引用有意义。
+		std::uint32_t RefActorBoolBits(const RE::TESObjectREFR* a_ref)
+		{
+			return *reinterpret_cast<const std::uint32_t*>(
+				reinterpret_cast<const std::uint8_t*>(a_ref) + kOffActorBoolBits);
+		}
+
+		// 诊断：本会话最多打 kCorpseProbeMax 条「尸体候选」探针。
+		//   用途：用户报「某具尸体该亮却没亮 / 不该亮却亮了」时，把 ref / base / 原始
+		//   formFlags / boolBits 打出来，和画面里的身体**按 FormID 对号入座**
+		//   （上一代项目就是靠这类探针把「引擎没给它置 kDead 位」钉死的）。
+		void CorpseProbe(const RE::TESObjectREFR* a_ref, const RE::TESForm* a_base,
+			std::uint32_t a_flags, std::uint32_t a_bits, const char* a_kind)
+		{
+			if (g_state.corpseProbes >= kCorpseProbeMax) {
+				return;
+			}
+			++g_state.corpseProbes;
+			REX::INFO("corpse probe: ref={:08X} base={:08X} formFlags=0x{:08X} boolBits=0x{:08X} -> {}",
+				a_ref->GetFormID(),
+				a_base ? a_base->GetFormID() : 0u,
+				a_flags,
+				a_bits,
+				a_kind);
+		}
+
+		// ★ v4.2：按**引用自己**（而不是只看 base）分类。
+		//   与 v4.1 的差别只有一条：ACHR 引用不再「一律不亮」，而是分活 / 死 ——
+		//     ① 死（运行时 kDead 位 **或** 记录标志 Starts Dead）⇒ **尸体**（可搜刮）；
+		//     ② 活 ⇒ 仍然一个都不亮（红线，不要放宽）。
+		//   另外「base = NPC_/LVLN 的普通 REFR」= Starfield 摆的「姿势固定的尸体道具」
+		//   （它不是 Actor、没有 AI/进程，不可能站起来），进尸体类。
+		//   a_corpse 回传「这条是尸体」——调用方据此做**判空**（容器 / 尸体都要判空）。
+		int ClassifyRef(const RE::TESObjectREFR* a_ref, const RE::TESForm* a_base, bool& a_corpse)
+		{
+			a_corpse = false;
+			if (!a_ref) {
+				return -1;
+			}
+			const auto* raw     = reinterpret_cast<const std::uint8_t*>(a_ref);
+			const auto  refType = raw[kOffFormType];
+
+			if (refType == kFormTypeACHR) {
+				const std::uint32_t bits       = RefActorBoolBits(a_ref);
+				const std::uint32_t flags      = RefFormFlags(a_ref);
+				const bool          deadBit    = (bits & kActorDeadBit) != 0;
+				const bool          startsDead = (flags & kFormFlagStartsDead) != 0;
+				const bool          startsUnc  = (flags & kFormFlagStartsUnconscious) != 0;
+
+				if (deadBit || startsDead) {
+					a_corpse = true;
+					++g_state.corpseSeen;
+					if (deadBit) {
+						++g_state.corpseByBit;
+					}
+					if (startsDead) {
+						++g_state.corpseByFlag;
+					}
+					CorpseProbe(a_ref, a_base, flags, bits,
+						deadBit ? "尸体（运行时 kDead 位）" : "尸体（记录标志 Starts Dead）");
+					return static_cast<int>(Category::kCorpse);
+				}
+				if (startsUnc) {
+					++g_state.corpseUncSkipped;
+					if (g_cfg.corpseUnconscious) {
+						a_corpse = true;
+						++g_state.corpseSeen;
+						CorpseProbe(a_ref, a_base, flags, bits,
+							"尸体（Starts Unconscious；已开 CorpseUnconscious）");
+						return static_cast<int>(Category::kCorpse);
+					}
+					CorpseProbe(a_ref, a_base, flags, bits,
+						"跳过：Starts Unconscious（倒地可搜刮但**还活着**；要亮就设 CorpseUnconscious=1）");
+					return -1;
+				}
+				// 活着的 Actor（正在行动的 NPC / 生物）—— 红线：不亮
+				return -1;
+			}
+
+			// ---- 非 ACHR：base 是 NPC_ / LVLN ⇒ 「姿势固定的尸体道具」----
+			if (a_base) {
+				const auto bt = static_cast<std::uint8_t>(a_base->GetFormType());
+				if (bt == static_cast<std::uint8_t>(RE::FormType::kNPC_) ||
+					bt == static_cast<std::uint8_t>(RE::FormType::kLVLN)) {
+					a_corpse = true;
+					++g_state.corpseSeen;
+					++g_state.corpseProps;
+					CorpseProbe(a_ref, a_base, RefFormFlags(a_ref), 0,
+						"尸体道具（base = NPC_/LVLN 的普通 REFR）");
+					return static_cast<int>(Category::kCorpse);
+				}
+			}
+			return ClassifyBase(a_base);
+		}
+
+		// 【v4.2】标定「库存列表指针」在 TESObjectREFR 里的真实偏移（0xA0 / 0xA8）。
+		//   为什么不能直接用头文件：`inventoryList` 是
+		//   `BSGuarded<BGSInventoryList*, BSReadWriteLock>`，而 commonlibsf 里
+		//   BSGuarded 的两个成员标着 "??"（data 在前还是锁在前不确定），两个成员都是
+		//   8 字节 ⇒ 只有两个候选。**不猜**：各取若干个**容器**样本做形状校验，
+		//   谁全过就用谁。
+		//   形状校验（每个样本）：① ref+off 是合理指针；② 可读 0x38 字节；
+		//   ③ +0x28 处的 BSTArray 三元组自洽（size <= cap <= 1M）；④ 非空时 data 可读。
+		//   标定不通过 → 永久降级（不判空，容器/尸体照常亮）——**绝不让没验证的偏移
+		//   进热路径**（上一代项目 v32 的教训）。标定本身每会话只跑一次。
+		std::size_t g_invOff = 0;  // 0 = 还没标定
+		void CalibrateInventory(const RE::TESObjectREFR* const* a_list, std::uint32_t a_size)
+		{
+			auto& s = g_state;
+			if (s.invCalibDone) {
+				return;
+			}
+			// 只在前 kInvCalibScanCap 个引用里找样本：当前 cell 一个容器都没有时
+			// （太空站内部、纯地形…）也不至于每轮把整张引用表扫一遍。
+			const std::uint32_t limit = std::min<std::uint32_t>(a_size, kInvCalibScanCap);
+			for (std::uint32_t i = 0; i < limit && s.invChecks < kInvCalibBudget; ++i) {
+				auto* ref = a_list[i];
+				if (!ref || !IsPlausiblePointer(reinterpret_cast<std::uint64_t>(ref))) {
+					continue;
+				}
+				const auto* base = ref->data.objectReference.get();
+				if (!base || base->GetFormType() != RE::FormType::kCONT) {
+					continue;  // 只拿容器当样本（纯内存读判类型）
+				}
+				++s.invChecks;
+				const auto* refRaw = reinterpret_cast<const std::uint8_t*>(ref);
+				for (int c = 0; c < 2; ++c) {
+					const auto p = *reinterpret_cast<const std::uint64_t*>(refRaw + kOffInvCand[c]);
+					if (!IsPlausiblePointer(p) || !IsReadable(reinterpret_cast<const void*>(p), 0x38)) {
+						++s.invBad[c];
+						continue;
+					}
+					const auto* inv  = reinterpret_cast<const std::uint8_t*>(p);
+					const auto  size = *reinterpret_cast<const std::uint32_t*>(inv + kOffInvData);
+					const auto  cap  = *reinterpret_cast<const std::uint32_t*>(inv + kOffInvData + 4);
+					const auto  data = *reinterpret_cast<const std::uint64_t*>(inv + kOffInvData + 8);
+					if (size > kInvMaxItems || cap < size || cap > (1u << 20)) {
+						++s.invBad[c];
+						continue;
+					}
+					if (size > 0 && (!IsPlausiblePointer(data) || !IsReadable(reinterpret_cast<const void*>(data), 8))) {
+						++s.invBad[c];
+						continue;
+					}
+					++s.invVotes[c];
+				}
+			}
+
+			for (int c = 0; c < 2; ++c) {
+				if (s.invVotes[c] >= kInvCalibNeedOk && s.invBad[c] <= kInvCalibMaxBad) {
+					g_invOff        = kOffInvCand[c];
+					s.invCalibDone  = true;
+					REX::INFO("inventory calibration: off=+0x{:X} ok={} bad={} checks={} -> 搜空判空**启用**",
+						g_invOff, s.invVotes[c], s.invBad[c], s.invChecks);
+					return;
+				}
+			}
+
+			if (s.invChecks >= kInvCalibBudget) {
+				s.invCalibDone = true;  // 放弃，不重试（每轮重试就是白烧 VirtualQuery）
+				REX::WARN("inventory calibration FAILED (votes @0x{:X}={} @0x{:X}={} bad={}/{}, checks={})"
+						  " -> 搜空判空**关闭**（容器 / 尸体照常亮）",
+					kOffInvCand[0], s.invVotes[0], kOffInvCand[1], s.invVotes[1],
+					s.invBad[0], s.invBad[1], s.invChecks);
+			}
+		}
+
+		// 【v4.2】「库存有没有东西」：1 = 有 / 0 = 空 / -1 = 未知（调用方按「有」处理 = 照常亮）。
+		//   `g_invOff` 由 CalibrateInventory() 标定（0 = 未标定 ⇒ 一律「未知」）。
+		//
+		//   ★ 为什么还要逐条把 stack 里的 count 加起来，而不是只看 `data.size()`：
+		//     物品被拿光之后，引擎**可能留下 count = 0 的空 stack / 空条目**
+		//     （Starfield 里「0 件物品仍占一格」的现象），只看条目数会把已经搜空的箱子
+		//     永远当成非空 ⇒ 高亮永不熄灭（这正是用户报的第 3 个问题）。
+		//   ★ 全程纯内存读（**零引擎调用、零 VirtualQuery**）：先探指针，再校验
+		//     BSTArray 头（size/cap 自洽），任何一步形状不对就返回「未知」。
+		//     ⇒ 最坏结果是「和以前一样照常亮」，绝不会因为读错内存而崩。
+		int RefLootState(const RE::TESObjectREFR* a_ref)
+		{
+			if (g_invOff == 0) {
+				return -1;
+			}
+			const auto* raw    = reinterpret_cast<const std::uint8_t*>(a_ref);
+			const auto  ptrRaw = *reinterpret_cast<const std::uint64_t*>(raw + g_invOff);
+			if (!IsPlausiblePointer(ptrRaw)) {
+				return -1;
+			}
+			const auto* inv  = reinterpret_cast<const std::uint8_t*>(ptrRaw);
+			const auto  size = *reinterpret_cast<const std::uint32_t*>(inv + kOffInvData);
+			const auto  cap  = *reinterpret_cast<const std::uint32_t*>(inv + kOffInvData + 4);
+			if (size > kInvMaxItems || cap < size || cap > (1u << 20)) {
+				return -1;  // 形状不对劲 = 读到垃圾，不判空
+			}
+			if (size == 0) {
+				return 0;  // 一条都没有 = 空的
+			}
+			const auto data = *reinterpret_cast<const std::uint64_t*>(inv + kOffInvData + 8);
+			if (!IsPlausiblePointer(data)) {
+				return -1;
+			}
+
+			const std::uint32_t items = std::min<std::uint32_t>(size, kInvWalkItemsMax);
+			bool                complete = (size <= kInvWalkItemsMax);
+			std::uint32_t       budget = 1024;  // 单次判空最多看多少个 stack（防呆，正常远用不到）
+			for (std::uint32_t i = 0; i < items; ++i) {
+				const auto* item = reinterpret_cast<const std::uint8_t*>(data) + i * kOffInvItemSize;
+				if (!IsPlausiblePointer(*reinterpret_cast<const std::uint64_t*>(item + kOffInvItemObject))) {
+					return -1;
+				}
+				const auto sn = *reinterpret_cast<const std::uint32_t*>(item + kOffInvItemStacks);
+				const auto sc = *reinterpret_cast<const std::uint32_t*>(item + kOffInvItemStacks + 4);
+				if (sn == 0) {
+					continue;  // 没有 stack 的条目：不计
+				}
+				if (sn > kInvMaxStacks || sc < sn || sc > (1u << 20)) {
+					return -1;
+				}
+				const auto sd = *reinterpret_cast<const std::uint64_t*>(item + kOffInvItemStacks + 8);
+				if (!IsPlausiblePointer(sd)) {
+					return -1;
+				}
+				for (std::uint32_t j = 0; j < sn; ++j) {
+					const auto cnt = *reinterpret_cast<const std::uint32_t*>(
+						reinterpret_cast<const std::uint8_t*>(sd) + j * kOffStackSize + kOffStackCount);
+					if (cnt > 0) {
+						return 1;  // 有东西，早退
+					}
+					if (--budget == 0) {
+						return -1;  // 条目/stack 多得离谱 ⇒ 不敢断言「空」
+					}
+				}
+			}
+			if (!complete) {
+				return -1;  // 条目太多没走完 ⇒ 不敢断言「空」
+			}
+			return 0;  // 所有条目 / stack 的 count 都是 0 = 空的
 		}
 
 		// ====================================================================
@@ -2121,6 +2482,13 @@ namespace SAS
 			auto* const*        list  = reinterpret_cast<RE::TESObjectREFR* const*>(arr.data);
 			const std::uint32_t count = std::min<std::uint32_t>(arr.size, kMaxRefsSanity);
 
+			// ★ v4.2：库存列表偏移标定（**每会话一次**，只拿容器当样本）。
+			//   放在这里是因为它要顺序扫引用找样本；标定完成后这一段不再执行，
+			//   热路径里一次 VirtualQuery 都不会有。
+			if (!g_state.invCalibDone && g_cfg.skipEmptyLoot) {
+				CalibrateInventory(list, count);
+			}
+
 			for (std::uint32_t i = 0; i < count; ++i) {
 				auto* ref = list[i];
 				// 全部是纯内存读，零引擎调用
@@ -2141,7 +2509,11 @@ namespace SAS
 				}
 
 				const auto* base = ref->data.objectReference.get();
-				const int   cat  = ClassifyBase(base);
+				// ★ v4.2：分类改成「按引用自己」（ClassifyRef）——
+				//   ACHR 引用要看死活（活人不亮 = 红线；尸体要亮），
+				//   「base = NPC_/LVLN 的普通 REFR」= 尸体道具。
+				bool      isCorpse = false;
+				const int cat      = ClassifyRef(ref, base, isCorpse);
 				if (cat < 0) {
 					// 诊断：半径内、类型不在白名单 → 记一笔类型直方图（见统计日志 rejTypes=）
 					if (base) {
@@ -2155,6 +2527,22 @@ namespace SAS
 				if (!g_cfg.categoryEnabled[static_cast<std::size_t>(cat)]) {
 					++g_state.disabledSkips;
 					continue;
+				}
+				// ★ v4.2：容器 / 尸体「搜空即熄灭」——库存为空就不进候选集合。
+				//   掉出候选之后由 SyncNativeOutline 的宽限期（UnhighlightGraceMs）
+				//   在约 1.5 秒内把描边摘掉 ⇒ 观感是「刚搜完就灭」。
+				//   判空是纯内存读；读不到 / 形状不对 ⇒ 未知 ⇒ 按「有东西」处理（照常亮）。
+				if (isCorpse || cat == static_cast<int>(Category::kContainer)) {
+					if (g_cfg.skipEmptyLoot && g_invOff != 0) {
+						const int loot = RefLootState(ref);
+						if (loot == 0) {
+							++g_state.emptySkips;
+							continue;
+						}
+						if (loot < 0) {
+							++g_state.lootUnknown;
+						}
+					}
 				}
 
 				// 水平夹角判定（只高亮正前方时）
@@ -2372,6 +2760,33 @@ namespace SAS
 					//   （默认只有 kOther/MSTT 关着；它应该持续是一个正数）
 					REX::INFO("  category (本轮选中): {} | 类别开关跳过 disabled={}", cats, g_state.disabledSkips);
 					g_state.disabledSkips = 0;
+				}
+
+				// ★ v4.2：尸体 / 搜空（诊断；计数**每轮扫描都累加**，
+				//   所以同一个尸体在半径内待 5 秒的计数会是它的 ~25 倍 —— 看趋势即可）。
+				//   排查方法：
+				//     · 「尸体该亮却没亮」→ 看 corpse 那三个来源计数是否都是 0，
+				//       以及 `corpse probe:` 那几行（探针带 ref/base 的 FormID，可对号入座）；
+				//     · 「搜空还亮」→ empty= 是否在涨；不涨说明 RefLootState 一直返回「未知」，
+				//       这时要看启动日志里的 inventory calibration 那一行。
+				{
+					char invOff[16]{};
+					if (g_invOff) {
+						std::snprintf(invOff, sizeof(invOff), "+0x%zX", g_invOff);
+					} else {
+						std::snprintf(invOff, sizeof(invOff), "%s", "未标定");
+					}
+					REX::INFO("  corpse (窗口内累加): 尸体={} (kDead位={} StartsDead标志={} 道具={}) "
+							  "| StartsUnconscious跳过={} | 搜空: empty={} unknown={} invOff={}",
+						g_state.corpseSeen, g_state.corpseByBit, g_state.corpseByFlag, g_state.corpseProps,
+						g_state.corpseUncSkipped, g_state.emptySkips, g_state.lootUnknown, invOff);
+					g_state.corpseSeen       = 0;
+					g_state.corpseByBit      = 0;
+					g_state.corpseByFlag     = 0;
+					g_state.corpseProps      = 0;
+					g_state.corpseUncSkipped = 0;
+					g_state.emptySkips       = 0;
+					g_state.lootUnknown      = 0;
 				}
 
 				// 摘除计数（诊断）：rmOk 应随 sel/outline 变化一起增长，

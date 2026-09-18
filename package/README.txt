@@ -3,7 +3,7 @@
  Always-on scanner highlighting for Starfield
 ========================================================================
 
-Version  : 4.1.0
+Version  : 4.2.0
 Author   : (fill in your Nexus username before uploading)
 Game     : Starfield 1.16.244.0 (matching version required)
 Requires : SFSE (Starfield Script Extender) 0.2.21+
@@ -25,9 +25,13 @@ feature, just always on.
 Highlights are color-coded by category (all values configurable):
   * Lootable items (misc / books / armor / weapons / ammo / aid ...)  blue
   * Containers (loot the good stuff)                                 orange
+  * Bodies / corpses - people AND creatures you can search           orange
   * Interactive devices / computers                                  green
   * Doors                                                            red
   * Flora (harvestable plants)                                       green
+
+Looted containers and looted bodies stop glowing as soon as they are
+empty, so the outline always means "there is still something to take".
 
 Press the toggle hotkey (default: F8) to switch the whole thing on or
 off at any moment. A short HUD message confirms the new state.
@@ -76,6 +80,12 @@ Most useful options:
   EnableOther=0         also outline movable statics (crates, tables).
                         Off by default: they cannot be picked up and the
                         vanilla scanner does not outline them either.
+  EnableCorpse=1        outline dead bodies (people and creatures, default on)
+  SkipEmptyLoot=1       stop outlining containers / bodies once they are
+                        empty (default on; see "corpses and empty
+                        containers" in the INI for the details)
+  CorpseUnconscious=0   also outline NPCs that are only knocked out /
+                        unconscious (default off - they are still alive)
   NotifyOnToggle=1      show a HUD message on toggle
   LogStats=1            write a stats line to the log every 5 seconds
 
@@ -100,13 +110,23 @@ categories).
 * Colors are hard to tell apart:
     the log's "stateByCategory" line shows which state each category
     uses; change the StateXxx values and restart.
+* A specific body is not highlighted:
+    - it may be empty (nothing left to take) - that is intended;
+    - it may be an unconscious NPC that is still alive: the log line
+      starts with "corpse probe:" and says so; set CorpseUnconscious=1
+      if you want those highlighted as well;
+    - a container / body stays lit when the inventory cannot be read
+      (the log then says "搜空判空**关闭**" in the calibration line);
+      that is a safe fallback, not a crash.
 
 ------------------------------------------------------------------------
  NOTES
 ------------------------------------------------------------------------
 * The mod only decides *which* references the engine outlines. It never
   touches activation, pick up, dialogue or any other interaction.
-* NPCs and creatures are never outlined.
+* Living NPCs and creatures are never outlined. Dead bodies - humans and
+  creatures alike - are, and they stop glowing once you have taken
+  everything from them.
 * Using the vanilla handheld scanner is fine: when you put it down, the
   mod automatically re-applies its highlights (ResyncOnScannerClose=1).
 * Objects are highlighted inside the current cell / loading space, the
