@@ -36,6 +36,9 @@ out/tmp/
 # 随时可以用 tools/re 里的脚本重跑，不入库
 out/
 
+# Nexus 发布包（可由 tools/package-nexus.ps1 随时重新生成）
+dist/
+
 # 编辑器/系统
 .vscode/
 .idea/
