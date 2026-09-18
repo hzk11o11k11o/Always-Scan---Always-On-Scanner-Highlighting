@@ -166,6 +166,29 @@ namespace SAS
 		constexpr std::size_t   kOffFormFlags = 0x20;      // TESForm::formFlags（u32）
 		constexpr std::uint32_t kFormFlagStartsDead        = 0x00000200u;  // ACHR: Starts Dead
 		constexpr std::uint32_t kFormFlagStartsUnconscious = 0x00002000u;  // ACHR: Starts Unconscious
+		// ★★ v4.5：TESForm 记录标志 bit2 = **Non-Playable（0x04）** = 「玩家拿不走的东西」
+		//   —— 这是「搜空还不熄灭」的**真根因**（2026-09-18 实测取证 + 离线对照）：
+		//
+		//   ① `loot probe` 把尸体的库存条目逐条摊开后，残留物**无一例外**全是
+		//      `Spacesuit_Assault_01_NOTPLAYABLE`（0x192294）/
+		//      `Spacesuit_Assault_Backpack_01_NoBoostpack_NOTPLAYABLE`（0x12AAC6）/
+		//      `Spacesuit_Assault_Helmet_01_NOTPLAYABLE`（0x192299）/
+		//      `Clothes_ScienceLabTec_CORPSE_FROZEN_NOTPLAYABLE`（0x75796）…
+		//      —— 这类「NPC 穿在身上的隐形装备」**在搜刮面板里不显示**；
+		//   ② 离线对照（同一件装备的两个版本）：
+		//        玩家版 `Spacesuit_Assault_01`          0x2265AD  flags=0x40  ← 不含 0x04
+		//        玩家版 `Spacesuit_Assault_Backpack_01` 0x169F59  flags=0x40  ← 不含 0x04
+		//        NPC 版 `..._NOTPLAYABLE`               0x192294  flags=0x44  ← 含 0x04
+		//        NPC 版 `..._NoBoostpack_NOTPLAYABLE`   0x12AAC6  flags=0x44  ← 含 0x04
+		//   ③ 可拿物品实测都是 **0x00**：`Credits`(MISC 0x0F)、`Digipick`(MISC 0x0A)、
+		//      `Ammo777mm`(AMMO 0x4AD3E)、`Food_ButchersBest_Veal`(ALCH 0x2C7245)。
+		//
+		//   ⇒ 玩家把面板里的东西拿光后面板显示「空」，但库存里这些 0x04 条目的
+		//     count 仍然 > 0 ⇒ `RefLootState` 返回「有东西」⇒ **描边永不熄灭**
+		//     （预置尸体与打死的敌人完全一样，与用户两次实测描述一字不差）。
+		//   ⇒ 判空时**跳过**这类条目：`object->formFlags & 0x04` ⇒ 不算「有东西」。
+		//     回退开关：INI `SkipNonPlayableLoot=0`（不改判定，只关这一条）。
+		constexpr std::uint32_t kFormFlagNonPlayable = 0x00000004u;
 		constexpr std::size_t   kOffActorBoolBits = 0x208;                 // Actor::boolBits（u32）
 		constexpr std::uint32_t kActorDeadBit     = 1u << 11;              // Actor::BOOL_BITS::kDead
 		// 诊断：每个会话最多打几条尸体探针（一个 cell 也就几十个 Actor，够对号入座）
@@ -521,6 +544,16 @@ namespace SAS
 			int           actorChangeProbeMax = static_cast<int>(kActorChangeProbeMax);
 			// ★ v4.4 诊断：库存明细探针 `loot probe:` 的条数上限（0 = 关）。
 			int           lootProbeMax      = static_cast<int>(kLootProbeMax);
+
+			// ================================================================
+			// ★★ v4.5：判空时跳过「非玩家物品」（记录标志 0x04）—— 默认 1
+			// ================================================================
+			// 背景与实证见常量区 `kFormFlagNonPlayable` 的长注释（一句话版）：
+			//   残留物全是 `*_NOTPLAYABLE` 的 NPC 隐形装备（玩家拿不走、面板也不显示），
+			//   把它们算作「有东西」会让**搜空后永不熄灭**（用户两次实测的现象：
+			//   预置尸体与打死的敌人一样）。
+			//   设 0 = 退回旧行为（把它们也算「有东西」，只在排查时用）。
+			bool          skipNonPlayableLoot = true;
 		};
 
 		// ====================================================================
@@ -1065,10 +1098,13 @@ namespace SAS
 				std::clamp(getInt("LootProbeMax", static_cast<int>(kLootProbeMax)), 0, 256);
 			// ★ v4.3：库存指针是 null 时算「空」（默认 1；理由见 Config 里的说明）
 			g_cfg.treatNullInvAsEmpty = getInt("TreatNullInvAsEmpty", 1) != 0;
+			// ★ v4.5：判空跳过「非玩家物品（0x04）」（默认 1；理由见 Config 里的说明）
+			g_cfg.skipNonPlayableLoot = getInt("SkipNonPlayableLoot", 1) != 0;
 			REX::INFO("config: corpseUnconscious={} corpseLifeState={} corpseBleedout={} skipEmptyLoot={}",
 				g_cfg.corpseUnconscious, g_cfg.corpseLifeState, g_cfg.corpseBleedout, g_cfg.skipEmptyLoot);
-			REX::INFO("config: actorProbeMax={} actorChangeProbeMax={} lootProbeMax={} treatNullInvAsEmpty={}",
-				g_cfg.actorProbeMax, g_cfg.actorChangeProbeMax, g_cfg.lootProbeMax, g_cfg.treatNullInvAsEmpty);
+			REX::INFO("config: actorProbeMax={} actorChangeProbeMax={} lootProbeMax={} treatNullInvAsEmpty={} skipNonPlayableLoot={}",
+				g_cfg.actorProbeMax, g_cfg.actorChangeProbeMax, g_cfg.lootProbeMax, g_cfg.treatNullInvAsEmpty,
+				g_cfg.skipNonPlayableLoot);
 
 			// --- ★ v4.0.1：可选的自定义类别颜色（ColorLoot=RRGGBB …，留空 = 用引擎原生配色）---
 			{
@@ -1265,6 +1301,17 @@ namespace SAS
 		{
 			return *reinterpret_cast<const std::uint32_t*>(
 				reinterpret_cast<const std::uint8_t*>(a_ref) + kOffActorBoolBits);
+		}
+
+		// ★ v4.5：某个物品（TESForm*，来自 `BGSInventoryItem::object`）是不是
+		//   「非玩家物品」（记录标志 bit2 = 0x04）—— 玩家拿不走、面板也不显示
+		//   （判定依据与实证见常量区 `kFormFlagNonPlayable` 的长注释）。
+		//   只对**已通过 IsPlausiblePointer 的指针**调用（与其它热路径读法一致）。
+		bool IsNonPlayableForm(std::uint64_t a_obj)
+		{
+			return (*reinterpret_cast<const std::uint32_t*>(
+						reinterpret_cast<const std::uint8_t*>(a_obj) + kOffFormFlags) &
+					   kFormFlagNonPlayable) != 0;
 		}
 
 		// ★★ v4.4：读**引擎自己的 lifeState 枚举**（`[Actor+0xF8]` 的 bits 17..20，0..15）。
@@ -1609,9 +1656,15 @@ namespace SAS
 			}
 
 			std::string   detail;
-			std::uint32_t nonEmpty = 0;
-			std::uint64_t total    = 0;
-			const auto    items    = std::min<std::uint32_t>(size, kInvWalkItemsMax);
+			// ★ v4.5：把「有 count>0 的条目」拆成两桶 ——
+			//   `playable`    = 玩家**能拿走**的（判空只看它）
+			//   `nonPlayable` = 记录标志 0x04 的 NPC 隐形装备（判空跳过它）
+			//   这样一行日志就能验证「修好了没有」：面板拿空后 playable 应变成 0。
+			std::uint32_t playable    = 0;
+			std::uint64_t total       = 0;
+			std::uint32_t nonPlayable = 0;
+			std::uint64_t npTotal     = 0;
+			const auto    items       = std::min<std::uint32_t>(size, kInvWalkItemsMax);
 			for (std::uint32_t i = 0; i < items; ++i) {
 				const auto* item = reinterpret_cast<const std::uint8_t*>(data) + i * kOffInvItemSize;
 				const auto  obj  = *reinterpret_cast<const std::uint64_t*>(item + kOffInvItemObject);
@@ -1634,29 +1687,40 @@ namespace SAS
 				if (sum == 0) {
 					continue;
 				}
-				++nonEmpty;
-				total += sum;
-				if (nonEmpty <= 4) {
+				const bool np = IsNonPlayableForm(obj);
+				if (np) {
+					++nonPlayable;
+					npTotal += sum;
+				} else {
+					++playable;
+					total += sum;
+				}
+				// 明细：可拿的列前 4 条、非玩家物品列前 2 条（都带 np= 标记）
+				if ((!np && playable <= 4) || (np && nonPlayable <= 2)) {
 					const auto* objRaw  = reinterpret_cast<const std::uint8_t*>(obj);
 					const auto  objType = objRaw[kOffFormType];
 					const auto  objFid  = reinterpret_cast<const RE::TESForm*>(obj)->GetFormID();
+					const auto  objFlags = *reinterpret_cast<const std::uint32_t*>(objRaw + kOffFormFlags);
 					// item flags（BGSInventoryItem::flags @+0x20，u32）：
 					//   低 3 位 = 装备槽（非 0 = 正在装备中），bit3 = kEquipStateLocked，
-					//   bit5 = kTemporary —— 打出来供下一轮判定「哪些算可搜刮」
+					//   bit5 = kTemporary
 					const auto itemFlags = *reinterpret_cast<const std::uint32_t*>(
 						item + kOffInvItemFlags);
-					char buf[96];
-					std::snprintf(buf, sizeof(buf), " [ft=%02X id=%08X n=%u c=%llu fl=%X]",
+					char buf[128];
+					std::snprintf(buf, sizeof(buf), " [ft=%02X id=%08X n=%u c=%llu fl=%X ff=%X np=%d]",
 						static_cast<unsigned>(objType),
 						static_cast<unsigned>(objFid),
 						static_cast<unsigned>(sn),
 						static_cast<unsigned long long>(sum),
-						static_cast<unsigned>(itemFlags));
+						static_cast<unsigned>(itemFlags),
+						static_cast<unsigned>(objFlags),
+						np ? 1 : 0);
 					detail += buf;
 				}
 			}
-			REX::INFO("loot probe: ref={:08X} d={:.1f}m size={} nonEmpty={} total={}{}",
-				fid, dM, size, nonEmpty, static_cast<unsigned long long>(total), detail);
+			REX::INFO("loot probe: ref={:08X} d={:.1f}m size={} playable={} total={} nonPlayable={} npTotal={}{}",
+				fid, dM, size, playable, static_cast<unsigned long long>(total),
+				nonPlayable, static_cast<unsigned long long>(npTotal), detail);
 		}
 
 		// 【v4.2 / v4.3】标定「库存列表指针」在 TESObjectREFR 里的真实偏移（0xA0 / 0xA8）。
@@ -1852,8 +1916,17 @@ namespace SAS
 			std::uint32_t       budget = 1024;  // 单次判空最多看多少个 stack（防呆，正常远用不到）
 			for (std::uint32_t i = 0; i < items; ++i) {
 				const auto* item = reinterpret_cast<const std::uint8_t*>(data) + i * kOffInvItemSize;
-				if (!IsPlausiblePointer(*reinterpret_cast<const std::uint64_t*>(item + kOffInvItemObject))) {
+				const auto  obj  = *reinterpret_cast<const std::uint64_t*>(item + kOffInvItemObject);
+				if (!IsPlausiblePointer(obj)) {
 					return -1;
+				}
+				// ★★ v4.5：跳过「非玩家物品」（记录标志 0x04）—— NPC 穿在身上的隐形装备
+				//   （`*_NOTPLAYABLE`），玩家拿不走、搜刮面板也不显示。把它们算作
+				//   「有东西」正是「拿空还亮」的根因（实证见常量区 kFormFlagNonPlayable）。
+				//   跳过之后：面板拿空 ⇒ 这里数到的 count 全 0 ⇒ 判「空」⇒ 熄灭。
+				//   ★ 只有 `SkipNonPlayableLoot=1`（默认）时才跳；设 0 = 退回旧行为。
+				if (g_cfg.skipNonPlayableLoot && IsNonPlayableForm(obj)) {
+					continue;
 				}
 				const auto sn = *reinterpret_cast<const std::uint32_t*>(item + kOffInvItemStacks);
 				const auto sc = *reinterpret_cast<const std::uint32_t*>(item + kOffInvItemStacks + 4);
