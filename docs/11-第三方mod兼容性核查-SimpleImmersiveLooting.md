@@ -176,3 +176,20 @@ python tools\re\tr_verify.py       <orig.esm> <out.esm>
    - 把上述三样结果反馈，再决定下一步（对策已在手：改 fragment 挂法 / 用当前 CK 重建记录）。
 4. **不回归红线**：其它 mod（`du_*` / `ase*` / `kinggath` / 本项目的 Always Scan）行为不受影响；
    GMST 覆盖只影响"死亡时装备掉落概率"（0.1 → 0），这是 mod 的既有设计。
+
+## 八、Nexus Mods 上传包（2026-09-18）
+
+用户要求把本汉化打包成可上传 Nexus 的格式。照 `tools/package-nexus.ps1`（高亮 mod 那套）
+的模式新增 **`tools/package-sil.ps1`**：
+
+| 项 | 值 |
+| --- | --- |
+| 产物 | **`dist\SimpleImmersiveLooting-zh-CN-1.0.zip`**，3 242 B，SHA256 `C5976FC2A608821DDA1FDC5C4849EC803746D46C890D58FCFDE6E6BF6350C253` |
+| 包内 | `SimpleImmersiveLooting.esm`（汉化版 2 876 B，SHA256 `3971667F…7BF10E`）+ `README.txt`（3 192 B）+ 包根即 Data 布局 |
+| 包内**刻意不含** | 原 mod 的 `SimpleImmersiveLooting - Main.ba2`（不重新分发原作者资产；README 写明需先装原 mod）与 `meta.ini` |
+| 可选模式 | `-IncludeBa2` ⇒ 「完整包」（含原 .ba2，一步安装；会再分发原作者资产，需作者许可） |
+| 自检 | 必需文件存在 / zip 内容逐条列出 / 每文件 SHA256 / 包体积；README 里 `<PUT-YOUR-NEXUS-NAME-HERE>` 未替换时告警 |
+| 上传文案 | `package/sil/nexus-description.md`（表单字段 + 英文 BBCode 正文 + 中文对照 + 上传前检查清单）；包内说明源 `package/sil/README.txt` |
+
+**复现**：`& 'tools\package-sil.ps1'`（改完 README 作者名后需重跑；`dist/` 不入库）。
+★ 上传前必做：替换 README 里的作者名占位符 → 重跑打包 → Files 里上传 zip → Requirements 挂原 mod 链接。
