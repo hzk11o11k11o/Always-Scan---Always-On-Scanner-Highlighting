@@ -378,6 +378,65 @@ namespace SAS
 		// 引用数组长度连续两轮一致才认（长度突变 = 加载线程还在往数组里塞）
 		constexpr std::uint32_t kRefsStableRounds = 2;
 
+		// ================================================================
+		// ★★ v4.7：外景连续性 —— 跨 cell 边界不再「整批熄灭」
+		// ================================================================
+		// 起因（用户实测 2026-09-19 + 当次日志实证）：
+		//   「星球表面地图上，原本已经高亮的物体突然不亮了；行走时似乎也不扫描」。
+		//   日志把真凶写在明面上 —— 玩家在 Kreet 表面来回穿越**两个相邻外景 cell**
+		//   （`0032588C` EDID `LC003KreetBaseRoof` grid(2,1) 与 `0032588B` grid(2,0)，
+		//   两条都是外景：CELL DATA=0x0002、有 XCLC），而本 MOD 每次
+		//   `player->parentCell` 一变就当成「换场景」：
+		//     ① `ResetForNewScene()` ⇒ **全部已挂高亮转入「待摘」**（当次日志 15 次
+		//        `reset (cell changed) outline=20~111`，也就是每次跨边界全灭）；
+		//     ② 静置 2 秒**完全不扫描**（`settleUntilMs`）；
+		//     ③ 之后只把**新 cell 自己**的引用当候选（`ref->parentCell != cell` 直接跳过）
+		//        ⇒ 边界对面那些还在眼前的引用**永远不亮**。
+		//   ⇒ 外景里 cell 只是「世界的一块」：跨过边界走一步不是换场景。把内景
+		//     （进门 = 载入画面）那一套照搬过来，观感就是「走着走着全灭、停下才铺满」。
+		//
+		// 判据（不依赖「cell 是不是外景」这种要读新偏移的信息）：
+		//   **上一个 cell 还在「近期 cell 环」里 ⇒ 世界是连续的** ⇒ 走「连续过渡」：
+		//     · 不整批摘（账本不动，谁真的离开半径就按宽限期自然淘汰）
+		//     · 静置缩短到 kSettleOnCellCrossMs
+		//     · 当前 cell + 环里其它 cell 一起参与扫描（见 Rescan / kRingCellMax）
+		//   反过来：读档 / 进门这些经过载入画面的切换会把环清空（Tick 里那条
+		//   「载入画面由开变关」），于是仍然走原来的「换场景」路径（整批待摘 + 2 秒静置）。
+		//   回退开关：INI `ExteriorContinuous=0`（退回 v4.6 行为，只用于对照）。
+		constexpr std::uint64_t kSettleOnCellCrossMs = 300;
+
+		// 「近期 cell 环」：只装玩家真正待过的 cell。
+		//   用途 ①：判断「这次换 cell 是不是连续过渡」（见上）；
+		//   用途 ②：让**边界对面的引用**也参与扫描 —— 外景里玩家经常在两个 cell 之间
+		//           来回走，只扫当前 cell 会让边界一侧的东西时亮时灭
+		//           （当次日志：站在 `…8B` 时只有 20~27 个目标，隔壁 `…8C` 的 100 多个
+		//            全灭，来回走一次就换一批）。
+		//   淘汰：连续 kRingCellMissMax 轮形状校验不过（= 这个 cell 已卸载）→ 踢掉；
+		//         环满 / 引用总数超过 kRingRefsCap → 淘汰最旧的。
+		//   ★ 安全性：环里的 cell 每轮都要过 IsReadable + 形状校验，**并且**抽查
+		//     「ref->parentCell == 这个 cell」（最强的一条自洽判据，垃圾数组过不了）。
+		constexpr std::size_t   kRingCellMax     = 8;
+		constexpr std::uint32_t kRingCellMissMax = 10;
+		constexpr std::uint32_t kRingRefsCap     = 60000;
+
+		// ★★ v4.7：引用数「轻微变化」的容差（治「行走时不扫描」的第二个来源）
+		//   旧判据：`arr.size != lastRefsSize` ⇒ 立刻 `stableRounds = 0` 并 return，
+		//   而 `stableRounds` 要连续 2 轮才放行 ⇒ **每次长度变化要跳过约 3 轮（≈600ms）**。
+		//   外景 / 城市里走动时加载线程一直在流式增删引用，于是扫描被反复打断。
+		//   现在：变化量 ≤ 这个容差就只记一笔（`streamMoves`）继续扫；超过（换场景 /
+		//   第一次进世界的批量填充）仍然按突变处理（等稳定轮数）。
+		constexpr std::uint32_t kRefsStreamJumpMax = 256;
+
+		// ★★ v4.7：3D 复检 —— 引擎侧描边被静默丢掉之后自动重挂
+		//   背景见 SyncNativeOutline 里的「4) 3D 复检」段。每轮最多复检这么多个已挂目标。
+		constexpr std::uint32_t kVerify3DPerScan = 32;
+
+		// ★ v4.7：Tick（主循环任务）间隔超过这么久就记一笔 —— 用来区分
+		//   「扫描没发生」是「Tick 根本没被引擎调用」（暂停 / 载入 / 主线程忙）
+		//   还是「Tick 调了但被早退挡住」。实测里出现过 39 秒一个 scan 都没有的窗口，
+		//   当时两种可能分不出来（这就是加它的原因）。
+		constexpr std::uint64_t kTickGapLogMs = 1500;
+
 		constexpr std::uint64_t kStatsLogIntervalMs = 5000;
 		constexpr std::uint64_t kBindWarnIntervalMs = 5000;
 
@@ -602,6 +661,25 @@ namespace SAS
 			//   `UnequipAll()`（卸下后才可搜刮）正是同一条引擎规则的旁证。
 			//   设 0 = 退回旧行为（只按 0x04 跳过），仅在排查时用。
 			bool          skipEquippedLoot = true;
+
+			// ================================================================
+			// ★★ v4.7：外景连续性 / 高亮丢失自愈（背景见常量区同名前缀的长注释）
+			// ================================================================
+			// 1 = 外景里跨 cell 边界当「连续过渡」处理：不整批熄灭、短静置、
+			//     并且把「近期待过的 cell」一起扫描（边界对面的东西也能亮）。
+			//   0 = 退回 v4.6 行为（每次跨边界全灭 + 2 秒不扫描），只用于对照排查。
+			bool          exteriorContinuous = true;
+			// 连续过渡时的静置时间（毫秒，0 ~ 2000）。引擎此刻正在往新 cell 的引用数组里
+			// 塞东西，但世界并没有重建 ⇒ 给一小段就够（默认 300）。
+			int           settleOnCellCrossMs = static_cast<int>(kSettleOnCellCrossMs);
+			// 引用数「轻微变化」的容差（0 ~ 65536）：变化量不超过它就不再打断扫描
+			// （外景 / 城市里走动时加载线程一直在流式增删引用）。设 0 = 退回旧判据
+			// （任何长度变化都要重新等 kRefsStableRounds 轮）。
+			int           streamJumpTolerance = static_cast<int>(kRefsStreamJumpMax);
+			// 每轮最多复检多少个「已挂」目标的 3D 根（0 = 关掉这条自愈，仅排查用）。
+			//   引擎侧描边是按 3D 图节点登记的，3D 被重建（外景流式加载 / LOD 切换）
+			//   就会丢，而账本还记着「挂着」⇒ 从此不亮。这一项让 MOD 发现后重挂。
+			int           verify3DPerScan = static_cast<int>(kVerify3DPerScan);
 		};
 
 		// ====================================================================
@@ -619,6 +697,14 @@ namespace SAS
 			//   摘除时**不读它** —— 先读引擎状态表里的真实值（原版可能覆盖过），
 			//   这是 v2.3 起就守着的做法。
 			std::uint32_t                    state      = 0xFF;
+			// ★ v4.7：挂上（或最近一次重挂）时该引用的 3D 根节点地址。
+			//   **只用于比较，绝不解引用**（3D 可能已经被销毁，那个地址随时可能失效）。
+			//   引擎侧描边是按「3D 图节点」登记在 HighlightManager 里的（v2.3 实证：
+			//   0x653F60 的 id 取自 3D 图叶子节点，不是 FormID）⇒ 3D 被重建
+			//   （外景流式加载、LOD ↔ 真模型互换）就会丢，而账本还记着「挂着」。
+			//   地址一变（或从 null 变非 null）就说明该重挂了 —— 见 SyncNativeOutline
+			//   的「4) 3D 复检」段。
+			const void*                      last3D     = nullptr;
 		};
 
 		struct State
@@ -770,6 +856,52 @@ namespace SAS
 			std::uint32_t stableRounds  = 0;  // 长度连续相同的轮数
 			std::uint64_t settleUntilMs = 0;  // 在此之前不扫描（换场景/读档后的静置期）
 			std::uint64_t refsRejected  = 0;  // 引用数组校验不通过而跳过的次数
+
+			// ================================================================
+			// ★★ v4.7：近期 cell 环（外景连续过渡 + 边界对面也参与扫描）
+			//   定义与淘汰规则见常量区 kRingCellMax 上方的长注释。
+			// ================================================================
+			struct RingCell
+			{
+				RE::TESObjectCELL* cell  = nullptr;
+				std::uint64_t      seenMs = 0;  // 最近一次校验通过 / 玩家在其中的时刻
+				std::uint32_t      miss   = 0;  // 连续校验失败次数（到 kRingCellMissMax 就踢）
+				std::uint32_t      refs   = 0;  // 最近一次读到的引用数（诊断）
+			};
+			RingCell      ring[kRingCellMax]{};
+			// --- 诊断（窗口内，打完成绩清零）---
+			std::uint64_t cellChanges    = 0;  // 换 cell 次数
+			std::uint64_t cellContinuous = 0;  // 其中走「连续过渡」的次数（应占绝大多数）
+			std::uint64_t ringSkipped    = 0;  // 环里校验失败被跳过的 cell 次数（卸载中的 cell）
+			std::uint32_t ringCells       = 0;  // 最近一轮实际参与扫描的「环内额外 cell 数」
+			std::uint64_t streamMoves    = 0;  // 引用数轻微变化（流式）但照常扫描的次数
+
+			// --- ★ v4.7：扫描被「哪一种原因」跳过的窗口计数（诊断）---
+			//   用途：用户报「行走时不扫描」时，一次日志就能指出卡在哪一步。
+			std::uint64_t skipOff       = 0;  // 功能关着（F8 OFF）
+			std::uint64_t skipThrottle  = 0;  // 扫描间隔节流（正常路径，5/s）
+			std::uint64_t skipLoading   = 0;  // 载入画面开着（不做任何引擎调用）
+			std::uint64_t skipNoPlayer  = 0;
+			std::uint64_t skipNoCell    = 0;
+			std::uint64_t skipSettle    = 0;  // 换场景 / 连续过渡后的静置期内
+			std::uint64_t skipUnstable  = 0;  // 引用数组还没定 / 长度突变
+			std::uint64_t skipWarmup    = 0;  // 等稳定轮数（kRefsStableRounds）
+
+			// --- ★ v4.7：Tick 间隔诊断（区分「Tick 没被调」和「被早退挡住」）---
+			std::uint64_t lastTickMs     = 0;
+			std::uint64_t tickGaps       = 0;  // 间隔 > kTickGapLogMs 的次数
+			std::uint64_t tickGapMsMax   = 0;
+			std::uint64_t tickGapMsTotal = 0;
+
+			// --- ★ v4.7：3D 复检（引擎侧描边丢了就重挂）---
+			std::size_t   verifyCursor       = 0;  // 轮转游标（覆盖所有已挂目标）
+			std::uint64_t outline3DProbes    = 0;  // 复检了多少次
+			std::uint64_t outline3DReasserts = 0;  // 其中发现 3D 变了、重挂了多少次
+
+			// --- ★ v4.7：移动距离（诊断：把「行走」和「跳过」对起来看）---
+			RE::NiPoint3 lastPos{};
+			bool         havePos    = false;
+			float        moveMeters = 0.0f;
 		};
 
 		Config               g_cfg;
@@ -1004,6 +1136,115 @@ namespace SAS
 			return true;
 		}
 
+		// ================================================================
+		// ★ v4.7：近期 cell 环（定义与淘汰规则见常量区 kRingCellMax 上方）
+		// ================================================================
+		void RingClear()
+		{
+			for (auto& r : g_state.ring) {
+				r = State::RingCell{};
+			}
+		}
+
+		std::uint32_t RingCount()
+		{
+			std::uint32_t n = 0;
+			for (const auto& r : g_state.ring) {
+				if (r.cell) {
+					++n;
+				}
+			}
+			return n;
+		}
+
+		bool RingContains(const RE::TESObjectCELL* a_cell)
+		{
+			if (!a_cell) {
+				return false;
+			}
+			for (const auto& r : g_state.ring) {
+				if (r.cell == a_cell) {
+					return true;
+				}
+			}
+			return false;
+		}
+
+		// 把 cell 放进环里（已在环里就刷新时间戳 / 引用数），必要时淘汰最旧的一个。
+		void RingTouch(RE::TESObjectCELL* a_cell, std::uint64_t a_nowMs, std::uint32_t a_refs)
+		{
+			if (!a_cell) {
+				return;
+			}
+			State::RingCell* free = nullptr;
+			for (auto& r : g_state.ring) {
+				if (r.cell == a_cell) {
+					r.seenMs = a_nowMs;
+					r.miss   = 0;
+					r.refs   = a_refs;
+					return;
+				}
+				if (!r.cell && !free) {
+					free = &r;
+				}
+			}
+			if (!free) {
+				// 环满：淘汰最旧的那个
+				free = &g_state.ring[0];
+				for (auto& r : g_state.ring) {
+					if (r.seenMs < free->seenMs) {
+						free = &r;
+					}
+				}
+			}
+			*free = State::RingCell{};
+			free->cell   = a_cell;
+			free->seenMs = a_nowMs;
+			free->refs   = a_refs;
+		}
+
+		// 引用总数超过上限时，从最旧的开始丢（防止每轮要遍历的引用数无界增长）。
+		void RingTrimByRefs()
+		{
+			std::uint64_t total = 0;
+			for (const auto& r : g_state.ring) {
+				total += r.refs;
+			}
+			while (total > kRingRefsCap) {
+				State::RingCell* oldest = nullptr;
+				for (auto& r : g_state.ring) {
+					if (r.cell && (!oldest || r.seenMs < oldest->seenMs)) {
+						oldest = &r;
+					}
+				}
+				if (!oldest) {
+					return;
+				}
+				total -= oldest->refs;
+				*oldest = State::RingCell{};
+			}
+		}
+
+		// 「这个偏移上真的是这个 cell 的引用数组吗？」—— 环里那些 cell 用这一条。
+		// 比 ValidateCellRefs 多一层**自洽性**判据：抽到的引用必须承认自己是这个 cell 的
+		// （`ref->parentCell == cell`）。这条对「cell 已经被卸载 / 对象被释放但内存还
+		// 可读」的极端情况特别有效 —— 垃圾数组几乎不可能同时满足
+		// [BSTArray 头自洽] + [元素是 REFR/ACHR] + [元素自认属于这个 cell]。
+		bool ValidateRingCellRefs(const RawArray& a_arr, const RE::TESObjectCELL* a_cell, std::uint32_t a_samples)
+		{
+			if (!ValidateCellRefs(a_arr, a_samples)) {
+				return false;
+			}
+			auto* const*        list = reinterpret_cast<RE::TESObjectREFR* const*>(a_arr.data);
+			const std::uint32_t n    = std::min<std::uint32_t>(a_arr.size, a_samples);
+			for (std::uint32_t i = 0; i < n; ++i) {
+				if (list[i]->parentCell != a_cell) {
+					return false;
+				}
+			}
+			return true;
+		}
+
 		std::string ModuleDir()
 		{
 			char    buf[MAX_PATH]{};
@@ -1105,6 +1346,12 @@ namespace SAS
 			g_cfg.resyncOnScannerClose = getInt("ResyncOnScannerClose", 1) != 0;
 			g_cfg.unhighlightGraceMs = std::clamp(getInt("UnhighlightGraceMs", 1500), 0, 60000);
 			g_cfg.maxOutlineOpsPerScan = std::clamp(getInt("MaxOutlineOpsPerScan", 64), 0, 4096);
+
+			// ★ v4.7：外景连续性 / 高亮丢失自愈（背景见常量区长注释）
+			g_cfg.exteriorContinuous  = getInt("ExteriorContinuous", 1) != 0;
+			g_cfg.settleOnCellCrossMs = std::clamp(getInt("SettleOnCellCrossMs", static_cast<int>(kSettleOnCellCrossMs)), 0, 2000);
+			g_cfg.streamJumpTolerance = std::clamp(getInt("StreamJumpTolerance", static_cast<int>(kRefsStreamJumpMax)), 0, 65536);
+			g_cfg.verify3DPerScan     = std::clamp(getInt("Verify3DPerScan", static_cast<int>(kVerify3DPerScan)), 0, 1024);
 
 			// --- ★ v4.0：分类分色（每个类别一个 outline 状态 0..11）---
 			//   （★ v4.2 追加 corpse，默认 9 = 与容器同色，理由见 Config::stateByCategory）
@@ -1210,6 +1457,9 @@ namespace SAS
 				g_cfg.autoEnsureManagers, g_cfg.resyncOnScannerClose, g_cfg.notifyOnToggle);
 			REX::INFO("config: unhighlightGrace={}ms maxOutlineOpsPerScan={}",
 				g_cfg.unhighlightGraceMs, g_cfg.maxOutlineOpsPerScan);
+			REX::INFO("config: exteriorContinuous={} settleOnCellCross={}ms streamJumpTolerance={} verify3DPerScan={}",
+				g_cfg.exteriorContinuous, g_cfg.settleOnCellCrossMs,
+				g_cfg.streamJumpTolerance, g_cfg.verify3DPerScan);
 
 			// 分类分色：把「类别 → outline 状态」逐条打出来（调配色时一眼能对上）
 			{
@@ -3003,6 +3253,9 @@ namespace SAS
 						e.ref        = RE::NiPointer<RE::TESObjectREFR>{ c->ref };
 						e.reassertMs = nextMs;
 						e.state      = c->state;
+						// ★ v4.7：记下挂的时候的 3D 根（之后只要它变了就说明 3D 被重建过 ⇒
+						//   引擎侧那条登记已经丢了 ⇒ 见「4) 3D 复检」）
+						e.last3D = RefGet3D(c->ref).get();
 						g_state.outlined[c->ref] = std::move(e);
 					}
 				} else if (a_nowMs >= it->second.reassertMs) {
@@ -3020,11 +3273,78 @@ namespace SAS
 					if (OutlineRef(c->ref, c->state)) {
 						it->second.reassertMs = nextMs;
 						it->second.state      = c->state;
+						it->second.last3D     = RefGet3D(c->ref).get();  // ★ v4.7
 					} else {
 						// 挂不上（管理器又没了）：本轮撤账，下轮重新试
 						it = g_state.outlined.erase(it);
 					}
 				}
+			}
+
+			// ================================================================
+			// ★★ v4.7：4) 3D 复检 —— 引擎把描边丢了就重挂
+			// ================================================================
+			// 背景（用户实测「星球表面地图上，原本已经高亮的物体突然不亮了」）：
+			//   描边是引擎按「3D 图节点」登记在 HighlightManager 里的（v2.3 实证：
+			//   摘除用的 0x653F60 那个 id 取自 **3D 图的叶子节点**，不是 FormID）。
+			//   外景走动时引擎会流式卸载 / 重建 3D（LOD ↔ 真模型互换就是最典型的），
+			//   重建之后管理器里那条登记就没了 —— 而我们的账本还记着「挂着」，
+			//   默认 `ReassertMs=0` 下**永远不会再 Set 一次** ⇒ 那个物体从此不亮，
+			//   直到它掉出半径再进来（这正是用户看到的「突然不亮」）。
+			//   与 v3.2 修的「用完扫描仪后全灭」是同一类问题：**账本与引擎侧脱节**，
+			//   只是那一次是整表被销毁（有管理器数量下跌这条判据），这一次是单条丢失
+			//   （管理器数量不变，任何全局判据都看不到）。
+			//
+			// 做法：每轮按游标复检 `Verify3DPerScan` 个**已挂**目标，
+			//   发现它的 3D 根指针与「挂的时候记下的」不一样（重建过 / 第一次加载出来）
+			//   就重新 Set 一次（同样走每轮预算）。
+			//   ★ 只比指针、**绝不解引用**记下的那个旧指针（3D 可能已经销毁）。
+			//   ★ 3D 现在是 null 就不动：看不见的东西本来就没描边，等它加载出来
+			//     指针自然会变，那时再挂。
+			//   ★ 成本：每轮最多 kVerify3DPerScan 次「取 3D」（虚调用 + 引用计数），
+			//     默认 32/轮 = 160/s，与每轮 5~40 条 Set/Remove 相比可以忽略。
+			//   诊断：统计行里的 `3D复检: probes=… reassert=…`（后者持续增长 = 这条
+			//   自愈在真的干活；用户下次报告里这两个数就是证据）。
+			if (g_state.nativeReady && g_cfg.verify3DPerScan > 0 && !a_chosen.empty()) {
+				const std::size_t total = a_chosen.size();
+				const std::size_t step  = std::min<std::size_t>(total, static_cast<std::size_t>(g_cfg.verify3DPerScan));
+				std::uint32_t     probed = 0;
+				for (std::size_t k = 0; k < step; ++k) {
+					const std::size_t idx = (g_state.verifyCursor + k) % total;
+					auto*             c   = a_chosen[idx];
+					auto              it  = g_state.outlined.find(c->ref);
+					if (it == g_state.outlined.end() || it->second.dropAt != 0) {
+						continue;  // 已经不在选中集合里（待摘的不要复活）
+					}
+					++probed;
+					auto root = RefGet3D(c->ref);
+					if (!root) {
+						continue;  // 3D 还没（重新）加载出来，等下一轮
+					}
+					const void* cur = root.get();
+					if (cur == it->second.last3D) {
+						continue;  // 3D 没变过 ⇒ 引擎侧那条登记还在，什么都不用做
+					}
+					if (budget == 0) {
+						++g_state.opsDeferred;
+						break;
+					}
+					--budget;
+					++g_state.opsThisScan;
+					if (OutlineRef(c->ref, c->state)) {
+						it->second.last3D = cur;
+						++g_state.outline3DReasserts;
+						// 只打前 32 条 + 之后每 100 条一条（外景走动时可能很频繁，
+						// 免得把日志刷爆）；趋势看统计行的 `3D复检: reassert=` 就够。
+						if (g_state.outline3DReasserts <= 32 || g_state.outline3DReasserts % 100 == 0) {
+							REX::INFO("native outline: 3D 重建（ref={:08X} 状态 {}）-> 重挂一次"
+									  "（累计 {} 次；引擎侧描边按 3D 节点登记，重建即丢）",
+								c->ref->GetFormID(), c->state, g_state.outline3DReasserts);
+						}
+					}
+				}
+				g_state.outline3DProbes += probed;
+				g_state.verifyCursor = (g_state.verifyCursor + step) % total;
 			}
 		}
 
@@ -3164,8 +3484,23 @@ namespace SAS
 		{
 			auto* cell = a_player->parentCell;
 			if (!cell) {
+				++g_state.skipNoCell;
 				return;
 			}
+
+			// 本轮要遍历的 cell 表：
+			//   [0] = 当前 cell（带「引用数组稳定性」判据，见下）
+			//   [1..] = 「近期 cell 环」里形状校验通过的 cell（★ v4.7，见 kRingCellMax）
+			// 环的意义有两个：① 跨 cell 边界时**边界对面的引用**也能亮；
+			//                  ② 换 cell 时不必把账本整批作废（配合 Tick 里的连续过渡）。
+			struct ScanCell
+			{
+				RE::TESObjectCELL*        cell  = nullptr;
+				RE::TESObjectREFR* const* list  = nullptr;
+				std::uint32_t             count = 0;
+			};
+			static std::array<ScanCell, 1 + kRingCellMax> scanCells;
+			std::size_t                                    cellCount = 0;
 
 			RawArray    arr{};
 			std::size_t usedOff = 0;
@@ -3202,18 +3537,88 @@ namespace SAS
 					g_state.stableRounds = 0;
 					return;
 				}
-				// 长度突变（或换了个偏移）= 加载线程还在往数组里塞引用 → 本轮先不动
-				if (arr.size != g_state.lastRefsSize || usedOff != g_state.cellRefsOff) {
-					g_state.lastRefsSize = arr.size;
+				// 换了个偏移 = 之前读的不是引用数组 → 重新开始数稳定轮数
+				if (usedOff != g_state.cellRefsOff) {
 					g_state.cellRefsOff  = usedOff;
+					g_state.lastRefsSize = arr.size;
 					g_state.stableRounds = 0;
+					++g_state.skipUnstable;
 					return;
 				}
+				// ★ v4.7：引用数判据分两档 ——
+				//   · **突变**（第一次进世界 / 换场景的批量填充）⇒ 还没稳定，等稳定轮数
+				//   · **轻微变化**（≤ StreamJumpTolerance）⇒ 加载线程在流式增删引用，
+				//     这正是「走动时」最常见的形态，**不再打断扫描**。旧判据是
+				//     「任何长度变化 ⇒ stableRounds 归零 + return」，而 stableRounds 要
+				//     连续两轮才放行 ⇒ 每次变化跳过约 3 轮（≈600ms）；外景 / 城市里走动时
+				//     加载线程一直在增删 ⇒ 扫描被反复打断 = 用户报的「行走时似乎不扫描」
+				//     的第二个来源。形状校验每轮都做 + 元素逐个校验，安全性不变。
+				const std::uint64_t prevSize = g_state.lastRefsSize;
+				const std::uint64_t delta    = arr.size > prevSize ? arr.size - prevSize : prevSize - arr.size;
+				const std::uint64_t tol      = static_cast<std::uint64_t>(g_cfg.streamJumpTolerance);
+				if (prevSize == 0 || delta > tol) {
+					g_state.lastRefsSize = arr.size;
+					g_state.stableRounds = 0;
+					++g_state.skipUnstable;
+					return;
+				}
+				if (delta != 0) {
+					++g_state.streamMoves;  // 流式变化：记一笔，照常扫描
+				}
+				g_state.lastRefsSize = arr.size;
 				// 长度连续稳定若干轮才认为世界已经稳定下来
 				if (++g_state.stableRounds < kRefsStableRounds) {
+					++g_state.skipWarmup;
 					return;
 				}
+
+				scanCells[cellCount++] = ScanCell{ cell,
+					reinterpret_cast<RE::TESObjectREFR* const*>(arr.data),
+					std::min<std::uint32_t>(arr.size, kMaxRefsSanity) };
+				// 当前 cell 进环（= 玩家真的在这里；「连续过渡」判据与「边界对面也扫」都靠它）
+				RingTouch(cell, a_nowMs, arr.size);
 			}
+
+			// ---- ★ v4.7：环里其它 cell（形状 + 自洽性都过才一起扫）----
+			{
+				for (auto& rc : g_state.ring) {
+					if (cellCount >= scanCells.size()) {
+						break;
+					}
+					if (!rc.cell || rc.cell == cell) {
+						continue;
+					}
+					RawArray ringArr{};
+					bool     ok = false;
+					if (IsReadable(rc.cell, 0x90)) {
+						for (const auto off : kCellRefsOffCandidates) {
+							const auto cand = ReadRawArray(rc.cell, off);
+							if (ValidateRingCellRefs(cand, rc.cell, kRefsShapeSamples)) {
+								ringArr = cand;
+								ok      = true;
+								break;
+							}
+						}
+					}
+					if (!ok) {
+						// 校验不过 = 这个 cell 已经卸载（或对象被释放）⇒ 累计几次就踢出环
+						++rc.miss;
+						++g_state.ringSkipped;
+						if (rc.miss >= kRingCellMissMax) {
+							rc = State::RingCell{};
+						}
+						continue;
+					}
+					rc.miss   = 0;
+					rc.seenMs = a_nowMs;
+					rc.refs   = ringArr.size;
+					scanCells[cellCount++] = ScanCell{ rc.cell,
+						reinterpret_cast<RE::TESObjectREFR* const*>(ringArr.data),
+						std::min<std::uint32_t>(ringArr.size, kMaxRefsSanity) };
+				}
+				RingTrimByRefs();
+			}
+			g_state.ringCells = static_cast<std::uint32_t>(cellCount > 0 ? cellCount - 1 : 0);
 
 			const RE::NiPoint3 origin  = a_player->GetPosition();
 			const float        radiusU = g_cfg.radiusMeters * g_cfg.unitsPerMeter;
@@ -3240,8 +3645,13 @@ namespace SAS
 			{
 				PhaseTimer tLoop{ &g_state.tLoopMs, &g_state.tLoopMax };
 
-			auto* const*        list  = reinterpret_cast<RE::TESObjectREFR* const*>(arr.data);
-			const std::uint32_t count = std::min<std::uint32_t>(arr.size, kMaxRefsSanity);
+			// ★ v4.7：对「当前 cell + 环内 cell」逐个遍历（见上面 scanCells 的说明）。
+			//   每个 cell 只认**它自己**的引用（`ref->parentCell == sc.cell`）：
+			//   这条既是最强的自洽判据，也顺带把「读到别的 cell 的引用」挡在外面。
+			for (std::size_t ci = 0; ci < cellCount; ++ci) {
+			const auto& sc = scanCells[ci];
+			auto* const*        list  = sc.list;
+			const std::uint32_t count = sc.count;
 
 			// ★ v4.2：库存列表偏移标定（**每会话一次**，只拿容器当样本）。
 			//   放在这里是因为它要顺序扫引用找样本；标定完成后这一段不再执行，
@@ -3260,7 +3670,7 @@ namespace SAS
 					++g_state.skipDeleted;
 					continue;
 				}
-				if (ref->parentCell != cell) {
+				if (ref->parentCell != sc.cell) {
 					++g_state.skipParentCell;
 					continue;
 				}
@@ -3355,6 +3765,7 @@ namespace SAS
 				c.key = c.lit ? d2 * 0.5f : d2;
 				cands.push_back(c);
 			}
+			}  // ← v4.7：cell 循环结束（当前 cell + 环内 cell）
 
 			g_state.candCount = cands.size();
 
@@ -3409,6 +3820,27 @@ namespace SAS
 			++g_state.tickCount;
 			const std::uint64_t now = NowMs();
 
+			// ★ v4.7：Tick 间隔诊断 —— 「高亮不更新」到底是「Tick 根本没被引擎调用」
+			//   还是「调了但被下面的早退挡住」，这两个数一眼就能分开。
+			//   实测里出现过 39 秒一个 scan 都没有的窗口（当时两种可能分不出来），
+			//   这就是加它的原因：间隔 > kTickGapLogMs 就记一笔并打一行 WARN。
+			if (g_state.lastTickMs && now - g_state.lastTickMs > kTickGapLogMs) {
+				const auto gap = now - g_state.lastTickMs;
+				++g_state.tickGaps;
+				g_state.tickGapMsTotal += gap;
+				if (gap > g_state.tickGapMsMax) {
+					g_state.tickGapMsMax = gap;
+				}
+				REX::WARN("tick gap {}ms（这段时间引擎没有调用本插件的主循环任务："
+						  "游戏暂停 / 载入 / 主线程忙？）loading={} monocle={} on={} cell={:08X}",
+					gap,
+					g_state.loadingNow ? 1 : 0,
+					IsMonocleMenuOpen() ? 1 : 0,
+					g_state.on ? 1 : 0,
+					g_state.lastCell ? g_state.lastCell->GetFormID() : 0);
+			}
+			g_state.lastTickMs = now;
+
 			PollHotkey(now);
 
 			// ★ v4.0：热键提示（写 GLOB，桥脚本轮询后弹 HUD）。
@@ -3435,6 +3867,10 @@ namespace SAS
 					g_state.stableRounds  = 0;
 					g_state.settleUntilMs = now + kSettleAfterSceneChangeMs;
 					InvalidateReadRegions();
+					// ★ v4.7：经过载入画面的切换 = 世界重开 ⇒ 「近期 cell 环」也必须作废
+					//   （旧 cell 的指针随时可能被释放；而且这样「换 cell」判据才不会
+					//    把一个全新的内景误判成「连续过渡」）。
+					RingClear();
 					ResetForNewScene(now, "载入画面关闭（读档 / 换场景）");
 				}
 				g_state.loadingSeen = loading;
@@ -3448,11 +3884,13 @@ namespace SAS
 			DetectEngineOutlineLoss(now);
 
 			if (!g_state.on) {
+				++g_state.skipOff;
 				return;
 			}
 
 			// 扫描节流
 			if (now - g_state.lastScanMs < static_cast<std::uint64_t>(g_cfg.scanIntervalMs)) {
+				++g_state.skipThrottle;
 				return;
 			}
 			g_state.lastScanMs = now;
@@ -3462,33 +3900,69 @@ namespace SAS
 			//   几百条叠起来就是实测日志里那个 18 秒的空档。
 			g_state.loadingNow = IsLoadingScreenUp();
 			if (g_state.loadingNow) {
+				++g_state.skipLoading;
 				return;
 			}
 
 			auto* player = RE::PlayerCharacter::GetSingleton();
 			if (!player) {
+				++g_state.skipNoPlayer;
 				return;
+			}
+			// ★ v4.7：移动距离（诊断）—— 每轮扫描累加玩家位移，统计行里打
+			//   `move=X.Xm`。用它把「行走」和「扫描被跳过 / 目标变化」对起来看。
+			{
+				const RE::NiPoint3 pos = player->GetPosition();
+				if (g_state.havePos) {
+					const float dx = pos.x - g_state.lastPos.x;
+					const float dy = pos.y - g_state.lastPos.y;
+					const float dz = pos.z - g_state.lastPos.z;
+					g_state.moveMeters += std::sqrt(dx * dx + dy * dy + dz * dz) / g_cfg.unitsPerMeter;
+				} else {
+					g_state.havePos = true;
+				}
+				g_state.lastPos = pos;
 			}
 			auto* cell = player->parentCell;
 			if (!cell) {
 				g_state.lastCell = nullptr;
+				++g_state.skipNoCell;
 				return;
 			}
 			if (cell != g_state.lastCell) {
 				const bool first = (g_state.lastCell == nullptr);
+				// ★★ v4.7：连续过渡判据 —— 上一个 cell 还在「近期 cell 环」里
+				//   （= 它是我们自己最近待过、并且形状校验一直通过的 cell），
+				//   说明世界没有被重开：外景里跨过 cell 边界走一步就是这种。
+				//   依据与完整推导见常量区 kSettleOnCellCrossMs 上方的长注释。
+				const bool continuous = g_cfg.exteriorContinuous && !first && RingContains(g_state.lastCell);
 				g_state.lastCell = cell;
-				// 换 cell / 第一次进入世界：重置引用数组稳定性判据，并静置一段
-				// 时间 —— 引擎此刻正在重建 3D 和引用数组，parentCell 是半初始化状态
-				// （上一代项目 v18 就是在这里崩的）。
+				// 换 cell（无论哪种）：重置引用数组稳定性判据。
+				//   引擎此刻正在往新 cell 的引用数组里塞东西，parentCell 可能还是
+				//   半初始化状态（上一代项目 v18 就是在这里崩的）。
 				g_state.cellRefsOff   = 0;
 				g_state.lastRefsSize  = 0;
 				g_state.stableRounds  = 0;
-				g_state.settleUntilMs = now + kSettleAfterSceneChangeMs;
-				InvalidateReadRegions();  // v2.3：旧 cell 的「可读区间」不再可信
-				ResetForNewScene(now, first ? "first cell" : "cell changed");
+				++g_state.cellChanges;
+				if (continuous) {
+					// 世界是连续的 ⇒ **不整批摘、不清账本**，只短静置一下：
+					//   谁真的离开半径 / 掉出候选集合，就按 UnhighlightGraceMs 自然淘汰。
+					++g_state.cellContinuous;
+					g_state.settleUntilMs = now +
+						static_cast<std::uint64_t>(g_cfg.settleOnCellCrossMs > 0 ? g_cfg.settleOnCellCrossMs : 0);
+					RingTouch(cell, now, 0);  // 先把新 cell 放进环（续上「连续」这条链）
+					REX::INFO("cell cross (连续过渡): 账本保留 {} 个已挂目标，静置 {}ms，环={} 个 cell",
+						g_state.outlined.size(), g_cfg.settleOnCellCrossMs, RingCount());
+				} else {
+					g_state.settleUntilMs = now + kSettleAfterSceneChangeMs;
+					InvalidateReadRegions();  // v2.3：旧 cell 的「可读区间」不再可信
+					RingClear();              // 新世界：环作废（重新从当前 cell 开始攒）
+					ResetForNewScene(now, first ? "first cell" : "cell changed（换场景）");
+				}
 			}
 			if (now < g_state.settleUntilMs) {
-				return;  // 静置期内不扫描
+				++g_state.skipSettle;  // 静置期内不扫描
+				return;
 			}
 
 			// ★ v4.0.1：进入世界后的第一次扫描 —— 做一次性「配色刷新」
@@ -3507,22 +3981,67 @@ namespace SAS
 
 			if (g_cfg.logStats && now - g_state.lastStatsMs > kStatsLogIntervalMs) {
 				g_state.lastStatsMs = now;
-				REX::INFO("scan#{} cell={:08X} off=0x{:X} refs={} cand={} sel={} outline={}/{}/{} rej={} on={} resync={} monocle={} load={} notify={}",
+				// ★ v4.7：新增 `cells=`（本轮扫了几个 cell：第一个是当前 cell，其余是
+				//   「近期 cell 环」里的）与 `move=`（窗口内玩家走了多少米 —— 用它把
+				//   「行走」和「扫描被跳过」对起来看）。
+				REX::INFO("scan#{} cell={:08X} off=0x{:X} refs={} cells={} cand={} sel={} outline={}/{}/{} on={} resync={} monocle={} load={} notify={} move={:.1f}m",
 					g_state.scanCount,
 					cell->GetFormID(),
 					g_state.cellRefsOff,
 					g_state.lastRefsSize,
+					1 + g_state.ringCells,
 					g_state.candCount,
 					g_state.selCount,
 					g_state.outlined.size(),
 					g_state.nativeReady ? 1 : 0,
 					CountLiveManagers(),
-					g_state.refsRejected,
 					g_state.on ? 1 : 0,
 					g_state.outlineResyncs,
 					g_state.monocleOpen ? 1 : 0,
 					g_state.loadGameResets,
-					g_state.notifyWrites);
+					g_state.notifyWrites,
+					g_state.moveMeters);
+
+				// ★★ v4.7：诊断组 —— 「高亮不更新 / 没在扫描」的一次日志定位。
+				//   · skip: 每种早退各跳过多少轮（throttle 是正常节流，5/s）
+				//   · tick: gaps>0 = 引擎有段时间根本没调用主循环任务（暂停 / 载入 /
+				//     主线程忙），这是与「被早退挡住」完全不同的两回事
+				//   · cell: changes = 换 cell 次数，连续过渡 = 其中走「不整批摘」的
+				//   · 环: cell = 最近一轮多扫了几个「近期待过的 cell」；skipped = 校验
+				//     不过被跳过（= 那个 cell 卸载了）
+				//   · 流式变化 = 引用数轻微增删但照常扫描的次数（外景走动时应该 >0）
+				//   · 3D复检: probes/reassert —— reassert 增长 = 引擎侧描边真的丢过、
+				//     且被这条自愈重新挂上了（「高亮丢失」的直接证据）
+				REX::INFO("  skip (窗口内): off={} throttle={} loading={} noplayer={} nocell={} settle={} shape={} unstable={} warmup={}",
+					g_state.skipOff, g_state.skipThrottle, g_state.skipLoading,
+					g_state.skipNoPlayer, g_state.skipNoCell, g_state.skipSettle,
+					g_state.refsRejected, g_state.skipUnstable, g_state.skipWarmup);
+				REX::INFO("  tick/场景 (窗口内): tick间隔>{}ms={} maxGap={}ms 合计={}ms | cell: changes={} 连续过渡={} | 环: cell={} skipped={} | 流式变化={} | 3D复检: probes={} reassert={} | move={:.1f}m",
+					kTickGapLogMs, g_state.tickGaps, g_state.tickGapMsMax, g_state.tickGapMsTotal,
+					g_state.cellChanges, g_state.cellContinuous,
+					g_state.ringCells, g_state.ringSkipped,
+					g_state.streamMoves,
+					g_state.outline3DProbes, g_state.outline3DReasserts,
+					g_state.moveMeters);
+				g_state.skipOff        = 0;
+				g_state.skipThrottle   = 0;
+				g_state.skipLoading    = 0;
+				g_state.skipNoPlayer   = 0;
+				g_state.skipNoCell     = 0;
+				g_state.skipSettle     = 0;
+				g_state.refsRejected   = 0;
+				g_state.skipUnstable   = 0;
+				g_state.skipWarmup     = 0;
+				g_state.tickGaps       = 0;
+				g_state.tickGapMsMax   = 0;
+				g_state.tickGapMsTotal = 0;
+				g_state.cellChanges    = 0;
+				g_state.cellContinuous = 0;
+				g_state.ringSkipped    = 0;
+				g_state.streamMoves    = 0;
+				g_state.outline3DProbes    = 0;
+				g_state.outline3DReasserts = 0;
+				g_state.moveMeters     = 0.0f;
 
 				// ★ v4.0：分类命中数 —— 每个类别本轮各挂了多少个（配色不对时靠它定位）
 				{
