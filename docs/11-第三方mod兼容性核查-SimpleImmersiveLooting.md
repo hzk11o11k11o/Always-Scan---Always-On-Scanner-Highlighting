@@ -194,3 +194,19 @@ python tools\re\tr_verify.py       <orig.esm> <out.esm>
 **复现**：`& 'tools\package-sil.ps1'`（改完 README 作者名后需重跑；`dist/` 不入库）。
 ★ 上传前必做：替换 README 里的作者名占位符 → 重跑打包 → Files 里上传 zip。
 ★ 因完整包含原作者的 `.ba2`，发布前需确认 korodic 的再分发许可（页面权限说明或私信）。
+
+## 九、★ 意外收获：它同时是本项目「搜空判定」的**引擎规则旁证**（2026-09-18）
+
+用户后来把这个 mod 下载下来并问「对『活体敌人的尸体拿空不熄灭』有没有帮助」——
+**有，而且是关键的一条**：它从「引擎规则」层面证实了本项目 v4.6 的判据。
+
+| SIL 的构成 | 它反推出的引擎规则 |
+| --- | --- |
+| 「扒取装备」脚本唯一的关键调用 = **`akTarget.UnequipAll()`**（见 §2 工作链第 3 条） | 尸体**身上穿着**的装备**不在搜刮面板里**，必须先 `UnequipAll()` 卸下，玩家才能拿走 |
+| 覆盖 `fEquippedArmorChanceToDrop`：**0.1 → 0.0**（§3 第 3 项） | 原版引擎只在「掉落」时才把身上装备变成可搜刮物（默认 10% 概率）；SIL 关掉它，改用「扒取装备」手动卸下 |
+| 新增 ARMO `SIL_ARMO_NakedSpacesuit`（DESC：*bodies being naked when the game requires a spacesuit to be worn*） | 卸下宇航服后尸体变裸体 —— 所以它再造一件「假宇航服」给尸体穿上（顺便说明 `UnequipAll` 真的把宇航服从身上摘掉了） |
+
+⇒ 本项目据此在 v4.6 给判空加了第二类跳过：**`BGSInventoryItem::flags` 低 3 位
+（kSlotMask）≠ 0 = 装备中 ⇒ 面板拿不走**（规则细节与实测样本见 `docs/12` 第九节）。
+两件事天然一致：**用 SIL 卸下装备后，那些条目的 `fl` 归零 ⇒ 本 MOD 立刻重新把尸体
+算作「有东西」并照常高亮**，直到玩家把它们拿走 —— 可作为 v4.6 判据的双向验证。

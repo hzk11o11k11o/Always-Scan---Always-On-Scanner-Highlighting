@@ -286,10 +286,45 @@ namespace SAS
 		constexpr std::size_t   kOffInvItemSize     = 0x28;    // sizeof(BGSInventoryItem)
 		constexpr std::size_t   kOffInvItemStacks   = 0x10;    // BGSInventoryItem::stacks（BSTArray<Stack>）
 		constexpr std::size_t   kOffInvItemObject   = 0x00;    // BGSInventoryItem::object
-		// ★ v4.4：BGSInventoryItem::flags（u32 @+0x20）—— 低 3 位 = 装备槽（非 0 = 装备中）、
-		//   bit3 = kEquipStateLocked、bit5 = kTemporary。只作**探针**用（见 LootProbe）：
-		//   「拿空还亮」十有八九是库存里残留了面板不显示的条目，这一格是分辨它们的钥匙。
+		// ★ v4.4：BGSInventoryItem::flags（u32 @+0x20）—— 逐位语义见下面 v4.6 的常量。
 		constexpr std::size_t   kOffInvItemFlags    = 0x20;
+		// ================================================================
+		// ★★ v4.6：「穿在身上的装备」也要跳过（`*_NOTPLAYABLE` 之外的第二个隐形容器）
+		// ================================================================
+		// 位定义（commonlibsf `RE/B/BGSInventoryItem.h` 的 `BGSInventoryItem::Flag`）：
+		//   bit0..2 = kSlotIndex1/2/3（合起来是 kSlotMask）—— **非 0 = 这件东西正被穿着 /
+		//             装备着**（头文件里的 `IsEquipped()` 就是 `flags.any(kSlotMask)`）；
+		//   bit3    = kEquipStateLocked（装备状态锁定）；
+		//   bit5    = kTemporary（引擎临时条目）。
+		//
+		// ★ 起因：v4.5 实测（用户原话）「**场景预置尸体拿空了会熄灭，但活体敌人的尸体
+		//   还是不会**」。v4.4/v4.5 的日志（`loot probe:` / `actor probe (changed):`）
+		//   把残留物摊开成三类：
+		//     ① `ff` 含 0x04 的 `*_NOTPLAYABLE` 隐形装备 —— v4.5 已跳过；
+		//     ② **`fl` 非 0（装备槽位被置位）而 `ff` 不含 0x04 的普通装备**：
+		//        实测样本 `Spacesuit_CrimsonFleet_Assault`(0x66821) /
+		//        `..._Helmet`(0x66822) / `..._Backpack`(0x66825)，离线 `esmrec.py`
+		//        逐条查过 = **记录标志 0x40 的玩家版**，可它们在尸体库存里 `fl=1`
+		//        （= 还穿在身上）；这类只有「活着被打死」的尸体才会有
+		//        （预置尸体用的多是 `*_NOTPLAYABLE`）⇒ 正是上面那句反馈的数据形态；
+		//     ③ `fl=0` 的散落物（Credits / 弹药 / Digipick / 掉落的护甲）—— **真能拿**。
+		//
+		//   ★ 旁证（用户本次下载的第三方 mod `SimpleImmersiveLooting`，Nexus 12677）：
+		//     它的整个卖点就是 **「扒取装备」= `Actor.UnequipAll()`** —— 先把尸体身上
+		//     穿着的装备**卸下来**，面板里才拿得走；并且它把 GMST
+		//     `fEquippedArmorChanceToDrop` 从 **0.1 覆盖成 0.0**（= 死亡时引擎**不再
+		//     自动掉落**身上装备）。⇒ 引擎的模型就是：**装备着的（fl≠0）不算可搜刮物，
+		//     只有被「掉落 / 卸下」的（fl=0）才进搜刮面板**。
+		//     `fl=0` 的护甲样本日志里也有：`[ft=22 id=002470D1 … fl=0 ff=9 np=0]`。
+		//
+		//   ⇒ 判空时把「装备中」的条目也算作「拿不走」（默认跳过；`SkipEquippedLoot=0`
+		//     可退回旧行为）。跳过之后两件事自动一致：
+		//       · 打死的敌人（穿着玩家版宇航服 + 面板拿空）⇒ 判空 ⇒ 熄灭 ✅；
+		//       · 用 `SimpleImmersiveLooting` 的「扒取装备」卸下后 `fl` 归零 ⇒ 重新
+		//         算作「有东西」⇒ 照常亮，直到你把它们拿走 ✅。
+		constexpr std::uint32_t kInvItemFlagSlotMask    = 0x07;  // kSlotIndex1|2|3（非 0 = 装备中）
+		constexpr std::uint32_t kInvItemFlagEquipLocked = 0x08;  // kEquipStateLocked
+		constexpr std::uint32_t kInvItemFlagTemporary   = 0x20;  // kTemporary
 		constexpr std::size_t   kOffStackSize       = 0x10;    // sizeof(BGSInventoryItem::Stack)
 		constexpr std::size_t   kOffStackCount      = 0x08;    // BGSInventoryItem::Stack::count
 		constexpr std::uint32_t kInvMaxItems        = 4096;    // 条目数超过它 = 一定读错了
@@ -554,6 +589,19 @@ namespace SAS
 			//   预置尸体与打死的敌人一样）。
 			//   设 0 = 退回旧行为（把它们也算「有东西」，只在排查时用）。
 			bool          skipNonPlayableLoot = true;
+
+			// ================================================================
+			// ★★ v4.6：判空时也跳过「正穿在身上的装备」（`BGSInventoryItem::flags`
+			//   的低 3 位 kSlotMask ≠ 0）—— 默认 1
+			// ================================================================
+			// 背景 / 实证见常量区 `kInvItemFlagSlotMask` 的长注释（一句话版）：
+			//   引擎只在物品被「掉落 / 卸下」（`fl=0`）时才让它进搜刮面板；还穿在
+			//   尸体身上的（`fl≠0`）面板不显示、玩家也拿不走，`count` 却永远 ≥ 1
+			//   ⇒ v4.5 只跳过了 0x04 那一类，所以「活体敌人的尸体（穿着玩家版宇航服）」
+			//     拿空后依然不熄灭。第三方 `SimpleImmersiveLooting` 的「扒取装备」=
+			//   `UnequipAll()`（卸下后才可搜刮）正是同一条引擎规则的旁证。
+			//   设 0 = 退回旧行为（只按 0x04 跳过），仅在排查时用。
+			bool          skipEquippedLoot = true;
 		};
 
 		// ====================================================================
@@ -646,6 +694,12 @@ namespace SAS
 			std::uint64_t lootNotEmpty     = 0;  // 判到「有东西」（正常，会亮）
 			std::uint64_t lootNullInv      = 0;  // ★ v4.3：inventoryList 指针就是 null（库存还没被引擎创建）
 			std::uint64_t lootBadShape     = 0;  // ★ v4.3：形状不像 BGSInventoryList（疑似标定选错了偏移）
+			// ★ v4.6：判空时被「跳过」的条目数（= 面板拿不走的那两类），分两路来源计数。
+			//   ★ 注意 RefLootState 找到第一件**真能拿**的东西就早退，所以这两个数只是
+			//     「本轮走到的那部分」里的累计值 —— 用途是确认**规则有没有在生效**
+			//     （非 0 且持续增长 = 生效）；精确的残留明细看 `loot probe:` 那几行。
+			std::uint64_t lootSkipNonPlayable = 0;  // 记录标志 0x04（`*_NOTPLAYABLE`）
+			std::uint64_t lootSkipEquipped    = 0;  // 装备中（kSlotMask ≠ 0，还穿在身上）
 			std::uint64_t corpseSeen       = 0;  // 判定为尸体的引用数（ACHR 尸体 + 尸体道具）
 			std::uint64_t corpseByBit      = 0;  // 其中靠运行时 kDead 位判定的
 			std::uint64_t corpseByFlag     = 0;  // 其中靠记录标志 Starts Dead 判定的
@@ -1100,11 +1154,13 @@ namespace SAS
 			g_cfg.treatNullInvAsEmpty = getInt("TreatNullInvAsEmpty", 1) != 0;
 			// ★ v4.5：判空跳过「非玩家物品（0x04）」（默认 1；理由见 Config 里的说明）
 			g_cfg.skipNonPlayableLoot = getInt("SkipNonPlayableLoot", 1) != 0;
+			// ★ v4.6：判空跳过「正穿在身上的装备（kSlotMask）」」（默认 1；理由见 Config 里的说明）
+			g_cfg.skipEquippedLoot = getInt("SkipEquippedLoot", 1) != 0;
 			REX::INFO("config: corpseUnconscious={} corpseLifeState={} corpseBleedout={} skipEmptyLoot={}",
 				g_cfg.corpseUnconscious, g_cfg.corpseLifeState, g_cfg.corpseBleedout, g_cfg.skipEmptyLoot);
-			REX::INFO("config: actorProbeMax={} actorChangeProbeMax={} lootProbeMax={} treatNullInvAsEmpty={} skipNonPlayableLoot={}",
+			REX::INFO("config: actorProbeMax={} actorChangeProbeMax={} lootProbeMax={} treatNullInvAsEmpty={} skipNonPlayableLoot={} skipEquippedLoot={}",
 				g_cfg.actorProbeMax, g_cfg.actorChangeProbeMax, g_cfg.lootProbeMax, g_cfg.treatNullInvAsEmpty,
-				g_cfg.skipNonPlayableLoot);
+				g_cfg.skipNonPlayableLoot, g_cfg.skipEquippedLoot);
 
 			// --- ★ v4.0.1：可选的自定义类别颜色（ColorLoot=RRGGBB …，留空 = 用引擎原生配色）---
 			{
@@ -1610,8 +1666,9 @@ namespace SAS
 		//     · 若读到的 count 全是 0 却仍返回「有」⇒ 是我们自己的读取 bug（这一行能证伪）。
 		//   触发条件：**近距离（≤ kLootProbeRangeMeters）的尸体**、判 notEmpty、
 		//   每个 ref 只打一次、每会话上限 `LootProbeMax`。
-		//   打印：`ref / d / size（条目数）/ nonEmpty（有 count>0 的条目数）/ total（count 之和）`
-		//   + 前 4 个非空条目的 `[ft=类型 id=FormID n=stack数 c=count]`。
+		//   打印：`ref / d / size（条目数）/ playable=总数 / equipped=总数 / nonPlayable=总数`
+		//   （★ v4.6：三桶 = 真能拿 / 装备中 / 0x04 非玩家物品）
+		//   + 前几个非空条目的 `[ft=类型 id=FormID n=stack数 c=count fl=条目flags ff=记录flags eq= np=]`。
 		//   ★ 纯内存读 + 形状校验；读不到就打原因，**绝不改判定**。
 		void LootProbe(const RE::TESObjectREFR* a_ref, float a_distSq)
 		{
@@ -1656,12 +1713,16 @@ namespace SAS
 			}
 
 			std::string   detail;
-			// ★ v4.5：把「有 count>0 的条目」拆成两桶 ——
-			//   `playable`    = 玩家**能拿走**的（判空只看它）
-			//   `nonPlayable` = 记录标志 0x04 的 NPC 隐形装备（判空跳过它）
-			//   这样一行日志就能验证「修好了没有」：面板拿空后 playable 应变成 0。
+			// ★ v4.5 / ★ v4.6：把「有 count>0 的条目」拆成**三桶**（= 判空的真实口径）——
+			//   `playable`    = 玩家**真能拿走**的（判空只看它：`fl=0` 且 `ff` 不含 0x04）
+			//   `equipped`    = **装备中**（`fl` 低 3 位 ≠ 0）：v4.6 起判空跳过
+			//   `nonPlayable` = 记录标志 0x04 的 NPC 隐形装备：v4.5 起判空跳过
+			//   这样一行日志就能验证「修好了没有」：面板拿空后 `playable` 应变成 0，
+			//   剩下的应该全落在 `equipped` / `nonPlayable` 这两桶里。
 			std::uint32_t playable    = 0;
 			std::uint64_t total       = 0;
+			std::uint32_t equipped    = 0;
+			std::uint64_t eqTotal     = 0;
 			std::uint32_t nonPlayable = 0;
 			std::uint64_t npTotal     = 0;
 			const auto    items       = std::min<std::uint32_t>(size, kInvWalkItemsMax);
@@ -1687,39 +1748,46 @@ namespace SAS
 				if (sum == 0) {
 					continue;
 				}
+				const auto  objFlags  = *reinterpret_cast<const std::uint32_t*>(
+					reinterpret_cast<const std::uint8_t*>(obj) + kOffFormFlags);
+				// item flags（BGSInventoryItem::flags @+0x20，u32）：
+				//   低 3 位 = 装备槽（非 0 = 正在装备中），bit3 = kEquipStateLocked，
+				//   bit5 = kTemporary
+				const auto itemFlags = *reinterpret_cast<const std::uint32_t*>(item + kOffInvItemFlags);
 				const bool np = IsNonPlayableForm(obj);
+				const bool eq = !np && (itemFlags & kInvItemFlagSlotMask) != 0;
 				if (np) {
 					++nonPlayable;
 					npTotal += sum;
+				} else if (eq) {
+					++equipped;
+					eqTotal += sum;
 				} else {
 					++playable;
 					total += sum;
 				}
-				// 明细：可拿的列前 4 条、非玩家物品列前 2 条（都带 np= 标记）
-				if ((!np && playable <= 4) || (np && nonPlayable <= 2)) {
+				// 明细：真能拿的列前 4 条、装备中的列前 2 条、非玩家物品列前 2 条
+				//   （每条都带 `fl=` 原始 flags、`eq=` 是否装备中、`np=` 是否非玩家物品）
+				if ((!np && !eq && playable <= 4) || (eq && equipped <= 2) || (np && nonPlayable <= 2)) {
 					const auto* objRaw  = reinterpret_cast<const std::uint8_t*>(obj);
 					const auto  objType = objRaw[kOffFormType];
 					const auto  objFid  = reinterpret_cast<const RE::TESForm*>(obj)->GetFormID();
-					const auto  objFlags = *reinterpret_cast<const std::uint32_t*>(objRaw + kOffFormFlags);
-					// item flags（BGSInventoryItem::flags @+0x20，u32）：
-					//   低 3 位 = 装备槽（非 0 = 正在装备中），bit3 = kEquipStateLocked，
-					//   bit5 = kTemporary
-					const auto itemFlags = *reinterpret_cast<const std::uint32_t*>(
-						item + kOffInvItemFlags);
-					char buf[128];
-					std::snprintf(buf, sizeof(buf), " [ft=%02X id=%08X n=%u c=%llu fl=%X ff=%X np=%d]",
+					char buf[160];
+					std::snprintf(buf, sizeof(buf), " [ft=%02X id=%08X n=%u c=%llu fl=%X ff=%X eq=%d np=%d]",
 						static_cast<unsigned>(objType),
 						static_cast<unsigned>(objFid),
 						static_cast<unsigned>(sn),
 						static_cast<unsigned long long>(sum),
 						static_cast<unsigned>(itemFlags),
 						static_cast<unsigned>(objFlags),
+						eq ? 1 : 0,
 						np ? 1 : 0);
 					detail += buf;
 				}
 			}
-			REX::INFO("loot probe: ref={:08X} d={:.1f}m size={} playable={} total={} nonPlayable={} npTotal={}{}",
+			REX::INFO("loot probe: ref={:08X} d={:.1f}m size={} playable={} total={} equipped={} eqTotal={} nonPlayable={} npTotal={}{}",
 				fid, dM, size, playable, static_cast<unsigned long long>(total),
+				equipped, static_cast<unsigned long long>(eqTotal),
 				nonPlayable, static_cast<unsigned long long>(npTotal), detail);
 		}
 
@@ -1926,6 +1994,21 @@ namespace SAS
 				//   跳过之后：面板拿空 ⇒ 这里数到的 count 全 0 ⇒ 判「空」⇒ 熄灭。
 				//   ★ 只有 `SkipNonPlayableLoot=1`（默认）时才跳；设 0 = 退回旧行为。
 				if (g_cfg.skipNonPlayableLoot && IsNonPlayableForm(obj)) {
+					++g_state.lootSkipNonPlayable;
+					continue;
+				}
+				// ★★ v4.6：跳过「正穿在身上的装备」（`BGSInventoryItem::flags` 的低 3 位
+				//   kSlotMask ≠ 0）—— 引擎只在物品被「掉落 / 卸下」（fl=0）时才让它进
+				//   搜刮面板；还穿在尸体身上的（fl≠0）面板不显示、玩家也拿不走，
+				//   `count` 却永远 ≥ 1 ⇒ v4.5 只跳了 0x04 那一类，剩下的这一类正是
+				//   「活体敌人的尸体（穿玩家版宇航服）拿空后依然不熄灭」的根因
+				//   （完整实证 + `SimpleImmersiveLooting` 的旁证见常量区 kInvItemFlagSlotMask）。
+				//   跳过之后：面板拿空 ⇒ 判「空」⇒ 熄灭；一旦用「扒取装备」卸下
+				//   （fl 归零）⇒ 立刻重新算作「有东西」⇒ 照常亮到拿走为止。
+				//   ★ 只有 `SkipEquippedLoot=1`（默认）时才跳；设 0 = 退回旧行为。
+				if (g_cfg.skipEquippedLoot &&
+					(*reinterpret_cast<const std::uint32_t*>(item + kOffInvItemFlags) & kInvItemFlagSlotMask) != 0) {
+					++g_state.lootSkipEquipped;
 					continue;
 				}
 				const auto sn = *reinterpret_cast<const std::uint32_t*>(item + kOffInvItemStacks);
@@ -3484,7 +3567,8 @@ namespace SAS
 							  "道具={} 炮塔/机器人/昏迷={}) "
 							  "| ACHR: 见到={} 判活跳过={} | StartsUnconscious跳过={} "
 							  "| 前置过滤: deleted/disabled={} 非本cell={} "
-							  "| 搜空: empty={} notEmpty={} unknown={} null={} shapeBad={} invOff={}",
+							  "| 搜空: empty={} notEmpty={} unknown={} null={} shapeBad={} invOff={} "
+							  "| 判空跳过: np={} eq={}",
 						g_state.corpseSeen, g_state.corpseByBit, g_state.corpseByFlag,
 						g_state.corpseByLife, g_state.corpseByBleed,
 						g_state.corpseProps, g_state.corpseUncSeen,
@@ -3492,7 +3576,8 @@ namespace SAS
 						g_state.corpseUncSkipped,
 						g_state.skipDeleted, g_state.skipParentCell,
 						g_state.emptySkips, g_state.lootNotEmpty, g_state.lootUnknown,
-						g_state.lootNullInv, g_state.lootBadShape, invOff);
+						g_state.lootNullInv, g_state.lootBadShape, invOff,
+						g_state.lootSkipNonPlayable, g_state.lootSkipEquipped);
 					g_state.corpseSeen       = 0;
 					g_state.corpseByBit      = 0;
 					g_state.corpseByFlag     = 0;
@@ -3506,6 +3591,8 @@ namespace SAS
 					g_state.lootUnknown      = 0;
 					g_state.lootNullInv      = 0;
 					g_state.lootBadShape     = 0;
+					g_state.lootSkipNonPlayable = 0;
+					g_state.lootSkipEquipped = 0;
 					g_state.achrSeen         = 0;
 					g_state.achrLive         = 0;
 					g_state.skipDeleted      = 0;
