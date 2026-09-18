@@ -44,7 +44,7 @@ SFSE_PLUGIN_LOAD(const SFSE::LoadInterface* a_sfse)
 {
 	SFSE::Init(a_sfse, { .logName = "SAS_AlwaysScan" });
 
-	REX::INFO("SAS_AlwaysScan v4.0.0 loading (SFSE build {})", SFSE::GetSFSEVersion());
+	REX::INFO("SAS_AlwaysScan v4.1.0 loading (SFSE build {})", SFSE::GetSFSEVersion());
 
 	if (auto* messaging = SFSE::GetMessagingInterface()) {
 		messaging->RegisterListener(OnMessage);

@@ -175,12 +175,16 @@ namespace SAS
 		// ====================================================================
 		enum class Category : std::uint8_t
 		{
-			kLoot = 0,   // 可拾取：MISC/BOOK/ARMO/WEAP/AMMO/ALCH/INGR/KEYM/NOTE/SLGM
+			kLoot = 0,   // 可拾取（进背包）：MISC/BOOK/ARMO/WEAP/AMMO/ALCH/INGR/KEYM/NOTE/SLGM
 			kContainer,  // 容器：CONT
 			kDevice,     // 可交互设备：ACTI / TERM
 			kDoor,       // 门：DOOR
 			kFlora,      // 植物：FLOR
-			kOther,      // 其它（MSTT 一类）
+			// ★ v4.1：其它 = **MSTT（MovableStatic，可移动静态物）**。
+			//   这一类**绝大多数是不能拾取进背包的装饰物**（纸箱 / 桌椅 / 吧台 /
+			//   飞船模块 …），原版扫描仪也不会高亮它们，所以**默认关闭**
+			//   （`EnableOther=0`，见 Config::categoryEnabled 的完整说明）。
+			kOther,
 			kCount
 		};
 		constexpr std::size_t kCategoryCount = static_cast<std::size_t>(Category::kCount);
@@ -259,6 +263,25 @@ namespace SAS
 			//     3 与 2 的 ref 色值完全相同。实测表见 docs/03 第十四节 14.5 / INI 注释。）
 			// ★ v4.0.3：门从 0 青改为 10 红 —— 可拾取是 2 蓝，青/蓝对比太弱，红拉开最大。
 			std::array<int, kCategoryCount> stateByCategory{ 2, 9, 4, 10, 5, 1 };
+
+			// ================================================================
+			// ★ v4.1：每个类别一个「是否高亮」开关
+			// ================================================================
+			// 起因（用户实测反馈）：*「有些不能拾取进背包的物品也有蓝色边框」*，
+			// 截图里被描边的是纸箱 / 桌椅 / 吧台 —— 它们在游戏数据里是 **MSTT
+			// （MovableStatic，可移动静态物）**，这一类**绝大多数是不能拾取进背包的
+			// 装饰物**（`CardboardBox*` / `Bar_*` / `IH_TableKit*` / 飞船模块 `SMOD_*` …），
+			// 而且**原版手持扫描仪根本不会高亮它们**（它只亮能拿 / 能搜 / 能开 / 能采的）。
+			//
+			// 而真正能拾取进背包的杂物（`CoffeeMug01` / `Tool_Wrench01` / 各种玩具…）
+			// 全是 **MISC**，走的是 `loot` 类 —— 这两类在数据里泾渭分明，所以
+			// 「不亮 MSTT」既符合原版观感，也正好满足「不可拾取的不亮」。
+			// ⇒ 默认 `EnableOther=0`（关掉 kOther = MSTT）；其余 5 类都是真目标，默认开。
+			//
+			// ★ 想恢复高亮 MSTT（或只想留其中几类）就改 INI 的
+			//   `EnableLoot / EnableContainer / EnableDevice / EnableDoor /
+			//    EnableFlora / EnableOther`，改完重进游戏生效。
+			std::array<bool, kCategoryCount> categoryEnabled{ true, true, true, true, true, false };
 
 			// ★ v4.0.1：可选的「自定义类别颜色」（INI 里写 ColorLoot=RRGGBB 之类）。
 			//   kColorUnset = 不覆盖，完全用引擎那个状态的原生配色。
@@ -345,6 +368,13 @@ namespace SAS
 			//   引用**都要执行一次，密集场景里每秒 2 万次哈希表操作，纯属白烧主线程。
 			//   现在下标就是 formType，一次自增完事。
 			std::array<std::uint32_t, 256> rejectTypes{};
+			// ★ v4.1：本轮**进入候选集合**（= 该亮的目标）的 base formType 直方图。
+			//   用途：用户报「某某东西不该亮」时，直接从日志看它的 formType 是多少，
+			//   再决定把它挪到哪个类别、或加一条排除规则（rejTypes 只能告诉我们
+			//   「该亮没亮的」，这个是反向的）。
+			std::array<std::uint32_t, 256> candTypes{};
+			// ★ v4.1：窗口内因为「类别开关 = 0」而被跳过的引用数（诊断：确认开关真的生效）。
+			std::uint64_t disabledSkips = 0;
 
 			// --- v2.2：耗时统计（每次统计日志之间重置，用来定位卡顿）---
 			std::uint64_t scanMsTotal     = 0;  // 窗口内 Sum(每轮 Rescan 耗时)
@@ -695,6 +725,26 @@ namespace SAS
 			for (std::size_t i = 0; i < kCategoryCount; ++i) {
 				g_cfg.stateByCategory[i] = std::clamp(getInt(kStateKeys[i], kStateDef[i]), 0, 11);
 			}
+
+			// --- ★ v4.1：类别开关（默认只有 kOther = MSTT 关着，理由见 Config 里的长注释）---
+			{
+				const char* const kEnableKeys[kCategoryCount] = {
+					"EnableLoot", "EnableContainer", "EnableDevice", "EnableDoor", "EnableFlora", "EnableOther"
+				};
+				const int kEnableDef[kCategoryCount] = { 1, 1, 1, 1, 1, 0 };
+				std::string s;
+				for (std::size_t i = 0; i < kCategoryCount; ++i) {
+					g_cfg.categoryEnabled[i] = getInt(kEnableKeys[i], kEnableDef[i]) != 0;
+					if (i) {
+						s += ", ";
+					}
+					s += kCategoryName[i];
+					s += '=';
+					s += g_cfg.categoryEnabled[i] ? '1' : '0';
+				}
+				REX::INFO("config: categoryEnabled: {}", s);
+			}
+
 			g_cfg.notifyOnToggle = getInt("NotifyOnToggle", 1) != 0;
 
 			// --- ★ v4.0.1：可选的自定义类别颜色（ColorLoot=RRGGBB …，留空 = 用引擎原生配色）---
@@ -726,9 +776,9 @@ namespace SAS
 					}
 					colorLog += kCategoryName[i];
 					colorLog += "=#";
-					char buf[8];
-					std::snprintf(buf, sizeof(buf), "%06X", g_cfg.colorOverride[i]);
-					colorLog += buf;
+					char hexv[8];  // 不叫 buf：外层那个 buf[64] 是 getFloat 用的（C4456 遮蔽警告）
+					std::snprintf(hexv, sizeof(hexv), "%06X", g_cfg.colorOverride[i]);
+					colorLog += hexv;
 				}
 				if (!colorLog.empty()) {
 					REX::INFO("config: colorOverride: {}", colorLog);
@@ -862,7 +912,10 @@ namespace SAS
 			// ---- 植物（可采集）----
 			case RE::FormType::kFLOR:
 				return static_cast<int>(Category::kFlora);
-			// ---- 其它（MSTT 一类可交互静态物）----
+			// ---- 其它：MSTT（MovableStatic）----
+			//   ★ v4.1：默认被 `EnableOther=0` 关掉 —— MSTT 里是纸箱 / 桌椅 / 吧台 /
+			//   飞船模块这类**不能拾取进背包**的装饰物（原版扫描仪也不亮它们）。
+			//   能拾取进背包的杂物（咖啡杯 / 扳手 / 玩具…）全是 MISC，走上面的 kLoot。
 			case RE::FormType::kMSTT:
 				return static_cast<int>(Category::kOther);
 			default:
@@ -2058,6 +2111,7 @@ namespace SAS
 			std::vector<Candidate*>         chosen;
 			cands.clear();
 			cands.reserve(512);
+			g_state.candTypes.fill(0);  // ★ v4.1：候选类型直方图只统计「最近一轮」
 
 			// ★ v2.3：遍历 + 排序 + 挑选这一整段（纯内存读，理论上应该在 1ms 量级；
 			//   实测却是 30ms 上下，所以必须单独计时把它和形状校验分开看）。
@@ -2095,6 +2149,13 @@ namespace SAS
 					}
 					continue;
 				}
+				// ★ v4.1：类别开关关掉的（默认只有 kOther = MSTT，即纸箱/桌椅/吧台这类
+				//   不能拾取进背包的装饰物；见 Config::categoryEnabled 的说明）。
+				//   与「不在白名单」分开计数，日志里 `disabled=N` 能确认开关真的生效。
+				if (!g_cfg.categoryEnabled[static_cast<std::size_t>(cat)]) {
+					++g_state.disabledSkips;
+					continue;
+				}
 
 				// 水平夹角判定（只高亮正前方时）
 				if (useFront) {
@@ -2108,6 +2169,10 @@ namespace SAS
 						}
 					}
 				}
+
+				// ★ v4.1：诊断 —— 本轮真正进入候选集合的目标按 base formType 计数
+				//   （统计日志里 `candTypes` 那行；「某东西不该亮」时看它的 formType）
+				++g_state.candTypes[static_cast<std::uint8_t>(base->GetFormType()) & 0xFF];
 
 				Candidate c;
 				c.ref = ref;
@@ -2303,7 +2368,10 @@ namespace SAS
 						cats += std::to_string(g_state.categoryCounts[i]);
 					}
 					g_state.categoryCounts.fill(0);
-					REX::INFO("  category (本轮选中): {}", cats);
+					// ★ v4.1：disabled = 窗口内因为「类别开关 = 0」被跳过的引用数
+					//   （默认只有 kOther/MSTT 关着；它应该持续是一个正数）
+					REX::INFO("  category (本轮选中): {} | 类别开关跳过 disabled={}", cats, g_state.disabledSkips);
+					g_state.disabledSkips = 0;
 				}
 
 				// 摘除计数（诊断）：rmOk 应随 sel/outline 变化一起增长，
@@ -2359,31 +2427,40 @@ namespace SAS
 				//   （guideHb / guideState / guideMarkers），引导线功能已整体移除，
 				//   对应的 GLOB 与这段日志也一起删掉。
 
-				// 半径内、base 类型不在白名单的分布（上个统计窗口）。
-				// 用途：发现「某个东西该亮却没亮」时，看它的 formType 是多少。
+				// base form 类型直方图（都只取 top 8）：
+				//   candTypes —— 本轮**候选集合**（= 该亮的目标）的 formType 分布。
+				//     ★ v4.1：用户报「某某东西不该亮」时，看这行就能定位它是哪种 formType。
+				//   rejTypes  —— 窗口内「半径内但被过滤掉」的 formType 分布
+				//     （不在白名单的 + 因为类别开关跳过的一起算）。
+				//     用途：发现「某个东西该亮却没亮」时看它是不是被白名单/开关挡了。
 				{
-					std::vector<std::pair<std::uint32_t, std::uint8_t>> hist;
-					for (std::uint32_t ft = 0; ft < g_state.rejectTypes.size(); ++ft) {
-						if (g_state.rejectTypes[ft]) {
-							hist.emplace_back(g_state.rejectTypes[ft], static_cast<std::uint8_t>(ft));
-						}
-					}
-					if (!hist.empty()) {
-						std::sort(hist.begin(), hist.end(),
-							[](const auto& a, const auto& b) { return a.first > b.first; });
-
-						std::string s;
-						const auto  topN = std::min<std::size_t>(hist.size(), 8);
-						for (std::size_t i = 0; i < topN; ++i) {
-							if (i) {
-								s += ", ";
+					const auto logTypeHist = [](const char* a_tag,
+					                             std::array<std::uint32_t, 256>& a_hist) {
+						std::vector<std::pair<std::uint32_t, std::uint8_t>> hist;
+						for (std::uint32_t ft = 0; ft < a_hist.size(); ++ft) {
+							if (a_hist[ft]) {
+								hist.emplace_back(a_hist[ft], static_cast<std::uint8_t>(ft));
 							}
-							s += "ft=" + std::to_string(static_cast<unsigned>(hist[i].second)) +
-							     "x" + std::to_string(hist[i].first);
 						}
-						REX::INFO("  rejTypes (半径内但类型不在白名单，formType x 次数): {}", s);
-					}
-					g_state.rejectTypes.fill(0);
+						if (!hist.empty()) {
+							std::sort(hist.begin(), hist.end(),
+								[](const auto& a, const auto& b) { return a.first > b.first; });
+
+							std::string s;
+							const auto  topN = std::min<std::size_t>(hist.size(), 8);
+							for (std::size_t i = 0; i < topN; ++i) {
+								if (i) {
+									s += ", ";
+								}
+								s += "ft=" + std::to_string(static_cast<unsigned>(hist[i].second)) +
+								     "x" + std::to_string(hist[i].first);
+							}
+							REX::INFO("  {}: {}", a_tag, s);
+						}
+						a_hist.fill(0);
+					};
+					logTypeHist("candTypes (本轮候选=该亮的目标，formType x 次数)", g_state.candTypes);
+					logTypeHist("rejTypes (半径内但不在白名单/被类别开关跳过，formType x 次数)", g_state.rejectTypes);
 				}
 
 				// 管理器哈希表的家底（每 30 秒一次就够，用于确认「键到底是什么」）。

@@ -779,3 +779,87 @@ v4.0.1 的默认映射是 `loot=0 / container=1 / device=2 / door=3`，
 ⇒ 视觉上真正能区分的是 **5 种**（青 / 淡蓝白 / 蓝 / 绿 / 橙，另加红）。
 6 个类别必然有两个撞色 —— 想更细就上 `ColorXxx` 自定义颜色（那一层可以任意指定）。
 
+---
+
+## 十五、v4.1（2026-09-18）—— 「不能拾取进背包的东西也亮」：MSTT 默认不亮
+
+### 15.1 现象与定性
+
+用户实测反馈（附截图）：**纸箱、桌椅、吧台这类场景装饰物也被描了一圈边**
+（淡蓝白 = state 1）。原话是「有些不能拾取进背包的物品也有蓝色边框」。
+
+这些对象在数据里的类型是 **MSTT（MovableStatic，可移动静态物）**：
+
+```
+MSTT|CardboardBox01_Open01|Cardboardboxes_keyword       ← 截图里那个纸箱
+MSTT|CardboardBox01_Lid01 / 02 / 04 / 06 / _Stacked01 / Flat01..03
+MSTT|Bar_Bowl01|Bar_Bowl01_Swap_Keyword                 ← 吧台一类
+MSTT|IH_TableKit_*、IH_DeskKit01_*、AK_FieldDesk_Open01  ← 桌子 / 工作台
+MSTT|SMOD_*（飞船模块，最典型的大块 MSTT）
+```
+
+而**能拾取进背包的杂物全是 MISC**（取自上一代项目导出的全量 base form 关键词表）：
+
+```
+MISC|CoffeeMug01|ObjectTypeJunk          ← 咖啡杯
+MISC|Tool_Wrench01|ObjectTypeJunk        ← 扳手
+MISC|Mug_With_Phrases_*|ObjectTypeJunk   ← 一整套马克杯
+```
+
+⇒ 两条事实让修法变得很干净：
+
+1. 「能拾取进背包」= base form 是 inventory 类（MISC/BOOK/ARMO/WEAP/AMMO/ALCH/INGR/
+   KEYM/NOTE/SLGM）—— 这正是 `Category::kLoot` 的定义；
+2. MSTT 里**没有一件是「拿得走」的**（MovableStatic 的字面语义就是「能推动的静态物」：
+   纸箱能推、能打飞，但按 E 收不进背包），而原版手持扫描仪也**不会**高亮它们
+   ⇒ 把 MSTT 整类关掉既满足「不可拾取的不亮」，也回到原版观感。
+
+### 15.2 修法：类别开关（INI，默认 `EnableOther=0`）
+
+`Config` 新增 `categoryEnabled[6]`，默认 `{1,1,1,1,1,0}`：
+
+| INI 键 | 类别 | 默认 | 说明 |
+| --- | --- | --- | --- |
+| `EnableLoot` | kLoot | 1 | 可拾取（进背包）：MISC/BOOK/ARMO/WEAP/AMMO/ALCH/INGR/KEYM/NOTE/SLGM |
+| `EnableContainer` | kContainer | 1 | 容器（能搜刮） |
+| `EnableDevice` | kDevice | 1 | ACTI / TERM（真交互） |
+| `EnableDoor` | kDoor | 1 | 门 |
+| `EnableFlora` | kFlora | 1 | 植物（可采） |
+| **`EnableOther`** | kOther = **MSTT** | **0** | 纸箱 / 桌椅 / 吧台 / 飞船模块 —— **默认不亮** |
+
+- `Rescan` 在 `ClassifyBase()` 之后多一道
+  `if (!g_cfg.categoryEnabled[cat]) { ++disabledSkips; continue; }` ——
+  纯内存判断，零引擎调用、零性能影响；
+- ★ MSTT 只是「不描边」，**没有任何交互被改动**：纸箱照样能推、能打飞；
+  本 MOD 从不碰激活/拾取逻辑（那条红线从 v1 起没变过）。
+- 想恢复（或只留其中几类）就改 INI 里对应的 `EnableXxx`，重进游戏生效 ——
+  不需要重新编译（DLL 的内置默认值与 INI 默认值一致）。
+
+### 15.3 新增诊断：`candTypes`（下次再有「不该亮 / 该亮没亮」直接看日志）
+
+| 日志 | 含义 |
+| --- | --- |
+| `config: categoryEnabled: loot=1, …, other=0` | 启动时实际生效的类别开关 |
+| `category (本轮选中): … \| 类别开关跳过 disabled=N` | `disabled` = 被开关挡掉的引用数（MSTT 多的场景里持续为正 = 开关确实在干活） |
+| **`candTypes (本轮候选=该亮的目标，formType x 次数)`** | ★ 本轮**候选集合**的 base formType 直方图 —— 「某东西不该亮」时看它 `ft=` 是多少 |
+| `rejTypes (半径内但不在白名单/被类别开关跳过，…)` | 反向（被过滤掉的都是什么；现在含被开关跳过的） |
+
+常用 formType 对照（`RE/F/FormTypes.h`，日志里的 `ft=` 是这个十进制值）：
+
+```
+30 0x1E ACTI      35 0x23 BOOK      36 0x24 CONT      37 0x25 DOOR
+40 0x28 MISC      44 0x2C MSTT      46 0x2E FLOR      48 0x30 WEAP
+62 0x3E TERM      74 0x4A REFR（引用本身）
+```
+
+### 15.4 验收
+
+1. 站在截图那种「纸箱堆 / 酒吧」场景：**纸箱、桌椅、吧台不再有描边**；
+   地上能捡的小物件（杯子 / 扳手 / 玩具）**照旧蓝色描边**；
+2. 启动日志出现 `config: categoryEnabled: loot=1, container=1, device=1, door=1, flora=1, other=0`；
+3. 统计行出现 `类别开关跳过 disabled=N`（N > 0）；
+4. `candTypes` 里**不应再出现 `ft=44`（MSTT）**；若出现，说明 INI 里 `EnableOther` 被改成了 1；
+5. 容器仍是橙、设备仍是绿、门仍是红、可拾取仍是蓝 —— 分类分色不受本次改动影响；
+6. 想「反悔」：`EnableOther=1` 重启游戏即可恢复 MSTT 描边（不需要换 DLL）。
+
+
