@@ -251,13 +251,14 @@ namespace SAS
 			// 状态语义（docs/03 第三节，从引擎算法反推）：
 			//   0/1 = 通用（未扫描/已扫描）  2/3 = 可扫描组  7/8 = 另一组  9 = 追踪
 			//   12 = 无高亮（管理器只有 0..10 共 11 个）
-			// 下标 = Category，默认 可拾取0 / 容器1 / 设备2 / 门3 / 植物7 / 其它0。
+			// 下标 = Category，默认 2 蓝 / 9 橙 / 4 绿 / 10 红 / 5 绿 / 1 淡蓝白。
 			// ★ 想换配色只改 INI 的 StateXxx；改完重进游戏生效。
 			// ★ v4.0.2：默认值按「实测的引擎原生配色」挑的**视觉上真正区分得开**的 5 种色：
 			//   2 蓝 / 9 橙 / 4 绿 / 0 青 / 5 绿 / 1 淡蓝白
 			//   （v4.0.1 的默认 0/1/2/3 实测全是蓝色系，看起来「颜色都一样」——
 			//     3 与 2 的 ref 色值完全相同。实测表见 docs/03 第十四节 14.5 / INI 注释。）
-			std::array<int, kCategoryCount> stateByCategory{ 2, 9, 4, 0, 5, 1 };
+			// ★ v4.0.3：门从 0 青改为 10 红 —— 可拾取是 2 蓝，青/蓝对比太弱，红拉开最大。
+			std::array<int, kCategoryCount> stateByCategory{ 2, 9, 4, 10, 5, 1 };
 
 			// ★ v4.0.1：可选的「自定义类别颜色」（INI 里写 ColorLoot=RRGGBB 之类）。
 			//   kColorUnset = 不覆盖，完全用引擎那个状态的原生配色。
@@ -690,7 +691,7 @@ namespace SAS
 			const char* const kStateKeys[kCategoryCount] = {
 				"StateLoot", "StateContainer", "StateDevice", "StateDoor", "StateFlora", "StateOther"
 			};
-			const int kStateDef[kCategoryCount] = { 2, 9, 4, 0, 5, 1 };
+			const int kStateDef[kCategoryCount] = { 2, 9, 4, 10, 5, 1 };
 			for (std::size_t i = 0; i < kCategoryCount; ++i) {
 				g_cfg.stateByCategory[i] = std::clamp(getInt(kStateKeys[i], kStateDef[i]), 0, 11);
 			}
