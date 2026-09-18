@@ -179,17 +179,18 @@ python tools\re\tr_verify.py       <orig.esm> <out.esm>
 
 ## 八、Nexus Mods 上传包（2026-09-18）
 
-用户要求把本汉化打包成可上传 Nexus 的格式。照 `tools/package-nexus.ps1`（高亮 mod 那套）
-的模式新增 **`tools/package-sil.ps1`**：
+用户要求：把本汉化打包成可上传 Nexus 的**完整包**（不是只含 ESM）。照 `tools/package-nexus.ps1`
+（高亮 mod 那套）的模式新增 **`tools/package-sil.ps1`**：
 
 | 项 | 值 |
 | --- | --- |
-| 产物 | **`dist\SimpleImmersiveLooting-zh-CN-1.0.zip`**，3 242 B，SHA256 `C5976FC2A608821DDA1FDC5C4849EC803746D46C890D58FCFDE6E6BF6350C253` |
-| 包内 | `SimpleImmersiveLooting.esm`（汉化版 2 876 B，SHA256 `3971667F…7BF10E`）+ `README.txt`（3 192 B）+ 包根即 Data 布局 |
-| 包内**刻意不含** | 原 mod 的 `SimpleImmersiveLooting - Main.ba2`（不重新分发原作者资产；README 写明需先装原 mod）与 `meta.ini` |
-| 可选模式 | `-IncludeBa2` ⇒ 「完整包」（含原 .ba2，一步安装；会再分发原作者资产，需作者许可） |
+| 产物 | **`dist\SimpleImmersiveLooting-zh-CN-1.0.zip`**，**4 267 B**，SHA256 `F7FEDF8DA08E3D1A2B7D4D383BB80F67EE2E21F7F8DB554922531DDAC8D7851E` |
+| 包内（完整包） | `SimpleImmersiveLooting.esm`（汉化版 2 876 B，`3971667F…`）+ `SimpleImmersiveLooting - Main.ba2`（**原版脚本包 1 791 B，逐字节未动**，`3A17C46C…`）+ `README.txt`（3 054 B，`85E44F75…`）；包根即 Data 布局，**一步安装、无需先装原 mod** |
+| 包内不含 | `meta.ini`（MO2 本地元数据，与分发包无关） |
+| 反向可选模式 | `-TranslationOnly` ⇒ 只含汉化 ESM 的翻译包（输出文件名自动加 `-translation-only` 后缀，不与完整包互相覆盖），供「未获原作者再分发许可」时的退路 |
 | 自检 | 必需文件存在 / zip 内容逐条列出 / 每文件 SHA256 / 包体积；README 里 `<PUT-YOUR-NEXUS-NAME-HERE>` 未替换时告警 |
-| 上传文案 | `package/sil/nexus-description.md`（表单字段 + 英文 BBCode 正文 + 中文对照 + 上传前检查清单）；包内说明源 `package/sil/README.txt` |
+| 上传文案 | `package/sil/nexus-description.md`（表单字段 + 英文 BBCode 正文 + 中文对照 + 上传前检查清单，含**再分发许可**提醒）；包内说明源 `package/sil/README.txt` |
 
 **复现**：`& 'tools\package-sil.ps1'`（改完 README 作者名后需重跑；`dist/` 不入库）。
-★ 上传前必做：替换 README 里的作者名占位符 → 重跑打包 → Files 里上传 zip → Requirements 挂原 mod 链接。
+★ 上传前必做：替换 README 里的作者名占位符 → 重跑打包 → Files 里上传 zip。
+★ 因完整包含原作者的 `.ba2`，发布前需确认 korodic 的再分发许可（页面权限说明或私信）。

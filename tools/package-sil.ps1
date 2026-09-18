@@ -4,19 +4,19 @@
 #  把 MO2 部署目录里的汉化版插件整理成一个可以直接上传到 Nexus 的 zip：
 #
 #      dist\SimpleImmersiveLooting-zh-CN-<version>.zip
-#        ├─ SimpleImmersiveLooting.esm   ← 汉化版插件（Data 根）
-#        └─ README.txt                   （取自 package\sil\README.txt）
+#        ├─ SimpleImmersiveLooting.esm          ← 汉化版插件（Data 根）
+#        ├─ SimpleImmersiveLooting - Main.ba2   ← 原版脚本包（未改动）
+#        └─ README.txt                          （取自 package\sil\README.txt）
 #
-#  默认（翻译包）**不含**原始 mod 的 "SimpleImmersiveLooting - Main.ba2"
-#  —— 不重新分发原作者的资产，README 里写明需先装原 mod。
-#  也**不含** meta.ini（MO2 本地元数据，与分发包无关）。
-#  加 -IncludeBa2 可打成「完整包」（含原 .ba2，一步安装，但会再分发原作者资产，
-#  仅当获得原作者许可或你自己就是作者时使用）。
+#  默认打「**完整包**」：一步安装、无需先装原 mod。
+#  注意：完整包会**再分发原作者的 .ba2** —— 发布前请确认原作者许可
+#  （Nexus 页面权限 / 私信同意）。如只想发翻译文件，用 -TranslationOnly。
+#  包内**不含** meta.ini（MO2 本地元数据，与分发包无关）。
 #
 #  用法（不要用 `pwsh -File`，命令包装器会拦；直接在当前会话跑）：
 #      & 'tools\package-sil.ps1'
 #      & 'tools\package-sil.ps1' -Version 1.1
-#      & 'tools\package-sil.ps1' -IncludeBa2
+#      & 'tools\package-sil.ps1' -TranslationOnly      # 只含汉化 ESM 的翻译包
 #      & 'tools\package-sil.ps1' -OutDir D:\some\where
 #
 #  自检：必需文件存在 + zip 内容逐条列出 + 每个文件 SHA256 + 包体积。
@@ -26,7 +26,7 @@ param(
     [string]$OutDir  = '',            # 默认 <项目根>\dist
     [string]$ModRoot = 'D:\Mod Organizer 2\starfield_mods\mods\Simple Immersive Looting',
     [string]$NamePrefix = 'SimpleImmersiveLooting-zh-CN',
-    [switch]$IncludeBa2  # 打「完整包」：带上原 mod 的 .ba2（会再分发原作者资产，慎用）
+    [switch]$TranslationOnly  # 只打「翻译包」（仅汉化 ESM，不含原 .ba2）
 )
 
 $ErrorActionPreference = 'Stop'
@@ -52,9 +52,11 @@ Write-Host "=== Packaging Simple Immersive Looting (zh-CN) v$Version for Nexus =
 $payload = [ordered]@{
     'SimpleImmersiveLooting.esm' = $true
 }
-if ($IncludeBa2) {
+if (-not $TranslationOnly) {
     $payload['SimpleImmersiveLooting - Main.ba2'] = $true
-    Write-Host '      NOTE: -IncludeBa2 生效 —— 包内将包含原 mod 的 .ba2（完整包模式）' -ForegroundColor Yellow
+    Write-Host '      模式: 完整包（含原版 .ba2）—— 发布前请确认原作者许可' -ForegroundColor Yellow
+} else {
+    Write-Host '      模式: 翻译包（仅汉化 ESM，需先装原 mod）' -ForegroundColor DarkGray
 }
 foreach ($rel in $payload.Keys) {
     $src = Join-Path $ModRoot $rel
@@ -87,7 +89,8 @@ foreach ($rel in $payload.Keys) {
 
 # ------------------------------------------------------------ 3. 打 zip（7z）
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
-$zipPath = Join-Path $OutDir "$NamePrefix-$Version.zip"
+$suffix = if ($TranslationOnly) { '-translation-only' } else { '' }
+$zipPath = Join-Path $OutDir "$NamePrefix-$Version$suffix.zip"
 if (Test-Path -LiteralPath $zipPath) { Remove-Item -LiteralPath $zipPath -Force }
 
 Push-Location $staging
