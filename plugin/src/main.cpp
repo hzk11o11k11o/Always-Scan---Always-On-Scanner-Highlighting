@@ -133,7 +133,7 @@ SFSE_PLUGIN_LOAD(const SFSE::LoadInterface* a_sfse)
 	SFSE::Init(a_sfse, { .logName = kLogName });
 	ApplyLogSizeLimit();
 
-	REX::INFO("SAS_AlwaysScan v4.11.0 loading (SFSE build {})", SFSE::GetSFSEVersion());
+	REX::INFO("SAS_AlwaysScan v4.12.0 loading (SFSE build {})", SFSE::GetSFSEVersion());
 
 	if (auto* messaging = SFSE::GetMessagingInterface()) {
 		messaging->RegisterListener(OnMessage);

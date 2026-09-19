@@ -404,17 +404,67 @@ namespace SAS
 		//     自动把「此刻唯一开着的、非白名单」的菜单名学成容器菜单名（会话级），
 		//     这样即使原版/第三方改了菜单名，同一局里也能自动恢复。
 		constexpr std::size_t kOffUiMenuEventSource  = 0x20;  // RE::UI 的 MenuOpenCloseEvent 源
-		// ★ `BSTEventSource<MenuOpenCloseEvent>` 的 vtable RVA（2026-09-19 离线反查）：
-		//   commonlibsf `RE/IDs_RTTI.h` 的 `BSTEventSource_MenuOpenCloseEvent_` = REL::ID 869079
-		//   → `tools/re/versionlib.py id 869079` = RVA **0x5CCADD0**。
-		//   注册 sink 之前用它做**硬比对**：不是这个 vtable 就绝不注册（退回轮询）——
-		//   这样「万一定位错、往别的事件源挂 sink」这条唯一有风险的路就被彻底堵死。
-		constexpr std::uintptr_t kMenuOpenCloseSourceVtblRva = 0x5CCADD0;
+		// ================================================================
+		// ★★ v4.12：vtable 期望值订正 —— 上一轮那条「不注册」WARN 的**真根因**
+		// ================================================================
+		// v4.11 实测日志（用户 13:20~13:22）：
+		//   `menu events: UI+0x20 的 vtable=0x7FF65860E3D8，期望 0x7FF65955ADD0
+		//    （BSTEventSource<MenuOpenCloseEvent>，RVA 0x5CCADD0）-> **不注册**`
+		// ⇒ 期望值算错了：**0x5CCADD0 根本不是 vtable，而是另一个类型的 TypeDescriptor
+		//   （RTTI 类型描述符）** —— 于是 sink 每 4 秒重试一次、一次都没挂上，
+		//   容器界面信号全程退回「轮询」（而对 `ContainerMenu` 轮询本来就读不到），
+		//   展示柜自然永远不熄灭。
+		//
+		// 离线复核（本轮新增 `out/probe_menu_evt.py` / `out/probe_menu_evt2.py` /
+		//   `out/dis_span.py` / `out/find_menu_notify.py`，四条线互相印证）：
+		//   ① RVA 0x5CCADD0 处 `+0x10` 的字符串 =
+		//      `.?AU?$BSTSDMTraits@VUI@@U?$BSTSingletonSDMOpStaticBuffer@VUI@@@@@@`
+		//      ⇒ 那是「UI 单例 traits」的 RTTI，跟菜单事件毫无关系；
+		//   ② exe 里 `BSTEventSource<MenuOpenCloseEvent>` 的 RTTI 名字字符串在
+		//      RVA 0x5CCAF78 ⇒ TypeDescriptor = 0x5CCAF68（MSVC：名字在 TD+0x10）；
+		//   ③ ★ 定死的证据 = **UI 构造函数里那串 vtable 写入**（RVA 0x253E2BD 区段）：
+		//         mov [rcx+0x00], <vtable 0x4D7E3F8>
+		//         mov [rcx+0x10], <vtable 0x4D7E408>   ← BSInputEventReceiver（vtable 有 2 槽）
+		//         mov [rcx+0x20], <vtable 0x4D7E3D8>   ★ 就是它
+		//         mov [rcx+0x48], <vtable 0x4D7E3E8>
+		//         mov [rcx+0x70], <vtable 0x4D7E3B8>
+		//         mov [rcx+0x98], <vtable 0x4D7E3C8>
+		//         mov [rcx+0xC0], <vtable 0x4D7E450>
+		//         mov [rcx+0xE8], <vtable 0x4D7E460>
+		//         mov [rcx+0x110], <vtable 0x4D7E430>
+		//         mov [rcx+0x138], <vtable 0x4D7E440>
+		//         mov [rcx+0x160], <vtable 0x4D7E420>
+		//     这 11 个偏移与 commonlibsf `RE/U/UI.h` 的基类表**逐条对上**
+		//     （0x00 BSTSingletonSDM / 0x10 BSInputEventReceiver /
+		//      0x20 **BSTEventSource<MenuOpenCloseEvent>** / 0x48 MenuModeChange /
+		//      0x70 MenuPauseChange / 0x98 MenuPauseCounterChange / 0xC0 Tutorial /
+		//      0xE8 BSCursorTypeChange / 0x110 BSCursorRotationChange /
+		//      0x138 BIUIMenuVisiblePausedBegin / 0x160 BIUIMenuVisiblePausedEnd）
+		//     ⇒ **commonlibsf 的 UI 布局是对的**（这次错的是我们算的 RVA，不是头文件）；
+		//   ④ 自洽校验：0x4D7E3D8 的首槽（RVA 0x25475BC）正是
+		//      `sub rcx, 0x20; jmp …` —— MSVC 多继承里「子对象位于完整对象 +0x20」的
+		//      标准析构 thunk；同组的 0x4D7E440 首槽是 `sub rcx, 0x138`，
+		//      与 ctor 里写 `[rcx+0x138]` 的那一条严格吻合 ⇒ 整张表自洽；
+		//   ⑤ 实测值反推：0x7FF65860E3D8 − 模块基址 0x7FF653890000 = 0x4D7E3D8 ✓。
+		//
+		// ⇒ 订正为 **0x4D7E3D8**。注册前仍然做 vtable 硬比对（不是它就绝不注册，
+		//   退回轮询并打一条「UI 布局指纹」便于下次定位）。
+		// ★ 教训（写进 docs/99 踩坑 12）：**RTTI 的 REL::ID 查出来的是 TypeDescriptor
+		//   （类型描述符），不是 vtable** —— 要 vtable 必须走
+		//   「COL → TypeDescriptor」链，或直接找**构造函数里写这个指针的那条指令**。
+		constexpr std::uintptr_t kMenuOpenCloseSourceVtblRva = 0x4D7E3D8;
 		constexpr std::size_t kMenuEvtOpenListMax    = 8;     // 事件侧「当前开着的菜单」上限
 		constexpr std::size_t kMenuEvtNameMax        = 32;    // 菜单名长度上限（BSFixedString 实际更短）
 		constexpr std::size_t kMenuEventLogMaxDefault = 48;   // 普通菜单事件最多写多少条日志
 		constexpr std::size_t kMenuLearnMax          = 4;     // 会话级最多学习几个容器菜单名
 		constexpr std::uint64_t kMenuLearnWindowMs   = 2500;  // 「最近一次的打开事件」有效窗口
+		// ★ v4.12：事件日志按「每个菜单名前几条」记（长会话里也一定能看到「都是哪些菜单在开关」；
+		//   上一轮是全局 48 条，玩久了额度就烧光，正是这轮取证最缺的信息）。
+		constexpr std::size_t   kMenuEvtNameStatMax   = 16;   // 「按名字统计」的表大小
+		constexpr std::uint32_t kMenuEvtPerNameLogMax = 3;    // 每个名字最多记几条
+		constexpr std::size_t   kMenuEvtRecentMax     = 4;    // 「最近几条事件」环形（取证行用）
+		constexpr std::size_t   kMenuEvtSrcScanMax    = 0x200; // UI+0x20 对不上时往后扫多远找源
+		constexpr std::uint64_t kMenuSinkCheckMs      = 60000; // 每 60 秒核对一次「sink 还在不在」
 		constexpr std::size_t kDcWatchMax            = 12;    // 逐帧观察的展示柜引用上限
 		// ★ 逐帧观察表的淘汰阈值：连续这么多帧读不到该引用就踢出去。
 		//   取值偏小（≈0.13 秒 @60fps）—— 因为 `IsReadable` 失败那一路会走
@@ -1062,10 +1112,33 @@ namespace SAS
 			std::atomic<std::uint64_t> menuEvtBad{ 0 };              // 负载不像菜单事件的条数（安全阀）
 			std::atomic<bool>          menuEvtOpen{ false };         // 事件侧：容器菜单此刻开着吗
 			bool          menuSinkRegistered = false;                // sink 注册成功了没有
+			// ★ v4.12：事件负载解释开关。坏负载到阈值时**只关掉解释**（sink 仍然挂着，
+			//   `ProcessEvent` 直接返回）—— 不去调引擎的 `UnregisterSink`（它的 ID 映射
+			//   与 `RegisterSink` 不是同一形状，且在回调里注销有重入风险，见实现处注释）。
+			bool          menuEvtActive      = false;
 			std::uint32_t menuSinkFailures   = 0;                    // 注册失败次数（诊断）
 			std::uint64_t menuSinkRetryAtMs  = 0;                    // 失败后下次重试的时间
+			std::uint64_t menuSinkCheckMs    = 0;                    // 上次核对「sink 还在不在」的时间
+			std::uint32_t menuFingerprints   = 0;                    // UI 布局指纹已打几次（上限 2）
 			std::uint64_t menuEvtLogged      = 0;                    // 已写日志的普通事件数
 			std::uint32_t menuDumps          = 0;                    // 「此刻开着的菜单」快照已打几次
+			// ★ v4.12：按名字统计「哪些菜单在开关」（每个名字最多记 kMenuEvtPerNameLogMax 条）
+			struct MenuEvtNameStat
+			{
+				char          name[kMenuEvtNameMax]{};
+				std::uint32_t count = 0;  // 这个名字一共来了几条事件
+			};
+			std::array<MenuEvtNameStat, kMenuEvtNameStatMax> menuEvtNames{};
+			std::size_t   menuEvtNameCount = 0;
+			// ★ v4.12：最近几条事件（名字 + 开/关 + 时间戳），取证行里带上
+			struct MenuEvtRecent
+			{
+				char          name[kMenuEvtNameMax]{};
+				bool          opening = false;
+				std::uint64_t ms      = 0;
+			};
+			std::array<MenuEvtRecent, kMenuEvtRecentMax> menuEvtRecent{};
+			std::size_t   menuEvtRecentCount = 0;
 			// 会话级学习的「容器菜单」候选名（自动学习，见常量区「v4.11」自愈那条）
 			std::array<std::string, kMenuLearnMax> containerMenuLearned{};
 			std::size_t   containerMenuLearnedCount = 0;
@@ -1728,7 +1801,8 @@ namespace SAS
 				return;
 			}
 			g_state.menuEvtTotal.fetch_add(1, std::memory_order_relaxed);
-			bool isContainer = false;
+			bool isContainer  = false;
+			bool firstOfName  = false;  // 这个名字头一次出现（那几条一定进日志，见下）
 			{
 				std::scoped_lock lock{ g_state.menuEvtLock };
 				auto* openNames = g_state.menuEvtOpenNames;
@@ -1762,6 +1836,41 @@ namespace SAS
 				}
 				isContainer            = MenuEvtContainerOpenLocked();
 				g_state.menuEvtOpen    = isContainer;  // atomics：主线程无锁读
+
+				// ★ v4.12：记「按名字统计」+「最近几条事件」（都在锁内，回调线程写、主线程读）
+				{
+					std::size_t slot = g_state.menuEvtNameCount;
+					for (std::size_t i = 0; i < g_state.menuEvtNameCount; ++i) {
+						if (::_stricmp(g_state.menuEvtNames[i].name, a_name) == 0) {
+							slot = i;
+							break;
+						}
+					}
+					if (slot == g_state.menuEvtNameCount) {
+						if (slot < kMenuEvtNameStatMax) {
+							std::snprintf(g_state.menuEvtNames[slot].name, kMenuEvtNameMax, "%s", a_name);
+							g_state.menuEvtNames[slot].count = 0;
+							++g_state.menuEvtNameCount;
+						} else {
+							slot = kMenuEvtNameStatMax;  // 表满：不再统计（只影响日志详略）
+						}
+					}
+					if (slot < kMenuEvtNameStatMax) {
+						firstOfName = g_state.menuEvtNames[slot].count == 0;
+						++g_state.menuEvtNames[slot].count;
+					}
+				}
+				// 最近事件：整体后移一格，新的放头部（最多 4 条，代价可忽略）
+				{
+					const std::size_t keep = std::min<std::size_t>(g_state.menuEvtRecentCount, kMenuEvtRecentMax - 1);
+					for (std::size_t i = keep; i > 0; --i) {
+						g_state.menuEvtRecent[i] = g_state.menuEvtRecent[i - 1];
+					}
+					std::snprintf(g_state.menuEvtRecent[0].name, kMenuEvtNameMax, "%s", a_name);
+					g_state.menuEvtRecent[0].opening = a_opening;
+					g_state.menuEvtRecent[0].ms      = NowMs();
+					g_state.menuEvtRecentCount       = keep + 1;
+				}
 			}
 			if (isContainer) {
 				const auto n = g_state.menuEvtContainer.fetch_add(1, std::memory_order_relaxed) + 1;
@@ -1776,10 +1885,13 @@ namespace SAS
 					a_name, a_opening ? "opening" : "closing", a_name, polled ? 1 : 0,
 					(polled == a_opening) ? "事件与轮询一致（通道接对了）"
 										  : "事件与轮询不一致（可能只是时序差：事件先到、菜单状态后更新）");
-			} else if (g_state.menuEvtLogged < static_cast<std::uint64_t>(g_cfg.menuEventLogMax)) {
+			} else if (firstOfName ||
+					   (g_state.menuEvtLogged < static_cast<std::uint64_t>(g_cfg.menuEventLogMax))) {
+				// ★ v4.12：**每个菜单名的头几条一定记**（上一轮是全局 48 条，玩久了额度烧光，
+				//   于是「搜刮界面到底叫什么名字」这个最关键的取证反而看不到）。
 				++g_state.menuEvtLogged;
-				REX::INFO("menu event: \"{}\" {}（普通菜单事件，只记前 {} 条）",
-					a_name, a_opening ? "opening" : "closing", g_cfg.menuEventLogMax);
+				REX::INFO("menu event: \"{}\" {}（普通菜单事件；每个名字头 {} 条必记，其余最多 {} 条）",
+					a_name, a_opening ? "opening" : "closing", kMenuEvtPerNameLogMax, g_cfg.menuEventLogMax);
 			}
 		}
 
@@ -1888,7 +2000,7 @@ namespace SAS
 			return true;
 		}
 
-		void UnregisterMenuEventSink(const char* a_why);
+		void DisableMenuEventSink(const char* a_why);
 
 		// 事件 sink：`ProcessEvent` 由引擎通过 vtable 调用（第 1 槽）。
 		class SasMenuEventSink final : public RE::BSTEventSink<SasMenuOpenCloseEvent>
@@ -1897,20 +2009,24 @@ namespace SAS
 			RE::BSEventNotifyControl ProcessEvent(const SasMenuOpenCloseEvent& a_event,
 				RE::BSTEventSource<SasMenuOpenCloseEvent>*) override
 			{
+				// ★ v4.12：通道停用后**立刻返回**（sink 仍然挂在源上，但什么都不做）
+				if (!g_state.menuEvtActive) {
+					return RE::BSEventNotifyControl::kContinue;
+				}
 				char name[32]{};
 				bool opening = false;
 				if (SafeReadMenuEvent(&a_event, name, sizeof(name), opening)) {
 					OnMenuEvent(name, opening);
 				} else {
-					// ★ 读到的东西不像菜单事件 ⇒ 记一笔；累计到阈值就注销整条通道。
+					// ★ 读到的东西不像菜单事件 ⇒ 记一笔；累计到阈值就停用解释。
 					const auto bad = g_state.menuEvtBad.fetch_add(1, std::memory_order_relaxed) + 1;
 					if (bad <= 3) {
 						REX::WARN("menu event (bad): 负载不像 `MenuOpenCloseEvent`（第 {} 条）-> "
-								  "若总数到 {} 会注销事件通道（退回轮询，绝不会因此崩）",
+								  "若总数到 {} 会停用事件通道（退回轮询，绝不会因此崩）",
 							bad, kMenuEvtBadMax);
 					}
 					if (bad >= kMenuEvtBadMax) {
-						UnregisterMenuEventSink("事件负载连续不像菜单事件");
+						DisableMenuEventSink("事件负载连续不像菜单事件");
 					}
 				}
 				return RE::BSEventNotifyControl::kContinue;
@@ -1918,74 +2034,192 @@ namespace SAS
 		};
 		SasMenuEventSink g_menuEventSink;
 
-		// 注销事件通道（只在「负载不对」时用 —— 宁可退回 v4.10 的轮询，也不带风险跑）。
-		void UnregisterMenuEventSink(const char* a_why)
+		// ★ v4.12：**只停用解释，不调引擎注销**。
+		//   为什么不去调 `UnregisterSink`（REL::ID 123822，commonlibsf 给的）：本轮离线核对
+		//   发现它的实现形状与 `RegisterSink`（123821 = 锁 + sink 数组 push，已逐条对上）
+		//   **不是同一套结构** —— 123822 在遍历一个 `[node+8]` 的链表，多半不是我们要的函数；
+		//   而且在事件回调里注销自己还有重入 / 死锁风险。
+		//   ⇒ 安全做法：把解释开关关掉（`ProcessEvent` 立刻返回），sink 留在数组里无害。
+		void DisableMenuEventSink(const char* a_why)
 		{
-			if (!g_state.menuSinkRegistered) {
+			if (!g_state.menuEvtActive) {
 				return;
 			}
-			g_state.menuSinkRegistered = false;
-			g_cfg.containerMenuEvents  = false;  // 本会话不再注册
-			auto* ui                   = RE::UI::GetSingleton();
-			if (!ui) {
-				return;
-			}
-			auto* src = reinterpret_cast<RE::BSTEventSource<SasMenuOpenCloseEvent>*>(
-				reinterpret_cast<std::uint8_t*>(ui) + kOffUiMenuEventSource);
-			src->UnregisterSink(&g_menuEventSink);
-			REX::WARN("menu events: 通道已注销（{}）-> 容器界面信号退回轮询（v4.10 行为：对 "
-					  "ContainerMenu 可能读不到；此时看 `menu dump` 行取证）",
+			g_state.menuEvtActive     = false;
+			g_cfg.containerMenuEvents = false;  // 本会话不再注册
+			REX::WARN("menu events: 事件通道已停用解释（{}）-> 容器界面信号退回轮询（对 "
+					  "ContainerMenu 可能读不到；此时看 `menu dump` 行取证）。sink 留在原地不动（无害）",
 				a_why);
 		}
 
-		// 注册 sink（主线程、只做一次；失败每 4 秒重试 —— 与库存标定同一套「永不放弃」）。
-		void EnsureMenuEventSink(std::uint64_t a_nowMs)
+		// ★ v4.12：找「UI 里那个 `MenuOpenCloseEvent` 事件源」——返回源地址，偏移写进 `a_outOff`。
+		//   ★ 为什么不再写死偏移：**vtable 是类型的唯一指纹**。先试 commonlibsf 声明的
+		//     `UI + 0x20`（本轮离线已用 UI 构造函数逐条证实），不对就沿 UI 对象每 8 字节往后
+		//     找一个「首 qword == base+0x4D7E3D8」的槽位 —— 只有**精确等于**那个 vtable
+		//     才算命中，所以即使将来布局位移，也绝不会误挂到别的事件源上（最坏 = 找不到 ⇒ 退回轮询）。
+		std::uint8_t* FindMenuEventSource(std::size_t* a_outOff)
 		{
-			if (!g_cfg.containerMenuEvents || g_state.menuSinkRegistered) {
+			if (a_outOff) {
+				*a_outOff = 0;
+			}
+			auto* ui = RE::UI::GetSingleton();
+			if (!ui) {
+				return nullptr;
+			}
+			const auto  expected = ModuleBase() + kMenuOpenCloseSourceVtblRva;
+			auto* const b8       = reinterpret_cast<std::uint8_t*>(ui);
+			// ① 首选：UI + 0x20（commonlibsf 基类偏移；本项目实测确认）
+			if (*reinterpret_cast<const std::uintptr_t*>(b8 + kOffUiMenuEventSource) == expected) {
+				if (a_outOff) {
+					*a_outOff = kOffUiMenuEventSource;
+				}
+				return b8 + kOffUiMenuEventSource;
+			}
+			// ② 兜底：向后扫（先确认整段可读，一次 VirtualQuery）
+			if (!IsReadable(b8, kMenuEvtSrcScanMax)) {
+				return nullptr;
+			}
+			for (std::size_t off = 0x08; off + 8 <= kMenuEvtSrcScanMax; off += 8) {
+				if (off == kOffUiMenuEventSource) {
+					continue;
+				}
+				if (*reinterpret_cast<const std::uintptr_t*>(b8 + off) == expected) {
+					if (a_outOff) {
+						*a_outOff = off;
+					}
+					return b8 + off;
+				}
+			}
+			return nullptr;
+		}
+
+		// vtable 对不上时的取证：把 UI 对象前 0x60 字节按 8 字节打成 RVA（最多两次）。
+		//   ★ 只有这一行，就能和离线反汇编「构造函数写了什么 vtable」逐条对照 —— 本轮正是这么定位的。
+		void LogUiLayoutFingerprint()
+		{
+			if (g_state.menuFingerprints >= 2) {
 				return;
 			}
+			++g_state.menuFingerprints;
+			auto* ui = RE::UI::GetSingleton();
+			if (!ui) {
+				return;
+			}
+			const auto* b8 = reinterpret_cast<const std::uint8_t*>(ui);
+			if (!IsReadable(b8, 0x60)) {
+				return;
+			}
+			const auto  base = ModuleBase();
+			char        buf[512]{};
+			std::size_t used = 0;
+			for (std::size_t off = 0; off < 0x60; off += 8) {
+				const auto q  = *reinterpret_cast<const std::uint64_t*>(b8 + off);
+				const auto qq = (q >= base && q < base + 0x20000000) ? (q - base) : q;
+				const int  n  = std::snprintf(buf + used, sizeof(buf) - used, "%s+0x%02zX=0x%llX",
+					 off ? " " : "", off, static_cast<unsigned long long>(qq));
+				if (n <= 0 || static_cast<std::size_t>(n) >= sizeof(buf) - used) {
+					break;
+				}
+				used += static_cast<std::size_t>(n);
+			}
+			REX::WARN("menu events: UI 布局指纹（VA 已换算成 RVA，便于和离线反汇编对照）: {}", buf);
+		}
+
+		// 「我们的 sink 还在不在那个 sink 数组里」——UI 重建 / 引擎清表时会掉出去。
+		bool MenuSinkStillRegistered(const std::uint8_t* a_src)
+		{
+			if (!a_src) {
+				return false;
+			}
+			const auto sz = *reinterpret_cast<const std::uint32_t*>(a_src + 0x08);
+			const auto cp = *reinterpret_cast<const std::uint32_t*>(a_src + 0x0C);
+			const auto dp = *reinterpret_cast<const std::uint64_t*>(a_src + 0x10);
+			if (sz > cp || cp > 4096 || sz == 0) {
+				return false;
+			}
+			if (!IsReadable(reinterpret_cast<const void*>(dp), static_cast<std::size_t>(sz) * 8)) {
+				return false;
+			}
+			auto* const* sinks = reinterpret_cast<void* const*>(dp);
+			for (std::uint32_t i = 0; i < sz; ++i) {
+				if (sinks[i] == &g_menuEventSink) {
+					return true;
+				}
+			}
+			return false;
+		}
+
+		// 注册 sink（主线程、只做一次；失败每 4 秒重试 —— 与库存标定同一套「永不放弃」）。
+		//   ★ v4.12：挂上之后**每 60 秒核对一次**「sink 还在数组里吗」，不在就重挂
+		//     （防「UI 重建 / 引擎清表」把通道悄悄弄哑）。
+		void EnsureMenuEventSink(std::uint64_t a_nowMs)
+		{
+			if (!g_cfg.containerMenuEvents) {
+				return;
+			}
+
+			if (g_state.menuSinkRegistered) {
+				if (a_nowMs - g_state.menuSinkCheckMs < kMenuSinkCheckMs) {
+					return;
+				}
+				g_state.menuSinkCheckMs = a_nowMs;
+				std::size_t off = 0;
+				auto*       src = FindMenuEventSource(&off);
+				if (src && MenuSinkStillRegistered(src)) {
+					return;
+				}
+				g_state.menuSinkRegistered = false;  // 掉出去了 ⇒ 下面重挂
+				REX::WARN("menu events: sink 不在事件源的 sink 数组里了（UI 重建 / 引擎清表？）-> 重新注册");
+			}
+
 			if (g_state.menuSinkRetryAtMs > a_nowMs) {
 				return;
 			}
 			g_state.menuSinkRetryAtMs = a_nowMs + 4000;
-			auto* ui                  = RE::UI::GetSingleton();
-			if (!ui) {
+
+			std::size_t off = 0;
+			auto*       src = FindMenuEventSource(&off);
+			if (!src) {
+				++g_state.menuSinkFailures;
+				REX::WARN("menu events: 在 UI 里找不到 vtable=0x{:X}（RVA 0x{:X} = BSTEventSource<MenuOpenCloseEvent>）"
+						  "的槽位 -> **不注册**（退回轮询；第 {} 次失败，4 秒后重试）",
+					ModuleBase() + kMenuOpenCloseSourceVtblRva, kMenuOpenCloseSourceVtblRva, g_state.menuSinkFailures);
+				LogUiLayoutFingerprint();
 				return;
 			}
-			// RE::UI 的基类列表（commonlibsf `RE/U/UI.h`）：
-			//   0x00 BSTSingletonSDM / 0x10 BSInputEventReceiver /
-			//   0x20 BSTEventSource<MenuOpenCloseEvent> … ⇒ 事件源就在 UI + 0x20。
-			auto* src = reinterpret_cast<RE::BSTEventSource<SasMenuOpenCloseEvent>*>(
-				reinterpret_cast<std::uint8_t*>(ui) + kOffUiMenuEventSource);
-			// ★ 形状校验再注册（BSTEventSource：vtable@0 + BSTArray sinks@0x08 + 两个计数）
-			//   拿它当「这个地址真的是个事件源」的最低门槛。
-			const auto sz = *reinterpret_cast<const std::uint32_t*>(reinterpret_cast<const std::uint8_t*>(src) + 0x08);
-			const auto cp = *reinterpret_cast<const std::uint32_t*>(reinterpret_cast<const std::uint8_t*>(src) + 0x0C);
-			const auto dp = *reinterpret_cast<const std::uint64_t*>(reinterpret_cast<const std::uint8_t*>(src) + 0x10);
+			// ★ 形状校验再注册（BSTEventSource：vtable@0 + BSTArray sinks@0x08：size/cap/data）
+			const auto sz = *reinterpret_cast<const std::uint32_t*>(src + 0x08);
+			const auto cp = *reinterpret_cast<const std::uint32_t*>(src + 0x0C);
+			const auto dp = *reinterpret_cast<const std::uint64_t*>(src + 0x10);
 			if (sz > cp || cp > 4096 || (sz != 0 && !IsReadable(reinterpret_cast<const void*>(dp), 8))) {
 				++g_state.menuSinkFailures;
 				REX::WARN("menu events: UI+0x{:X} 的形状不像事件源（size={} cap={} data={}) -> 退回轮询"
 						  "（容器界面信号可能仍读不到；第 {} 次失败，4 秒后重试）",
-					kOffUiMenuEventSource, sz, cp, dp, g_state.menuSinkFailures);
+					off, sz, cp, dp, g_state.menuSinkFailures);
+				LogUiLayoutFingerprint();
 				return;
 			}
 			// ★★ 硬比对 vtable：确认这个源就是 `BSTEventSource<MenuOpenCloseEvent>`
-			//   （期望值离线反查得到，见常量区）。**不是它就不注册** —— 宁可退回轮询，
-			//   也绝不把 sink 挂到一个「别的事件」的源上（那样会按错误布局解释负载）。
+			//   （常量区有完整推导）。**不是它就不注册** —— 宁可退回轮询，也绝不把 sink
+			//   挂到一个「别的事件」的源上（那样会按错误布局解释负载）。
 			const auto vtbl     = *reinterpret_cast<const std::uintptr_t*>(src);
 			const auto expected = ModuleBase() + kMenuOpenCloseSourceVtblRva;
 			if (vtbl != expected) {
 				++g_state.menuSinkFailures;
 				REX::WARN("menu events: UI+0x{:X} 的 vtable=0x{:X}，期望 0x{:X}（BSTEventSource<MenuOpenCloseEvent>，"
-						  "RVA 0x{:X}）-> **不注册**（退回轮询）。把这一行发出来即可定位真实偏移/类型",
-					kOffUiMenuEventSource, vtbl, expected, kMenuOpenCloseSourceVtblRva);
+						  "RVA 0x{:X}）-> **不注册**（退回轮询）",
+					off, vtbl, expected, kMenuOpenCloseSourceVtblRva);
+				LogUiLayoutFingerprint();
 				return;
 			}
-			src->RegisterSink(&g_menuEventSink);
+			reinterpret_cast<RE::BSTEventSource<SasMenuOpenCloseEvent>*>(src)->RegisterSink(&g_menuEventSink);
 			g_state.menuSinkRegistered = true;
+			g_state.menuEvtActive      = true;
+			g_state.menuSinkCheckMs    = a_nowMs;
 			REX::INFO("menu events: sink registered at UI+0x{:X}（vtable=0x{:X} 已核对 = BSTEventSource<MenuOpenCloseEvent>；"
-					  "sinks size={} cap={}）-> 菜单开/关事件将进日志，容器界面状态改由事件驱动（轮询仍然叠加）",
-				kOffUiMenuEventSource, vtbl, sz, cp);
+					  "sinks size={} cap={}）-> 菜单开/关事件将进日志（每个菜单名前 {} 条必记），"
+					  "容器界面状态改由「事件 ∨ 轮询」驱动",
+				off, vtbl, sz, cp, kMenuEvtPerNameLogMax);
 		}
 
 		// 「此刻开着的菜单」快照（诊断 / 自动学习用）—— 纯 `IsMenuOpen` 查询，零内存猜测。
@@ -2147,8 +2381,10 @@ namespace SAS
 				g_cfg.displayCaseUiEmpty, g_cfg.containerMenuName,
 				(g_cfg.skipDisplayCaseEmpty && g_cfg.displayCaseUiEmpty) ? "同一段打开期读到空即熄灭" : "关闭也亮（v4.9 行为）");
 			REX::INFO("config: containerMenuEvents={} containerMenuLearn={} menuDumpMax={} menuEventLogMax={} "
-					  "-> 容器界面信号 = 菜单事件 ∨ 轮询（v4.10 的轮询对 ContainerMenu 实测读不到）",
-				g_cfg.containerMenuEvents, g_cfg.containerMenuLearn, g_cfg.menuDumpMax, g_cfg.menuEventLogMax);
+					  "-> 容器界面信号 = 菜单事件 ∨ 轮询（v4.10 的轮询对 ContainerMenu 实测读不到）"
+					  "；事件源 = UI+0x{:X} 且 vtable RVA 必须是 0x{:X}（v4.12 已用 UI 构造函数逐条证实）",
+				g_cfg.containerMenuEvents, g_cfg.containerMenuLearn, g_cfg.menuDumpMax, g_cfg.menuEventLogMax,
+				kOffUiMenuEventSource, kMenuOpenCloseSourceVtblRva);
 			REX::INFO("config: displayCaseFrameWatch={} displayCaseTraceMax={} -> 展示柜逐帧观察={}",
 				g_cfg.displayCaseFrameWatch, g_cfg.displayCaseTraceMax,
 				g_cfg.displayCaseFrameWatch ? "开（拿空窗口缩到 1 帧）" : "关（只在 200ms 扫描节拍上判）");
@@ -3310,6 +3546,7 @@ namespace SAS
 			const auto  n = SnapshotOpenMenus(openList);
 			// 事件侧「此刻开着」的菜单名（锁内拷贝一份出来）
 			std::string evtList;
+			std::string recentList;  // ★ v4.12：最近几条事件（名字 + 开/关 + 多久以前）
 			char        lastOpen[kMenuEvtNameMax]{};
 			std::uint64_t lastOpenMs = 0;
 			{
@@ -3320,16 +3557,33 @@ namespace SAS
 					}
 					evtList += g_state.menuEvtOpenNames[i];
 				}
+				for (std::size_t i = 0; i < g_state.menuEvtRecentCount; ++i) {
+					if (!recentList.empty()) {
+						recentList += ", ";
+					}
+					recentList += g_state.menuEvtRecent[i].name;
+					recentList += g_state.menuEvtRecent[i].opening ? "开" : "关";
+					char tail[32]{};
+					std::snprintf(tail, sizeof(tail), "(%llums 前)",
+						static_cast<unsigned long long>(nowMs > g_state.menuEvtRecent[i].ms
+															? nowMs - g_state.menuEvtRecent[i].ms
+															: 0));
+					recentList += tail;
+				}
+				if (recentList.empty()) {
+					recentList = "（没有收到任何菜单事件）";
+				}
 				std::snprintf(lastOpen, sizeof(lastOpen), "%s", g_state.menuEvtLastOpen);
 				lastOpenMs = g_state.menuEvtLastOpenMs;
 			}
 			if (g_state.menuDumps < static_cast<std::uint32_t>(g_cfg.menuDumpMax)) {
 				++g_state.menuDumps;
 				REX::INFO("menu dump (看到展示柜投影但 ui=0，取证): ref={:08X} | IsMenuOpen 快照: [{}]（{} 个）"
-						  "| 事件侧开着: [{}] | 最近一次打开: \"{}\"（{}ms 前）| 事件总数={} 容器事件={}",
+						  "| 事件侧开着: [{}] | 最近一次打开: \"{}\"（{}ms 前）| 事件总数={} 容器事件={} "
+						  "| 最近事件: {}",
 					a_ref ? a_ref->GetFormID() : 0, openList, n, evtList, lastOpen,
 					lastOpenMs ? (NowMs() - lastOpenMs) : 0,
-					g_state.menuEvtTotal.load(), g_state.menuEvtContainer.load());
+					g_state.menuEvtTotal.load(), g_state.menuEvtContainer.load(), recentList);
 			}
 			// ★ 自愈：事件侧「开着的菜单」里，若**恰好只有一个**不在忽略名单里 ⇒ 就是它
 			//   （容器界面开着的时候，别的菜单基本都关着；HUD / 光标这类永远在的会被排除）。
@@ -5214,7 +5468,15 @@ namespace SAS
 			//   ★ 放在每帧路径上（不是 200ms 扫描路径）—— 关闭动作会让投影立刻收回
 			//     （size→0），段号必须在那一刻就变，否则「关掉没拿」会被误判成「拿空」。
 			{
-				const bool evOpen = g_state.menuEvtOpen.load(std::memory_order_relaxed);
+				// ★ v4.12：事件侧的「容器菜单开着吗」**每帧在主线程重算一次**（不再只在收到事件时算）——
+				//   自愈学习到新菜单名之后，它此刻「正开着」这件事必须**立刻**生效：否则要等
+				//   下一次菜单事件才会更新，而「拿空」往往就发生在这一小段窗口里。
+				bool evOpen = g_state.menuEvtOpen.load(std::memory_order_relaxed);
+				if (g_cfg.containerMenuEvents && g_state.menuSinkRegistered) {
+					std::scoped_lock evtLock{ g_state.menuEvtLock };
+					evOpen              = MenuEvtContainerOpenLocked();
+					g_state.menuEvtOpen = evOpen;
+				}
 				const bool uiOpen = g_cfg.containerMenuEvents ? (evOpen || PollContainerMenuOpen())
 															 : PollContainerMenuOpen();
 				if (uiOpen != g_state.containerUiOpen) {
