@@ -272,6 +272,16 @@ namespace SAS
 		// 库存明细探针只对「玩家多近」的目标打（米）。
 		constexpr float kLootProbeRangeMeters = 20.0f;
 
+		// ★★ v4.8 诊断：`cont probe:` —— 容器「判空链路快照」探针（背景与用法见
+		//   ContProbe 函数顶部的长注释）。这三个常量控制它的数量与范围：
+		//     kContProbeMax        —— 本会话最多打几条（0 = 关掉这组探针）
+		//     kContProbePerRefMax  —— 同一个引用最多打几条（首次 1 条 + 判决变化 1 条）
+		//     kContProbeRangeMeters—— 只对这么近的容器打（米）★ 比 loot probe 近：
+		//       用户就站在那个箱子前面，近一点能少浪费额度（营地场景容器很多）
+		constexpr std::uint32_t kContProbeMax         = 48;
+		constexpr std::uint32_t kContProbePerRefMax   = 2;
+		constexpr float         kContProbeRangeMeters = 15.0f;
+
 		// 【判空】容器 / 尸体的「库存列表」——
 		//   `TESObjectREFR::inventoryList` 是 `BSGuarded<BGSInventoryList*, BSReadWriteLock>`，
 		//   而 commonlibsf 头文件里 BSGuarded 的成员顺序标着 "??"（data 在前还是锁在前
@@ -638,6 +648,11 @@ namespace SAS
 			int           actorChangeProbeMax = static_cast<int>(kActorChangeProbeMax);
 			// ★ v4.4 诊断：库存明细探针 `loot probe:` 的条数上限（0 = 关）。
 			int           lootProbeMax      = static_cast<int>(kLootProbeMax);
+			// ★ v4.8 诊断：容器「判空链路快照」探针 `cont probe:` 的条数上限（0 = 关）。
+			//   用途：用户报「武器箱关着时不亮、一打开就亮」—— 这个探针会在
+			//   「第一次见到这个容器」和「判决发生变化」时各打一条库存明细，
+			//   开关前后的两条一对比，原因就定死了（见 ContProbe 顶部的说明）。
+			int           contProbeMax      = static_cast<int>(kContProbeMax);
 
 			// ================================================================
 			// ★★ v4.5：判空时跳过「非玩家物品」（记录标志 0x04）—— 默认 1
@@ -804,6 +819,15 @@ namespace SAS
 			std::unordered_set<const RE::TESObjectREFR*> lootProbed;
 			std::uint32_t lootProbes        = 0;  // 本会话已打的库存明细探针数（上限 cfg.lootProbeMax）
 			std::uint32_t actorChangeProbes = 0;  // 本会话已打的「判决变化」探针数
+			// ★ v4.8：容器探针 —— 每个 ref 记住「上次的判空结果」与已打条数，
+			//   判决**变化**时再补一条（首次 1 条 + 变化 1 条 = 开关箱子的前后对照）。
+			struct ContProbeRec
+			{
+				int           lastVerdict = 0x7FFFFFFF;  // 上次 RefLootState 的返回值
+				std::uint32_t count       = 0;           // 已为该 ref 打过几条
+			};
+			std::unordered_map<const RE::TESObjectREFR*, ContProbeRec> contProbed;
+			std::uint32_t contProbes = 0;  // 本会话已打的容器探针数（上限 cfg.contProbeMax）
 			// ★ v4.3：ACHR 判决全景（「该亮没亮」时最有用的一对数）
 			std::uint64_t achrSeen         = 0;  // 窗口内半径内的 ACHR 数（不论死活）
 			std::uint64_t achrLive         = 0;  // 其中被判成「活人」跳过的（红线；「尸体不亮」先看这里）
@@ -1397,6 +1421,9 @@ namespace SAS
 				std::clamp(getInt("ActorChangeProbeMax", static_cast<int>(kActorChangeProbeMax)), 0, 256);
 			g_cfg.lootProbeMax =
 				std::clamp(getInt("LootProbeMax", static_cast<int>(kLootProbeMax)), 0, 256);
+			// ★ v4.8：容器「判空链路快照」探针的条数上限
+			g_cfg.contProbeMax =
+				std::clamp(getInt("ContProbeMax", static_cast<int>(kContProbeMax)), 0, 256);
 			// ★ v4.3：库存指针是 null 时算「空」（默认 1；理由见 Config 里的说明）
 			g_cfg.treatNullInvAsEmpty = getInt("TreatNullInvAsEmpty", 1) != 0;
 			// ★ v4.5：判空跳过「非玩家物品（0x04）」（默认 1；理由见 Config 里的说明）
@@ -1405,9 +1432,9 @@ namespace SAS
 			g_cfg.skipEquippedLoot = getInt("SkipEquippedLoot", 1) != 0;
 			REX::INFO("config: corpseUnconscious={} corpseLifeState={} corpseBleedout={} skipEmptyLoot={}",
 				g_cfg.corpseUnconscious, g_cfg.corpseLifeState, g_cfg.corpseBleedout, g_cfg.skipEmptyLoot);
-			REX::INFO("config: actorProbeMax={} actorChangeProbeMax={} lootProbeMax={} treatNullInvAsEmpty={} skipNonPlayableLoot={} skipEquippedLoot={}",
-				g_cfg.actorProbeMax, g_cfg.actorChangeProbeMax, g_cfg.lootProbeMax, g_cfg.treatNullInvAsEmpty,
-				g_cfg.skipNonPlayableLoot, g_cfg.skipEquippedLoot);
+			REX::INFO("config: actorProbeMax={} actorChangeProbeMax={} lootProbeMax={} contProbeMax={} treatNullInvAsEmpty={} skipNonPlayableLoot={} skipEquippedLoot={}",
+				g_cfg.actorProbeMax, g_cfg.actorChangeProbeMax, g_cfg.lootProbeMax, g_cfg.contProbeMax,
+				g_cfg.treatNullInvAsEmpty, g_cfg.skipNonPlayableLoot, g_cfg.skipEquippedLoot);
 
 			// --- ★ v4.0.1：可选的自定义类别颜色（ColorLoot=RRGGBB …，留空 = 用引擎原生配色）---
 			{
@@ -2041,6 +2068,186 @@ namespace SAS
 				nonPlayable, static_cast<unsigned long long>(npTotal), detail);
 		}
 
+		// ★★ v4.8 诊断：`cont probe:` —— 容器「判空链路快照」。
+		//   背景（用户实测反馈）：*「这个武器箱子表现有点奇怪，关闭的时候没有高亮，
+		//   只有打开的时候才会开始高亮」* —— 也就是：**关着的容器不进候选（不亮），
+		//   一打开（搜刮界面出来）就亮**。要一次定位到环节：
+		//     ① **判空误判**（最可疑）：关着时我们读到的就是「空」。细分四种形态：
+		//        · `inv=null`（引擎没建库存；`TreatNullInvAsEmpty=1` ⇒ 判空）
+		//        · `size=0`（数组里一条都没有）
+		//        · 有条目但所有 stack 的 count 都是 0
+		//        · 有条目、count 也 > 0，但**全被两条跳过规则跳过**
+		//          （`SkipNonPlayableLoot` 的 0x04 / `SkipEquippedLoot` 的 kSlotMask）
+		//          ★ 这两条规则**只在尸体上做过实证**（v4.5 / v4.6），
+		//          容器里的物品是否同样成立 —— 这次正好第一次有数据。
+		//     ② 别的环节（分类 / 类别开关 / 距离 / 3D）—— 那 probe 也不白打：
+		//        「能读到条目明细」本身就证明它走到了判空这一步，是 ① 的证据。
+		//   触发：`kContProbeRangeMeters` 内的**容器**（CONT）；
+		//   每个 ref 在「第一次见到」和「判决变化」时各打一条（`kContProbePerRefMax`），
+		//   会话总量上限 `cfg.contProbeMax`。用户复现一次
+		//   （走到箱子旁 → 看它不亮 → 打开 → 亮），日志里就有同一 ref 的一对记录，
+		//   对照「开关前后」的 `size / sum / skipNp / skipEq` 即可定论。
+		//   ★ 纯内存读 + 形状校验，**绝不改判定**；读不到就打原因。
+		void ContProbe(const RE::TESObjectREFR* a_ref, const RE::TESForm* a_base, float a_distSq, int a_loot)
+		{
+			if (g_cfg.contProbeMax <= 0) {
+				return;
+			}
+			const float limitUnits = kContProbeRangeMeters * g_cfg.unitsPerMeter;
+			if (a_distSq > limitUnits * limitUnits) {
+				return;
+			}
+			if (g_state.contProbes >= static_cast<std::uint32_t>(g_cfg.contProbeMax)) {
+				return;
+			}
+			auto it = g_state.contProbed.find(a_ref);
+			if (it == g_state.contProbed.end()) {
+				if (g_state.contProbed.size() >= 256) {
+					return;  // 兜底：别让这张表无限长（正常远用不到）
+				}
+				it = g_state.contProbed.emplace(a_ref, State::ContProbeRec{}).first;
+			}
+			auto&      rec   = it->second;
+			const bool first = (rec.count == 0);
+			if (!first && (rec.lastVerdict == a_loot || rec.count >= kContProbePerRefMax)) {
+				return;  // 判决没变 / 这个 ref 已经打够条数
+			}
+			rec.lastVerdict = a_loot;
+			++rec.count;
+			++g_state.contProbes;
+
+			const auto  fid     = a_ref->GetFormID();
+			const auto  bid     = a_base ? a_base->GetFormID() : 0;
+			const auto  dM      = std::sqrt(std::max(a_distSq, 0.0f)) / g_cfg.unitsPerMeter;
+			const char* tag     = first ? "" : " (changed)";
+			const auto* raw     = reinterpret_cast<const std::uint8_t*>(a_ref);
+
+			if (g_invOff == 0) {
+				REX::INFO("cont probe{}: ref={:08X} base={:08X} d={:.1f}m loot={} -> 库存偏移还没标定（不判空，容器照常亮）",
+					tag, fid, bid, dM, a_loot);
+				return;
+			}
+
+			const auto ptrRaw = *reinterpret_cast<const std::uint64_t*>(raw + g_invOff);
+			if (ptrRaw == 0) {
+				REX::INFO("cont probe{}: ref={:08X} base={:08X} d={:.1f}m loot={} inv=null -> 判空原因=引擎没给这个引用建库存{}",
+					tag, fid, bid, dM, a_loot,
+					g_cfg.treatNullInvAsEmpty ? "（TreatNullInvAsEmpty=1 ⇒ 判「空」）" : "（TreatNullInvAsEmpty=0 ⇒ 按未知处理）");
+				return;
+			}
+			if (!IsPlausiblePointer(ptrRaw)) {
+				REX::INFO("cont probe{}: ref={:08X} base={:08X} d={:.1f}m loot={} inv=垃圾指针 0x{:X}（判空链路返回「未知」）",
+					tag, fid, bid, dM, a_loot, ptrRaw);
+				return;
+			}
+			const auto* inv  = reinterpret_cast<const std::uint8_t*>(ptrRaw);
+			const auto  size = *reinterpret_cast<const std::uint32_t*>(inv + kOffInvData);
+			const auto  cap  = *reinterpret_cast<const std::uint32_t*>(inv + kOffInvData + 4);
+			const auto  data = *reinterpret_cast<const std::uint64_t*>(inv + kOffInvData + 8);
+			if (size > kInvMaxItems || cap < size || cap > (1u << 20) ||
+				(size != 0 && !IsPlausiblePointer(data))) {
+				REX::INFO("cont probe{}: ref={:08X} base={:08X} d={:.1f}m loot={} 形状不对（size={} cap={} data=0x{:X}）",
+					tag, fid, bid, dM, a_loot, size, cap, data);
+				return;
+			}
+			if (size == 0) {
+				REX::INFO("cont probe{}: ref={:08X} base={:08X} d={:.1f}m loot={} inv=ok size=0 -> 判空原因=库存数组为空（一条都没有）",
+					tag, fid, bid, dM, a_loot);
+				return;
+			}
+
+			// 逐条摊开（最多 kInvWalkItemsMax 条；明细只列前 4 条）。
+			//   口径与 RefLootState 完全一致：先判 np（0x04）再判 eq（kSlotMask）。
+			std::uint32_t withCount = 0;  // 有条目 count > 0 的条目数
+			std::uint32_t keepCnt   = 0;  // 判空口径里「算数」的条目数（可拿）
+			std::uint64_t sumRaw    = 0;  // 所有条目 count 之和
+			std::uint64_t sumKeep   = 0;  // 判空口径里「算数」的 count 之和
+			std::uint32_t skipNp    = 0;
+			std::uint32_t skipEq    = 0;
+			std::string   detail;
+			char          buf[192];
+			const auto    items = std::min<std::uint32_t>(size, kInvWalkItemsMax);
+			for (std::uint32_t i = 0; i < items; ++i) {
+				const auto* item = reinterpret_cast<const std::uint8_t*>(data) + i * kOffInvItemSize;
+				const auto  obj  = *reinterpret_cast<const std::uint64_t*>(item + kOffInvItemObject);
+				if (!IsPlausibleFormPtr(obj)) {
+					continue;
+				}
+				const auto sn = *reinterpret_cast<const std::uint32_t*>(item + kOffInvItemStacks);
+				std::uint64_t sum = 0;
+				if (sn > 0 && sn <= kInvMaxStacks) {
+					const auto sd = *reinterpret_cast<const std::uint64_t*>(item + kOffInvItemStacks + 8);
+					if (IsPlausiblePointer(sd)) {
+						for (std::uint32_t j = 0; j < sn; ++j) {
+							sum += *reinterpret_cast<const std::uint32_t*>(
+								reinterpret_cast<const std::uint8_t*>(sd) + j * kOffStackSize + kOffStackCount);
+						}
+					}
+				}
+				const auto itemFlags = *reinterpret_cast<const std::uint32_t*>(item + kOffInvItemFlags);
+				const bool np        = IsNonPlayableForm(obj);
+				const bool eq        = !np && (itemFlags & kInvItemFlagSlotMask) != 0;
+				sumRaw += sum;
+				if (sum > 0) {
+					++withCount;
+				}
+				if (np) {
+					++skipNp;
+				} else if (eq) {
+					++skipEq;
+				} else {
+					++keepCnt;
+					sumKeep += sum;
+				}
+				if (i < 4) {
+					const auto* objRaw  = reinterpret_cast<const std::uint8_t*>(obj);
+					const auto  objType = objRaw[kOffFormType];
+					const auto  objFid  = reinterpret_cast<const RE::TESForm*>(obj)->GetFormID();
+					const auto  objFlg  = *reinterpret_cast<const std::uint32_t*>(objRaw + kOffFormFlags);
+					std::snprintf(buf, sizeof(buf),
+						" [i=%u ft=%02X id=%08X n=%u c=%llu fl=%X ff=%X eq=%d np=%d]",
+						static_cast<unsigned>(i),
+						static_cast<unsigned>(objType),
+						static_cast<unsigned>(objFid),
+						static_cast<unsigned>(sn),
+						static_cast<unsigned long long>(sum),
+						static_cast<unsigned>(itemFlags),
+						static_cast<unsigned>(objFlg),
+						eq ? 1 : 0,
+						np ? 1 : 0);
+					detail += buf;
+				}
+			}
+
+			// 交叉核对：把「探针自己数出来的口径」与「RefLootState 的返回值」并排打出来。
+			//   两边不一致 ⇒ 直接说明判定链路里有 bug（这行就是证据）。
+			char whyBuf[192];
+			if (a_loot == 1) {
+				std::snprintf(whyBuf, sizeof(whyBuf), "有东西（进候选、会亮）");
+			} else if (sumKeep > 0) {
+				std::snprintf(whyBuf, sizeof(whyBuf),
+					"探针数到 %llu 个可拿的东西，但判定 loot=%d ⇒ 两边不一致（把这行发出来）",
+					static_cast<unsigned long long>(sumKeep), a_loot);
+			} else if (sumRaw == 0) {
+				std::snprintf(whyBuf, sizeof(whyBuf),
+					"所有条目 count 都是 0（条目数=%u，其中被跳过 np=%u eq=%u）",
+					size, skipNp, skipEq);
+			} else if (skipNp + skipEq > 0) {
+				std::snprintf(whyBuf, sizeof(whyBuf),
+					"有条目的 count>0，但全被跳过（np=%u eq=%u，原始合计=%llu）",
+					skipNp, skipEq, static_cast<unsigned long long>(sumRaw));
+			} else {
+				std::snprintf(whyBuf, sizeof(whyBuf),
+					"其它（条目=%u 有数=%u 原始合计=%llu 可拿合计=%llu）",
+					size, withCount, static_cast<unsigned long long>(sumRaw),
+					static_cast<unsigned long long>(sumKeep));
+			}
+			REX::INFO("cont probe{}: ref={:08X} base={:08X} d={:.1f}m loot={} size={} keep={}(sum={}) withCount={} sumRaw={} skipNp={} skipEq={} why={}{}",
+				tag, fid, bid, dM, a_loot, size, keepCnt,
+				static_cast<unsigned long long>(sumKeep), withCount,
+				static_cast<unsigned long long>(sumRaw), skipNp, skipEq, whyBuf, detail);
+		}
+
 		// 【v4.2 / v4.3】标定「库存列表指针」在 TESObjectREFR 里的真实偏移（0xA0 / 0xA8）。
 		//   为什么不能直接用头文件：`inventoryList` 是
 		//   `BSGuarded<BGSInventoryList*, BSReadWriteLock>`，而 commonlibsf 里
@@ -2302,6 +2509,7 @@ namespace SAS
 			//   （旧世界的引用随时可能被销毁，留着它们只会是野键）。
 			g_state.achrVerdict.clear();
 			g_state.lootProbed.clear();
+			g_state.contProbed.clear();  // ★ v4.8
 
 			// 换场景 / 读档：把这批引用从引擎的高亮表里摘掉。
 			// ★ v2.2 改成**不立刻动手**：这一步原本会在一帧里发出 200~300 条引擎调用，
@@ -3708,6 +3916,13 @@ namespace SAS
 				if (isCorpse || cat == static_cast<int>(Category::kContainer)) {
 					if (g_cfg.skipEmptyLoot && g_invOff != 0) {
 						const int loot = RefLootState(ref);
+						// ★ v4.8：容器「判空链路快照」探针（首次 + 判决变化时各一条）。
+						//   用户报「武器箱关着不亮、一打开就亮」—— 这两条记录就是答案：
+						//   见 ContProbe 顶部的长注释（关着时的 size/sum/skipNp/skipEq
+						//   与打开后一对比即可定位）。
+						if (cat == static_cast<int>(Category::kContainer) && !isCorpse) {
+							ContProbe(ref, base, d2, loot);
+						}
 						if (loot == 0) {
 							++g_state.emptySkips;
 							continue;  // 空 ⇒ 不进候选 ⇒ 宽限期后熄灭
