@@ -1120,6 +1120,7 @@ namespace SAS
 			std::uint64_t menuSinkRetryAtMs  = 0;                    // 失败后下次重试的时间
 			std::uint64_t menuSinkCheckMs    = 0;                    // 上次核对「sink 还在不在」的时间
 			std::uint32_t menuFingerprints   = 0;                    // UI 布局指纹已打几次（上限 2）
+			bool          menuEvtCrossChecked = false;               // 首条事件的交叉校验做过没有
 			std::uint64_t menuEvtLogged      = 0;                    // 已写日志的普通事件数
 			std::uint32_t menuDumps          = 0;                    // 「此刻开着的菜单」快照已打几次
 			// ★ v4.12：按名字统计「哪些菜单在开关」（每个名字最多记 kMenuEvtPerNameLogMax 条）
@@ -1876,15 +1877,6 @@ namespace SAS
 				const auto n = g_state.menuEvtContainer.fetch_add(1, std::memory_order_relaxed) + 1;
 				REX::INFO("menu event (container): \"{}\" {} -> 容器界面现在 {}（事件第 {} 条）",
 					a_name, a_opening ? "opening" : "closing", a_opening ? "开着" : "关着", n);
-			} else if (g_state.menuEvtTotal.load(std::memory_order_relaxed) == 1) {
-				// ★ 首条有效事件的**交叉校验**：引擎调用与我们的轮询应当一致
-				//   （`LoadingMenu` / `FaderMenu` 这条路项目长期实测有效）——
-				//   这一行同时证明「事件通道接对了地方 + 负载解出来了」。
-				const bool polled = IsMenuNameOpenNow(a_name);
-				REX::INFO("menu events: 首条事件 \"{}\" {} | 轮询 IsMenuOpen(\"{}\")={} -> {}",
-					a_name, a_opening ? "opening" : "closing", a_name, polled ? 1 : 0,
-					(polled == a_opening) ? "事件与轮询一致（通道接对了）"
-										  : "事件与轮询不一致（可能只是时序差：事件先到、菜单状态后更新）");
 			} else if (firstOfName ||
 					   (g_state.menuEvtLogged < static_cast<std::uint64_t>(g_cfg.menuEventLogMax))) {
 				// ★ v4.12：**每个菜单名的头几条一定记**（上一轮是全局 48 条，玩久了额度烧光，
@@ -5484,6 +5476,28 @@ namespace SAS
 					++g_state.containerUiSerial;
 					if (uiOpen) {
 						++g_state.containerUiOpens;
+					}
+				}
+
+				// ★ v4.12：**首条事件的交叉校验放到主线程做**（事件回调里绝不调引擎函数 ——
+				//   回调可能跑在 UI 线程、而 `IsMenuOpen` 内部要抢全局锁，不能在回调里碰）。
+				//   这一行同时证明「事件通道接对了地方 + 负载解出来了」。
+				if (g_cfg.containerMenuEvents && g_state.menuSinkRegistered &&
+					!g_state.menuEvtCrossChecked && g_state.menuEvtTotal.load() > 0) {
+					char firstName[kMenuEvtNameMax]{};
+					{
+						std::scoped_lock evtLock{ g_state.menuEvtLock };
+						std::snprintf(firstName, sizeof(firstName), "%s", g_state.menuEvtLastOpen);
+					}
+					if (firstName[0]) {
+						g_state.menuEvtCrossChecked = true;
+						const bool polled = IsMenuNameOpenNow(firstName);
+						REX::INFO("menu events: 首条事件交叉校验（主线程）: 最近一次打开 \"{}\" | "
+								  "IsMenuOpen(\"{}\")={} | 事件总数={} -> {}",
+							firstName, firstName, polled ? 1 : 0, g_state.menuEvtTotal.load(),
+							polled ? "事件与轮询都看到它（通道接对了）"
+								   : "事件收到了、但 IsMenuOpen 看不到它（正常：它可能不在 "
+									 "`UI+0x450` 那张表里 / 屏幕提示类菜单不注册）");
 					}
 				}
 			}
