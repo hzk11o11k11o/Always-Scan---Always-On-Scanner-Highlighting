@@ -19,10 +19,10 @@
 | --- | --- |
 | **Mod name** | `Always Scan - Always-On Scanner Highlighting (SFSE)` |
 | **Summary**（约 250 字符以内） | `Keep the scanner highlight on at all times. No need to hold the handheld scanner: everything inside a configurable radius gets the vanilla outline, color-coded by category. Full-radius highlighting, one toggle hotkey, fully configurable via INI. SFSE plugin.` |
-| **Version** | `4.6.0` |
+| **Version** | `4.7.0` |
 | **Category** | `Gameplay`（Alternate suggestion: `Items and Objects - Gameplay`） |
 | **Requirements（依赖）** | `Starfield Script Extender (SFSE) 0.2.21+`、`(1.16.244.0) SFSE Address Library`、游戏版本 `1.16.244.0` |
-| **主文件（Main file）** | `StarfieldAlwaysScan-4.6.0.zip` |
+| **主文件（Main file）** | `StarfieldAlwaysScan-4.7.0.zip` |
 | **Permissions** | 允许转载需注明出处？建议：**不得重新上传（No re-uploading）**；允许个人修改（源码已含 Papyrus 部分） |
 
 ---
@@ -59,6 +59,7 @@ In the vanilla game you have to equip the handheld scanner to see which objects 
 - **Vanilla scanner friendly** — using the handheld scanner yourself is perfectly fine. When you put it down, the mod automatically re-applies its highlights within a second, so nothing "goes dark" after scanning.
 - **Interaction safe** — this mod only decides **which objects the engine outlines**. Activation, pick-up prompts, dialogue, doors, computers and crafting all work exactly like vanilla.
 - **Never highlights living beings** — living NPCs and creatures are excluded by design; only dead bodies are outlined (and `CorpseUnconscious=1` optionally includes knocked-out NPCs, off by default).
+- **Stays on while you walk** — crossing the invisible border between two outdoor cells no longer drops the highlight: what was glowing keeps glowing, and the objects on the other side of the border are outlined too while you are near it.
 - **Performance aware** — the world is scanned every 200 ms with per-pass budgets and a leave-grace period, so walking around does not cause stutter. The log can show timings if you ever need to verify.
 
 ### Requirements
@@ -102,12 +103,16 @@ Most used options:
 - `SkipNonPlayableLoot=1` / `SkipEquippedLoot=1` — "looted means dark" only counts what you can actually take: the invisible NPC-only gear every body carries, and gear a killed actor is still wearing, are ignored (both default on; set to 0 only for debugging).
 - `ActorChangeProbeMax=32` / `LootProbeMax=16` — diagnostic only: the log prints a line whenever an actor's verdict changes (e.g. the moment you kill it) and lists what is left inside bodies that still count as "has loot" (0 = off). Leave them alone unless you are reporting a highlight bug.
 - `ActorProbeMax=24` — diagnostic only: how many per-actor lines (`actor probe:`) the log prints per session (0 = off). Leave it alone unless you are reporting a highlight bug.
+- `ExteriorContinuous=1` — treat walking across an outdoor cell border as a continuous transition: highlights are kept, and the cell you came from is scanned as well (default on). Set to 0 only to compare with the old behaviour.
+- `SettleOnCellCrossMs=300` — how long to pause after such a border cross (0 = no pause).
+- `StreamJumpTolerance=256` — while you walk, the engine streams objects in and out; small changes like that no longer interrupt scanning. 0 = old behaviour.
+- `Verify3DPerScan=32` — per pass, re-check this many outlined objects and re-apply the outline if the engine rebuilt their 3D (streaming). This is what cures the rare "it was glowing, then suddenly went dark" case out in the open. 0 = off.
 - `MaxTargets=256` — how many objects can be outlined at once
 - `OnlyInFront=0` — if you prefer "only what you actually face", set to 1 (original scanner-like behaviour)
 
 ### Compatibility
 
-- Only decides outline states for references in the current cell/space — the same reach the vanilla scanner has — limited by the configured radius.
+- Only decides outline states for references in the current cell/space — the same reach the vanilla scanner has — limited by the configured radius. Outdoors, the cells you have recently walked through count as part of that reach, so highlights survive a border cross.
 - No known conflicts: other mods that change loot, NPCs or level lists are unaffected.
 - Works together with the vanilla scanner (see above).
 
@@ -124,6 +129,7 @@ At startup the log prints the active config and whether the native outline funct
 ### Notes / known limitations
 
 - Objects are outlined inside the current cell / loading space, same as the vanilla scanner. When you cross a loading door, the new area is highlighted within about a second.
+- Outdoors, walking across the invisible border between two cells no longer drops the highlights: what was glowing stays glowing, and the objects on the other side of the border are outlined too while you are near it. If a model is unloaded and rebuilt by the engine's streaming (very common outdoors), the outline is re-applied automatically (`Verify3DPerScan`).
 - "Empty" is decided by reading the reference's inventory (item stacks whose count is zero do not count). This needs a one-time memory-offset calibration, which **keeps retrying until it succeeds** (it samples nearby containers and actors) — so it also starts working if the area you started in had nothing to sample from. Until it succeeds the mod simply keeps outlining containers / bodies as before (the log says so) — it never crashes and never hides something that still has loot.
 - A reference whose inventory list was **never created** by the engine counts as empty (`TreatNullInvAsEmpty=1`) — such a reference has nothing to loot by definition. If you ever meet a body / container that stays dark but should glow, set that option to 0.
 - "Looted means dark" only counts what you can **take**: the invisible NPC-only gear (`_NOTPLAYABLE`) that every body carries, and gear a killed actor is still wearing, are ignored — that is what makes a fully looted body really go dark. With *Simple Immersive Looting* (Nexus 12677) installed, using its **Strip** option unequips a body's gear, so the body starts glowing again (the gear is takeable now); loot it and the outline goes away.
@@ -135,6 +141,7 @@ At startup the log prints the active config and whether the native outline funct
 
 ### Version history
 
+- **4.7.0** — Highlights survive walking across cell borders outdoors: the area is no longer re-scanned from scratch (both sides of the border stay outlined), and the rare "it was glowing, then suddenly went dark" case is fixed by re-applying an outline when the engine rebuilds an object's 3D. Scanning is also no longer interrupted by small streaming changes while you walk.
 - **4.6.0** — Looted bodies of enemies you kill now go dark reliably: entries the dead actor is still *wearing* (which cannot be taken) no longer count as loot. The log file is now capped at 1 MiB.
 - **4.5.0** — "Looted means dark" no longer counts the invisible NPC-only gear (`_NOTPLAYABLE`) that every body carries — that was why a fully looted body used to keep glowing.
 - **4.4.0** — Kills are detected through the engine's own life-state check, so enemies, creatures, robots and turrets light up the moment they die. Added diagnostic log lines (`actor probe (changed):`, `loot probe:`) that make bug reports verifiable from one log.
@@ -173,6 +180,8 @@ Built with **SFSE** and **CommonLibSF**. Huge thanks to their authors and to eve
 - **与原版扫描仪完全不冲突**：你自己举扫描仪扫完放下，MOD 的高亮会在 1 秒内自动重挂回来；
 - **不影响任何交互**：对话、拾取、开门、用终端、工作台，全部与原版行为一致 —— MOD 只决定「哪些东西被描边」，从不碰交互逻辑；
 - **活着的 NPC / 生物永不描边**（只亮尸体）；
+- **走动不灭**：星球表面跨 cell 边界不再整片熄灭 —— 原本亮着的继续亮，**边界对面**的东西也一起亮；
+  引擎流式重建模型（外景很常见）导致描边丢失时会自动重挂；
 - **性能友好**：每 200ms 扫描一轮、变更分批应用、有离开宽限期，走动不卡顿。
 
 **依赖**：Starfield 1.16.244.0、SFSE 0.2.21+、对应版本 Address Library。
@@ -194,5 +203,10 @@ Built with **SFSE** and **CommonLibSF**. Huge thanks to their authors and to eve
 > （`SkipNonPlayableLoot=1` / `SkipEquippedLoot=1`）。装了 Simple Immersive Looting 时，
 > 用它的「扒取装备」把身上装备卸下 ⇒ 该尸体重新亮起（装备变成可拿的了），拿空后再熄灭。
 > 日志文件恒定 ≤ 1 MiB（超过即清空重写）。
+>
+> **4.7.0**：星球表面**跨 cell 边界走动不再整片熄灭** —— 账本保留、边界对面的 cell 一起扫
+> （`ExteriorContinuous=1` / `SettleOnCellCrossMs=300`）；引擎**流式重建 3D**（LOD ↔ 真模型）导致
+> 单条描边丢失时**自动重挂**（`Verify3DPerScan=32`，日志里 `3D复检: reassert=` 在涨）；
+> 走动时引用数的**轻微变化不再打断扫描**（`StreamJumpTolerance=256`）。
 
 **日志**：`文档\My Games\Starfield\SFSE\Logs\SAS_AlwaysScan.log`，启动打配置、游戏中每 5 秒打一行统计，排查问题看它即可。

@@ -12,6 +12,7 @@
 - 给一个快捷键开关mod功能
 - 不要影响玩家与其他实体的交互能力，比如NPC对话，使用可交互物品等
 - 基于SFSE制作
+- 要有日志，但日志文件不能超过1M，旧内容要做到滚动删除
 
 ## starfield安装位置
 D:\SteamLibrary\steamapps\common\Starfield（sfse已安装）

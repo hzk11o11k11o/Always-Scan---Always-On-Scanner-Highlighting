@@ -3,7 +3,7 @@
  Always-on scanner highlighting for Starfield
 ========================================================================
 
-Version  : 4.6.0
+Version  : 4.7.0
 Author   : (fill in your Nexus username before uploading)
 Game     : Starfield 1.16.244.0 (matching version required)
 Requires : SFSE (Starfield Script Extender) 0.2.21+
@@ -123,6 +123,22 @@ Most useful options:
                         loot", list what is left inside them. This is the
                         line to send when reporting a "still glowing after
                         looting" bug. 0 = off.
+  ExteriorContinuous=1  walking across an exterior cell border is treated
+                        as a continuous transition: highlights are kept
+                        (nothing goes dark) and the area you came from is
+                        scanned as well, so objects on both sides of the
+                        border stay outlined. 0 = old behaviour (everything
+                        is dropped and re-scanned on every border cross).
+  SettleOnCellCrossMs=300  how long to pause after such a border cross
+                        (0 = no pause at all)
+  StreamJumpTolerance=256  while you walk, the engine keeps streaming
+                        objects in and out. Small changes like that no
+                        longer interrupt scanning (0 = old behaviour).
+  Verify3DPerScan=32    per pass, re-check this many outlined objects whose
+                        3D was rebuilt by streaming (LOD <-> full model) and
+                        re-apply the outline if it was lost - this is what
+                        cures the rare "it was glowing, then suddenly went
+                        dark" case out in the open. 0 = off.
   NotifyOnToggle=1      show a HUD message on toggle
   LogStats=1            write a stats line to the log every 5 seconds
 
@@ -193,7 +209,15 @@ categories).
 * Using the vanilla handheld scanner is fine: when you put it down, the
   mod automatically re-applies its highlights (ResyncOnScannerClose=1).
 * Objects are highlighted inside the current cell / loading space, the
-  same as the vanilla scanner's reach, limited by RadiusMeters.
+  same as the vanilla scanner's reach, limited by RadiusMeters. Going
+  through a loading door (building, ship, fast travel) re-scans the new
+  area within about a second.
+* Outdoors, walking across the invisible border between two worldspace
+  cells no longer drops the highlights: what was glowing keeps glowing,
+  and the objects on the other side of the border are outlined too while
+  you are near it. If a model is unloaded and rebuilt by the engine's
+  streaming (very common outdoors), the outline is re-applied
+  automatically (Verify3DPerScan).
 
 ------------------------------------------------------------------------
  CREDITS / LICENCE
