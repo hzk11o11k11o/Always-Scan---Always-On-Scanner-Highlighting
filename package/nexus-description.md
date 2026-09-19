@@ -19,10 +19,10 @@
 | --- | --- |
 | **Mod name** | `Always Scan - Always-On Scanner Highlighting (SFSE)` |
 | **Summary**（约 250 字符以内） | `Keep the scanner highlight on at all times. No need to hold the handheld scanner: everything inside a configurable radius gets the vanilla outline, color-coded by category. Full-radius highlighting, one toggle hotkey, fully configurable via INI. SFSE plugin.` |
-| **Version** | `4.7.0` |
+| **Version** | `1.3`（引擎 build 4.14.0；Nexus 上的 1.0 / 1.1 / 1.2 之后的下一版） |
 | **Category** | `Gameplay`（Alternate suggestion: `Items and Objects - Gameplay`） |
 | **Requirements（依赖）** | `Starfield Script Extender (SFSE) 0.2.21+`、`(1.16.244.0) SFSE Address Library`、游戏版本 `1.16.244.0` |
-| **主文件（Main file）** | `StarfieldAlwaysScan-4.7.0.zip` |
+| **主文件（Main file）** | `StarfieldAlwaysScan-1.3.zip` |
 | **Permissions** | 允许转载需注明出处？建议：**不得重新上传（No re-uploading）**；允许个人修改（源码已含 Papyrus 部分） |
 
 ---
@@ -54,6 +54,7 @@ In the vanilla game you have to equip the handheld scanner to see which objects 
 
 - **Bodies are highlighted** — pre-placed corpses and everything you kill: humans, creatures, robots and turrets alike (including the wrecked machines already lying around). They behave like containers: empty them and the outline goes away.
 - **Looted means dark** — a container or a body that has nothing left to take stops being outlined (about a second later), so an outline always means "there is still something in there".
+- **Display cases included** — weapon cases, weapon racks, helmet / backpack / datapad racks and the outpost display cases glow even while they are closed, and they go dark once you have taken everything out of them. Taking only part of the contents, or opening one without taking anything, keeps it lit (by design).
 
 - **Toggle hotkey** — press **F8** (any key can be configured) to switch everything on or off, with a short HUD confirmation (`Always Scan: ON / OFF`). You can also choose to start with the feature disabled.
 - **Vanilla scanner friendly** — using the handheld scanner yourself is perfectly fine. When you put it down, the mod automatically re-applies its highlights within a second, so nothing "goes dark" after scanning.
@@ -101,6 +102,8 @@ Most used options:
 - `CorpseUnconscious=1` — also outline "unconscious" units. In the vanilla data most of those are **wrecked robots and turrets you can loot** (that is why it is on by default); a handful are knocked-out living characters, which are lootable as well. Set it to 0 if you ever see a *walking* NPC outlined.
 - `CorpseLifeState=1` — decide "dead" through the engine's own life-state check. This is what makes enemies, creatures, robots and turrets light up the **moment you kill them**; set it to 0 only for debugging. `CorpseBleedout=1` also includes downed / bleeding-out units (default on; they are lootable).
 - `SkipNonPlayableLoot=1` / `SkipEquippedLoot=1` — "looted means dark" only counts what you can actually take: the invisible NPC-only gear every body carries, and gear a killed actor is still wearing, are ignored (both default on; set to 0 only for debugging).
+- `SkipDisplayCaseEmpty=1` — display cases (weapon cases, racks, outpost displays) glow even while closed (default on): the game does not keep their contents in the normal container inventory until the case is opened, so the usual "empty" check does not apply to them. Set to 0 only to compare with the old behaviour.
+- `DisplayCaseUiEmpty=1` — a display case you have emptied goes dark and stays dark (default on); the mod tracks what you take out of it, item by item.
 - `ActorChangeProbeMax=32` / `LootProbeMax=16` — diagnostic only: the log prints a line whenever an actor's verdict changes (e.g. the moment you kill it) and lists what is left inside bodies that still count as "has loot" (0 = off). Leave them alone unless you are reporting a highlight bug.
 - `ActorProbeMax=24` — diagnostic only: how many per-actor lines (`actor probe:`) the log prints per session (0 = off). Leave it alone unless you are reporting a highlight bug.
 - `ExteriorContinuous=1` — treat walking across an outdoor cell border as a continuous transition: highlights are kept, and the cell you came from is scanned as well (default on). Set to 0 only to compare with the old behaviour.
@@ -133,6 +136,7 @@ At startup the log prints the active config and whether the native outline funct
 - "Empty" is decided by reading the reference's inventory (item stacks whose count is zero do not count). This needs a one-time memory-offset calibration, which **keeps retrying until it succeeds** (it samples nearby containers and actors) — so it also starts working if the area you started in had nothing to sample from. Until it succeeds the mod simply keeps outlining containers / bodies as before (the log says so) — it never crashes and never hides something that still has loot.
 - A reference whose inventory list was **never created** by the engine counts as empty (`TreatNullInvAsEmpty=1`) — such a reference has nothing to loot by definition. If you ever meet a body / container that stays dark but should glow, set that option to 0.
 - "Looted means dark" only counts what you can **take**: the invisible NPC-only gear (`_NOTPLAYABLE`) that every body carries, and gear a killed actor is still wearing, are ignored — that is what makes a fully looted body really go dark. With *Simple Immersive Looting* (Nexus 12677) installed, using its **Strip** option unequips a body's gear, so the body starts glowing again (the gear is takeable now); loot it and the outline goes away.
+- Display cases (weapon cases, weapon racks, outpost display cases) are handled separately from normal containers: they glow even while closed, because the game keeps their contents out of the normal container inventory until the case is opened. Once you have taken everything out of one, its outline goes away and stays away; taking only part of the contents leaves it lit.
 - The SFSE log (`SAS_AlwaysScan.log`) is capped at 1 MiB: once it grows past that, it is emptied and starts over.
 - Quest objects are not marked specially.
 - Outlines can only appear inside the current cell / space (engine limit) — bodies in another loading area are not highlighted.
@@ -141,6 +145,9 @@ At startup the log prints the active config and whether the native outline funct
 
 ### Version history
 
+*(This release is **1.3**. The list below uses the plugin's internal build numbers where an older release is concerned.)*
+
+- **1.3** *(plugin build 4.14.0)* — Display cases and racks (weapon cases, weapon racks, outpost display cases) are now handled properly: they glow even while closed, and they reliably go dark once you have taken everything out of them — emptying is tracked item by item as you take things out, so "take it all, then close the case" is caught as well. Taking only part of the contents, or opening one without taking anything, keeps it lit (by design). This supersedes the interim attempts in builds 4.8–4.13.
 - **4.7.0** — Highlights survive walking across cell borders outdoors: the area is no longer re-scanned from scratch (both sides of the border stay outlined), and the rare "it was glowing, then suddenly went dark" case is fixed by re-applying an outline when the engine rebuilds an object's 3D. Scanning is also no longer interrupted by small streaming changes while you walk.
 - **4.6.0** — Looted bodies of enemies you kill now go dark reliably: entries the dead actor is still *wearing* (which cannot be taken) no longer count as loot. The log file is now capped at 1 MiB.
 - **4.5.0** — "Looted means dark" no longer counts the invisible NPC-only gear (`_NOTPLAYABLE`) that every body carries — that was why a fully looted body used to keep glowing.
@@ -176,6 +183,7 @@ Built with **SFSE** and **CommonLibSF**. Huge thanks to their authors and to eve
 - **分类分色**：可拾取物品（蓝）、容器（橙）、**尸体（橙，含怪物尸体）**、可交互设备（绿）、门（红）、植物（绿），全部可配；
 - **尸体高亮**：预置的尸体和你打死的敌人都亮 —— **人类、怪物、机器人、炮塔一视同仁**（在游戏数据里它们同构），连地图上原本就躺着的机器报废体也会亮；
 - **搜空即熄灭**：容器 / 尸体被拿空后约 1 秒熄灭 —— 只统计你真能拿走的东西（拿不走的隐形 NPC 装备、尸体身上还穿着的装备都不算），有描边就代表「里面还有东西」；
+- **展示柜也管**：武器箱 / 武器架 / 头盔架 / 背包架 / 数据板架 / 前哨展示柜 —— **关着也亮**（游戏在关闭状态下不把内容放进容器库存），拿走最后一件东西后熄灭；
 - **开关热键**：默认 **F8**，按一下开/关，HUD 弹一行提示（`Always Scan: ON / OFF`），可改键或关闭提示；
 - **与原版扫描仪完全不冲突**：你自己举扫描仪扫完放下，MOD 的高亮会在 1 秒内自动重挂回来；
 - **不影响任何交互**：对话、拾取、开门、用终端、工作台，全部与原版行为一致 —— MOD 只决定「哪些东西被描边」，从不碰交互逻辑；
@@ -208,5 +216,9 @@ Built with **SFSE** and **CommonLibSF**. Huge thanks to their authors and to eve
 > （`ExteriorContinuous=1` / `SettleOnCellCrossMs=300`）；引擎**流式重建 3D**（LOD ↔ 真模型）导致
 > 单条描边丢失时**自动重挂**（`Verify3DPerScan=32`，日志里 `3D复检: reassert=` 在涨）；
 > 走动时引用数的**轻微变化不再打断扫描**（`StreamJumpTolerance=256`）。
+>
+> **1.3（引擎 4.14）**：**展示柜（武器箱 / 武器架 / 头盔架 / 背包架 / 数据板架 / 前哨展示柜）**
+> 现在「关着也亮」，并且**拿走最后一件东西后就熄灭** —— 拿空按「你真正拿走的物品」**逐件记账**，
+> 所以「拿空后立刻关掉面板」也不会漏判；拿一部分 / 打开不拿就关掉都保持亮（设计如此）。
 
 **日志**：`文档\My Games\Starfield\SFSE\Logs\SAS_AlwaysScan.log`，启动打配置、游戏中每 5 秒打一行统计，排查问题看它即可。

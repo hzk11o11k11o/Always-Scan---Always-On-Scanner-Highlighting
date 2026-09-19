@@ -3,7 +3,7 @@
  Always-on scanner highlighting for Starfield
 ========================================================================
 
-Version  : 4.7.0
+Version  : 1.3  (plugin build 4.14.0)
 Author   : (fill in your Nexus username before uploading)
 Game     : Starfield 1.16.244.0 (matching version required)
 Requires : SFSE (Starfield Script Extender) 0.2.21+
@@ -36,6 +36,12 @@ empty, so the outline always means "there is still something to take".
 (What a body still carries but you cannot take - the invisible NPC-only
 gear it wears, or clothing that is still equipped - does not count as
 loot.)
+
+Display cases are covered as well: weapon cases, weapon racks, helmet /
+backpack / datapad racks and the outpost display cases glow even while
+they are closed (the game does not keep their contents in the normal
+container inventory), and they go dark once you have taken everything
+out of them.
 
 Press the toggle hotkey (default: F8) to switch the whole thing on or
 off at any moment. A short HUD message confirms the new state.
@@ -113,6 +119,16 @@ Most useful options:
                         as loot (default on). This is what makes enemies
                         killed in combat go dark once looted. Set to 0
                         only for debugging.
+  SkipDisplayCaseEmpty=1  weapon cases / weapon racks and other display
+                        cases glow even while closed (default on): the
+                        game does not keep their contents in the normal
+                        container inventory, so the "looted = empty"
+                        check does not apply to them. Set to 0 only if
+                        you want the old behaviour back (cases stay dark
+                        until opened).
+  DisplayCaseUiEmpty=1  a display case you have emptied goes dark and
+                        stays dark (default on). The mod tracks what you
+                        take out of it, item by item.
   ActorProbeMax=24      how many per-actor diagnostic lines ("actor
                         probe:") the log prints per session. Set to 0 to
                         turn them off; they are only useful when reporting
@@ -185,6 +201,14 @@ categories).
     "actor probe (changed):" lines. Killing is detected through the
     engine's own life state, so the log also shows the moment the
     verdict changed.
+* A display case is highlighted when it should be dark (or the other
+    way around):
+    display cases (weapon cases, weapon racks, outpost displays) are
+    tracked separately: they glow even while closed, and they go dark
+    once you have taken everything out of them. Taking only part of the
+    contents - or opening one and taking nothing - keeps it glowing, by
+    design. If it still looks wrong, send me the log lines starting
+    with "display case trace:" and "loot events".
 * A walking NPC is outlined (should not happen):
     set CorpseUnconscious=0 in the INI - the log line starting with
     "corpse probe:" will tell you which reference it was.
@@ -198,6 +222,11 @@ categories).
   creatures alike - are, and they stop glowing once you have taken
   everything from them. What cannot be taken (invisible NPC-only gear,
   and clothing a killed actor is still wearing) does not count as loot.
+* Display cases (weapon cases, weapon racks, outpost display cases) glow
+  even while they are closed - the game keeps their contents out of the
+  normal container inventory until the case is opened, so they are
+  handled separately. Once you take everything out of one, it goes dark
+  like any other container; taking part of its contents leaves it lit.
 * With "Simple Immersive Looting" (Nexus 12677) installed, using its
   "Strip" option unequips a body's gear - the body starts glowing again
   because the gear is takeable now; loot it and the outline goes away.
