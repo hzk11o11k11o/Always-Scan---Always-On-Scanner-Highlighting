@@ -1,0 +1,72 @@
+========================================================================
+ Creation Kit upload form copy
+ Starfield Always Scan (SFSE)  v4.7.0   -   2026-09-19
+========================================================================
+
+HOW TO USE THIS FILE
+--------------------
+* Only needed if you actually attempt a Creations submission (see
+  CC-UPLOAD-GUIDE.md, section 0 for why this is expected to be rejected).
+* Paste the fields below into the Creation Kit upload dialog
+  (Title / Description / Category / Platform).
+* The description is deliberately HONEST about the SFSE dependency.
+  Do not hide it: uploads that misrepresent their runtime requirements
+  can be removed and put your account at risk.
+
+========================================================================
+ FIELDS
+========================================================================
+
+Title:
+Always Scan - Always-On Scanner Highlighting
+
+Category:
+Gameplay
+(if a second category is allowed: Items and Objects - Gameplay)
+
+Platform:
+PC only
+(do NOT tick Xbox/console - this build cannot run on consoles)
+
+Short summary (for any "summary"/subtitle field):
+Keep the scanner highlight on at all times - no need to hold the
+handheld scanner, and everything in a configurable radius is outlined.
+
+========================================================================
+ DESCRIPTION (paste as-is)
+========================================================================
+
+Always Scan keeps the game's own scanner highlight active at all times,
+without holding the handheld scanner, and expands it from the vanilla
+center circle to a configurable radius around the player.
+
+The visuals are the vanilla feature: the plugin drives the game's own
+outline system, so colors, thickness and pulse are identical to what the
+handheld scanner draws.
+
+Features:
+- Always on: highlighting stays visible while you run, fight, loot or fly.
+- Full radius: objects inside the configured radius (default 50 m) are
+  outlined in every direction, not just the center circle.
+- Category colors: lootable items (blue), containers (orange), bodies
+  and corpses - humans, creatures, wrecked robots and turrets (orange),
+  interactive devices and terminals (green), doors (red), flora (green).
+- Bodies behave like containers: loot them empty and the outline goes
+  away. Anything you cannot take does not count as loot.
+- Toggle hotkey (default F8) with a short HUD message.
+- Interaction safe: activation, pick-up, dialogue, doors, computers and
+  crafting all behave exactly like vanilla.
+
+IMPORTANT - RUNTIME REQUIREMENT:
+This mod is an SFSE (Starfield Script Extender) plugin. Its highlighting
+logic is a compiled DLL that calls the game's internal outline system,
+which is not exposed to Papyrus scripts. This submission therefore ships
+as the ESM plugin and its Papyrus helper only, and WILL NOT light
+anything up without the SFSE plugin DLL on the player's machine.
+The DLL cannot be included here because Creations do not permit external
+code / script-extender dependencies, and consoles cannot load DLLs.
+We are submitting this package to ask whether an SFSE-dependent build
+can be distributed through Creations at all; if the answer is no,
+that is understood and this submission can be discarded.
+
+========================================================================
