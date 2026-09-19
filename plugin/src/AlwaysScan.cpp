@@ -513,11 +513,25 @@ namespace SAS
 		//      （`DcSnapOut`）；收到「从这个 ref 拿走 X×N」事件就减账，
 		//      **减到 0 ⇒ 判拿空**（粘性熄灭）。拿空后立刻关掉、甚至同一个扫描间隔
 		//      内关掉都不影响 —— 这正是 v4.10 那个「已知窗口」缺的东西。
-		//   ② **兜底**（INI `DisplayCaseQuickOpenEmpty=1`，默认开）：**只有在①从没
-		//      生效过**（该 ref 这一段打开期里一次拿走事件都没收到）时才启用：
-		//      「快速面板为这个 ref 开着」+「连续读到空 ≥ 400ms」⇒ 判拿空。
-		//      ★ 仍然拿不到「面板关闭」信号 ⇒ 「拿了部分就立刻关掉、人还站着」理论上
-		//        可能被误判（退路：INI 设 0，或看日志 `展示柜拿空(兜底)`）。
+		//      ★ 实测（2026-09-19 14:25:07，武器箱 ref=0033FCCA）：两条 take
+		//        （枪 ×1、弹药 ×8）精确减账 8→0 ⇒ `记账判空=1` ⇒ 熄灭并保持。
+		//   ② **兜底**（INI `DisplayCaseQuickOpenEmpty`，★ v4.14 起**默认关**）：
+		//      **只有在①从没生效过**（这一段打开期里一次拿走事件都没收到）时才启用：
+		//      「快速面板为这个 ref 开着」+「这一段里读到过内容（v4.14 加严）」+
+		//      「连续读到空 ≥ 400ms」⇒ 判拿空。
+		//      ★★ v4.14 默认关的两个理由（同一局日志 + 推导，两条都实证/可推导）：
+		//        a) **误灭面 ①「打开瞬间」**：面板刚打开、投影还没建立的那 0.4~0.7 秒
+		//           （展示柜关闭时库存本来就是空的）会被当成「连续读到空」⇒ 误判。
+		//           实证：14:25:05.812 快速面板事件 → 14:25:06.222 判「拿空」，
+		//           可 14:25:06.463 投影出现、箱子里明明有 2 件东西。
+		//           ⇒ v4.14 用 `sawContentInSession`（这一段里见过内容）把 a) 挡掉。
+		//        b) **误灭面 ②「打开不拿就关掉」**：关掉后投影消失、库存又读空，
+		//           而「面板关闭」**没有任何信号**（拿空与关闭在数据上完全同形 ——
+		//           v4.9 就论证过）⇒ 400ms 后必然误判 ⇒ 违反验收点「打开不拿就
+		//           关掉 ⇒ 保持亮」。这一类**无法修**（信息不可分）⇒ 默认关掉兜底。
+		//      ★ 为什么敢关：真实拿空走记账（①）—— 展示柜触发物品事件已有实测；
+		//        「不走物品事件的展示柜」至今没有任何实测证据。项目红线是
+		//        「宁可少灭一次，绝不误灭」（v4.9/v4.12 两轮验收都依赖这条）。
 		//   ③ 两条都不成立 ⇒ 退回 v4.9/v4.12 行为（照常亮），绝不乱灭。
 		//
 		// ★ 安全姿势与 v4.11/v4.12 完全相同：注册前**硬核对 vtable**（不是那个
@@ -985,12 +999,21 @@ namespace SAS
 			//     · QuickContainerOpenedEvent —— 快速搜刮面板打开（per-ref）
 			//   0 = 不注册（退回 v4.12 行为，仅排查用）。
 			bool          containerLootEvents = true;
-			// 1 = 允许「兜底判据」：快速面板确认为这个 ref 开着、且这一段打开期里
-			//     **一次拿走事件都没收到**、且连续读到空 ≥ 400ms ⇒ 判「拿空」。
-			//   0 = 只信记账（若某些展示柜不触发物品事件，它们就不会熄灭）。
-			//   ★ 兜底仍然拿不到「面板关闭」信号 ⇒ 「拿了部分就立刻关掉」理论上可能
-			//     被误判成拿空；关掉即可回到「拿空不灭」（v4.12 行为）。
-			bool          displayCaseQuickOpenEmpty = true;
+			// 1 = 允许「兜底判据」：快速面板确认为这个 ref 开着、这一段打开期里读到过
+			//     内容、且**一次拿走事件都没收到**、且连续读到空 ≥ 400ms ⇒ 判「拿空」。
+			//   0 = 只信记账（默认，v4.14 起）。
+			//   ★★ v4.14 默认改成 0（关）——实测 + 推导发现兜底有**两个误灭面**：
+			//      ① 面板刚打开、投影还没建立的那 0.4~0.7 秒（关闭状态库存本来就空）
+			//         ⇒ 「连续读到空」直接成立 ⇒ 误判（2026-09-19 14:25:06 的日志实证，
+			//         那一刻箱子里明明有 2 件东西；本版已用 `sawContentInSession` 加严）；
+			//      ② 「打开看一眼、不拿、关掉」——关掉后投影消失、库存又读空，
+			//         而「面板关闭」这件事**没有任何信号**（拿空与关闭在数据上同形，
+			//         v4.9 就论证过）⇒ 400ms 后必然误判（本版无法修，只能默认关）。
+			//   ★ 取舍：记账（TESContainerChangedEvent）已实测能覆盖真实拿空
+			//      （2026-09-19 那局 2 条 take 精确减账到 0）；「不走物品事件的展示柜」
+			//      目前没有任何实测证据 ⇒ 「宁少灭、不误灭」（项目红线）。
+			//      真要开回来：INI 设 1（会重新带上 ② 的误灭风险）。
+			bool          displayCaseQuickOpenEmpty = false;
 			// 物品事件 / 快速面板事件的日志上限（诊断；默认 32 条）。
 			int           lootEventLogMax = 32;
 
@@ -1193,6 +1216,12 @@ namespace SAS
 				bool          sawTakeEvt       = false;
 				std::uint64_t emptySinceMs     = 0;
 				std::uint32_t evtLogs          = 0;   // 该 ref 已写的事件日志条数（限流）
+				// ★ v4.14：**这一段打开期里读到过内容**（打开时清零、读到「有东西」时置位）
+				//   —— 兜底判据必须要有它：否则「面板刚打开、投影还没建立」的那一瞬
+				//   （关闭状态库存本来就空）会被当成「连续读到空」⇒ 误判拿空。
+				//   实测证据见常量区「v4.13」尾部的 v4.14 段（2026-09-19 那一局的
+				//   `display case emptied (兜底…)` 就是它误判出来的）。
+				bool          sawContentInSession = false;
 			};
 			std::unordered_map<const RE::TESObjectREFR*, DisplayCaseVerdict> displayCaseVerdict;
 			std::uint64_t displayCaseEmptied = 0;
@@ -2740,7 +2769,7 @@ namespace SAS
 			g_cfg.displayCaseFrameWatch   = getInt("DisplayCaseFrameWatch", 1) != 0;
 			// ★ v4.13：游戏事件通道（理由 / 离线取证见常量区「v4.13」长注释）
 			g_cfg.containerLootEvents          = getInt("ContainerLootEvents", 1) != 0;
-			g_cfg.displayCaseQuickOpenEmpty    = getInt("DisplayCaseQuickOpenEmpty", 1) != 0;
+			g_cfg.displayCaseQuickOpenEmpty    = getInt("DisplayCaseQuickOpenEmpty", 0) != 0;  // v4.14 默认关（误灭面见 Config 注释）
 			g_cfg.lootEventLogMax              = std::clamp(getInt("LootEventLogMax", 32), 0, 4096);
 			REX::INFO("config: corpseUnconscious={} corpseLifeState={} corpseBleedout={} skipEmptyLoot={}",
 				g_cfg.corpseUnconscious, g_cfg.corpseLifeState, g_cfg.corpseBleedout, g_cfg.skipEmptyLoot);
@@ -2764,8 +2793,8 @@ namespace SAS
 					  "事件源 = 静态对象 RVA 0x{:X}/0x{:X}（vtable 0x{:X}/0x{:X} 注册前硬核对）",
 				g_cfg.containerLootEvents, g_cfg.displayCaseQuickOpenEmpty, g_cfg.lootEventLogMax,
 				g_cfg.displayCaseQuickOpenEmpty
-					? " + 兜底（QuickContainerOpenedEvent 确认面板 + 连续读到空；收不到拿走事件时才用）"
-					: "（兜底已关）",
+					? " + 兜底（QuickContainerOpenedEvent + 连续读到空；★ v4.14 起非默认——会误灭「打开不拿就关掉」）"
+					: "（兜底已关＝v4.14 默认：只信记账，避免「打开不拿就关掉」被误灭）",
 				kInvEvtSourceRva, kQuickOpenSourceRva, kInvEvtSourceVtblRva, kQuickOpenSourceVtblRva);
 
 			// --- ★ v4.0.1：可选的自定义类别颜色（ColorLoot=RRGGBB …，留空 = 用引擎原生配色）---
@@ -3844,6 +3873,8 @@ namespace SAS
 		{
 			auto& ds = DisplayCaseVerdictFor(a_ref);
 			ds.lastKnown = 1;
+			// ★ v4.14：这一段打开期里确实读到过内容（兜底判据的前置证据，见字段注释）
+			ds.sawContentInSession = true;
 			if (a_sawTemporary) {
 				ds.lastTpSerial = g_state.containerUiSerial;
 			}
@@ -3884,9 +3915,12 @@ namespace SAS
 				ds.lastTpSerial == g_state.containerUiSerial) {
 				return true;  // ② 同一段打开期（v4.10 判据）
 			}
-			// ③ ★ v4.13 兜底
+			// ③ ★ v4.13 兜底（★ v4.14 默认关 + 加严，完整依据见常量区「v4.13」尾部的 v4.14 段）
+			//   加严：`sawContentInSession` —— 这一段打开期里必须**真的读到过内容**。
+			//   没有它时会误判：面板刚打开、投影还没建立的那一段（关闭状态库存本来就空）
+			//   会被当成「连续读到空 ≥ 400ms」⇒ 一打开就判拿空（2026-09-19 的日志实证）。
 			if (!g_cfg.displayCaseQuickOpenEmpty || ds.quickOpenMs == 0 ||
-				ds.sawTakeEvt || ds.emptySinceMs == 0) {
+				ds.sawTakeEvt || ds.emptySinceMs == 0 || !ds.sawContentInSession) {
 				return false;
 			}
 			const auto now = a_nowMs ? a_nowMs : NowMs();
@@ -3990,15 +4024,19 @@ namespace SAS
 						// 同一时刻只有一个面板 ⇒ 先清掉别的 ref 的会话
 						for (auto& [r, ds] : g_state.displayCaseVerdict) {
 							if (r != ref && ds.quickOpenMs != 0) {
-								ds.quickOpenMs  = 0;
-								ds.sawTakeEvt   = false;
-								ds.emptySinceMs = 0;
+								ds.quickOpenMs         = 0;
+								ds.sawTakeEvt          = false;
+								ds.emptySinceMs        = 0;
+								ds.sawContentInSession = false;  // ★ v4.14
 							}
 						}
 						auto& ds        = DisplayCaseVerdictFor(ref);
 						ds.quickOpenMs  = a_nowMs;
 						ds.sawTakeEvt   = false;
 						ds.emptySinceMs = 0;
+						// ★ v4.14：新会话 = 还没见过内容（打开瞬间投影可能尚未建立，
+						//   关闭状态的库存本来就空 ⇒ 没有这条就会把「打开瞬间」误判成拿空）
+						ds.sawContentInSession = false;
 						++g_state.quickOpenMatched;
 						g_state.quickOpenLastFid = fid;
 						if (ds.evtLogs < kLootEvtPerRefLogMax && LootEvtMayLog()) {
@@ -6509,7 +6547,8 @@ namespace SAS
 					//     （take/put 两侧各算一条；drop= 队列满被丢掉的条数）；
 					//   `命中=` 落在逐帧观察表上的条数；`减账/加账=` 真的动过账的次数；
 					//   `记账判空=` **核心指标**（非 0 且增长 = 「拿空即灭」生效）；
-					//   `快速面板 total/命中=` QuickContainerOpenedEvent；`兜底判空=` 兜底判据生效次数。
+					//   `快速面板 total/命中=` QuickContainerOpenedEvent；`兜底判空=` 兜底判据生效次数
+					//     （★ v4.14 起兜底默认关 ⇒ 这一项应恒为 0；非 0 = INI 打开了兜底）。
 					REX::INFO("  loot events (累计): 物品事件 total={} take={} put={} drop={} bad={} | 命中={} 未命中={} "
 							  "| 减账={} 加账={} 记账判空={} || 快速面板 total={} 命中={} 未命中={} 兜底判空={} "
 							  "| last: ref={:08X} {}ms 前",
