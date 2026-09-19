@@ -238,7 +238,7 @@ if (-not $SkipDeploy) {
     }
     Copy-Item -LiteralPath (Join-Path $root "scripts\$bridgeScript.psc") -Destination (Join-Path $scriptSrcDir "$bridgeScript.psc") -Force
 
-    Set-Content -LiteralPath (Join-Path $modRoot 'meta.ini') -Value "[General]`nmodid=0`nversion=4.9.0`ncomment=Always-on scanner highlighting (SFSE)" -Encoding UTF8
+    Set-Content -LiteralPath (Join-Path $modRoot 'meta.ini') -Value "[General]`nmodid=0`nversion=4.10.0`ncomment=Always-on scanner highlighting (SFSE)" -Encoding UTF8
 
     Get-ChildItem -LiteralPath $modRoot -Recurse -File | ForEach-Object {
         Write-Host ("  {0}  ({1} bytes)" -f $_.FullName.Substring($modRoot.Length + 1), $_.Length)

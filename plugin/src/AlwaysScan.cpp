@@ -328,6 +328,45 @@ namespace SAS
 		//     判空（打开着被发现是空的 ⇒ 熄灭）。
 		constexpr std::uint32_t kDisplayCaseRuntimeMax = 256;  // 运行期学习集合上限（防呆）
 
+		// ================================================================
+		// ★★ v4.10：展示柜「拿空即灭」—— 用「容器界面的同一段打开期」把
+		//   「真拿空」与「关着读到的空」分开
+		// ================================================================
+		// 起因（用户实测，v4.9 如实记录的副作用被确认）：*「现在关着的武器箱会高亮
+		//   了，但是拿空了却不会熄灭了」* —— v4.9 为了「关着也亮」用了最粗的规则
+		//   （展示柜读到空一律不熄灭），于是「拿空后」也永远亮。
+		//
+		// ★ 难点（数据形态）：展示柜**关闭状态**下 `size=0` 与「刚被拿空」在库存里
+		//   长得完全一样（内容只在搜刮界面打开期间投影进来，见上面 v4.9 段）。
+		//   ⇒ 必须引入**独立于库存的第二个信号**：**搜刮界面是不是开着**。
+		//
+		// ★ 判据（游戏自带脚本实证）：容器界面的菜单名 = `"ContainerMenu"`
+		//   —— `AudioContainerNoAnimScript.psc`（容器开/关音效）与
+		//   `OutpostContainerScript.psc`（「打开容器就进 busy、关掉再结算」）都用
+		//   `RegisterForMenuOpenCloseEvent("ContainerMenu")`；DLL 侧与 `MonocleMenu`
+		//   同一套做法（`RE::UI::IsMenuOpen` 轮询，每帧一次）。
+		//
+		//   规则（每个展示柜引用一份状态，见 State::DisplayCaseVerdict）：
+		//     · 打开期内读到 `kTemporary` 条目 ⇒ 记下「这一段打开期」的段号；
+		//     · **同一段打开期**里读到「空」⇒ 内容被拿光 ⇒ 判空（熄灭）；
+		//     · 关闭状态下读到「空」⇒ 内容未知 ⇒ 照常亮（v4.9 的目标，不回归）；
+		//     · 一旦判空过 ⇒ 粘性：关掉后保持熄灭（= 用户要的「拿空即灭」）。
+		//
+		//   ★ 为什么用「UI 段号」而不是「时间窗」：关闭动作会让投影立刻收回
+		//     （size→0，v4.9 日志实证），只看时间窗会把「关掉没拿」误判成「拿空」，
+		//     而段号在每次「界面开 ↔ 关」翻转时 +1 ⇒ 「上一段打开期」的标记永远
+		//     不可能等于「这一段」⇒ 两种情形被干净地分开。
+		//   ★ 开销：除每帧一次 IsMenuOpen（与既有的 loading / monocle 检测同量级）
+		//     外，热路径仍是纯内存读；任何一步形状不对 ⇒ 按「未知」⇒ 照常亮
+		//     （最坏结果 = 退回 v4.9 行为，绝不会崩）。
+		//   ★ 回退：INI `DisplayCaseUiEmpty=0` ⇒ 退回 v4.9 行为；菜单名可由
+		//     `ContainerMenuName` 覆盖（万一是别的名字，不用换 DLL）。
+		//   ★ 已知窗口（如实记录）：玩家在同一个扫描间隔（默认 200ms）内完成
+		//     「拿空 + 关闭」⇒ 两头都观测不到「同一段打开期内读到的空」⇒ 漏判
+		//     （仍亮）；下次打开该容器（若已被拿空 ⇒ 库存在打开期也是空，但那时
+		//     `kt` 不会出现 ⇒ 依旧无法确认）。概率极低，且不会误灭（安全方向）。
+		constexpr std::size_t kDisplayCaseVerdictMax = 512;  // per-ref 判决缓存上限（防呆）
+
 		// 【判空】容器 / 尸体的「库存列表」——
 		//   `TESObjectREFR::inventoryList` 是 `BSGuarded<BGSInventoryList*, BSReadWriteLock>`，
 		//   而 commonlibsf 头文件里 BSGuarded 的成员顺序标着 "??"（data 在前还是锁在前
@@ -734,6 +773,19 @@ namespace SAS
 			bool          skipDisplayCaseEmpty = true;
 
 			// ================================================================
+			// ★★ v4.10：展示柜「拿空即灭」（见常量区「v4.10 展示柜拿空即灭」）
+			// ================================================================
+			// 1 = 用「容器界面的同一段打开期」区分两种「空」：
+			//     打开期内读到的空 = 内容被拿光 ⇒ 熄灭（含拿空后关闭的粘性）；
+			//     关着 / 从没打开过读到的空 = 内容未知 ⇒ 照常亮。
+			//   0 = 退回 v4.9 行为（展示柜读到空一律不熄灭）。
+			bool          displayCaseUiEmpty = true;
+			// 容器（搜刮）界面的菜单名 —— 默认 `"ContainerMenu"`（游戏自带脚本实证：
+			//   `AudioContainerNoAnimScript` / `OutpostContainerScript` 都用它）。
+			//   万一实测发现是别的名字（改了菜单名 / 第三方 UI），改这里即可，不用换 DLL。
+			char          containerMenuName[64]{ "ContainerMenu" };
+
+			// ================================================================
 			// ★★ v4.7：外景连续性 / 高亮丢失自愈（背景见常量区同名前缀的长注释）
 			// ================================================================
 			// 1 = 外景里跨 cell 边界当「连续过渡」处理：不整批熄灭、短静置、
@@ -894,6 +946,25 @@ namespace SAS
 			//   （= 展示柜照常亮的轮数；非 0 且增长 = 规则在生效）。
 			std::unordered_set<std::uint32_t> displayCaseRuntime;
 			std::uint64_t                     displayCaseSkips = 0;
+			// ★ v4.10：容器（搜刮）界面状态 —— 每帧更新（见 Tick）。
+			//   containerUiSerial：每次「开 ↔ 关」翻转 +1（= 段号）。展示柜的
+			//   「拿空」判据靠它把「同一段打开期」与「上一段（已关闭）」严格分开
+			//   （完整推导见常量区「v4.10 展示柜拿空即灭」）。
+			bool          containerUiOpen   = false;  // 当前 ContainerMenu 是否打开
+			std::uint64_t containerUiSerial = 0;      // 段号（每次开/关翻转 +1）
+			std::uint64_t containerUiOpens  = 0;      // 打开次数（诊断）
+			//   DisplayCaseVerdict：每个展示柜引用一份判决缓存（见常量区 v4.10）：
+			//     lastKnown    —— 0=未知（照常亮） 1=有东西 2=已确认拿空（粘性熄灭）
+			//     lastTpSerial —— 最后一次见到 `kTemporary` 投影条目时的 UI 段号
+			//   displayCaseEmptied：窗口内「展示柜拿空即灭」的轮数（诊断：
+			//     非 0 且增长 = 新规则在生效）。
+			struct DisplayCaseVerdict
+			{
+				std::uint8_t  lastKnown    = 0;
+				std::uint64_t lastTpSerial = 0;
+			};
+			std::unordered_map<const RE::TESObjectREFR*, DisplayCaseVerdict> displayCaseVerdict;
+			std::uint64_t displayCaseEmptied = 0;
 			// ★ v4.3：ACHR 判决全景（「该亮没亮」时最有用的一对数）
 			std::uint64_t achrSeen         = 0;  // 窗口内半径内的 ACHR 数（不论死活）
 			std::uint64_t achrLive         = 0;  // 其中被判成「活人」跳过的（红线；「尸体不亮」先看这里）
@@ -1400,6 +1471,24 @@ namespace SAS
 			return ui->IsMenuOpen(kMonocleMenu);
 		}
 
+		// ----------------------------------------------------------------
+		// ★ v4.10：「容器（搜刮）界面」此刻是不是开着
+		// ----------------------------------------------------------------
+		// 用于展示柜的「拿空即灭」判据（见常量区「v4.10 展示柜拿空即灭」）。
+		// 菜单名默认 `"ContainerMenu"` —— 游戏自带脚本实证（`AudioContainerNoAnimScript`
+		// 拿它做容器开合音效、`OutpostContainerScript` 拿它做「打开就进 busy、关掉再
+		// 结算」）；可由 INI `ContainerMenuName` 覆盖（万一是别的名字不用换 DLL）。
+		// 与 IsMonocleMenuOpen 一样：菜单没注册时返回 false，不会崩。
+		bool IsContainerMenuOpen()
+		{
+			auto* ui = RE::UI::GetSingleton();
+			if (!ui) {
+				return false;
+			}
+			static const RE::BSFixedString kName{ g_cfg.containerMenuName };
+			return ui->IsMenuOpen(kName);
+		}
+
 		void LoadConfig()
 		{
 			g_iniPath          = ModuleDir() + "\\SAS_AlwaysScan.ini";
@@ -1498,12 +1587,27 @@ namespace SAS
 			g_cfg.skipEquippedLoot = getInt("SkipEquippedLoot", 1) != 0;
 			// ★ v4.9：展示柜容器不判空（默认 1；理由见 Config 里的说明）
 			g_cfg.skipDisplayCaseEmpty = getInt("SkipDisplayCaseEmpty", 1) != 0;
+			// ★ v4.10：展示柜「拿空即灭」（默认 1；理由与判据见常量区「v4.10」）
+			g_cfg.displayCaseUiEmpty = getInt("DisplayCaseUiEmpty", 1) != 0;
+			//   容器界面菜单名（默认 "ContainerMenu"；游戏自带脚本实证）
+			{
+				char menuName[64]{};
+				::GetPrivateProfileStringA("General", "ContainerMenuName", "ContainerMenu",
+					menuName, sizeof(menuName), ini);
+				if (menuName[0] == '\0') {
+					std::snprintf(menuName, sizeof(menuName), "%s", "ContainerMenu");
+				}
+				std::snprintf(g_cfg.containerMenuName, sizeof(g_cfg.containerMenuName), "%s", menuName);
+			}
 			REX::INFO("config: corpseUnconscious={} corpseLifeState={} corpseBleedout={} skipEmptyLoot={}",
 				g_cfg.corpseUnconscious, g_cfg.corpseLifeState, g_cfg.corpseBleedout, g_cfg.skipEmptyLoot);
 			REX::INFO("config: actorProbeMax={} actorChangeProbeMax={} lootProbeMax={} contProbeMax={} treatNullInvAsEmpty={} skipNonPlayableLoot={} skipEquippedLoot={} skipDisplayCaseEmpty={}",
 				g_cfg.actorProbeMax, g_cfg.actorChangeProbeMax, g_cfg.lootProbeMax, g_cfg.contProbeMax,
 				g_cfg.treatNullInvAsEmpty, g_cfg.skipNonPlayableLoot, g_cfg.skipEquippedLoot,
 				g_cfg.skipDisplayCaseEmpty);
+			REX::INFO("config: displayCaseUiEmpty={} containerMenu=\"{}\" -> 展示柜拿空判据={}",
+				g_cfg.displayCaseUiEmpty, g_cfg.containerMenuName,
+				(g_cfg.skipDisplayCaseEmpty && g_cfg.displayCaseUiEmpty) ? "同一段打开期读到空即熄灭" : "关闭也亮（v4.9 行为）");
 
 			// --- ★ v4.0.1：可选的自定义类别颜色（ColorLoot=RRGGBB …，留空 = 用引擎原生配色）---
 			{
@@ -1769,7 +1873,9 @@ namespace SAS
 		//   实现（`g_invOff` / `RefLootState`）写在文件更下面（和 CalibrateInventory
 		//   放在一起方便对照阅读）。同一个 TU 内前置声明即可。
 		extern std::size_t g_invOff;  // NOLINT(readability-identifier-naming)
-		int                RefLootState(const RE::TESObjectREFR* a_ref);
+		//   ★ v4.10：多一个可选输出 `a_outSawTemporary`（本轮有没有见到 kTemporary
+		//     投影条目）—— 展示柜「拿空即灭」判据要用（见常量区「v4.10」）。
+		int                RefLootState(const RE::TESObjectREFR* a_ref, bool* a_outSawTemporary = nullptr);
 
 		// 诊断：本会话最多打 kCorpseProbeMax 条「尸体候选」探针。
 		//   用途：用户报「某具尸体该亮却没亮 / 不该亮却亮了」时，把 ref / base / 原始
@@ -2200,6 +2306,19 @@ namespace SAS
 			const char* tag = a_displayCase ?
 				(first ? " dc=1" : " dc=1 (changed)") :
 				(first ? "" : " (changed)");
+			// ★ v4.10：展示柜的判决状态（`ui=` 容器界面是否开着；`st=` 0=未知 1=有东西
+			//   2=已确认拿空；`tpS=` 这一段打开期里见过投影条目）—— 「拿空即灭」
+			//   有没有生效、卡在哪一步，看这三个字段（见常量区「v4.10」）。
+			char dcBuf[64]{};
+			if (a_displayCase) {
+				const auto dsIt = g_state.displayCaseVerdict.find(a_ref);
+				const int  st   = (dsIt != g_state.displayCaseVerdict.end()) ? dsIt->second.lastKnown : 0;
+				const bool tpS  = (dsIt != g_state.displayCaseVerdict.end()) &&
+								  dsIt->second.lastTpSerial != 0 &&
+								  dsIt->second.lastTpSerial == g_state.containerUiSerial;
+				std::snprintf(dcBuf, sizeof(dcBuf), " ui=%d st=%d tpS=%d",
+					g_state.containerUiOpen ? 1 : 0, st, tpS ? 1 : 0);
+			}
 			const auto* raw     = reinterpret_cast<const std::uint8_t*>(a_ref);
 
 			if (g_invOff == 0) {
@@ -2231,8 +2350,8 @@ namespace SAS
 				return;
 			}
 			if (size == 0) {
-				REX::INFO("cont probe{}: ref={:08X} base={:08X} d={:.1f}m loot={} inv=ok size=0 -> 判空原因=库存数组为空（一条都没有）",
-					tag, fid, bid, dM, a_loot);
+				REX::INFO("cont probe{}: ref={:08X} base={:08X} d={:.1f}m loot={} inv=ok size=0{} -> 判空原因=库存数组为空（一条都没有）",
+					tag, fid, bid, dM, a_loot, dcBuf);
 				return;
 			}
 
@@ -2312,8 +2431,22 @@ namespace SAS
 					"探针数到 %llu 个可拿的东西，但判定 loot=%d ⇒ 两边不一致（把这行发出来）",
 					static_cast<unsigned long long>(sumKeep), a_loot);
 			} else if (a_displayCase) {
-				std::snprintf(whyBuf, sizeof(whyBuf),
-					"展示柜：读到「空」不算空（关闭时内容不在库存里）⇒ 跳过判空、照常亮");
+				// ★ v4.10：展示柜的「空」分两种 —— 按当前状态预判（判决随后就会
+				//   落到同一套判据上，这里的文案要和它一致，见常量区「v4.10」）。
+				const auto dsIt       = g_state.displayCaseVerdict.find(a_ref);
+				const bool stickEmpty = (dsIt != g_state.displayCaseVerdict.end()) && dsIt->second.lastKnown == 2;
+				const bool sameOpen   = (dsIt != g_state.displayCaseVerdict.end()) &&
+										dsIt->second.lastTpSerial != 0 &&
+										dsIt->second.lastTpSerial == g_state.containerUiSerial &&
+										g_state.containerUiOpen;
+				if (stickEmpty || sameOpen) {
+					std::snprintf(whyBuf, sizeof(whyBuf),
+						"展示柜：%s ⇒ 判「拿空」、会熄灭（关掉后靠粘性保持熄灭）",
+						stickEmpty ? "此前已确认拿空（粘性）" : "同一段打开期里读到空（内容被拿光）");
+				} else {
+					std::snprintf(whyBuf, sizeof(whyBuf),
+						"展示柜：关闭状态 / 从没打开过读到「空」= 内容未知 ⇒ 照常亮（v4.9 行为）");
+				}
 			} else if (sumRaw == 0) {
 				std::snprintf(whyBuf, sizeof(whyBuf),
 					"所有条目 count 都是 0（条目数=%u，其中被跳过 np=%u eq=%u）",
@@ -2328,10 +2461,10 @@ namespace SAS
 					size, withCount, static_cast<unsigned long long>(sumRaw),
 					static_cast<unsigned long long>(sumKeep));
 			}
-			REX::INFO("cont probe{}: ref={:08X} base={:08X} d={:.1f}m loot={} size={} keep={}(sum={}) withCount={} sumRaw={} skipNp={} skipEq={} why={}{}",
+			REX::INFO("cont probe{}: ref={:08X} base={:08X} d={:.1f}m loot={} size={} keep={}(sum={}) withCount={} sumRaw={} skipNp={} skipEq={} why={}{}{}",
 				tag, fid, bid, dM, a_loot, size, keepCnt,
 				static_cast<unsigned long long>(sumKeep), withCount,
-				static_cast<unsigned long long>(sumRaw), skipNp, skipEq, whyBuf, detail);
+				static_cast<unsigned long long>(sumRaw), skipNp, skipEq, whyBuf, detail, dcBuf);
 		}
 
 		// 【v4.2 / v4.3】标定「库存列表指针」在 TESObjectREFR 里的真实偏移（0xA0 / 0xA8）。
@@ -2506,6 +2639,62 @@ namespace SAS
 				fid, g_state.displayCaseRuntime.size());
 		}
 
+		// ★ v4.10：展示柜判决缓存 —— 每个展示柜引用一份（见常量区「v4.10」）。
+		//   上限防呆：真到上限就整体清空（最坏结果只是退回「关着也亮」的旧行为，
+		//   绝不会崩 —— 换场景时也会清）。
+		State::DisplayCaseVerdict& DisplayCaseVerdictFor(const RE::TESObjectREFR* a_ref)
+		{
+			auto it = g_state.displayCaseVerdict.find(a_ref);
+			if (it != g_state.displayCaseVerdict.end()) {
+				return it->second;
+			}
+			if (g_state.displayCaseVerdict.size() >= kDisplayCaseVerdictMax) {
+				g_state.displayCaseVerdict.clear();
+			}
+			return g_state.displayCaseVerdict.emplace(a_ref, State::DisplayCaseVerdict{}).first->second;
+		}
+
+		// ★ v4.10：展示柜读到「有东西」时更新状态：记「有东西」+ 刷新「这一段打开期」。
+		//   `a_sawTemporary`（本轮见到 kTemporary 投影条目）⇒ 把当前 UI 段号记下，
+		//   后面「同一段打开期里读到空」就是「拿空」的判据。
+		void NoteDisplayCaseOccupied(const RE::TESObjectREFR* a_ref, bool a_sawTemporary)
+		{
+			auto& ds = DisplayCaseVerdictFor(a_ref);
+			ds.lastKnown = 1;
+			if (a_sawTemporary) {
+				ds.lastTpSerial = g_state.containerUiSerial;
+			}
+		}
+
+		// ★ v4.10：展示柜读到「空」时的判决（**只看状态，不改状态**）——
+		//   返回 true = 这是「真拿空」（调用方会改成「不进候选 ⇒ 熄灭」）。
+		//   两路判据（完整推导见常量区「v4.10 展示柜拿空即灭」）：
+		//     ① 粘性：此前已经确认拿空过（`lastKnown==2`）⇒ 关闭后也保持熄灭
+		//        —— 这正是用户要的「拿空即灭」；
+		//     ② 同一段打开期：容器界面**正开着**，且该 ref 在**这一段**打开期里
+		//        见到过投影条目 ⇒ 此刻读到的空 = 内容被拿光 ⇒ 判空。
+		//   其余（关着 / 从没见过投影 / 从没打开过）⇒ 内容未知 ⇒ 照常亮（v4.9 目标）。
+		bool DisplayCaseReadsEmpty(const RE::TESObjectREFR* a_ref)
+		{
+			const auto it = g_state.displayCaseVerdict.find(a_ref);
+			if (it == g_state.displayCaseVerdict.end()) {
+				return false;  // 从没见过它的投影 ⇒ 未知 ⇒ 照常亮
+			}
+			const auto& ds = it->second;
+			if (ds.lastKnown == 2) {
+				return true;  // ① 粘性：已确认拿空（关掉后仍保持熄灭）
+			}
+			return g_state.containerUiOpen && ds.lastTpSerial != 0 &&
+				   ds.lastTpSerial == g_state.containerUiSerial;  // ② 同一段打开期
+		}
+
+		// ★ v4.10：把上面的判决**真正落到状态**（只有调用方决定「熄灭」时才调，
+		//   所以粘性只会因为「确认拿空」而建立）。
+		void MarkDisplayCaseEmptied(const RE::TESObjectREFR* a_ref)
+		{
+			DisplayCaseVerdictFor(a_ref).lastKnown = 2;
+		}
+
 		// 【v4.2】「库存有没有东西」的返回值约定（v4.3 起细分）：
 		//     1 = 有东西（照常亮）
 		//     0 = 空（不进候选 ⇒ 约 1.5 秒后熄灭）
@@ -2516,6 +2705,9 @@ namespace SAS
 		//   ★ v4.3 把「null」与「形状坏」分开：前者多半只是「库存还没创建」，
 		//     后者才可能是「标定选错了偏移」——排查「搜空还亮」时必须能区分。
 		//   `g_invOff` 由 CalibrateInventory() 标定。
+		//   ★ v4.10：可选输出 `a_outSawTemporary` —— 本轮走到过 `kTemporary` 投影
+		//     条目（展示柜打开期间才有）。展示柜「拿空即灭」判决靠它判断
+		//     「这一段打开期里投影出现过」（见常量区「v4.10 展示柜拿空即灭」）。
 		//
 		//   ★ 为什么还要逐条把 stack 里的 count 加起来，而不是只看 `data.size()`：
 		//     物品被拿光之后，引擎**可能留下 count = 0 的空 stack / 空条目**
@@ -2524,8 +2716,13 @@ namespace SAS
 		//   ★ 全程纯内存读（**零引擎调用、零 VirtualQuery**）：先探指针，再校验
 		//     BSTArray 头（size/cap 自洽），任何一步形状不对就返回「未知」。
 		//     ⇒ 最坏结果是「和以前一样照常亮」，绝不会因为读错内存而崩。
-		int RefLootState(const RE::TESObjectREFR* a_ref)
+		int RefLootState(const RE::TESObjectREFR* a_ref, bool* a_outSawTemporary)
 		{
+			// ★ v4.10：`a_outSawTemporary`（调用方传了才写）—— 本轮有没有见到
+			//   `kTemporary` 投影条目。展示柜的「拿空即灭」判据要用（常量区「v4.10」）。
+			if (a_outSawTemporary) {
+				*a_outSawTemporary = false;
+			}
 			if (g_invOff == 0) {
 				return -3;
 			}
@@ -2574,6 +2771,9 @@ namespace SAS
 				//   注意：这一条**不改变返回值**，只做学习；条目本身照旧参与判空
 				//   （打开状态下「有东西 / 拿空了」该怎么判还怎么判）。
 				if ((*reinterpret_cast<const std::uint32_t*>(item + kOffInvItemFlags) & kInvItemFlagTemporary) != 0) {
+					if (a_outSawTemporary) {
+						*a_outSawTemporary = true;  // ★ v4.10：调用方（展示柜判决）要用
+					}
 					RecordDisplayCaseRuntime(a_ref);
 				}
 				// ★★ v4.5：跳过「非玩家物品」（记录标志 0x04）—— NPC 穿在身上的隐形装备
@@ -2640,7 +2840,8 @@ namespace SAS
 			//   （旧世界的引用随时可能被销毁，留着它们只会是野键）。
 			g_state.achrVerdict.clear();
 			g_state.lootProbed.clear();
-			g_state.contProbed.clear();  // ★ v4.8
+			g_state.contProbed.clear();       // ★ v4.8
+			g_state.displayCaseVerdict.clear();  // ★ v4.10（旧世界的引用随时可能被销毁）
 
 			// 换场景 / 读档：把这批引用从引擎的高亮表里摘掉。
 			// ★ v2.2 改成**不立刻动手**：这一步原本会在一帧里发出 200~300 条引擎调用，
@@ -4045,19 +4246,27 @@ namespace SAS
 				//   在约 1.5 秒内把描边摘掉 ⇒ 观感是「刚搜完就灭」。
 				//   判空是纯内存读；读不到 / 形状不对 ⇒ 未知 ⇒ 按「有东西」处理（照常亮）。
 				//
-				//   ★★ v4.9：展示柜（武器箱 / 武器架 / 头盔架…）是例外 —— 它的内容只在
-				//     搜刮界面打开期间以 `kTemporary` 条目投影进库存，关着时读到
-				//     size=0（用户实测：「关着不亮、一打开才亮」）。
-				//     ⇒ 这类容器**不因读到「空」而熄灭**，否则关着的武器箱永远不亮。
+				//   ★★ v4.9 / v4.10：展示柜（武器箱 / 武器架 / 头盔架…）是例外 ——
+				//     它的内容只在搜刮界面打开期间以 `kTemporary` 条目投影进库存，
+				//     关着时读到 size=0（用户实测：「关着不亮、一打开才亮」）。
+				//     ⇒ v4.9：这类容器**不因读到「空」而熄灭**，否则关着的武器箱
+				//       永远不亮；
+				//     ⇒ v4.10：但「拿空后」必须熄灭（用户实测：「拿空了却不会熄灭」）
+				//       —— 判据 = **同一段容器界面打开期**里读到的空才是真拿空
+				//       （``DisplayCaseReadsEmpty``），关掉后靠粘性保持熄灭。
 				//     识别 = 静态白名单（SasDisplayCases.h，118 个原版记录）
-				//     ∨ 运行期学习集合；完整实证见常量区「v4.9 展示柜」长注释。
-				//     开关：INI `SkipDisplayCaseEmpty=0` 可退回旧行为。
+				//     ∨ 运行期学习集合；完整实证见常量区「v4.9 展示柜」/「v4.10」。
+				//     开关：INI `SkipDisplayCaseEmpty=0`（退回 v4.8）、
+				//     `DisplayCaseUiEmpty=0`（退回 v4.9）。
 				const bool displayCase =
 					(!isCorpse && cat == static_cast<int>(Category::kContainer) &&
 						g_cfg.skipDisplayCaseEmpty && IsDisplayCaseBase(base));
 				if (isCorpse || cat == static_cast<int>(Category::kContainer)) {
 					if (g_cfg.skipEmptyLoot && g_invOff != 0) {
-						const int loot = RefLootState(ref);
+						// ★ v4.10：展示柜要额外知道「本轮有没有见到投影条目」——
+						//   它是「同一段打开期」判据的另一半（常量区「v4.10」）。
+						bool      sawTemporary = false;
+						const int loot         = RefLootState(ref, displayCase ? &sawTemporary : nullptr);
 						// ★ v4.8：容器「判空链路快照」探针（首次 + 判决变化时各一条）。
 						//   用户报「武器箱关着不亮、一打开就亮」—— 这两条记录就是答案：
 						//   见 ContProbe 顶部的长注释（关着时的 size/sum/skipNp/skipEq
@@ -4066,7 +4275,22 @@ namespace SAS
 							ContProbe(ref, base, d2, loot, displayCase);
 						}
 						if (loot == 0) {
-							if (!displayCase) {
+							// ★★ v4.10：展示柜的「空」分两种（用户实测：*「关着的武器箱
+							//   会高亮了，但是拿空了却不会熄灭了」*）：
+							//     · 同一段打开期里读到的空（= 内容被拿光）⇒ 判空（熄灭），
+							//       并建立**粘性** ⇒ 关掉后保持熄灭 = 「拿空即灭」；
+							//     · 关闭状态 / 从没打开过读到的空（= 内容未知）⇒ 照常亮
+							//       （v4.9 的目标，不回归）。
+							//   完整判据见常量区「v4.10 展示柜拿空即灭」的长注释。
+							bool emptyNow = !displayCase;  // 非展示柜：读到空就是空（行为不变）
+							if (displayCase && g_cfg.displayCaseUiEmpty) {
+								emptyNow = DisplayCaseReadsEmpty(ref);
+								if (emptyNow) {
+									MarkDisplayCaseEmptied(ref);  // 粘性：关掉后也保持熄灭
+									++g_state.displayCaseEmptied;
+								}
+							}
+							if (emptyNow) {
 								++g_state.emptySkips;
 								continue;  // 空 ⇒ 不进候选 ⇒ 宽限期后熄灭
 							}
@@ -4074,6 +4298,10 @@ namespace SAS
 							++g_state.displayCaseSkips;
 						} else if (loot == 1) {
 							++g_state.lootNotEmpty;
+							// ★ v4.10：展示柜记「有东西」+ 刷新「这一段打开期」（见到投影条目时）
+							if (displayCase) {
+								NoteDisplayCaseOccupied(ref, sawTemporary);
+							}
 							// ★ v4.4：「判到有东西」的尸体 ⇒ 打一份**库存明细**
 							//   （只对近距离的、每个 ref 只打一次；上限 LootProbeMax）。
 							//   这是「拿空还亮」的取证主力：残留条目会被逐条列出。
@@ -4234,6 +4462,23 @@ namespace SAS
 					ResetForNewScene(now, "载入画面关闭（读档 / 换场景）");
 				}
 				g_state.loadingSeen = loading;
+			}
+
+			// ★ v4.10：容器（搜刮）界面的开/关 —— 每帧看一眼（一次 IsMenuOpen，
+			//   与上面的 loading 检测同量级）。每次「开 ↔ 关」翻转都把**段号** +1：
+			//   展示柜的「拿空」判据靠段号把「同一段打开期」与「上一段（已关闭）」
+			//   严格分开（推导见常量区「v4.10 展示柜拿空即灭」）。
+			//   ★ 放在每帧路径上（不是 200ms 扫描路径）—— 关闭动作会让投影立刻收回
+			//     （size→0），段号必须在那一刻就变，否则「关掉没拿」会被误判成「拿空」。
+			{
+				const bool uiOpen = IsContainerMenuOpen();
+				if (uiOpen != g_state.containerUiOpen) {
+					g_state.containerUiOpen = uiOpen;
+					++g_state.containerUiSerial;
+					if (uiOpen) {
+						++g_state.containerUiOpens;
+					}
+				}
 			}
 
 			// ★ v3.2：检测「引擎把我们的高亮清掉了」的时机并自动重挂
@@ -4447,7 +4692,7 @@ namespace SAS
 							  "| ACHR: 见到={} 判活跳过={} | StartsUnconscious跳过={} "
 							  "| 前置过滤: deleted/disabled={} 非本cell={} "
 							  "| 搜空: empty={} notEmpty={} unknown={} null={} shapeBad={} invOff={} "
-							  "| 判空跳过: np={} eq={} | 展示柜跳过={}",
+							  "| 判空跳过: np={} eq={} | 展示柜跳过={} 展示柜拿空={}",
 						g_state.corpseSeen, g_state.corpseByBit, g_state.corpseByFlag,
 						g_state.corpseByLife, g_state.corpseByBleed,
 						g_state.corpseProps, g_state.corpseUncSeen,
@@ -4457,7 +4702,7 @@ namespace SAS
 						g_state.emptySkips, g_state.lootNotEmpty, g_state.lootUnknown,
 						g_state.lootNullInv, g_state.lootBadShape, invOff,
 						g_state.lootSkipNonPlayable, g_state.lootSkipEquipped,
-						g_state.displayCaseSkips);
+						g_state.displayCaseSkips, g_state.displayCaseEmptied);
 					g_state.corpseSeen       = 0;
 					g_state.corpseByBit      = 0;
 					g_state.corpseByFlag     = 0;
@@ -4474,6 +4719,7 @@ namespace SAS
 					g_state.lootSkipNonPlayable = 0;
 					g_state.lootSkipEquipped = 0;
 					g_state.displayCaseSkips = 0;
+					g_state.displayCaseEmptied = 0;  // ★ v4.10
 					g_state.achrSeen         = 0;
 					g_state.achrLive         = 0;
 					g_state.skipDeleted      = 0;
