@@ -4,7 +4,7 @@
 ========================================================================
 
 Version  : 1.3  (plugin build 4.14.0)
-Author   : (fill in your Nexus username before uploading)
+Author   : hzk11o11k11o (Nexus Mods)
 Game     : Starfield 1.16.244.0 (matching version required)
 Requires : SFSE (Starfield Script Extender) 0.2.21+
            "(1.16.244.0) SFSE Address Library"
