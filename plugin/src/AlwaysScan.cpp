@@ -475,6 +475,66 @@ namespace SAS
 		constexpr std::size_t kMenuDumpMax           = 6;     // 「此刻开着的菜单」快照最多打几次
 		constexpr std::uint64_t kMenuEvtBadMax       = 5;     // 事件负载「不像菜单事件」到几条就注销通道
 
+		// ================================================================
+		// ★★ v4.13：搜刮界面**根本不是 UI 菜单** ⇒ 改用两条「引擎自己的游戏事件」
+		// ================================================================
+		// ★ 取证（v4.12 那一局的日志，本轮逐行核对）：
+		//   · 投影出现（= 搜刮面板开着）的那一刻**没有任何 ContainerMenu 事件**
+		//     （统计行 `menu events: total=18 container=0`；那一局的 18 条事件全被
+		//      Fader / Loading / Main / Cursor / Data / Pause / HUD / HUDMessages 占满）；
+		//   · `menu dump` 的 `IsMenuOpen` 快照里只有 `[HUDMenu, HUDMessagesMenu]`。
+		//   ⇒ 结论：Starfield 的「快速搜刮面板」**不是 UI 菜单**（不产生
+		//     `MenuOpenCloseEvent`）—— v4.10 的轮询与 v4.11/v4.12 的事件
+		//     **两条路拿不到它**，不是常量算错，是「面板 = 菜单」这个**前提不成立**。
+		//
+		// ★ 离线取证（本轮新增两个可复用工具，都在 `out/`）：
+		//   `out/find_event_sources.py`（RTTI 名字 → TD → COL → vtable → 静态对象）
+		//   与 `out/scan_event_sources.py`（反向：扫 .data 里「首字段 = vtable」的对象
+		//   → vtable → RTTI 名字；**全镜像 861 个 `BSTEventSource<X>` 里 229 个是静态对象**）。
+		//   其中这两个正是我们要的：
+		//
+		//   ① `BSTEventSource<TESContainerChangedEvent>` @ RVA **0x5977BA8**
+		//      （vtable RVA **0x4B98240**）—— 「**物品在容器之间移动**」事件，
+		//      就是 Papyrus `OnItemAdded` / `OnItemRemoved` 背后那一个
+		//      （游戏自带 `OutpostContainerScript.psc` 就是靠它做前哨容器的联动结算）。
+		//      负载 = `{ source, target, baseObject, itemCount, itemRef, uniqueID… }`
+		//      （同 commonlibsf `RE/E/Events.h`，sizeof 0x28）。
+		//      ⇒ 玩家从箱子里拿走东西**必然**经过它 ⇒ 可以**精确记账**。
+		//
+		//   ② `BSTEventSource<QuickContainerOpenedEvent>` @ RVA **0x5978A30**
+		//      （vtable RVA **0x4B985B0**）—— 「**快速搜刮面板打开**」事件。
+		//      ★ 负载 = **一个指向容器引用的指针**（反汇编实证：发事件的函数在
+		//        RVA 0x1480390 区段，取到引用后先 `cmp byte ptr [rcx+0x2E], 0x4B`
+		//        （容器 formType）判是容器，再 AddRef 放进负载、`Notify` 出去）
+		//        ⇒ 它把「面板此刻为**哪个**箱子开着」直接告诉我们（per-ref！）。
+		//
+		// ★ 判决（分层，实现在 `DisplayCaseReadsEmpty`）：
+		//   ① **记账（精确）**：逐帧/每轮读到投影时把内容记成 `base -> count` 快照
+		//      （`DcSnapOut`）；收到「从这个 ref 拿走 X×N」事件就减账，
+		//      **减到 0 ⇒ 判拿空**（粘性熄灭）。拿空后立刻关掉、甚至同一个扫描间隔
+		//      内关掉都不影响 —— 这正是 v4.10 那个「已知窗口」缺的东西。
+		//   ② **兜底**（INI `DisplayCaseQuickOpenEmpty=1`，默认开）：**只有在①从没
+		//      生效过**（该 ref 这一段打开期里一次拿走事件都没收到）时才启用：
+		//      「快速面板为这个 ref 开着」+「连续读到空 ≥ 400ms」⇒ 判拿空。
+		//      ★ 仍然拿不到「面板关闭」信号 ⇒ 「拿了部分就立刻关掉、人还站着」理论上
+		//        可能被误判（退路：INI 设 0，或看日志 `展示柜拿空(兜底)`）。
+		//   ③ 两条都不成立 ⇒ 退回 v4.9/v4.12 行为（照常亮），绝不乱灭。
+		//
+		// ★ 安全姿势与 v4.11/v4.12 完全相同：注册前**硬核对 vtable**（不是那个
+		//   类型就绝不注册）、BSTEventSource 形状校验、负载全部 `SafeReadMem` 读、
+		//   回调里只往队列塞一条记录（判决在主线程做）。
+		constexpr std::uintptr_t kInvEvtSourceRva     = 0x5977BA8;   // TESContainerChangedEvent 静态源
+		constexpr std::uintptr_t kInvEvtSourceVtblRva = 0x4B98240;   // 它的 vtable（注册前硬核对）
+		constexpr std::uintptr_t kQuickOpenSourceRva     = 0x5978A30;  // QuickContainerOpenedEvent 静态源
+		constexpr std::uintptr_t kQuickOpenSourceVtblRva = 0x4B985B0;  // 它的 vtable
+		constexpr std::size_t   kLootEvtQueueMax      = 64;     // 事件→主线程队列上限
+		constexpr std::size_t   kLootEvtPerRefLogMax  = 3;      // 每个 ref 最多记几条事件日志
+		constexpr std::size_t   kDcSnapMax            = 8;      // 展示柜内容快照的条目上限
+		constexpr std::uint32_t kDcSnapStackBudget    = 96;     // 快照最多走多少个 stack（防呆）
+		constexpr std::uint64_t kDcEmptyConfirmMs     = 400;    // 「连续读到空」多久算确认（兜底判据用）
+		constexpr std::uint64_t kQuickOpenSessionMs   = 30000;  // 「快速面板打开」会话的有效期
+		constexpr std::uint64_t kLootEvtSinkCheckMs   = 60000;  // 每 60 秒核对 sink 还在不在
+
 		// 【判空】容器 / 尸体的「库存列表」——
 		//   `TESObjectREFR::inventoryList` 是 `BSGuarded<BGSInventoryList*, BSReadWriteLock>`，
 		//   而 commonlibsf 头文件里 BSGuarded 的成员顺序标着 "??"（data 在前还是锁在前
@@ -915,6 +975,26 @@ namespace SAS
 			bool          displayCaseFrameWatch = true;
 
 			// ================================================================
+			// ★★ v4.13：改用**引擎自己的游戏事件**（见常量区「v4.13」长注释）
+			// ================================================================
+			// 为什么换：实测证明搜刮面板**不是 UI 菜单**（投影出现那一刻没有任何
+			//   ContainerMenu 事件、IsMenuOpen 快照里只有 HUD/HUDMessages），
+			//   所以 v4.10 的轮询与 v4.11/v4.12 的菜单事件**两条路都拿不到它**。
+			// 1 = 注册两个引擎事件 sink：
+			//     · TESContainerChangedEvent  —— 物品进出容器（**精确记账**的输入）
+			//     · QuickContainerOpenedEvent —— 快速搜刮面板打开（per-ref）
+			//   0 = 不注册（退回 v4.12 行为，仅排查用）。
+			bool          containerLootEvents = true;
+			// 1 = 允许「兜底判据」：快速面板确认为这个 ref 开着、且这一段打开期里
+			//     **一次拿走事件都没收到**、且连续读到空 ≥ 400ms ⇒ 判「拿空」。
+			//   0 = 只信记账（若某些展示柜不触发物品事件，它们就不会熄灭）。
+			//   ★ 兜底仍然拿不到「面板关闭」信号 ⇒ 「拿了部分就立刻关掉」理论上可能
+			//     被误判成拿空；关掉即可回到「拿空不灭」（v4.12 行为）。
+			bool          displayCaseQuickOpenEmpty = true;
+			// 物品事件 / 快速面板事件的日志上限（诊断；默认 32 条）。
+			int           lootEventLogMax = 32;
+
+			// ================================================================
 			// ★★ v4.7：外景连续性 / 高亮丢失自愈（背景见常量区同名前缀的长注释）
 			// ================================================================
 			// 1 = 外景里跨 cell 边界当「连续过渡」处理：不整批熄灭、短静置、
@@ -1087,13 +1167,55 @@ namespace SAS
 			//     lastTpSerial —— 最后一次见到 `kTemporary` 投影条目时的 UI 段号
 			//   displayCaseEmptied：窗口内「展示柜拿空即灭」的轮数（诊断：
 			//     非 0 且增长 = 新规则在生效）。
+			//
+			//   ★★ v4.13：这里的字段被「游戏事件通道」复用/扩展（见常量区「v4.13」）：
+			//     · 内容快照 snap[]（逐帧/每轮读到投影时刷新）= **记账的基准**
+			//       —— 收到「从这个 ref 拿走 base×N」就减账，减到 0 ⇒ 判拿空；
+			//     · quickOpenMs：「快速搜刮面板为这个 ref 打开」的时刻（0 = 没有）；
+			//     · sawTakeEvt：这一段打开期里收到过拿走事件没有 —— 有 ⇒ 只信记账
+			//       （兜底判据自动让位，避免「拿了部分就立刻关掉」被误判）；
+			//     · emptySinceMs：「连续读到空」的起点（兜底判据要求 ≥ 400ms）。
+			struct DcSnap
+			{
+				std::uint32_t base[kDcSnapMax]{};
+				std::uint32_t cnt[kDcSnapMax]{};
+				std::uint8_t  count     = 0;
+				bool          valid     = false;  // 这一份是不是「完整读过一遍」
+				bool          uncertain = false;  // 有过认不出的东西 / 减成负数 ⇒ 不许下「拿空」结论
+			};
 			struct DisplayCaseVerdict
 			{
 				std::uint8_t  lastKnown    = 0;
 				std::uint64_t lastTpSerial = 0;
+				// ★ v4.13
+				DcSnap        snap{};
+				std::uint64_t quickOpenMs      = 0;
+				bool          sawTakeEvt       = false;
+				std::uint64_t emptySinceMs     = 0;
+				std::uint32_t evtLogs          = 0;   // 该 ref 已写的事件日志条数（限流）
 			};
 			std::unordered_map<const RE::TESObjectREFR*, DisplayCaseVerdict> displayCaseVerdict;
 			std::uint64_t displayCaseEmptied = 0;
+			// ★ v4.13：事件通道的开关 / 注册状态（sink 由 EnginesLootEventSinks 挂）
+			bool          lootEvtActive       = false;  // 是否解释物品事件
+			bool          quickOpenActive     = false;  // 是否解释快速面板事件
+			bool          invEvtRegistered    = false;
+			bool          quickOpenRegistered = false;
+			std::uint64_t lootEvtRetryAtMs    = 0;
+			std::uint64_t lootEvtSinkCheckMs  = 0;
+			std::uint32_t lootEvtSinkFailures = 0;
+			// ★ v4.13：诊断计数（「事件通道到底有没有在工作」一眼可辨）
+			std::uint64_t lootEvtMatches       = 0;  // 事件命中逐帧观察表的条数
+			std::uint64_t lootEvtTakeApplied   = 0;  // 真正减过账的次数
+			std::uint64_t lootEvtPutApplied    = 0;  // 真正加过账的次数
+			std::uint64_t lootEvtEmptyDecided  = 0;  // 记账判出「拿空」的次数（核心指标）
+			std::uint64_t lootEvtUnmatched     = 0;  // 没命中观察表的事件数（诊断）
+			std::uint64_t quickOpenMatched     = 0;  // 快速面板事件命中观察表的次数
+			std::uint64_t quickOpenUnmatched   = 0;  // 快速面板事件没命中观察表的次数
+			std::uint64_t quickOpenFallbackDecided = 0;  // 兜底判据判出「拿空」的次数
+			std::uint64_t quickOpenLastMs      = 0;  // 最近一次「快速面板打开」（任何 ref）
+			std::uint32_t quickOpenLastFid     = 0;  // 它的 FormID（诊断）
+			std::uint32_t lootEvtLogs          = 0;  // 事件日志已写条数（上限 cfg.lootEventLogMax）
 
 			// ================================================================
 			// ★★ v4.11：容器界面「事件通道」+ 展示柜逐帧观察（见常量区「v4.11」）
@@ -1992,6 +2114,259 @@ namespace SAS
 			return true;
 		}
 
+		// ================================================================
+		// ★★ v4.13：游戏事件通道 —— 负载结构 + sink + 「事件 → 主线程」队列
+		//   （离线取证 / 判决分层 / 为什么换掉「面板 = 菜单」的前提，见常量区「v4.13」）
+		// ----------------------------------------------------------------
+		// 两个事件都由**引擎自己**发，`ProcessEvent` 的调用线程不保证是主线程 ⇒
+		//   回调里**只做两件事**：把负载安全读出来、往队列塞一条记录；
+		//   判决与日志全在主线程（`ProcessLootEvents`，每帧一次）做。
+		// ================================================================
+		struct SasContainerChangedEvent
+		{
+			std::uint32_t source;      // 00 旧容器（物品从这里出去）—— 非 0 = 一次「拿走」
+			std::uint32_t target;      // 04 新容器（物品进到这里）—— 非 0 = 一次「放进去」
+			std::uint32_t baseObject;  // 08 物品 base form
+			std::uint32_t itemCount;   // 0C 数量
+			std::uint32_t itemRef;     // 10
+			std::uint16_t uniqueID;    // 14
+			std::uint8_t  pad0[2];     // 16
+			std::uint64_t unk18;       // 18
+			std::uint32_t unk20;       // 20
+			std::uint8_t  pad1[4];     // 24
+		};
+		static_assert(sizeof(SasContainerChangedEvent) == 0x28, "must match RE::TESContainerChangedEvent");
+
+		// `QuickContainerOpenedEvent` 的负载 = 一个指向**容器引用**的指针（反汇编实证）。
+		struct SasQuickContainerOpenedEvent
+		{
+			void* ref;  // 00
+		};
+		static_assert(sizeof(SasQuickContainerOpenedEvent) == 0x8);
+
+		enum class LootEvtKind : std::uint8_t
+		{
+			kTake      = 0,  // 物品从这个 ref 出去
+			kPut       = 1,  // 物品进这个 ref
+			kQuickOpen = 2   // 快速搜刮面板为这个 ref 打开
+		};
+
+		struct LootEvtRec
+		{
+			std::uint8_t  kind    = 0;  // LootEvtKind
+			std::uint32_t refFid  = 0;  // 涉及的容器引用 FormID（take / put）
+			std::uint32_t baseFid = 0;  // 物品 base form（take / put）
+			std::uint32_t count   = 0;  // 数量（take / put）
+			std::uint64_t refPtr  = 0;  // 容器引用指针（kQuickOpen）
+			std::uint64_t ms      = 0;  // 事件时间
+		};
+
+		std::mutex                               g_lootEvtLock;
+		std::array<LootEvtRec, kLootEvtQueueMax> g_lootEvtQueue{};
+		std::size_t                              g_lootEvtQueueCount = 0;
+		std::atomic<std::uint64_t>               g_lootEvtTotal{ 0 };
+		std::atomic<std::uint64_t>               g_lootEvtTakeTotal{ 0 };
+		std::atomic<std::uint64_t>               g_lootEvtPutTotal{ 0 };
+		std::atomic<std::uint64_t>               g_lootEvtQuickTotal{ 0 };
+		std::atomic<std::uint64_t>               g_lootEvtDropped{ 0 };
+		std::atomic<std::uint64_t>               g_lootEvtBad{ 0 };
+
+		void PushLootEvt(const LootEvtRec& a_rec)
+		{
+			std::scoped_lock lock{ g_lootEvtLock };
+			if (g_lootEvtQueueCount >= kLootEvtQueueMax) {
+				g_lootEvtDropped.fetch_add(1, std::memory_order_relaxed);
+				return;
+			}
+			g_lootEvtQueue[g_lootEvtQueueCount++] = a_rec;
+		}
+
+		class SasInvEvtSink final : public RE::BSTEventSink<SasContainerChangedEvent>
+		{
+		public:
+			RE::BSEventNotifyControl ProcessEvent(const SasContainerChangedEvent& a_event,
+				RE::BSTEventSource<SasContainerChangedEvent>*) override
+			{
+				if (!g_state.lootEvtActive) {
+					return RE::BSEventNotifyControl::kContinue;
+				}
+				SasContainerChangedEvent ev{};
+				if (!SafeReadMem(&a_event, &ev, sizeof(ev))) {
+					g_lootEvtBad.fetch_add(1, std::memory_order_relaxed);
+					return RE::BSEventNotifyControl::kContinue;
+				}
+				// 「从 A 搬到 B」两侧都非 0 ⇒ 两边各记一条（我们只关心命中观察表的那些）。
+				if (ev.source != 0) {
+					LootEvtRec rec{};
+					rec.kind    = static_cast<std::uint8_t>(LootEvtKind::kTake);
+					rec.refFid  = ev.source;
+					rec.baseFid = ev.baseObject;
+					rec.count   = ev.itemCount;
+					rec.ms      = NowMs();
+					PushLootEvt(rec);
+					g_lootEvtTakeTotal.fetch_add(1, std::memory_order_relaxed);
+				}
+				if (ev.target != 0) {
+					LootEvtRec rec{};
+					rec.kind    = static_cast<std::uint8_t>(LootEvtKind::kPut);
+					rec.refFid  = ev.target;
+					rec.baseFid = ev.baseObject;
+					rec.count   = ev.itemCount;
+					rec.ms      = NowMs();
+					PushLootEvt(rec);
+					g_lootEvtPutTotal.fetch_add(1, std::memory_order_relaxed);
+				}
+				g_lootEvtTotal.fetch_add(1, std::memory_order_relaxed);
+				return RE::BSEventNotifyControl::kContinue;
+			}
+		};
+		SasInvEvtSink g_invEvtSink;
+
+		class SasQuickOpenSink final : public RE::BSTEventSink<SasQuickContainerOpenedEvent>
+		{
+		public:
+			RE::BSEventNotifyControl ProcessEvent(const SasQuickContainerOpenedEvent& a_event,
+				RE::BSTEventSource<SasQuickContainerOpenedEvent>*) override
+			{
+				if (!g_state.quickOpenActive) {
+					return RE::BSEventNotifyControl::kContinue;
+				}
+				std::uint64_t refPtr = 0;
+				if (!SafeReadMem(&a_event, &refPtr, sizeof(refPtr))) {
+					g_lootEvtBad.fetch_add(1, std::memory_order_relaxed);
+					return RE::BSEventNotifyControl::kContinue;
+				}
+				LootEvtRec rec{};
+				rec.kind   = static_cast<std::uint8_t>(LootEvtKind::kQuickOpen);
+				rec.refPtr = refPtr;
+				rec.ms     = NowMs();
+				PushLootEvt(rec);
+				g_lootEvtQuickTotal.fetch_add(1, std::memory_order_relaxed);
+				return RE::BSEventNotifyControl::kContinue;
+			}
+		};
+		SasQuickOpenSink g_quickOpenSink;
+
+		// 「我们的 sink 还在不在这个事件源的 sink 数组里」（引擎清表 / 重建时防哑）。
+		bool SinkStillInArray(const std::uint8_t* a_src, const void* a_sink)
+		{
+			if (!a_src || !a_sink) {
+				return false;
+			}
+			const auto sz = *reinterpret_cast<const std::uint32_t*>(a_src + 0x08);
+			const auto cp = *reinterpret_cast<const std::uint32_t*>(a_src + 0x0C);
+			const auto dp = *reinterpret_cast<const std::uint64_t*>(a_src + 0x10);
+			if (sz == 0 || sz > cp || cp > 4096) {
+				return false;
+			}
+			if (!IsReadable(reinterpret_cast<const void*>(dp), static_cast<std::size_t>(sz) * 8)) {
+				return false;
+			}
+			auto* const* sinks = reinterpret_cast<void* const*>(dp);
+			for (std::uint32_t i = 0; i < sz; ++i) {
+				if (sinks[i] == a_sink) {
+					return true;
+				}
+			}
+			return false;
+		}
+
+		// 注册一个**静态**事件源的 sink（v4.13 的两个源都是静态对象，直接取地址）。
+		//   ★ 与 v4.11/v4.12 同一套安全姿势：vtable 硬核对 + BSTEventSource 形状校验；
+		//     核对不过就**不注册**（最坏结果 = 少一条信号，绝不会按错误布局解释负载）。
+		template <class T>
+		bool RegisterEngineEventSink(std::uintptr_t a_srcRva, std::uintptr_t a_vtblRva,
+			RE::BSTEventSink<T>* a_sink, const char* a_name)
+		{
+			const auto  base = ModuleBase();
+			auto* const src  = reinterpret_cast<std::uint8_t*>(base + a_srcRva);
+			if (!IsReadable(src, 0x20)) {
+				REX::WARN("loot events: {} 的静态源不可读（RVA 0x{:X}）-> 不注册", a_name, a_srcRva);
+				return false;
+			}
+			const auto sz = *reinterpret_cast<const std::uint32_t*>(src + 0x08);
+			const auto cp = *reinterpret_cast<const std::uint32_t*>(src + 0x0C);
+			const auto dp = *reinterpret_cast<const std::uint64_t*>(src + 0x10);
+			if (sz > cp || cp > 4096 || (sz != 0 && !IsReadable(reinterpret_cast<const void*>(dp), 8))) {
+				REX::WARN("loot events: {} 的形状不像事件源（size={} cap={} data=0x{:X}，RVA 0x{:X}）-> 不注册",
+					a_name, sz, cp, dp, a_srcRva);
+				return false;
+			}
+			const auto vtbl     = *reinterpret_cast<const std::uintptr_t*>(src);
+			const auto expected = base + a_vtblRva;
+			if (vtbl != expected) {
+				REX::WARN("loot events: {} 的 vtable=0x{:X}，期望 0x{:X}（RVA 0x{:X}）-> **不注册**"
+						  "（宁可少一条信号，也绝不按错的布局解释负载）",
+					a_name, vtbl, expected, a_vtblRva);
+				return false;
+			}
+			reinterpret_cast<RE::BSTEventSource<T>*>(src)->RegisterSink(a_sink);
+			REX::INFO("loot events: sink registered for {}（源 RVA 0x{:X}，vtable=0x{:X} 已核对；"
+					  "sinks size={} cap={}）",
+				a_name, a_srcRva, vtbl, sz, cp);
+			return true;
+		}
+
+		// 主线程：确保两个事件 sink 挂着（失败每 4 秒重试；挂上后每 60 秒核对一次）。
+		void EnsureLootEventSinks(std::uint64_t a_nowMs)
+		{
+			if (!g_cfg.containerLootEvents) {
+				return;
+			}
+			const auto base = ModuleBase();
+			if (g_state.invEvtRegistered || g_state.quickOpenRegistered) {
+				if (a_nowMs - g_state.lootEvtSinkCheckMs < kLootEvtSinkCheckMs) {
+					return;
+				}
+				g_state.lootEvtSinkCheckMs = a_nowMs;
+				// ★ 只重挂「真的掉出去的那个」—— 两个都重挂会让还挂着的那个变成
+				//   数组里有两条 ⇒ 事件被处理两次 ⇒ 记账会被多减一次（真会算错账）。
+				if (g_state.invEvtRegistered &&
+					!SinkStillInArray(reinterpret_cast<const std::uint8_t*>(base + kInvEvtSourceRva), &g_invEvtSink)) {
+					g_state.invEvtRegistered = false;
+					g_state.lootEvtRetryAtMs = 0;  // 立刻重挂（不等 4 秒节流）
+					REX::WARN("loot events: 物品事件的 sink 从事件源数组里掉出去了 -> 重挂它");
+				}
+				if (g_state.quickOpenRegistered &&
+					!SinkStillInArray(reinterpret_cast<const std::uint8_t*>(base + kQuickOpenSourceRva), &g_quickOpenSink)) {
+					g_state.quickOpenRegistered = false;
+					g_state.lootEvtRetryAtMs    = 0;
+					REX::WARN("loot events: 快速面板事件的 sink 从事件源数组里掉出去了 -> 重挂它");
+				}
+				if (g_state.invEvtRegistered && g_state.quickOpenRegistered) {
+					return;
+				}
+			}
+			if (g_state.lootEvtRetryAtMs > a_nowMs) {
+				return;
+			}
+			g_state.lootEvtRetryAtMs = a_nowMs + 4000;
+
+			if (!g_state.invEvtRegistered) {
+				if (RegisterEngineEventSink<SasContainerChangedEvent>(kInvEvtSourceRva, kInvEvtSourceVtblRva,
+						&g_invEvtSink, "TESContainerChangedEvent（物品进出容器）")) {
+					g_state.invEvtRegistered = true;
+					g_state.lootEvtActive     = true;
+				} else {
+					++g_state.lootEvtSinkFailures;
+				}
+			}
+			if (!g_state.quickOpenRegistered) {
+				if (RegisterEngineEventSink<SasQuickContainerOpenedEvent>(kQuickOpenSourceRva, kQuickOpenSourceVtblRva,
+						&g_quickOpenSink, "QuickContainerOpenedEvent（快速搜刮面板打开）")) {
+					g_state.quickOpenRegistered = true;
+					g_state.quickOpenActive     = true;
+				} else {
+					++g_state.lootEvtSinkFailures;
+				}
+			}
+			if (g_state.invEvtRegistered && g_state.quickOpenRegistered) {
+				g_state.lootEvtSinkCheckMs = a_nowMs;
+				REX::INFO("loot events: 两个通道就绪 -> 容器界面信号 = 记账（精确）+ 兜底（快速面板 + 连续读到空）"
+						  "；展示柜「拿空即灭」不再依赖「面板是不是菜单」");
+			}
+		}
+
 		void DisableMenuEventSink(const char* a_why);
 
 		// 事件 sink：`ProcessEvent` 由引擎通过 vtable 调用（第 1 槽）。
@@ -2363,6 +2738,10 @@ namespace SAS
 			g_cfg.menuEventLogMax         = std::clamp(getInt("MenuEventLogMax", static_cast<int>(kMenuEventLogMaxDefault)), 0, 4096);
 			g_cfg.displayCaseTraceMax     = std::clamp(getInt("DisplayCaseTraceMax", static_cast<int>(kDisplayCaseTraceMaxDefault)), 0, 256);
 			g_cfg.displayCaseFrameWatch   = getInt("DisplayCaseFrameWatch", 1) != 0;
+			// ★ v4.13：游戏事件通道（理由 / 离线取证见常量区「v4.13」长注释）
+			g_cfg.containerLootEvents          = getInt("ContainerLootEvents", 1) != 0;
+			g_cfg.displayCaseQuickOpenEmpty    = getInt("DisplayCaseQuickOpenEmpty", 1) != 0;
+			g_cfg.lootEventLogMax              = std::clamp(getInt("LootEventLogMax", 32), 0, 4096);
 			REX::INFO("config: corpseUnconscious={} corpseLifeState={} corpseBleedout={} skipEmptyLoot={}",
 				g_cfg.corpseUnconscious, g_cfg.corpseLifeState, g_cfg.corpseBleedout, g_cfg.skipEmptyLoot);
 			REX::INFO("config: actorProbeMax={} actorChangeProbeMax={} lootProbeMax={} contProbeMax={} treatNullInvAsEmpty={} skipNonPlayableLoot={} skipEquippedLoot={} skipDisplayCaseEmpty={}",
@@ -2380,6 +2759,14 @@ namespace SAS
 			REX::INFO("config: displayCaseFrameWatch={} displayCaseTraceMax={} -> 展示柜逐帧观察={}",
 				g_cfg.displayCaseFrameWatch, g_cfg.displayCaseTraceMax,
 				g_cfg.displayCaseFrameWatch ? "开（拿空窗口缩到 1 帧）" : "关（只在 200ms 扫描节拍上判）");
+			REX::INFO("config: containerLootEvents={} displayCaseQuickOpenEmpty={} lootEventLogMax={} "
+					  "-> 展示柜拿空判据 = 记账（TESContainerChangedEvent 减账到 0）{}；"
+					  "事件源 = 静态对象 RVA 0x{:X}/0x{:X}（vtable 0x{:X}/0x{:X} 注册前硬核对）",
+				g_cfg.containerLootEvents, g_cfg.displayCaseQuickOpenEmpty, g_cfg.lootEventLogMax,
+				g_cfg.displayCaseQuickOpenEmpty
+					? " + 兜底（QuickContainerOpenedEvent 确认面板 + 连续读到空；收不到拿走事件时才用）"
+					: "（兜底已关）",
+				kInvEvtSourceRva, kQuickOpenSourceRva, kInvEvtSourceVtblRva, kQuickOpenSourceVtblRva);
 
 			// --- ★ v4.0.1：可选的自定义类别颜色（ColorLoot=RRGGBB …，留空 = 用引擎原生配色）---
 			{
@@ -2645,9 +3032,25 @@ namespace SAS
 		//   实现（`g_invOff` / `RefLootState`）写在文件更下面（和 CalibrateInventory
 		//   放在一起方便对照阅读）。同一个 TU 内前置声明即可。
 		extern std::size_t g_invOff;  // NOLINT(readability-identifier-naming)
-		//   ★ v4.10：多一个可选输出 `a_outSawTemporary`（本轮有没有见到 kTemporary
+		// ★ v4.13：「内容快照」的可选输出（**只在展示柜那条路上要**）——
+		//   记账判据的基准：`base -> count`（见常量区「v4.13」）。
+		//   传了它 ⇒ 不早退，把整份库存走完（上限 kDcSnapMax 条 / kDcSnapStackBudget
+		//   个 stack）；超出上限 / 有条目被跳过（np、eq）⇒ `overflow`/`uncertain` = true
+		//   ⇒ 记账**不许下「拿空」结论**（宁可少灭一次，也绝不误灭）。
+		struct DcSnapOut
+		{
+			std::uint32_t base[kDcSnapMax]{};
+			std::uint32_t cnt[kDcSnapMax]{};
+			std::uint8_t  count     = 0;
+			bool          overflow  = false;  // 条目/stack 超出枚举上限
+			bool          uncertain = false;  // 有条目被跳过（拿不走的那两类）⇒ 快照不完整
+			bool          sawTp     = false;  // 这一份里有没有 kTemporary 投影条目
+		};
+		//   ★ v4.10：可选输出 `a_outSawTemporary`（本轮有没有见到 kTemporary
 		//     投影条目）—— 展示柜「拿空即灭」判据要用（见常量区「v4.10」）。
-		int                RefLootState(const RE::TESObjectREFR* a_ref, bool* a_outSawTemporary = nullptr);
+		//   ★ v4.13：可选输出 `a_outSnap`（内容快照，见上）。
+		int                RefLootState(const RE::TESObjectREFR* a_ref, bool* a_outSawTemporary = nullptr,
+						   DcSnapOut* a_outSnap = nullptr);
 
 		// 诊断：本会话最多打 kCorpseProbeMax 条「尸体候选」探针。
 		//   用途：用户报「某具尸体该亮却没亮 / 不该亮却亮了」时，把 ref / base / 原始
@@ -3434,24 +3837,40 @@ namespace SAS
 		// ★ v4.10：展示柜读到「有东西」时更新状态：记「有东西」+ 刷新「这一段打开期」。
 		//   `a_sawTemporary`（本轮见到 kTemporary 投影条目）⇒ 把当前 UI 段号记下，
 		//   后面「同一段打开期里读到空」就是「拿空」的判据。
-		void NoteDisplayCaseOccupied(const RE::TESObjectREFR* a_ref, bool a_sawTemporary)
+		//   ★ v4.13：同时**刷新内容快照**（`a_snap`，记账判据的基准）+ 清掉
+		//     「连续读到空」的计时（内容又出现了 ⇒ 兜底判据必须作废）。
+		void NoteDisplayCaseOccupied(const RE::TESObjectREFR* a_ref, bool a_sawTemporary,
+			const DcSnapOut* a_snap = nullptr)
 		{
 			auto& ds = DisplayCaseVerdictFor(a_ref);
 			ds.lastKnown = 1;
 			if (a_sawTemporary) {
 				ds.lastTpSerial = g_state.containerUiSerial;
 			}
+			ds.emptySinceMs = 0;
+			if (a_snap) {
+				ds.snap.count     = a_snap->count;
+				ds.snap.valid     = true;
+				ds.snap.uncertain = a_snap->overflow || a_snap->uncertain;
+				for (std::uint8_t i = 0; i < a_snap->count; ++i) {
+					ds.snap.base[i] = a_snap->base[i];
+					ds.snap.cnt[i]  = a_snap->cnt[i];
+				}
+			}
 		}
 
 		// ★ v4.10：展示柜读到「空」时的判决（**只看状态，不改状态**）——
 		//   返回 true = 这是「真拿空」（调用方会改成「不进候选 ⇒ 熄灭」）。
-		//   两路判据（完整推导见常量区「v4.10 展示柜拿空即灭」）：
-		//     ① 粘性：此前已经确认拿空过（`lastKnown==2`）⇒ 关闭后也保持熄灭
+		//   判据（完整推导见常量区「v4.10」/「v4.13」）：
+		//     ① 粘性：此前已确认拿空过（`lastKnown==2`）⇒ 关闭后也保持熄灭
 		//        —— 这正是用户要的「拿空即灭」；
-		//     ② 同一段打开期：容器界面**正开着**，且该 ref 在**这一段**打开期里
-		//        见到过投影条目 ⇒ 此刻读到的空 = 内容被拿光 ⇒ 判空。
+		//     ② v4.10 的「同一段打开期」（UI 是菜单时代的产物 —— 实测拿不到，
+		//        保留只为兼容「万一某个菜单真的开了」的情形）；
+		//     ③ ★ v4.13 兜底：**快速搜刮面板确认为这个 ref 开着**、这一段打开期里
+		//        **一次拿走事件都没收到**、且连续读到空 ≥ kDcEmptyConfirmMs。
+		//        （收到过拿走事件的情形由记账判据直接落粘性，不走这里。）
 		//   其余（关着 / 从没见过投影 / 从没打开过）⇒ 内容未知 ⇒ 照常亮（v4.9 目标）。
-		bool DisplayCaseReadsEmpty(const RE::TESObjectREFR* a_ref)
+		bool DisplayCaseReadsEmpty(const RE::TESObjectREFR* a_ref, std::uint64_t a_nowMs = 0)
 		{
 			const auto it = g_state.displayCaseVerdict.find(a_ref);
 			if (it == g_state.displayCaseVerdict.end()) {
@@ -3461,15 +3880,237 @@ namespace SAS
 			if (ds.lastKnown == 2) {
 				return true;  // ① 粘性：已确认拿空（关掉后仍保持熄灭）
 			}
-			return g_state.containerUiOpen && ds.lastTpSerial != 0 &&
-				   ds.lastTpSerial == g_state.containerUiSerial;  // ② 同一段打开期
+			if (g_state.containerUiOpen && ds.lastTpSerial != 0 &&
+				ds.lastTpSerial == g_state.containerUiSerial) {
+				return true;  // ② 同一段打开期（v4.10 判据）
+			}
+			// ③ ★ v4.13 兜底
+			if (!g_cfg.displayCaseQuickOpenEmpty || ds.quickOpenMs == 0 ||
+				ds.sawTakeEvt || ds.emptySinceMs == 0) {
+				return false;
+			}
+			const auto now = a_nowMs ? a_nowMs : NowMs();
+			if (now - ds.quickOpenMs > kQuickOpenSessionMs) {
+				return false;  // 这一段打开期早就过期了（防呆：别拿很久以前的事件当依据）
+			}
+			return (now - ds.emptySinceMs) >= kDcEmptyConfirmMs;
 		}
 
-		// ★ v4.10：把上面的判决**真正落到状态**（只有调用方决定「熄灭」时才调，
-		//   所以粘性只会因为「确认拿空」而建立）。
-		void MarkDisplayCaseEmptied(const RE::TESObjectREFR* a_ref)
+		// ★ v4.10 / v4.13：把上面的判决**真正落到状态**（只有调用方决定「熄灭」时
+		//   才调，所以粘性只会因为「确认拿空」而建立）。`a_why` 进日志（诊断哪条判据）。
+		void MarkDisplayCaseEmptied(const RE::TESObjectREFR* a_ref, const char* a_why, bool a_fallback = false)
 		{
-			DisplayCaseVerdictFor(a_ref).lastKnown = 2;
+			auto& ds = DisplayCaseVerdictFor(a_ref);
+			if (ds.lastKnown == 2) {
+				return;  // 已经粘住了（避免每帧重复计数 / 重复写日志）
+			}
+			ds.lastKnown = 2;
+			++g_state.displayCaseEmptied;
+			if (a_fallback) {
+				++g_state.quickOpenFallbackDecided;
+			}
+			REX::INFO("display case emptied ({}): ref={:08X} -> 关掉后保持熄灭（粘性）",
+				a_why, a_ref ? a_ref->GetFormID() : 0);
+		}
+
+		// ★ v4.13：`AddToSnap`（快照累加）定义在 `RefLootState` 前面（读库存那段），
+		//   这里先用一下 ⇒ 前置声明。
+		void AddToSnap(DcSnapOut& a_snap, std::uint32_t a_baseFid, std::uint32_t a_count);
+
+		// ================================================================
+		// ★★ v4.13：调试「事件 → 主线程」队列（每帧一次；判据见常量区「v4.13」）
+		// ----------------------------------------------------------------
+		// 记账（精确）：收到「从这个 ref 拿走 base×N」⇒ 从内容快照里减，
+		//   减到 0（且快照完整）⇒ **判拿空**（粘性熄灭）。拿空后立刻关掉也不影响。
+		//   「放进去」⇒ 加账 + 清粘性（东西又有了 ⇒ 重新亮）。
+		// 快速面板打开 ⇒ 给该 ref 记 `quickOpenMs`，并把**别的** ref 的会话清掉
+		//   （同一时刻只有一个搜刮面板）⇒ 兜底判据只在「就是它」时才可能生效。
+		// ================================================================
+		const RE::TESObjectREFR* FindWatchedRefByFid(std::uint32_t a_fid, std::size_t* a_outIdx = nullptr)
+		{
+			if (a_fid == 0) {
+				return nullptr;
+			}
+			for (std::size_t i = 0; i < g_state.dcWatchCount; ++i) {
+				const auto* ref = g_state.dcWatch[i].ref;
+				if (ref && ref->GetFormID() == a_fid) {
+					if (a_outIdx) {
+						*a_outIdx = i;
+					}
+					return ref;
+				}
+			}
+			return nullptr;
+		}
+
+		// 事件日志限流（上限 cfg.lootEventLogMax；返回 true = 可以打这一条）。
+		bool LootEvtMayLog()
+		{
+			if (g_state.lootEvtLogs >= static_cast<std::uint32_t>(std::max(0, g_cfg.lootEventLogMax))) {
+				return false;
+			}
+			++g_state.lootEvtLogs;
+			return true;
+		}
+
+		void ProcessLootEvents(std::uint64_t a_nowMs)
+		{
+			std::array<LootEvtRec, kLootEvtQueueMax> local{};
+			std::size_t                              n = 0;
+			{
+				std::scoped_lock lock{ g_lootEvtLock };
+				n = g_lootEvtQueueCount;
+				if (n > kLootEvtQueueMax) {
+					n = kLootEvtQueueMax;
+				}
+				for (std::size_t i = 0; i < n; ++i) {
+					local[i] = g_lootEvtQueue[i];
+				}
+				g_lootEvtQueueCount = 0;
+			}
+			if (!g_cfg.containerLootEvents) {
+				return;  // 功能关着：**照旧把队列排空**（否则它会一直涨），只是不判决
+			}
+			for (std::size_t i = 0; i < n; ++i) {
+				const auto& rec = local[i];
+				if (rec.kind == static_cast<std::uint8_t>(LootEvtKind::kQuickOpen)) {
+					// ---- 快速搜刮面板打开：per-ref 的「面板开着」会话 ----
+					const auto* ref = reinterpret_cast<const RE::TESObjectREFR*>(rec.refPtr);
+					g_state.quickOpenLastMs  = a_nowMs;
+					std::uint32_t fid        = 0;
+					bool          matched    = false;
+					for (std::size_t k = 0; k < g_state.dcWatchCount; ++k) {
+						if (g_state.dcWatch[k].ref == ref) {
+							fid     = ref->GetFormID();
+							matched = true;
+							break;
+						}
+					}
+					if (matched) {
+						// 同一时刻只有一个面板 ⇒ 先清掉别的 ref 的会话
+						for (auto& [r, ds] : g_state.displayCaseVerdict) {
+							if (r != ref && ds.quickOpenMs != 0) {
+								ds.quickOpenMs  = 0;
+								ds.sawTakeEvt   = false;
+								ds.emptySinceMs = 0;
+							}
+						}
+						auto& ds        = DisplayCaseVerdictFor(ref);
+						ds.quickOpenMs  = a_nowMs;
+						ds.sawTakeEvt   = false;
+						ds.emptySinceMs = 0;
+						++g_state.quickOpenMatched;
+						g_state.quickOpenLastFid = fid;
+						if (ds.evtLogs < kLootEvtPerRefLogMax && LootEvtMayLog()) {
+							++ds.evtLogs;
+							REX::INFO("loot event (quick open): ref={:08X} 的快速搜刮面板打开了"
+									  "（在逐帧观察表里）-> 兜底判据就绪：这一段打开期里只要收不到"
+									  "「拿走」事件、且连续读到空 ≥ {}ms 就判拿空",
+								fid, kDcEmptyConfirmMs);
+						}
+					} else {
+						++g_state.quickOpenUnmatched;
+						if (LootEvtMayLog()) {
+							REX::INFO("loot event (quick open): 面板为引用 0x{:X} 打开，但它不在逐帧观察表里"
+									  "（不在附近 / 不是展示柜 / 表满）-> 这一条不参与判决",
+								static_cast<unsigned long long>(rec.refPtr));
+						}
+					}
+					continue;
+				}
+
+				// ---- 物品进出容器（take / put）----
+				const bool isTake = (rec.kind == static_cast<std::uint8_t>(LootEvtKind::kTake));
+				const auto* ref   = FindWatchedRefByFid(rec.refFid);
+				if (!ref) {
+					++g_state.lootEvtUnmatched;
+					continue;  // 与我们无关的容器（世界里随时都有物品流动）
+				}
+				++g_state.lootEvtMatches;
+				auto& ds = DisplayCaseVerdictFor(ref);
+				if (isTake) {
+					ds.sawTakeEvt = true;  // 有拿走事件 ⇒ 兜底判据让位（只信记账）
+					if (!ds.snap.valid) {
+						// 还没读到过内容快照 ⇒ 记不了账（最坏 = 这一轮不判拿空）
+						if (ds.evtLogs < kLootEvtPerRefLogMax && LootEvtMayLog()) {
+							++ds.evtLogs;
+							REX::INFO("loot event (take): ref={:08X} base={:08X} x{} -> 还没读到内容快照，"
+									  "这一次记不了账（下一帧读到投影时会补上基准）",
+								rec.refFid, rec.baseFid, rec.count);
+						}
+						continue;
+					}
+					std::uint32_t left  = 0;
+					bool          found = false;
+					for (std::uint8_t k = 0; k < ds.snap.count; ++k) {
+						if (ds.snap.base[k] == rec.baseFid) {
+							found = true;
+							const std::uint32_t have = ds.snap.cnt[k];
+							if (have >= rec.count) {
+								ds.snap.cnt[k] = have - rec.count;
+							} else {
+								ds.snap.cnt[k] = 0;
+								// 拿走的比记的多 ⇒ 账不可信（快照是旧的 / 漏了条目）⇒ 不下结论
+								ds.snap.uncertain = true;
+							}
+						}
+						left += ds.snap.cnt[k];
+					}
+					if (!found) {
+						ds.snap.uncertain = true;  // 拿走的 base 不在快照里 ⇒ 账不可信
+					}
+					++g_state.lootEvtTakeApplied;
+					if (ds.evtLogs < kLootEvtPerRefLogMax && LootEvtMayLog()) {
+						++ds.evtLogs;
+						REX::INFO("loot event (take): ref={:08X} base={:08X} x{} -> 记账后还剩 {}"
+								  "（快照 {} 条，{}）",
+							rec.refFid, rec.baseFid, rec.count, left,
+							ds.snap.count, ds.snap.uncertain ? "有不可信标记" : "可信");
+					}
+					if (left == 0 && !ds.snap.uncertain && ds.snap.count > 0) {
+						++g_state.lootEvtEmptyDecided;
+						MarkDisplayCaseEmptied(ref, "记账（事件：最后一件被拿走）");
+					}
+				} else {
+					// 放进去了 ⇒ 加账 + 清粘性（东西又有了 ⇒ 重新亮）
+					++g_state.lootEvtPutApplied;
+					if (ds.snap.valid && !ds.snap.uncertain) {
+						bool found = false;
+						for (std::uint8_t k = 0; k < ds.snap.count; ++k) {
+							if (ds.snap.base[k] == rec.baseFid) {
+								ds.snap.cnt[k] += rec.count;
+								found = true;
+								break;
+							}
+						}
+						if (!found) {
+							DcSnapOut tmp{};
+							tmp.count = ds.snap.count;
+							for (std::uint8_t k = 0; k < ds.snap.count; ++k) {
+								tmp.base[k] = ds.snap.base[k];
+								tmp.cnt[k]  = ds.snap.cnt[k];
+							}
+							AddToSnap(tmp, rec.baseFid, rec.count);
+							ds.snap.count     = tmp.count;
+							ds.snap.uncertain = tmp.overflow;
+							for (std::uint8_t k = 0; k < tmp.count; ++k) {
+								ds.snap.base[k] = tmp.base[k];
+								ds.snap.cnt[k]  = tmp.cnt[k];
+							}
+						}
+					}
+					if (ds.lastKnown == 2) {
+						ds.lastKnown = 1;  // 又有东西了 ⇒ 撤销「拿空」粘性（重新亮）
+						REX::INFO("display case re-lit (事件：放进了东西): ref={:08X} base={:08X} x{}",
+							rec.refFid, rec.baseFid, rec.count);
+					}
+					if (ds.evtLogs < kLootEvtPerRefLogMax && LootEvtMayLog()) {
+						++ds.evtLogs;
+						REX::INFO("loot event (put): ref={:08X} base={:08X} x{} -> 已加账（快照 {} 条）",
+							rec.refFid, rec.baseFid, rec.count, ds.snap.count);
+					}
+				}
+			}
 		}
 
 		// ================================================================
@@ -3509,18 +4150,30 @@ namespace SAS
 
 		// 投影出现 / 消失的追踪日志（诊断主力，条数受 `DisplayCaseTraceMax` 限制）。
 		//   ★ 只有在「状态真的变了」时才写 ⇒ 不会刷屏。
+		//   ★ v4.13：行尾补 `qo=`（快速面板会话开着吗）/ `take=`（这一段打开期里
+		//     收到过拿走事件吗）/ `snap=`（内容快照条数）/ `emptyMs=`（连续空多久）
+		//     —— 判据生效与否，看这一行就够了。
 		void DcTrace(const RE::TESObjectREFR* a_ref, int a_loot, bool a_sawTp)
 		{
 			if (g_state.dcTraceCount >= static_cast<std::uint32_t>(g_cfg.displayCaseTraceMax)) {
 				return;
 			}
 			++g_state.dcTraceCount;
-			REX::INFO("display case trace: ref={:08X} loot={} tp={} ui={}(ev={} serial={}) -> {}",
+			std::uint32_t qo = 0, take = 0, snapN = 0;
+			std::uint64_t emptyMs = 0;
+			if (const auto it = g_state.displayCaseVerdict.find(a_ref); it != g_state.displayCaseVerdict.end()) {
+				qo      = it->second.quickOpenMs ? 1 : 0;
+				take    = it->second.sawTakeEvt ? 1 : 0;
+				snapN   = it->second.snap.count;
+				emptyMs = it->second.emptySinceMs ? (NowMs() - it->second.emptySinceMs) : 0;
+			}
+			REX::INFO("display case trace: ref={:08X} loot={} tp={} ui={}(ev={} serial={}) "
+					  "qo={} take={} snap={} emptyMs={} -> {}",
 				a_ref ? a_ref->GetFormID() : 0, a_loot, a_sawTp ? 1 : 0,
 				g_state.containerUiOpen ? 1 : 0, g_state.menuEvtOpen.load() ? 1 : 0,
-				g_state.containerUiSerial,
-				a_sawTp ? "投影出现（搜刮界面正开着）"
-						: (a_loot == 0 ? "投影消失（这一帧 ui=1 ⇒ 判「拿空」；ui=0 ⇒ 内容未知）" : "内容有东西"));
+				g_state.containerUiSerial, qo, take, snapN, emptyMs,
+				a_sawTp ? "投影出现（搜刮面板正开着）"
+						: (a_loot == 0 ? "投影消失（判「拿空」看 qo/take/emptyMs；都不是 ⇒ 内容未知）" : "内容有东西"));
 		}
 
 		// 「看到投影，可我们的界面标志还是 false」⇒ 取证 +（可选）自愈学习。
@@ -3630,22 +4283,40 @@ namespace SAS
 				}
 				w.miss = 0;
 				bool      sawTp = false;
-				const int loot  = RefLootState(w.ref, &sawTp);
-				const int prev  = w.lastLoot;
+				DcSnapOut snap{};
+				// ★ v4.13：逐帧读的时候顺便刷**内容快照**（记账判据的基准）。
+				const int loot = RefLootState(w.ref, &sawTp, &snap);
+				const int prev = w.lastLoot;
+				const auto now = NowMs();
+				auto&      ds  = DisplayCaseVerdictFor(w.ref);
+				// ★ v4.13：「连续读到空」的计时（兜底判据要求 ≥ kDcEmptyConfirmMs）
+				if (loot == 0) {
+					if (ds.emptySinceMs == 0) {
+						ds.emptySinceMs = now;
+					}
+				} else {
+					ds.emptySinceMs = 0;
+				}
 				if (loot == 1) {
 					// 「有东西」：投影刚出现（`tp=1`）或数量变化时才留痕
 					if (prev != 1 || (sawTp && !w.lastTp)) {
 						DcTrace(w.ref, loot, sawTp);
 					}
-					NoteDisplayCaseOccupied(w.ref, sawTp);
-				} else if (loot == 0 && prev != 0) {
-					// 刚刚变空：这才是需要判的那一帧（判据见常量区「v4.10 / v4.11」）
-					if (DisplayCaseReadsEmpty(w.ref)) {
-						DcTrace(w.ref, loot, false);
-						MarkDisplayCaseEmptied(w.ref);  // 粘性：关掉后保持熄灭
-						++g_state.displayCaseEmptiedFrame;
+					NoteDisplayCaseOccupied(w.ref, sawTp, &snap);
+				} else {
+					// 空（刚变空 / 一直空）：每帧都按判据问一次 —— v4.13 的兜底判据
+					//   需要「连续空一段时间」才成立，只在跳变那一帧问会漏掉它。
+					const bool byFallback =
+						(ds.lastKnown != 2) && ds.quickOpenMs != 0 && !ds.sawTakeEvt;
+					if (DisplayCaseReadsEmpty(w.ref, now)) {
+						if (prev != 0) {
+							DcTrace(w.ref, loot, false);
+							++g_state.displayCaseEmptiedFrame;
+						}
+						MarkDisplayCaseEmptied(w.ref,
+							byFallback ? "兜底（快速面板 + 连续读到空）" : "打开期里读到空", byFallback);
 					} else if (prev == 1) {
-						// 投影消失但判不出「拿空」⇒ 内容未知（关掉了 / 界面信号没接上）
+						// 投影消失但判不出「拿空」⇒ 内容未知（关掉了 / 信号没接上）
 						DcTrace(w.ref, loot, false);
 						if (!g_state.containerUiOpen) {
 							DcUiProbe(w.ref);  // 取证 +（可选）自愈学习
@@ -3679,12 +4350,36 @@ namespace SAS
 		//   ★ 全程纯内存读（**零引擎调用、零 VirtualQuery**）：先探指针，再校验
 		//     BSTArray 头（size/cap 自洽），任何一步形状不对就返回「未知」。
 		//     ⇒ 最坏结果是「和以前一样照常亮」，绝不会因为读错内存而崩。
-		int RefLootState(const RE::TESObjectREFR* a_ref, bool* a_outSawTemporary)
+		// ★ v4.13：往内容快照里累加一条 `base -> count`（条目满了就标 overflow
+		//   —— 快照不完整时记账**不许**下「拿空」结论，宁可少灭一次）。
+		void AddToSnap(DcSnapOut& a_snap, std::uint32_t a_baseFid, std::uint32_t a_count)
+		{
+			for (std::uint8_t i = 0; i < a_snap.count; ++i) {
+				if (a_snap.base[i] == a_baseFid) {
+					a_snap.cnt[i] += a_count;
+					return;
+				}
+			}
+			if (a_snap.count >= kDcSnapMax) {
+				a_snap.overflow = true;
+				return;
+			}
+			a_snap.base[a_snap.count] = a_baseFid;
+			a_snap.cnt[a_snap.count]  = a_count;
+			++a_snap.count;
+		}
+
+		int RefLootState(const RE::TESObjectREFR* a_ref, bool* a_outSawTemporary, DcSnapOut* a_outSnap)
 		{
 			// ★ v4.10：`a_outSawTemporary`（调用方传了才写）—— 本轮有没有见到
 			//   `kTemporary` 投影条目。展示柜的「拿空即灭」判据要用（常量区「v4.10」）。
 			if (a_outSawTemporary) {
 				*a_outSawTemporary = false;
+			}
+			// ★ v4.13：内容快照（记账基准）。调用方传了它 ⇒ 这一轮**不早退**，
+			//   把整份库存走完（只对展示柜开这条支路）。
+			if (a_outSnap) {
+				*a_outSnap = DcSnapOut{};
 			}
 			if (g_invOff == 0) {
 				return -3;
@@ -3712,6 +4407,9 @@ namespace SAS
 				return -1;  // 形状不对劲 = 读到垃圾，不判空
 			}
 			if (size == 0) {
+				if (a_outSnap) {
+					a_outSnap->count = 0;  // 一条都没有 ⇒ 快照就是「空」（这是有效信息！）
+				}
 				return 0;  // 一条都没有 = 空的
 			}
 			const auto data = *reinterpret_cast<const std::uint64_t*>(inv + kOffInvData + 8);
@@ -3721,6 +4419,12 @@ namespace SAS
 
 			const std::uint32_t items = std::min<std::uint32_t>(size, kInvWalkItemsMax);
 			bool                complete = (size <= kInvWalkItemsMax);
+			// 快照模式：枚举上限更小（只记账，不需要全量），并且**不早退**。
+			if (a_outSnap && size > kDcSnapStackBudget) {
+				a_outSnap->overflow = true;
+			}
+			bool    hasAny = false;
+			std::uint32_t snapBudget = kDcSnapStackBudget;
 			std::uint32_t       budget = 1024;  // 单次判空最多看多少个 stack（防呆，正常远用不到）
 			for (std::uint32_t i = 0; i < items; ++i) {
 				const auto* item = reinterpret_cast<const std::uint8_t*>(data) + i * kOffInvItemSize;
@@ -3737,6 +4441,9 @@ namespace SAS
 					if (a_outSawTemporary) {
 						*a_outSawTemporary = true;  // ★ v4.10：调用方（展示柜判决）要用
 					}
+					if (a_outSnap) {
+						a_outSnap->sawTp = true;
+					}
 					RecordDisplayCaseRuntime(a_ref);
 				}
 				// ★★ v4.5：跳过「非玩家物品」（记录标志 0x04）—— NPC 穿在身上的隐形装备
@@ -3746,6 +4453,9 @@ namespace SAS
 				//   ★ 只有 `SkipNonPlayableLoot=1`（默认）时才跳；设 0 = 退回旧行为。
 				if (g_cfg.skipNonPlayableLoot && IsNonPlayableForm(obj)) {
 					++g_state.lootSkipNonPlayable;
+					if (a_outSnap) {
+						a_outSnap->uncertain = true;  // ★ v4.13：快照不完整 ⇒ 记账不许断言「拿空」
+					}
 					continue;
 				}
 				// ★★ v4.6：跳过「正穿在身上的装备」（`BGSInventoryItem::flags` 的低 3 位
@@ -3760,6 +4470,9 @@ namespace SAS
 				if (g_cfg.skipEquippedLoot &&
 					(*reinterpret_cast<const std::uint32_t*>(item + kOffInvItemFlags) & kInvItemFlagSlotMask) != 0) {
 					++g_state.lootSkipEquipped;
+					if (a_outSnap) {
+						a_outSnap->uncertain = true;  // ★ v4.13：同上
+					}
 					continue;
 				}
 				const auto sn = *reinterpret_cast<const std::uint32_t*>(item + kOffInvItemStacks);
@@ -3774,19 +4487,44 @@ namespace SAS
 				if (!IsPlausiblePointer(sd)) {
 					return -1;
 				}
+				std::uint32_t entryCnt = 0;  // 这一个条目所有 stack 的正数合计（快照模式用）
 				for (std::uint32_t j = 0; j < sn; ++j) {
 					const auto cnt = *reinterpret_cast<const std::uint32_t*>(
 						reinterpret_cast<const std::uint8_t*>(sd) + j * kOffStackSize + kOffStackCount);
 					if (cnt > 0) {
-						return 1;  // 有东西，早退
+						if (!a_outSnap) {
+							return 1;  // 有东西，早退（老路径：只关心有没有）
+						}
+						// ★ v4.13：快照模式 —— 把该条目**所有 stack** 的正数加起来
+						//   （一个条目可能有多个 stack；只取第一个会少记 ⇒ 之后
+						//    「拿走的比记的多」被标成不可信 ⇒ 白丢一次判定）。
+						//   上限 1<<20 与 count 的形状校验同一口径（防溢出）。
+						if (entryCnt < (1u << 20)) {
+							entryCnt += cnt;
+						}
 					}
 					if (--budget == 0) {
 						return -1;  // 条目/stack 多得离谱 ⇒ 不敢断言「空」
 					}
 				}
+				if (a_outSnap && entryCnt > 0) {
+					hasAny = true;
+					AddToSnap(*a_outSnap, reinterpret_cast<const RE::TESForm*>(obj)->GetFormID(), entryCnt);
+				}
+				if (a_outSnap && --snapBudget == 0) {
+					a_outSnap->overflow = true;  // 枚举预算用完 ⇒ 快照不完整
+					break;
+				}
 			}
 			if (!complete) {
+				if (a_outSnap) {
+					a_outSnap->overflow = true;
+					return hasAny ? 1 : -1;
+				}
 				return -1;  // 条目太多没走完 ⇒ 不敢断言「空」
+			}
+			if (a_outSnap) {
+				return hasAny ? 1 : 0;  // 快照走完了：有没有东西按累计结果给
 			}
 			return 0;  // 所有条目 / stack 的 count 都是 0 = 空的
 		}
@@ -3810,6 +4548,12 @@ namespace SAS
 			//    但这里清掉才是干净的）。
 			g_state.dcWatchCount = 0;
 			g_state.dcUiProbeLastMs = 0;
+			// ★ v4.13：事件队列里排队的记录也是「旧世界」的（FormID / 指针随时可能作废）
+			//   ⇒ 一起丢掉，免得换场景后按旧 FormID 去减账。
+			{
+				std::scoped_lock lock{ g_lootEvtLock };
+				g_lootEvtQueueCount = 0;
+			}
 
 			// 换场景 / 读档：把这批引用从引擎的高亮表里摘掉。
 			// ★ v2.2 改成**不立刻动手**：这一步原本会在一帧里发出 200~300 条引擎调用，
@@ -5233,8 +5977,11 @@ namespace SAS
 					if (g_cfg.skipEmptyLoot && g_invOff != 0) {
 						// ★ v4.10：展示柜要额外知道「本轮有没有见到投影条目」——
 						//   它是「同一段打开期」判据的另一半（常量区「v4.10」）。
+						//   ★ v4.13：展示柜还要**内容快照**（记账判据的基准，见常量区「v4.13」）。
 						bool      sawTemporary = false;
-						const int loot         = RefLootState(ref, displayCase ? &sawTemporary : nullptr);
+						DcSnapOut snap{};
+						const int loot =
+							RefLootState(ref, displayCase ? &sawTemporary : nullptr, displayCase ? &snap : nullptr);
 						// ★ v4.8：容器「判空链路快照」探针（首次 + 判决变化时各一条）。
 						//   用户报「武器箱关着不亮、一打开就亮」—— 这两条记录就是答案：
 						//   见 ContProbe 顶部的长注释（关着时的 size/sum/skipNp/skipEq
@@ -5263,13 +6010,21 @@ namespace SAS
 							//       并建立**粘性** ⇒ 关掉后保持熄灭 = 「拿空即灭」；
 							//     · 关闭状态 / 从没打开过读到的空（= 内容未知）⇒ 照常亮
 							//       （v4.9 的目标，不回归）。
-							//   完整判据见常量区「v4.10 展示柜拿空即灭」的长注释。
+							//   完整判据见常量区「v4.10 展示柜拿空即灭」/「v4.13」的长注释。
 							bool emptyNow = !displayCase;  // 非展示柜：读到空就是空（行为不变）
 							if (displayCase && g_cfg.displayCaseUiEmpty) {
-								emptyNow = DisplayCaseReadsEmpty(ref);
+								// ★ v4.13：「连续读到空」的计时（扫描节拍上也维护一份，
+								//   这样即使逐帧观察表里没有它，兜底判据也有依据）
+								auto& ds = DisplayCaseVerdictFor(ref);
+								if (ds.emptySinceMs == 0) {
+									ds.emptySinceMs = a_nowMs;
+								}
+								emptyNow = DisplayCaseReadsEmpty(ref, a_nowMs);
 								if (emptyNow) {
-									MarkDisplayCaseEmptied(ref);  // 粘性：关掉后也保持熄灭
-									++g_state.displayCaseEmptied;
+									MarkDisplayCaseEmptied(ref,
+										ds.quickOpenMs && !ds.sawTakeEvt ? "兜底（快速面板 + 连续读到空）"
+																		 : "打开期里读到空",
+										ds.quickOpenMs != 0 && !ds.sawTakeEvt);
 								}
 							}
 							if (emptyNow) {
@@ -5281,8 +6036,9 @@ namespace SAS
 						} else if (loot == 1) {
 							++g_state.lootNotEmpty;
 							// ★ v4.10：展示柜记「有东西」+ 刷新「这一段打开期」（见到投影条目时）
+							//   ★ v4.13：顺便刷新**内容快照**（记账判据的基准）
 							if (displayCase) {
-								NoteDisplayCaseOccupied(ref, sawTemporary);
+								NoteDisplayCaseOccupied(ref, sawTemporary, &snap);
 							}
 							// ★ v4.4：「判到有东西」的尸体 ⇒ 打一份**库存明细**
 							//   （只对近距离的、每个 ref 只打一次；上限 LootProbeMax）。
@@ -5449,7 +6205,13 @@ namespace SAS
 			// ★ v4.11：先把「菜单事件通道」挂上（首次进世界时注册；失败每 4 秒重试）。
 			//   v4.10 的轮询在实测里对 ContainerMenu **全程读到 0**（见常量区「v4.11」），
 			//   所以这条事件路是「拿空即灭」能不能生效的关键。
+			//   ★ v4.13：菜单路实测对「快速搜刮面板」本来就无效（面板不是菜单）——
+			//     真正干活的换成下面那两个**游戏事件**（见常量区「v4.13」）。
 			EnsureMenuEventSink(now);
+			EnsureLootEventSinks(now);
+			//   事件是引擎在别的调用点发的 ⇒ 每帧把队列里的记录消化成判决
+			//   （记账减账 / 快速面板会话；判据见常量区「v4.13」）。
+			ProcessLootEvents(now);
 
 			// ★ v4.10 / v4.11：容器（搜刮）界面的开/关 —— 每帧看一眼。每次「开 ↔ 关」
 			//   翻转都把**段号** +1：展示柜的「拿空」判据靠段号把「同一段打开期」与
@@ -5742,6 +6504,25 @@ namespace SAS
 						g_state.menuEvtTotal.load(), g_state.menuEvtContainer.load(),
 						g_state.menuEvtBad.load(),
 						g_state.containerMenuLearnedCount, g_state.dcWatchCount, g_state.menuDumps);
+					// ★ v4.13：**游戏事件通道**（这才是「拿空即灭」现在依赖的信号）：
+					//   `物品事件 total=` 收到的 TESContainerChangedEvent 条数
+					//     （take/put 两侧各算一条；drop= 队列满被丢掉的条数）；
+					//   `命中=` 落在逐帧观察表上的条数；`减账/加账=` 真的动过账的次数；
+					//   `记账判空=` **核心指标**（非 0 且增长 = 「拿空即灭」生效）；
+					//   `快速面板 total/命中=` QuickContainerOpenedEvent；`兜底判空=` 兜底判据生效次数。
+					REX::INFO("  loot events (累计): 物品事件 total={} take={} put={} drop={} bad={} | 命中={} 未命中={} "
+							  "| 减账={} 加账={} 记账判空={} || 快速面板 total={} 命中={} 未命中={} 兜底判空={} "
+							  "| last: ref={:08X} {}ms 前",
+						g_lootEvtTotal.load(), g_lootEvtTakeTotal.load(), g_lootEvtPutTotal.load(),
+						g_lootEvtDropped.load(), g_lootEvtBad.load(),
+						g_state.lootEvtMatches, g_state.lootEvtUnmatched,
+						g_state.lootEvtTakeApplied, g_state.lootEvtPutApplied, g_state.lootEvtEmptyDecided,
+						g_lootEvtQuickTotal.load(), g_state.quickOpenMatched, g_state.quickOpenUnmatched,
+						g_state.quickOpenFallbackDecided,
+						g_state.quickOpenLastFid,
+						static_cast<unsigned long long>(g_state.quickOpenLastMs
+															? (NowMs() - g_state.quickOpenLastMs)
+															: 0));
 					g_state.corpseSeen       = 0;
 					g_state.corpseByBit      = 0;
 					g_state.corpseByFlag     = 0;
