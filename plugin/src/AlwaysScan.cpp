@@ -274,12 +274,15 @@ namespace SAS
 
 		// ★★ v4.8 诊断：`cont probe:` —— 容器「判空链路快照」探针（背景与用法见
 		//   ContProbe 函数顶部的长注释）。这三个常量控制它的数量与范围：
-		//     kContProbeMax        —— 本会话最多打几条（0 = 关掉这组探针）
-		//     kContProbePerRefMax  —— 同一个引用最多打几条（首次 1 条 + 判决变化 1 条）
-		//     kContProbeRangeMeters—— 只对这么近的容器打（米）★ 比 loot probe 近：
+		//     kContProbeMax          —— 本会话最多打几条（0 = 关掉这组探针）
+		//     kContProbeChangeMax    —— 同一个引用在「首次快照」之外最多再打几条
+		//       （**判决变化**时各一条）。★ 首次快照不计入这个上限 —— 否则近处容器一多，
+		//       额度全被「首次」吃掉，用户开关箱子的那两条关键记录就打不出来了。
+		//       而「打开 → 关掉」正好是 2 次变化 ⇒ 上限 2（共最多 3 条/引用）。
+		//     kContProbeRangeMeters —— 只对这么近的容器打（米）★ 比 loot probe 近：
 		//       用户就站在那个箱子前面，近一点能少浪费额度（营地场景容器很多）
-		constexpr std::uint32_t kContProbeMax         = 48;
-		constexpr std::uint32_t kContProbePerRefMax   = 2;
+		constexpr std::uint32_t kContProbeMax         = 64;
+		constexpr std::uint32_t kContProbeChangeMax   = 2;
 		constexpr float         kContProbeRangeMeters = 15.0f;
 
 		// 【判空】容器 / 尸体的「库存列表」——
@@ -819,12 +822,14 @@ namespace SAS
 			std::unordered_set<const RE::TESObjectREFR*> lootProbed;
 			std::uint32_t lootProbes        = 0;  // 本会话已打的库存明细探针数（上限 cfg.lootProbeMax）
 			std::uint32_t actorChangeProbes = 0;  // 本会话已打的「判决变化」探针数
-			// ★ v4.8：容器探针 —— 每个 ref 记住「上次的判空结果」与已打条数，
-			//   判决**变化**时再补一条（首次 1 条 + 变化 1 条 = 开关箱子的前后对照）。
+			// ★ v4.8：容器探针 —— 每个 ref 记住「上次的判空结果」与已打的**变化**条数，
+			//   判决变化时再补一条（首次快照 + 「打开 → 关掉」两次变化 = 前后对照）。
+			//   ★ 首次快照不受 `kContProbeChangeMax` 限制（见常量区说明）。
 			struct ContProbeRec
 			{
 				int           lastVerdict = 0x7FFFFFFF;  // 上次 RefLootState 的返回值
-				std::uint32_t count       = 0;           // 已为该 ref 打过几条
+				std::uint32_t changes     = 0;           // 已为该 ref 打过的「变化」条数
+				bool          seen        = false;       // 首次快照打过了没有
 			};
 			std::unordered_map<const RE::TESObjectREFR*, ContProbeRec> contProbed;
 			std::uint32_t contProbes = 0;  // 本会话已打的容器探针数（上限 cfg.contProbeMax）
@@ -2083,10 +2088,10 @@ namespace SAS
 		//     ② 别的环节（分类 / 类别开关 / 距离 / 3D）—— 那 probe 也不白打：
 		//        「能读到条目明细」本身就证明它走到了判空这一步，是 ① 的证据。
 		//   触发：`kContProbeRangeMeters` 内的**容器**（CONT）；
-		//   每个 ref 在「第一次见到」和「判决变化」时各打一条（`kContProbePerRefMax`），
-		//   会话总量上限 `cfg.contProbeMax`。用户复现一次
-		//   （走到箱子旁 → 看它不亮 → 打开 → 亮），日志里就有同一 ref 的一对记录，
-		//   对照「开关前后」的 `size / sum / skipNp / skipEq` 即可定论。
+		//   每个 ref 打「首次快照」一条 + 判决变化最多 `kContProbeChangeMax` 条
+		//   （走到箱子旁 → 打开 → 关掉，正好是 1 + 2 条），会话总量上限
+		//   `cfg.contProbeMax`。对照「开关前后」的 `size / sum / skipNp / skipEq`
+		//   即可定论；**关掉搜刮界面后判决有没有变回「空」**同样是关键证据。
 		//   ★ 纯内存读 + 形状校验，**绝不改判定**；读不到就打原因。
 		void ContProbe(const RE::TESObjectREFR* a_ref, const RE::TESForm* a_base, float a_distSq, int a_loot)
 		{
@@ -2108,12 +2113,15 @@ namespace SAS
 				it = g_state.contProbed.emplace(a_ref, State::ContProbeRec{}).first;
 			}
 			auto&      rec   = it->second;
-			const bool first = (rec.count == 0);
-			if (!first && (rec.lastVerdict == a_loot || rec.count >= kContProbePerRefMax)) {
-				return;  // 判决没变 / 这个 ref 已经打够条数
+			const bool first = !rec.seen;
+			if (!first && (rec.lastVerdict == a_loot || rec.changes >= kContProbeChangeMax)) {
+				return;  // 判决没变 / 这个 ref 的「变化」条数已经打够
 			}
 			rec.lastVerdict = a_loot;
-			++rec.count;
+			rec.seen        = true;
+			if (!first) {
+				++rec.changes;
+			}
 			++g_state.contProbes;
 
 			const auto  fid     = a_ref->GetFormID();
