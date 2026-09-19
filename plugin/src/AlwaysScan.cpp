@@ -46,6 +46,8 @@
 #include "RE/T/TESObjectREFR.h"
 #include "RE/U/UI.h"
 
+#include "SasDisplayCases.h"  // ★ v4.9：展示柜（Display Case）容器白名单（脚本生成）
+
 #include <Windows.h>
 
 #include <algorithm>
@@ -284,6 +286,47 @@ namespace SAS
 		constexpr std::uint32_t kContProbeMax         = 64;
 		constexpr std::uint32_t kContProbeChangeMax   = 2;
 		constexpr float         kContProbeRangeMeters = 15.0f;
+
+		// ================================================================
+		// ★★ v4.9：「展示柜（Display Case）」容器 —— 判空规则对它们不适用
+		// ================================================================
+		// 起因（用户实测）：*「武器箱关闭的时候没有高亮，只有打开的时候才开始高亮」*
+		//   —— 两张截图：关着的武器箱不亮；一打开（搜刮界面）箱体橙描边 + 箱内
+		//   弹药/武器蓝描边（这些颜色就是本 MOD 的 container / loot 两色）。
+		//
+		// 取证（2026-09-19 11:27~11:29 的用户日志，Kreet，v4.8 的 `cont probe:`）：
+		//     11:27:09 关着   ref=0033FCCA base=00246224  inv=ok size=0
+		//     11:29:22 打开   size=2
+		//                     [i=0 ft=31 id=0004AD3E n=1 c=8 fl=20]
+		//                     [i=1 ft=30 id=00028A02 n=1 c=1 fl=20]
+		//     11:29:29 关上   size=0
+		//   · `fl=0x20` = `BGSInventoryItem::Flag::kTemporary`（见
+		//     commonlibsf `RE/B/BGSInventoryItem.h`，常量 kInvItemFlagTemporary）
+		//     —— 这两条是**临时条目**：引擎只在搜刮界面打开期间把展示柜的内容
+		//     「投影」进 `inventoryList`，关掉界面就收走。
+		//     ⇒ **关闭状态下判空读到的 size=0 不是「空」**，而是「内容根本不在
+		//     库存里」。判空逻辑本身没有错，错的是「对这类容器用它」。
+		//   · 离线反查 base（`out/probe_case.py` dump Starfield.esm）：
+		//     `00246224` = `Loot_Display_WeaponsCase_Rifles_Common`，记录里带
+		//     `BFCB "BGSDisplayCase"` + `DCSD`/`DCED` —— **展示柜组件**。
+		//   · 全量统计（`tools/re/gen_display_cases.py`）：707 个 CONT 里**恰好
+		//     118 个**带该组件（武器箱 / 武器架 / 头盔架 / 背包架 / 数据板架 /
+		//     前哨展示柜…，含 `_EMPTY` 变体）⇒ 数量可控，生成**静态白名单**
+		//     （`SasDisplayCases.h`，产物入库）。
+		//
+		// ⇒ 判定：base 命中白名单（或运行期学习集合，见下）的**容器**不因
+		//   「读到空」被跳过 ⇒ 关闭状态照常亮。INI `SkipDisplayCaseEmpty=0` 可
+		//   退回旧行为（只在排查用）。
+		//
+		//   ★ 运行期学习（兜底第三方 mod 新增的展示柜）：任何容器只要在打开期间
+		//     读到过 `kTemporary` 条目，就把它的 base 记进内存集合
+		//     （`State::displayCaseRuntime`）—— 之后这个 base 的所有实例都享受
+		//     同等待遇。会话级（不落盘）；上限见 kDisplayCaseRuntimeMax。
+		//
+		//   ★ 如实记录的副作用：展示柜**被拿空后关着也会亮**（关闭状态读不到
+		//     内容，与「没打开过」在数据上不可区分）；「打开时」照旧按实际投影
+		//     判空（打开着被发现是空的 ⇒ 熄灭）。
+		constexpr std::uint32_t kDisplayCaseRuntimeMax = 256;  // 运行期学习集合上限（防呆）
 
 		// 【判空】容器 / 尸体的「库存列表」——
 		//   `TESObjectREFR::inventoryList` 是 `BSGuarded<BGSInventoryList*, BSReadWriteLock>`，
@@ -681,6 +724,16 @@ namespace SAS
 			bool          skipEquippedLoot = true;
 
 			// ================================================================
+			// ★★ v4.9：展示柜（Display Case）容器**不判空** —— 默认 1
+			// ================================================================
+			// 背景与实证见常量区「v4.9 展示柜」长注释（一句话版）：
+			//   展示柜（武器箱 / 武器架 / 头盔架…）的内容只在搜刮界面打开期间以
+			//   `kTemporary` 条目投影进 `inventoryList`，关着时读到 size=0 ——
+			//   不判空才能让「关着也亮」（否则就是用户实测的「打开才亮」）。
+			//   设 0 = 退回旧行为（展示柜也按库存判空），仅在排查时用。
+			bool          skipDisplayCaseEmpty = true;
+
+			// ================================================================
 			// ★★ v4.7：外景连续性 / 高亮丢失自愈（背景见常量区同名前缀的长注释）
 			// ================================================================
 			// 1 = 外景里跨 cell 边界当「连续过渡」处理：不整批熄灭、短静置、
@@ -833,6 +886,14 @@ namespace SAS
 			};
 			std::unordered_map<const RE::TESObjectREFR*, ContProbeRec> contProbed;
 			std::uint32_t contProbes = 0;  // 本会话已打的容器探针数（上限 cfg.contProbeMax）
+			// ★ v4.9：展示柜（见常量区「v4.9 展示柜」）——
+			//   displayCaseRuntime：运行期**学习**到的「展示柜 base」集合
+			//   （打开期间读到过 kTemporary 条目的容器；覆盖第三方 mod 新增的记录，
+			//     与静态白名单 SasDisplayCases.h 取或）。
+			//   displayCaseSkips：窗口内「因为白名单而没被『读到空』跳过」的次数
+			//   （= 展示柜照常亮的轮数；非 0 且增长 = 规则在生效）。
+			std::unordered_set<std::uint32_t> displayCaseRuntime;
+			std::uint64_t                     displayCaseSkips = 0;
 			// ★ v4.3：ACHR 判决全景（「该亮没亮」时最有用的一对数）
 			std::uint64_t achrSeen         = 0;  // 窗口内半径内的 ACHR 数（不论死活）
 			std::uint64_t achrLive         = 0;  // 其中被判成「活人」跳过的（红线；「尸体不亮」先看这里）
@@ -1435,11 +1496,14 @@ namespace SAS
 			g_cfg.skipNonPlayableLoot = getInt("SkipNonPlayableLoot", 1) != 0;
 			// ★ v4.6：判空跳过「正穿在身上的装备（kSlotMask）」」（默认 1；理由见 Config 里的说明）
 			g_cfg.skipEquippedLoot = getInt("SkipEquippedLoot", 1) != 0;
+			// ★ v4.9：展示柜容器不判空（默认 1；理由见 Config 里的说明）
+			g_cfg.skipDisplayCaseEmpty = getInt("SkipDisplayCaseEmpty", 1) != 0;
 			REX::INFO("config: corpseUnconscious={} corpseLifeState={} corpseBleedout={} skipEmptyLoot={}",
 				g_cfg.corpseUnconscious, g_cfg.corpseLifeState, g_cfg.corpseBleedout, g_cfg.skipEmptyLoot);
-			REX::INFO("config: actorProbeMax={} actorChangeProbeMax={} lootProbeMax={} contProbeMax={} treatNullInvAsEmpty={} skipNonPlayableLoot={} skipEquippedLoot={}",
+			REX::INFO("config: actorProbeMax={} actorChangeProbeMax={} lootProbeMax={} contProbeMax={} treatNullInvAsEmpty={} skipNonPlayableLoot={} skipEquippedLoot={} skipDisplayCaseEmpty={}",
 				g_cfg.actorProbeMax, g_cfg.actorChangeProbeMax, g_cfg.lootProbeMax, g_cfg.contProbeMax,
-				g_cfg.treatNullInvAsEmpty, g_cfg.skipNonPlayableLoot, g_cfg.skipEquippedLoot);
+				g_cfg.treatNullInvAsEmpty, g_cfg.skipNonPlayableLoot, g_cfg.skipEquippedLoot,
+				g_cfg.skipDisplayCaseEmpty);
 
 			// --- ★ v4.0.1：可选的自定义类别颜色（ColorLoot=RRGGBB …，留空 = 用引擎原生配色）---
 			{
@@ -2093,7 +2157,11 @@ namespace SAS
 		//   `cfg.contProbeMax`。对照「开关前后」的 `size / sum / skipNp / skipEq`
 		//   即可定论；**关掉搜刮界面后判决有没有变回「空」**同样是关键证据。
 		//   ★ 纯内存读 + 形状校验，**绝不改判定**；读不到就打原因。
-		void ContProbe(const RE::TESObjectREFR* a_ref, const RE::TESForm* a_base, float a_distSq, int a_loot)
+		//   ★ v4.9：新增 `a_displayCase` —— `dc=1` 表示该容器是「展示柜」（白名单 /
+		//     运行期学习，见常量区「v4.9 展示柜」）。它的 `size=0` 是**常态**
+		//     （内容只在搜刮界面打开期间投影进来），不参与「搜空熄灭」判定。
+		void ContProbe(const RE::TESObjectREFR* a_ref, const RE::TESForm* a_base, float a_distSq,
+			int a_loot, bool a_displayCase)
 		{
 			if (g_cfg.contProbeMax <= 0) {
 				return;
@@ -2124,10 +2192,14 @@ namespace SAS
 			}
 			++g_state.contProbes;
 
-			const auto  fid     = a_ref->GetFormID();
-			const auto  bid     = a_base ? a_base->GetFormID() : 0;
-			const auto  dM      = std::sqrt(std::max(a_distSq, 0.0f)) / g_cfg.unitsPerMeter;
-			const char* tag     = first ? "" : " (changed)";
+			const auto fid = a_ref->GetFormID();
+			const auto bid = a_base ? a_base->GetFormID() : 0;
+			const auto dM  = std::sqrt(std::max(a_distSq, 0.0f)) / g_cfg.unitsPerMeter;
+			// ★ v4.9：`dc=1` = 该容器被判为「展示柜」（静态白名单或运行期学习集合，
+			//   见常量区「v4.9 展示柜」）—— 它的「空」不会被用来熄灭高亮。
+			const char* tag = a_displayCase ?
+				(first ? " dc=1" : " dc=1 (changed)") :
+				(first ? "" : " (changed)");
 			const auto* raw     = reinterpret_cast<const std::uint8_t*>(a_ref);
 
 			if (g_invOff == 0) {
@@ -2212,8 +2284,10 @@ namespace SAS
 					const auto  objType = objRaw[kOffFormType];
 					const auto  objFid  = reinterpret_cast<const RE::TESForm*>(obj)->GetFormID();
 					const auto  objFlg  = *reinterpret_cast<const std::uint32_t*>(objRaw + kOffFormFlags);
+					// ★ v4.9：明细里加 `tp=`（kTemporary，fl 的 bit5）—— 展示柜的
+					//   临时投影条目一眼可辨（`fl=20` 时 tp=1），见常量区「v4.9 展示柜」。
 					std::snprintf(buf, sizeof(buf),
-						" [i=%u ft=%02X id=%08X n=%u c=%llu fl=%X ff=%X eq=%d np=%d]",
+						" [i=%u ft=%02X id=%08X n=%u c=%llu fl=%X ff=%X eq=%d np=%d tp=%d]",
 						static_cast<unsigned>(i),
 						static_cast<unsigned>(objType),
 						static_cast<unsigned>(objFid),
@@ -2222,7 +2296,8 @@ namespace SAS
 						static_cast<unsigned>(itemFlags),
 						static_cast<unsigned>(objFlg),
 						eq ? 1 : 0,
-						np ? 1 : 0);
+						np ? 1 : 0,
+						(itemFlags & kInvItemFlagTemporary) ? 1 : 0);
 					detail += buf;
 				}
 			}
@@ -2236,6 +2311,9 @@ namespace SAS
 				std::snprintf(whyBuf, sizeof(whyBuf),
 					"探针数到 %llu 个可拿的东西，但判定 loot=%d ⇒ 两边不一致（把这行发出来）",
 					static_cast<unsigned long long>(sumKeep), a_loot);
+			} else if (a_displayCase) {
+				std::snprintf(whyBuf, sizeof(whyBuf),
+					"展示柜：读到「空」不算空（关闭时内容不在库存里）⇒ 跳过判空、照常亮");
 			} else if (sumRaw == 0) {
 				std::snprintf(whyBuf, sizeof(whyBuf),
 					"所有条目 count 都是 0（条目数=%u，其中被跳过 np=%u eq=%u）",
@@ -2391,6 +2469,43 @@ namespace SAS
 			}
 		}
 
+		// ★ v4.9：这个 base 是不是「展示柜」？—— 静态白名单（`SasDisplayCases.h`，
+		//   118 条原版记录）与**运行期学习集合**（打开期间读到过 `kTemporary` 条目的
+		//   容器，覆盖第三方 mod 的记录）取或。
+		//   完整背景（为什么这类容器不能判空）见常量区「v4.9 展示柜」长注释。
+		bool IsDisplayCaseBase(const RE::TESForm* a_base)
+		{
+			if (!a_base) {
+				return false;
+			}
+			const auto fid = a_base->GetFormID();
+			if (std::binary_search(DisplayCases::kBaseIDs,
+					DisplayCases::kBaseIDs + DisplayCases::kBaseIDCount, fid)) {
+				return true;
+			}
+			return g_state.displayCaseRuntime.find(fid) != g_state.displayCaseRuntime.end();
+		}
+
+		// ★ v4.9：运行期学习 —— 某个容器里出现了 `kTemporary` 条目（`fl&0x20`）
+		//   ⇒ 它也是展示柜（内容只在搜刮界面打开期间存在，见常量区）。
+		//   把它的 base 记下来，之后这个 base 的所有实例都不再判空。
+		//   ★ 只在「新学到」时打一条日志（重复调用是热路径，静默）。
+		void RecordDisplayCaseRuntime(const RE::TESObjectREFR* a_ref)
+		{
+			const auto* base = a_ref ? a_ref->data.objectReference.get() : nullptr;
+			if (!base || IsDisplayCaseBase(base)) {
+				return;  // 静态白名单里已有 / 已经学过了 —— 不重复记
+			}
+			if (g_state.displayCaseRuntime.size() >= kDisplayCaseRuntimeMax) {
+				return;  // 防呆上限（正常玩一辈子也遇不到 256 个「新」展示柜 base）
+			}
+			const auto fid = base->GetFormID();
+			g_state.displayCaseRuntime.insert(fid);
+			REX::INFO("display case (learned): base={:08X} 读到临时条目（fl&0x20 kTemporary）"
+					  " -> 之后不再对它判空（本会话已学 {} 个）",
+				fid, g_state.displayCaseRuntime.size());
+		}
+
 		// 【v4.2】「库存有没有东西」的返回值约定（v4.3 起细分）：
 		//     1 = 有东西（照常亮）
 		//     0 = 空（不进候选 ⇒ 约 1.5 秒后熄灭）
@@ -2452,6 +2567,14 @@ namespace SAS
 				const auto  obj  = *reinterpret_cast<const std::uint64_t*>(item + kOffInvItemObject);
 				if (!IsPlausiblePointer(obj)) {
 					return -1;
+				}
+				// ★★ v4.9：见到 `kTemporary`（`fl&0x20`）⇒ 这是**展示柜**的临时投影条目
+				//   （只在搜刮界面打开期间存在；实证见常量区「v4.9 展示柜」）⇒
+				//   把它的 base 记进运行期学习集合（第三方 mod 新增的展示柜靠这一步兜底）。
+				//   注意：这一条**不改变返回值**，只做学习；条目本身照旧参与判空
+				//   （打开状态下「有东西 / 拿空了」该怎么判还怎么判）。
+				if ((*reinterpret_cast<const std::uint32_t*>(item + kOffInvItemFlags) & kInvItemFlagTemporary) != 0) {
+					RecordDisplayCaseRuntime(a_ref);
 				}
 				// ★★ v4.5：跳过「非玩家物品」（记录标志 0x04）—— NPC 穿在身上的隐形装备
 				//   （`*_NOTPLAYABLE`），玩家拿不走、搜刮面板也不显示。把它们算作
@@ -3921,6 +4044,17 @@ namespace SAS
 				//   掉出候选之后由 SyncNativeOutline 的宽限期（UnhighlightGraceMs）
 				//   在约 1.5 秒内把描边摘掉 ⇒ 观感是「刚搜完就灭」。
 				//   判空是纯内存读；读不到 / 形状不对 ⇒ 未知 ⇒ 按「有东西」处理（照常亮）。
+				//
+				//   ★★ v4.9：展示柜（武器箱 / 武器架 / 头盔架…）是例外 —— 它的内容只在
+				//     搜刮界面打开期间以 `kTemporary` 条目投影进库存，关着时读到
+				//     size=0（用户实测：「关着不亮、一打开才亮」）。
+				//     ⇒ 这类容器**不因读到「空」而熄灭**，否则关着的武器箱永远不亮。
+				//     识别 = 静态白名单（SasDisplayCases.h，118 个原版记录）
+				//     ∨ 运行期学习集合；完整实证见常量区「v4.9 展示柜」长注释。
+				//     开关：INI `SkipDisplayCaseEmpty=0` 可退回旧行为。
+				const bool displayCase =
+					(!isCorpse && cat == static_cast<int>(Category::kContainer) &&
+						g_cfg.skipDisplayCaseEmpty && IsDisplayCaseBase(base));
 				if (isCorpse || cat == static_cast<int>(Category::kContainer)) {
 					if (g_cfg.skipEmptyLoot && g_invOff != 0) {
 						const int loot = RefLootState(ref);
@@ -3929,18 +4063,16 @@ namespace SAS
 						//   见 ContProbe 顶部的长注释（关着时的 size/sum/skipNp/skipEq
 						//   与打开后一对比即可定位）。
 						if (cat == static_cast<int>(Category::kContainer) && !isCorpse) {
-							ContProbe(ref, base, d2, loot);
+							ContProbe(ref, base, d2, loot, displayCase);
 						}
 						if (loot == 0) {
-							++g_state.emptySkips;
-							continue;  // 空 ⇒ 不进候选 ⇒ 宽限期后熄灭
-						}
-						// ★ v4.3：细分「有 / 未知 / 库存指针为 null / 未标定」——
-						//   用户报「搜空还亮」时，这四个数直接指出卡在哪一步：
-						//     empty 不涨 + unknown 一直涨   ⇒ 形状不对（可能标定选错偏移）
-						//     empty 不涨 + null 一直涨      ⇒ 库存指针是 null（引擎没建/已销毁）
-						//     empty 不涨 + notEmpty 一直涨  ⇒ 库存里真有引擎条目（不可见物品）
-						if (loot == 1) {
+							if (!displayCase) {
+								++g_state.emptySkips;
+								continue;  // 空 ⇒ 不进候选 ⇒ 宽限期后熄灭
+							}
+							// ★ v4.9：展示柜读到「空」不算空（关闭时内容本来就不在库存里）
+							++g_state.displayCaseSkips;
+						} else if (loot == 1) {
 							++g_state.lootNotEmpty;
 							// ★ v4.4：「判到有东西」的尸体 ⇒ 打一份**库存明细**
 							//   （只对近距离的、每个 ref 只打一次；上限 LootProbeMax）。
@@ -3949,6 +4081,11 @@ namespace SAS
 								LootProbe(ref, d2);
 							}
 						} else if (loot == -2) {
+							// ★ v4.3：细分「有 / 未知 / 库存指针为 null / 未标定」——
+							//   用户报「搜空还亮」时，这四个数直接指出卡在哪一步：
+							//     empty 不涨 + unknown 一直涨   ⇒ 形状不对（可能标定选错偏移）
+							//     empty 不涨 + null 一直涨      ⇒ 库存指针是 null（引擎没建/已销毁）
+							//     empty 不涨 + notEmpty 一直涨  ⇒ 库存里真有引擎条目（不可见物品）
 							++g_state.lootNullInv;
 						} else if (loot == -1) {
 							++g_state.lootUnknown;
@@ -4310,7 +4447,7 @@ namespace SAS
 							  "| ACHR: 见到={} 判活跳过={} | StartsUnconscious跳过={} "
 							  "| 前置过滤: deleted/disabled={} 非本cell={} "
 							  "| 搜空: empty={} notEmpty={} unknown={} null={} shapeBad={} invOff={} "
-							  "| 判空跳过: np={} eq={}",
+							  "| 判空跳过: np={} eq={} | 展示柜跳过={}",
 						g_state.corpseSeen, g_state.corpseByBit, g_state.corpseByFlag,
 						g_state.corpseByLife, g_state.corpseByBleed,
 						g_state.corpseProps, g_state.corpseUncSeen,
@@ -4319,7 +4456,8 @@ namespace SAS
 						g_state.skipDeleted, g_state.skipParentCell,
 						g_state.emptySkips, g_state.lootNotEmpty, g_state.lootUnknown,
 						g_state.lootNullInv, g_state.lootBadShape, invOff,
-						g_state.lootSkipNonPlayable, g_state.lootSkipEquipped);
+						g_state.lootSkipNonPlayable, g_state.lootSkipEquipped,
+						g_state.displayCaseSkips);
 					g_state.corpseSeen       = 0;
 					g_state.corpseByBit      = 0;
 					g_state.corpseByFlag     = 0;
@@ -4335,6 +4473,7 @@ namespace SAS
 					g_state.lootBadShape     = 0;
 					g_state.lootSkipNonPlayable = 0;
 					g_state.lootSkipEquipped = 0;
+					g_state.displayCaseSkips = 0;
 					g_state.achrSeen         = 0;
 					g_state.achrLive         = 0;
 					g_state.skipDeleted      = 0;
