@@ -19,10 +19,10 @@
 | --- | --- |
 | **Mod name** | `Always Scan - Always-On Scanner Highlighting (SFSE)` |
 | **Summary**（约 250 字符以内） | `Keep the scanner highlight on at all times. No need to hold the handheld scanner: everything inside a configurable radius gets the vanilla outline, color-coded by category. Full-radius highlighting, one toggle hotkey, fully configurable via INI. SFSE plugin.` |
-| **Version** | `1.3`（引擎 build 4.14.0；Nexus 上的 1.0 / 1.1 / 1.2 之后的下一版） |
+| **Version** | `1.4`（引擎 build 4.15.0；Nexus 上的 1.0 / 1.1 / 1.2 / 1.3 之后的下一版） |
 | **Category** | `Gameplay`（Alternate suggestion: `Items and Objects - Gameplay`） |
 | **Requirements（依赖）** | `Starfield Script Extender (SFSE) 0.2.21+`、`(1.16.244.0) SFSE Address Library`、游戏版本 `1.16.244.0` |
-| **主文件（Main file）** | `StarfieldAlwaysScan-1.3.zip` |
+| **主文件（Main file）** | `StarfieldAlwaysScan-1.4.zip` |
 | **Permissions** | 允许转载需注明出处？建议：**不得重新上传（No re-uploading）**；允许个人修改（源码已含 Papyrus 部分） |
 
 ---
@@ -145,8 +145,9 @@ At startup the log prints the active config and whether the native outline funct
 
 ### Version history
 
-*(This release is **1.3**. The list below uses the plugin's internal build numbers where an older release is concerned.)*
+*(This release is **1.4**. The list below uses the plugin's internal build numbers where an older release is concerned.)*
 
+- **1.4** *(plugin build 4.15.0)* — **Crash fixes only, no gameplay changes.** Two crashes found in crash-dump analysis are gone: (1) the game could crash while *shutting down* — the plugin's own cleanup ran after the address-library mapping had already been torn down, so it ended up calling into the engine one last time; the plugin now keeps its state alive instead of destroying it on exit and touches nothing engine-side while the game is closing. (2) a rare crash during cell transitions / loading, where an object the plugin was still watching had already been deleted and its memory reused by unrelated data — reference objects are now validated (readable, valid vtable, valid form type) and every inventory read goes through exception-free memory reads, so a stale object can only ever be treated as "unknown" (kept lit) instead of crashing. No INI changes.
 - **1.3** *(plugin build 4.14.0)* — Display cases and racks (weapon cases, weapon racks, outpost display cases) are now handled properly: they glow even while closed, and they reliably go dark once you have taken everything out of them — emptying is tracked item by item as you take things out, so "take it all, then close the case" is caught as well. Taking only part of the contents, or opening one without taking anything, keeps it lit (by design). This supersedes the interim attempts in builds 4.8–4.13.
 - **4.7.0** — Highlights survive walking across cell borders outdoors: the area is no longer re-scanned from scratch (both sides of the border stay outlined), and the rare "it was glowing, then suddenly went dark" case is fixed by re-applying an outline when the engine rebuilds an object's 3D. Scanning is also no longer interrupted by small streaming changes while you walk.
 - **4.6.0** — Looted bodies of enemies you kill now go dark reliably: entries the dead actor is still *wearing* (which cannot be taken) no longer count as loot. The log file is now capped at 1 MiB.
@@ -216,6 +217,13 @@ Built with **SFSE** and **CommonLibSF**. Huge thanks to their authors and to eve
 > （`ExteriorContinuous=1` / `SettleOnCellCrossMs=300`）；引擎**流式重建 3D**（LOD ↔ 真模型）导致
 > 单条描边丢失时**自动重挂**（`Verify3DPerScan=32`，日志里 `3D复检: reassert=` 在涨）；
 > 走动时引用数的**轻微变化不再打断扫描**（`StreamJumpTolerance=256`）。
+>
+> **1.4（引擎 4.15）**：**只修崩溃，不改玩法。** ① 退出游戏时不再崩（本 MOD 自己的清理
+> 代码原本跑在「地址库映射已经拆掉」之后，等于退出时又调了一次引擎；现在状态改成"退出时
+> 不销毁"、关闭过程中不碰引擎）；② 换场景 / 载入途中偶发的崩溃修掉（观察表里可能留着一个
+> 已经被删除、内存被别的数据复用的引用；现在引用要过「可读 + vtable + formType」三关，
+> 而且所有库存读取都不会再抛访问异常 —— 陈旧对象最多被判成「未知（保持亮）」，不会崩）。
+> INI 无变化。
 >
 > **1.3（引擎 4.14）**：**展示柜（武器箱 / 武器架 / 头盔架 / 背包架 / 数据板架 / 前哨展示柜）**
 > 现在「关着也亮」，并且**拿走最后一件东西后就熄灭** —— 拿空按「你真正拿走的物品」**逐件记账**，

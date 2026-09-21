@@ -3,7 +3,11 @@
  Always-on scanner highlighting for Starfield
 ========================================================================
 
-Version  : 1.3  (plugin build 4.14.0)
+Version  : 1.4  (plugin build 4.15.0)
+           1.4 = crash fixes only: no more crash while quitting the game,
+           and no more rare crash during cell transitions / loading.
+           No gameplay or INI changes (if you are upgrading, your
+           SAS_AlwaysScan.ini is untouched).
 Author   : hzk11o11k11o (Nexus Mods)
 Game     : Starfield 1.16.244.0 (matching version required)
 Requires : SFSE (Starfield Script Extender) 0.2.21+

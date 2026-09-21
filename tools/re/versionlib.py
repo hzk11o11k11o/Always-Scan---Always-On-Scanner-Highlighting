@@ -31,11 +31,20 @@ LIB = Path(
 #   0x54  u32   pointerSize     = 8
 #   0x58  u32   <pad>           = 0
 #   0x5C  u32   addressCount    = 0x137458
-#   0x60  u32[] offsets         ← 条目就是「纯 4 字节 RVA」，**ID 即下标 +1**
+#   0x60  u32[] offsets         ← 条目就是「纯 4 字节 RVA」
 #
-# 即 offset(id) = u32 @ (0x60 + 4*(id-1))。已用 IDs.h 里连续 ID 反查验证：
-#   83006 -> 0x1306D50, 83007 -> 0x1306E20, 83008 -> 0x1306E80（相邻函数，间隔合理）
-#   937585(GameVM::Singleton) -> 0x5FD9B88（.data 段，合理）
+# ★ 索引口径（2026-09-21 订正，见 docs/15）：**`entry[0]` 是占位（实测 = 0），
+#   `entry[i]` = ID `i` 的 RVA** —— 也就是和 commonlibsf 的
+#   `IDDB::offset(id) { return m_v5[id]; }`（`m_v5.data = mmap + sizeof(HEADER_V5)` = +0x60）
+#   完全一致。
+#   · 旧代码写的是 `table[i + 1] = entry[i]`（当成「ID = 下标 + 1」），**整体差一条**：
+#     查 ID 83006 实际返回的是 entry[83005]。
+#   · 订正依据（三重一致）：
+#     ① 文件头 0x60 前 3 条 = 0x0 / 0x1000 / 0x1030，第 0 条为 0 ⇒ 占位；
+#     ② commonlibsf 的 HEADER_V5 `sizeof` = 0x60，`m_v5[a_id]` 直接下标访问；
+#     ③ 崩溃现场反查：ID 38742（`TESForm::DecRefCount`）⇒
+#        `entry[38742] = 0x384600`，反汇编是 `lock xadd [rcx+8]` 的引用计数递减 ✓
+#        （`entry[38741] = 0x3845F0` 只是个 `lea rax,[rip+…]; ret` 的取址小函数）。
 HEADER_SIZE = 0x60
 ENTRY_SIZE = 4
 
@@ -61,7 +70,7 @@ def read_versionlib(path: Path):
         (rva,) = struct.unpack_from("<I", data, off)
         off += ENTRY_SIZE
         if rva:
-            table[i + 1] = rva  # ID 从 1 开始
+            table[i] = rva  # ★ 订正：ID 即下标（entry[0] 是 0 占位，见文件头注释）
 
     header = {
         "format": fmt,

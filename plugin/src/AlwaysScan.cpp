@@ -1410,8 +1410,33 @@ namespace SAS
 			float        moveMeters = 0.0f;
 		};
 
-		Config               g_cfg;
-		State                g_state;
+		Config g_cfg;
+		// ================================================================
+		// ★★ v4.15（崩溃 A 的修复，docs/15 §3）：**故意泄漏 `g_state`，永不析构**
+		// ================================================================
+		// `g_state.outlined` 里存的是 `RE::NiPointer<RE::TESObjectREFR>`，它的析构会调
+		// **引擎函数** `TESForm::DecRefCount()`（commonlibsf 里那个成员带一个函数内
+		// `static REL::Relocation{ ID::TESForm::DecRefCount }`）。
+		//
+		// 进程退出时的析构顺序是致命的：
+		//   · `g_state` 是**命名空间静态对象** ⇒ 本模块加载时就构造，析构登记在
+		//     CRT 退出表的**最前面** ⇒ 最后才析构；
+		//   · commonlibsf 的 `REL::IDDB` 是 `TSingleton` 的**函数内静态**（第一次
+		//     `REL::ID` 查表时才构造）⇒ 登记在**后面** ⇒ **先**析构，
+		//     `~FMemoryMap` 把地址库文件的映射 `UnmapViewOfFile` 掉；
+		//   · 之后轮到 `g_state` 析构 ⇒ `outlined` 的节点析构 ⇒ `DecRefCount()` 的
+		//     那个 `static REL::Relocation` **首次**初始化 ⇒ 查 `m_v5[38742]`
+		//     ⇒ 读**已 unmap 的映射** ⇒ C0000005（10 份转储全在 `SAS+0x4098A`）。
+		// 故障栈实证（转储 24876）：
+		//   IDDB::offset(IDDB.cpp:457) ← REL::ID::address(REL/ID.h:27)
+		//   ← TESForm::DecRefCount(RE/T/TESForm.h:158) ← `~_Hash_vec`(xhash:256)
+		//   ← `~list`(list:1061) ← dllmain_crt_process_detach(ucrt/vcstartup)
+		//   ← DllMain(DLL_PROCESS_DETACH) ← kernel32!BaseThreadInitThunk
+		// ⇒ 既不析构，进程退出时就不会有任何「引擎调用」；mod 里这是标准做法
+		//   （退出时进程都要没了，泄漏这点内存无关紧要）。
+		//   ★ 底线：**绝不在退出路径上碰游戏对象** —— 连 `DecRefCount` 也不碰
+		//   （那时游戏自己的静态析构也可能已经把对象拆了）。
+		State& g_state = *new State{};
 		std::mutex           g_tickLock;
 		std::atomic_uint32_t g_mainThreadId{ 0 };
 		std::string          g_iniPath;
@@ -2065,6 +2090,57 @@ namespace SAS
 			}
 			SIZE_T read = 0;
 			return ::ReadProcessMemory(::GetCurrentProcess(), a_src, a_dst, a_len, &read) != 0 && read == a_len;
+		}
+
+		// ----------------------------------------------------------------
+		// ★★ v4.15：引用对象「还活着吗」的强判据（崩溃 B 的修复，docs/15 §4）
+		// ----------------------------------------------------------------
+		// 崩溃 B 的现场（转储 Starfield_09-21-01-50.dmp）：
+		//   `SAS+0x2023A` = `AlwaysScan.cpp:4442`（RefLootState 读库存 size），
+		//   rcx（库存指针）= `0x1A486`、读地址 `0x1A4AE` = 0x1A486 + 0x28。
+		//   把 R8（那个"引用"）的内存 dump 出来一看：**根本不是 TESObjectREFR**
+		//   —— 头部是 `0x27C0000333C00003`（不是 vtable 指针），通篇是浮点数与小整数。
+		// ⇒ 真根因：**展示柜逐帧观察表里留着一个已经被释放的引用**（换场景 / 载入期
+		//   对象被销毁），那块堆内存被别的数据复用，于是 `*(ref + 0xA0)` 读出一串垃圾
+		//   当库存指针用。**旧判据 `IsReadable` 挡不住这种情况**：内存还 mapped，
+		//   VirtualQuery 一律通过（它只回答「能不能读」，回答不了「读出来的是什么」）。
+		// ⇒ 三层判据（全部是纯读 + 比较，不做 VirtualQuery）：
+		//     ① 引用头部（0x30 字节）能读出来 —— 走 SafeReadMem，读不出直接算死；
+		//     ② `[ref + 0x00]` 是**落在游戏主模块映像内**的 vtable 指针
+		//        （TESObjectREFR / Actor 的 vtable 都在 Starfield.exe 的 .rdata）；
+		//     ③ `[ref + 0x2E]`（formType）∈ {REFR, ACHR}。
+		//   ②③ 是 TESForm 的固定成员，垃圾内存同时满足的概率可以忽略。
+		std::uintptr_t GameImageEnd()
+		{
+			static const std::uintptr_t end = [] {
+				const auto* base = reinterpret_cast<const std::uint8_t*>(::GetModuleHandleA(nullptr));
+				if (!base) {
+					return std::uintptr_t{ 0 };
+				}
+				const auto lfanew = *reinterpret_cast<const std::uint32_t*>(base + 0x3C);
+				const auto size   = *reinterpret_cast<const std::uint32_t*>(base + lfanew + 0x50);  // SizeOfImage
+				return reinterpret_cast<std::uintptr_t>(base) + size;
+			}();
+			return end;
+		}
+
+		bool LooksLikeLiveRef(std::uint64_t a_ref)
+		{
+			const auto  base = reinterpret_cast<std::uintptr_t>(::GetModuleHandleA(nullptr));
+			const auto  end  = GameImageEnd();
+			if (base == 0 || end == 0 || !IsPlausiblePointer(a_ref)) {
+				return false;
+			}
+			std::uint8_t head[0x30]{};
+			if (!SafeReadMem(reinterpret_cast<const void*>(a_ref), head, sizeof(head))) {
+				return false;  // ① 连头部都读不出来 ⇒ 当它死了
+			}
+			const auto vtbl = *reinterpret_cast<const std::uint64_t*>(head);
+			if (vtbl < base || vtbl >= end) {
+				return false;  // ② 对象头不是「游戏映像里的 vtable」⇒ 内存已被复用
+			}
+			const auto ft = head[kOffFormType];
+			return ft == kFormTypeREFR || ft == kFormTypeACHR;  // ③
 		}
 
 		bool LooksLikeMenuName(const char* a_s)
@@ -3000,12 +3076,16 @@ namespace SAS
 		// ★ v4.5：某个物品（TESForm*，来自 `BGSInventoryItem::object`）是不是
 		//   「非玩家物品」（记录标志 bit2 = 0x04）—— 玩家拿不走、面板也不显示
 		//   （判定依据与实证见常量区 `kFormFlagNonPlayable` 的长注释）。
-		//   只对**已通过 IsPlausiblePointer 的指针**调用（与其它热路径读法一致）。
+		//   ★ v4.15：改走 SafeReadMem —— 这个指针来自库存条目，**清单本身可能是
+		//     垃圾**（引用被释放后内存复用，见 docs/15 §4）⇒ 裸读有 AV 风险。
+		//     读不出来时返回 false（= 当作「可拿的物品」），由调用方后面的形状校验兜住。
 		bool IsNonPlayableForm(std::uint64_t a_obj)
 		{
-			return (*reinterpret_cast<const std::uint32_t*>(
-						reinterpret_cast<const std::uint8_t*>(a_obj) + kOffFormFlags) &
-					   kFormFlagNonPlayable) != 0;
+			std::uint32_t flags = 0;
+			if (!SafeReadMem(reinterpret_cast<const void*>(a_obj + kOffFormFlags), &flags, sizeof(flags))) {
+				return false;
+			}
+			return (flags & kFormFlagNonPlayable) != 0;
 		}
 
 		// ★★ v4.4：读**引擎自己的 lifeState 枚举**（`[Actor+0xF8]` 的 bits 17..20，0..15）。
@@ -3133,8 +3213,9 @@ namespace SAS
 			std::uint64_t invPtr = 0;
 			int           loot   = -3;
 			if (g_invOff != 0) {
-				invPtr = *reinterpret_cast<const std::uint64_t*>(raw + g_invOff);
-				loot   = RefLootState(a_ref);
+				// ★ v4.15：探针里的裸读一并改走 SafeReadMem（docs/15 §4：同一类风险）
+				SafeReadMem(raw + g_invOff, &invPtr, sizeof(invPtr));
+				loot = RefLootState(a_ref);
 			}
 			const auto* base = a_ref->data.objectReference.get();
 
@@ -3348,7 +3429,12 @@ namespace SAS
 			const auto  fid = a_ref->GetFormID();
 			const auto  dM  = std::sqrt(std::max(a_distSq, 0.0f)) / g_cfg.unitsPerMeter;
 
-			const auto ptrRaw = *reinterpret_cast<const std::uint64_t*>(raw + g_invOff);
+			// ★ v4.15：探针的每一次「按指针取字段」都改走 SafeReadMem（docs/15 §4）
+			std::uint64_t ptrRaw = 0;
+			if (!SafeReadMem(raw + g_invOff, &ptrRaw, sizeof(ptrRaw))) {
+				REX::INFO("loot probe: ref={:08X} d={:.1f}m inv 读不出来（引用已失效？）", fid, dM);
+				return;
+			}
 			if (ptrRaw == 0) {
 				REX::INFO("loot probe: ref={:08X} d={:.1f}m inv=null（引擎没给这个引用建过库存）", fid, dM);
 				return;
@@ -3357,10 +3443,16 @@ namespace SAS
 				REX::INFO("loot probe: ref={:08X} d={:.1f}m inv=垃圾指针 0x{:X}", fid, dM, ptrRaw);
 				return;
 			}
-			const auto* inv  = reinterpret_cast<const std::uint8_t*>(ptrRaw);
-			const auto  size = *reinterpret_cast<const std::uint32_t*>(inv + kOffInvData);
-			const auto  cap  = *reinterpret_cast<const std::uint32_t*>(inv + kOffInvData + 4);
-			const auto  data = *reinterpret_cast<const std::uint64_t*>(inv + kOffInvData + 8);
+			const auto* inv = reinterpret_cast<const std::uint8_t*>(ptrRaw);
+			std::uint32_t size = 0;
+			std::uint32_t cap  = 0;
+			std::uint64_t data = 0;
+			if (!SafeReadMem(inv + kOffInvData, &size, sizeof(size)) ||
+				!SafeReadMem(inv + kOffInvData + 4, &cap, sizeof(cap)) ||
+				!SafeReadMem(inv + kOffInvData + 8, &data, sizeof(data))) {
+				REX::INFO("loot probe: ref={:08X} d={:.1f}m 库存头读不出来（指针 0x{:X} 已失效？）", fid, dM, ptrRaw);
+				return;
+			}
 			if (size > kInvMaxItems || cap < size || cap > (1u << 20) ||
 				(size != 0 && !IsPlausiblePointer(data))) {
 				REX::INFO("loot probe: ref={:08X} d={:.1f}m 形状不对（size={} cap={} data=0x{:X}）",
@@ -3383,13 +3475,19 @@ namespace SAS
 			std::uint64_t npTotal     = 0;
 			const auto    items       = std::min<std::uint32_t>(size, kInvWalkItemsMax);
 			for (std::uint32_t i = 0; i < items; ++i) {
-				const auto* item = reinterpret_cast<const std::uint8_t*>(data) + i * kOffInvItemSize;
+				// ★ v4.15：条目头整块安全读（一次 SafeReadMem 覆盖下面用到的所有字段）
+				std::uint8_t itemBuf[kOffInvItemSize]{};
+				if (!SafeReadMem(reinterpret_cast<const std::uint8_t*>(data) + i * kOffInvItemSize,
+						itemBuf, sizeof(itemBuf))) {
+					break;  // 条目数组已经读不动 ⇒ 后面的都不用看了
+				}
+				const auto* item = itemBuf;
 				const auto  obj  = *reinterpret_cast<const std::uint64_t*>(item + kOffInvItemObject);
 				if (!IsPlausibleFormPtr(obj)) {
 					continue;
 				}
 				const auto sn = *reinterpret_cast<const std::uint32_t*>(item + kOffInvItemStacks);
-				if (sn == 0) {
+				if (sn == 0 || sn > kInvMaxStacks) {
 					continue;
 				}
 				const auto sd = *reinterpret_cast<const std::uint64_t*>(item + kOffInvItemStacks + 8);
@@ -3398,14 +3496,21 @@ namespace SAS
 				}
 				std::uint64_t sum = 0;
 				for (std::uint32_t j = 0; j < sn; ++j) {
-					sum += *reinterpret_cast<const std::uint32_t*>(
-						reinterpret_cast<const std::uint8_t*>(sd) + j * kOffStackSize + kOffStackCount);
+					std::uint32_t cnt = 0;
+					if (!SafeReadMem(reinterpret_cast<const std::uint8_t*>(sd) + j * kOffStackSize + kOffStackCount,
+							&cnt, sizeof(cnt))) {
+						sum = 0;  // 读不动 ⇒ 这一条按「读不出来」处理（不计入任何桶）
+						break;
+					}
+					sum += cnt;
 				}
 				if (sum == 0) {
 					continue;
 				}
-				const auto  objFlags  = *reinterpret_cast<const std::uint32_t*>(
-					reinterpret_cast<const std::uint8_t*>(obj) + kOffFormFlags);
+				// ★ v4.15：物品记录标志也走 SafeReadMem（读不出 = 0，桶归属只看 np/eq）
+				std::uint32_t objFlags = 0;
+				SafeReadMem(reinterpret_cast<const std::uint8_t*>(obj) + kOffFormFlags,
+					&objFlags, sizeof(objFlags));
 				// item flags（BGSInventoryItem::flags @+0x20，u32）：
 				//   低 3 位 = 装备槽（非 0 = 正在装备中），bit3 = kEquipStateLocked，
 				//   bit5 = kTemporary
@@ -3536,7 +3641,13 @@ namespace SAS
 				return;
 			}
 
-			const auto ptrRaw = *reinterpret_cast<const std::uint64_t*>(raw + g_invOff);
+			// ★ v4.15：探针的每一次「按指针取字段」都改走 SafeReadMem（docs/15 §4）
+			std::uint64_t ptrRaw = 0;
+			if (!SafeReadMem(raw + g_invOff, &ptrRaw, sizeof(ptrRaw))) {
+				REX::INFO("cont probe{}: ref={:08X} base={:08X} d={:.1f}m loot={} inv 读不出来（引用已失效？）",
+					tag, fid, bid, dM, a_loot);
+				return;
+			}
 			if (ptrRaw == 0) {
 				REX::INFO("cont probe{}: ref={:08X} base={:08X} d={:.1f}m loot={} inv=null -> 判空原因=引擎没给这个引用建库存{}",
 					tag, fid, bid, dM, a_loot,
@@ -3548,10 +3659,17 @@ namespace SAS
 					tag, fid, bid, dM, a_loot, ptrRaw);
 				return;
 			}
-			const auto* inv  = reinterpret_cast<const std::uint8_t*>(ptrRaw);
-			const auto  size = *reinterpret_cast<const std::uint32_t*>(inv + kOffInvData);
-			const auto  cap  = *reinterpret_cast<const std::uint32_t*>(inv + kOffInvData + 4);
-			const auto  data = *reinterpret_cast<const std::uint64_t*>(inv + kOffInvData + 8);
+			const auto* inv = reinterpret_cast<const std::uint8_t*>(ptrRaw);
+			std::uint32_t size = 0;
+			std::uint32_t cap  = 0;
+			std::uint64_t data = 0;
+			if (!SafeReadMem(inv + kOffInvData, &size, sizeof(size)) ||
+				!SafeReadMem(inv + kOffInvData + 4, &cap, sizeof(cap)) ||
+				!SafeReadMem(inv + kOffInvData + 8, &data, sizeof(data))) {
+				REX::INFO("cont probe{}: ref={:08X} base={:08X} d={:.1f}m loot={} 库存头读不出来（指针 0x{:X} 已失效？）",
+					tag, fid, bid, dM, a_loot, ptrRaw);
+				return;
+			}
 			if (size > kInvMaxItems || cap < size || cap > (1u << 20) ||
 				(size != 0 && !IsPlausiblePointer(data))) {
 				REX::INFO("cont probe{}: ref={:08X} base={:08X} d={:.1f}m loot={} 形状不对（size={} cap={} data=0x{:X}）",
@@ -3576,7 +3694,13 @@ namespace SAS
 			char          buf[192];
 			const auto    items = std::min<std::uint32_t>(size, kInvWalkItemsMax);
 			for (std::uint32_t i = 0; i < items; ++i) {
-				const auto* item = reinterpret_cast<const std::uint8_t*>(data) + i * kOffInvItemSize;
+				// ★ v4.15：条目头整块安全读（一次 SafeReadMem 覆盖下面用到的所有字段）
+				std::uint8_t itemBuf[kOffInvItemSize]{};
+				if (!SafeReadMem(reinterpret_cast<const std::uint8_t*>(data) + i * kOffInvItemSize,
+						itemBuf, sizeof(itemBuf))) {
+					break;  // 条目数组已经读不动 ⇒ 后面的都不用看了
+				}
+				const auto* item = itemBuf;
 				const auto  obj  = *reinterpret_cast<const std::uint64_t*>(item + kOffInvItemObject);
 				if (!IsPlausibleFormPtr(obj)) {
 					continue;
@@ -3587,8 +3711,14 @@ namespace SAS
 					const auto sd = *reinterpret_cast<const std::uint64_t*>(item + kOffInvItemStacks + 8);
 					if (IsPlausiblePointer(sd)) {
 						for (std::uint32_t j = 0; j < sn; ++j) {
-							sum += *reinterpret_cast<const std::uint32_t*>(
-								reinterpret_cast<const std::uint8_t*>(sd) + j * kOffStackSize + kOffStackCount);
+							std::uint32_t cnt = 0;
+							if (!SafeReadMem(
+									reinterpret_cast<const std::uint8_t*>(sd) + j * kOffStackSize + kOffStackCount,
+									&cnt, sizeof(cnt))) {
+								sum = 0;
+								break;
+							}
+							sum += cnt;
 						}
 					}
 				}
@@ -3608,10 +3738,15 @@ namespace SAS
 					sumKeep += sum;
 				}
 				if (i < 4) {
+					// ★ v4.15：明细里的「物品记录」三个字段同样走 SafeReadMem（纯诊断，读到 0 也无妨）
 					const auto* objRaw  = reinterpret_cast<const std::uint8_t*>(obj);
-					const auto  objType = objRaw[kOffFormType];
-					const auto  objFid  = reinterpret_cast<const RE::TESForm*>(obj)->GetFormID();
-					const auto  objFlg  = *reinterpret_cast<const std::uint32_t*>(objRaw + kOffFormFlags);
+					std::uint8_t objFt = 0;
+					std::uint32_t objFid = 0;
+					std::uint32_t objFlg = 0;
+					SafeReadMem(objRaw + kOffFormType, &objFt, sizeof(objFt));
+					SafeReadMem(objRaw + kOffFormID, &objFid, sizeof(objFid));
+					SafeReadMem(objRaw + kOffFormFlags, &objFlg, sizeof(objFlg));
+					const auto objType = objFt;
 					// ★ v4.9：明细里加 `tp=`（kTemporary，fl 的 bit5）—— 展示柜的
 					//   临时投影条目一眼可辨（`fl=20` 时 tp=1），见常量区「v4.9 展示柜」。
 					std::snprintf(buf, sizeof(buf),
@@ -3751,15 +3886,23 @@ namespace SAS
 				++sampled;
 				++s.invChecks;
 				for (int c = 0; c < 2; ++c) {
-					const auto p = *reinterpret_cast<const std::uint64_t*>(refRaw + kOffInvCand[c]);
-					if (!IsPlausiblePointer(p) || !IsReadable(reinterpret_cast<const void*>(p), 0x38)) {
+					// ★ v4.15：候选偏移上的指针也用 SafeReadMem 取（换场景期引用随时可能失效）
+					std::uint64_t p = 0;
+					if (!SafeReadMem(refRaw + kOffInvCand[c], &p, sizeof(p)) ||
+						!IsPlausiblePointer(p) || !IsReadable(reinterpret_cast<const void*>(p), 0x38)) {
 						++s.invBad[c];
 						continue;
 					}
-					const auto* inv  = reinterpret_cast<const std::uint8_t*>(p);
-					const auto  size = *reinterpret_cast<const std::uint32_t*>(inv + kOffInvData);
-					const auto  cap  = *reinterpret_cast<const std::uint32_t*>(inv + kOffInvData + 4);
-					const auto  data = *reinterpret_cast<const std::uint64_t*>(inv + kOffInvData + 8);
+					const auto* inv = reinterpret_cast<const std::uint8_t*>(p);
+					std::uint32_t size = 0;
+					std::uint32_t cap  = 0;
+					std::uint64_t data = 0;
+					if (!SafeReadMem(inv + kOffInvData, &size, sizeof(size)) ||
+						!SafeReadMem(inv + kOffInvData + 4, &cap, sizeof(cap)) ||
+						!SafeReadMem(inv + kOffInvData + 8, &data, sizeof(data))) {
+						++s.invBad[c];
+						continue;
+					}
 					if (size > kInvMaxItems || cap < size || cap > (1u << 20)) {
 						++s.invBad[c];
 						continue;
@@ -4306,11 +4449,21 @@ namespace SAS
 			if (!g_cfg.displayCaseFrameWatch || g_state.dcWatchCount == 0 || g_invOff == 0) {
 				return;
 			}
+			// ★ v4.15：载入 / 换场景期间*不碰旧世界的引用*（docs/15 §4 —— 崩溃 B 就是
+			//   在这里读到「已经被释放、内存被别的数据复用」的引用）。
+			//   这里用的是上一帧的值（`loadingNow` 在 Tick 里稍后才刷新）：只当优化，
+			//   真正的安全由下面的 LooksLikeLiveRef 兜底。
+			if (g_state.loadingNow) {
+				return;
+			}
 			++g_state.dcWatchFrames;
 			for (std::size_t i = 0; i < g_state.dcWatchCount;) {
 				auto& w = g_state.dcWatch[i];
-				// 形状校验：引用对象至少能读到 inventoryList 指针那一块（换算成 ref 自身）
-				const bool ok = w.ref && IsReadable(reinterpret_cast<const void*>(w.ref), g_invOff + 8);
+				// 形状校验（★ v4.15 加强）：不再只看「能不能读」，而是「**还像不像一个
+				// 活着的引用对象**」—— 可读 + vtable 在游戏映像内 + formType ∈ {REFR,ACHR}。
+				//   崩溃 B 的现场里那块内存**是可读的**（堆内存还 mapped），旧判据一律放行，
+				//   于是 `*(ref+0xA0)` 读出一串垃圾（0x1A486）当库存指针用 ⇒ AV。
+				const bool ok = w.ref && LooksLikeLiveRef(reinterpret_cast<std::uint64_t>(w.ref));
 				if (!ok) {
 					if (++w.miss >= kDcWatchMissMax) {
 						g_state.dcWatch[i] = g_state.dcWatch[--g_state.dcWatchCount];
@@ -4422,8 +4575,17 @@ namespace SAS
 			if (g_invOff == 0) {
 				return -3;
 			}
-			const auto* raw    = reinterpret_cast<const std::uint8_t*>(a_ref);
-			const auto  ptrRaw = *reinterpret_cast<const std::uint64_t*>(raw + g_invOff);
+			const auto* raw = reinterpret_cast<const std::uint8_t*>(a_ref);
+			// ★★ v4.15（崩溃 B 的修复，docs/15 §4）：**这一读改成 SafeReadMem**。
+			//   实测现场：`ref` 已经被释放、那块堆内存被别的数据（一串浮点）复用，
+			//   于是 `*(ref+0xA0)` 读出垃圾 `0x1A486`；它是「> 0x10000」的合法范围值，
+			//   `IsPlausiblePointer` 放行 ⇒ 下面裸读 `*(inv+0x28)` 直接 AV（+0x2023A）。
+			//   SafeReadMem（ReadProcessMemory）对不可读地址**只会返回 false**，不抛异常
+			//   ⇒ 读不出来一律按「未知」处理（返回 -1 ⇒ 照常亮，绝不误灭）。
+			std::uint64_t ptrRaw = 0;
+			if (!SafeReadMem(raw + g_invOff, &ptrRaw, sizeof(ptrRaw))) {
+				return -1;
+			}
 			if (ptrRaw == 0) {
 				// ★ v4.3：空指针 = 引擎**从未给这个引用建过库存**（不是「读到垃圾」）。
 				//   反汇编证据（2026-09-18）：唯一分配 `BGSInventoryList` 的函数
@@ -4438,9 +4600,15 @@ namespace SAS
 			if (!IsPlausiblePointer(ptrRaw)) {
 				return -1;
 			}
-			const auto* inv  = reinterpret_cast<const std::uint8_t*>(ptrRaw);
-			const auto  size = *reinterpret_cast<const std::uint32_t*>(inv + kOffInvData);
-			const auto  cap  = *reinterpret_cast<const std::uint32_t*>(inv + kOffInvData + 4);
+			const auto* inv = reinterpret_cast<const std::uint8_t*>(ptrRaw);
+			// ★ v4.15：库存数组头三个字段也走 SafeReadMem（原因同上：指针可能已经失效）
+			std::uint32_t size = 0;
+			std::uint32_t cap  = 0;
+			std::uint64_t data = 0;
+			if (!SafeReadMem(inv + kOffInvData, &size, sizeof(size)) ||
+				!SafeReadMem(inv + kOffInvData + 4, &cap, sizeof(cap))) {
+				return -1;  // 读不出来 = 指针失效，不判空
+			}
 			if (size > kInvMaxItems || cap < size || cap > (1u << 20)) {
 				return -1;  // 形状不对劲 = 读到垃圾，不判空
 			}
@@ -4450,8 +4618,8 @@ namespace SAS
 				}
 				return 0;  // 一条都没有 = 空的
 			}
-			const auto data = *reinterpret_cast<const std::uint64_t*>(inv + kOffInvData + 8);
-			if (!IsPlausiblePointer(data)) {
+			if (!SafeReadMem(inv + kOffInvData + 8, &data, sizeof(data)) ||
+				!IsPlausiblePointer(data)) {
 				return -1;
 			}
 
@@ -4465,7 +4633,15 @@ namespace SAS
 			std::uint32_t snapBudget = kDcSnapStackBudget;
 			std::uint32_t       budget = 1024;  // 单次判空最多看多少个 stack（防呆，正常远用不到）
 			for (std::uint32_t i = 0; i < items; ++i) {
-				const auto* item = reinterpret_cast<const std::uint8_t*>(data) + i * kOffInvItemSize;
+				// ★ v4.15：条目头**整块**安全读 —— 一次 SafeReadMem 拿到 0x28 字节，
+				//   后面所有字段都从这个副本里取（`object` / `stacks` / `flags`），
+				//   于是「条目数组本身是垃圾 / 越界」也不会 AV。
+				std::uint8_t itemBuf[kOffInvItemSize]{};
+				if (!SafeReadMem(reinterpret_cast<const std::uint8_t*>(data) + i * kOffInvItemSize,
+						itemBuf, sizeof(itemBuf))) {
+					return -1;  // 条目读不出来 ⇒ 不敢断言「空」
+				}
+				const auto* item = itemBuf;
 				const auto  obj  = *reinterpret_cast<const std::uint64_t*>(item + kOffInvItemObject);
 				if (!IsPlausiblePointer(obj)) {
 					return -1;
@@ -4527,8 +4703,12 @@ namespace SAS
 				}
 				std::uint32_t entryCnt = 0;  // 这一个条目所有 stack 的正数合计（快照模式用）
 				for (std::uint32_t j = 0; j < sn; ++j) {
-					const auto cnt = *reinterpret_cast<const std::uint32_t*>(
-						reinterpret_cast<const std::uint8_t*>(sd) + j * kOffStackSize + kOffStackCount);
+					// ★ v4.15：每个 stack 的 count 走 SafeReadMem（指针可能已失效）
+					std::uint32_t cnt = 0;
+					if (!SafeReadMem(reinterpret_cast<const std::uint8_t*>(sd) + j * kOffStackSize + kOffStackCount,
+							&cnt, sizeof(cnt))) {
+						return -1;  // 读不出来 ⇒ 不敢断言「空」
+					}
 					if (cnt > 0) {
 						if (!a_outSnap) {
 							return 1;  // 有东西，早退（老路径：只关心有没有）
@@ -4546,8 +4726,14 @@ namespace SAS
 					}
 				}
 				if (a_outSnap && entryCnt > 0) {
-					hasAny = true;
-					AddToSnap(*a_outSnap, reinterpret_cast<const RE::TESForm*>(obj)->GetFormID(), entryCnt);
+					// ★ v4.15：物品的记录 ID 也走 SafeReadMem（读不出来就把快照标成不确定）
+					std::uint32_t baseFid = 0;
+					if (SafeReadMem(reinterpret_cast<const void*>(obj + kOffFormID), &baseFid, sizeof(baseFid))) {
+						hasAny = true;
+						AddToSnap(*a_outSnap, baseFid, entryCnt);
+					} else {
+						a_outSnap->uncertain = true;  // 记账基准不完整 ⇒ 不许断言「拿空」
+					}
 				}
 				if (a_outSnap && --snapBudget == 0) {
 					a_outSnap->overflow = true;  // 枚举预算用完 ⇒ 快照不完整
