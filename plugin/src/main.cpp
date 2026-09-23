@@ -4,8 +4,12 @@
 
 #include <atomic>
 #include <cstddef>
+#include <exception>
 #include <filesystem>
+#include <iterator>
 #include <memory>
+
+#include "REX/CONVERT.h"  // REX::UTF16_TO_UTF8（日志里打印真实路径）
 
 #include <spdlog/details/file_helper.h>
 #include <spdlog/sinks/base_sink.h>
@@ -20,8 +24,9 @@ namespace
 {
 	std::atomic_bool g_installed{ false };
 
-	// SFSE 日志名（对应 SFSE\Logs\<name>.log）。限长 sink 要拼回同一路径，
-	// 与下面 SFSE::Init 共用同一个常量，避免两处写死不一致。
+	// 日志名（落到 <esm 同级目录>\SAS_AlwaysScan.log；该目录不可写时回退到
+	// SFSE 默认的 SFSE\Logs\<name>.log）。与下面 SFSE::Init 共用同一个常量，
+	// 避免两处写死不一致。
 	constexpr const char* kLogName = "SAS_AlwaysScan";
 
 	// 日志文件上限 1 MiB：写新一行时若会超过就把旧内容整体清空，
@@ -72,16 +77,58 @@ namespace
 		std::size_t                   _bytesWritten{};
 	};
 
-	// 把 commonlibsf 建的默认 logger 换成「限长文件 sink」版。
-	// 必须在 SFSE::Init 之后调用（logger 到那时才存在）。
+	// 本插件 DLL 所在目录（MO2 下 = mod 目录里的 SFSE\Plugins\；
+	// 手动安装 = <游戏>\Data\SFSE\Plugins\）。
+	// 用当前模块的 ImageBase 反查（REX::W32::GetCurrentModule 就是 &__ImageBase），
+	// 精确到本 DLL —— 不依赖 SFSE 接口，也不怕同时加载了多个插件。
+	std::filesystem::path PluginDir()
+	{
+		wchar_t buf[1024]{};
+		const std::uint32_t n = REX::W32::GetModuleFileNameW(
+			REX::W32::GetCurrentModule(), buf, static_cast<std::uint32_t>(std::size(buf)));
+		if (n == 0 || n >= std::size(buf)) {
+			return {};
+		}
+		return std::filesystem::path{ buf, buf + n }.parent_path();
+	}
+
+	// esm 所在目录 = <游戏>\Data（本 DLL 在 Data\SFSE\Plugins\ 下，上溯两级）。
+	//
+	// ★ 需求（AGENTS.md）：日志文件生成在**和 esm 同级目录**里 ⇒ 就写这里。
+	//   MO2 下 usvfs 只把「写 mod 目录里**已存在**的文件」重定向回 mod 目录，
+	//   全新的文件会被丢进 overwrite —— 所以部署脚本（tools/build-sas.ps1）会
+	//   在 mod 根预置一个空的 SAS_AlwaysScan.log，日志才会真落在 esm 旁边；
+	//   没预置（比如手动安装）时，日志仍写在 Data 根（内容一样能查到）。
+	std::filesystem::path EsmDir()
+	{
+		const auto dllDir = PluginDir();
+		if (dllDir.empty()) {
+			return {};
+		}
+		return dllDir.parent_path().parent_path();
+	}
+
+	// 路径转 UTF-8（spdlog 的文本都是 UTF-8；非 ASCII 路径在中文系统上
+	// 直接 .string() 会变 GBK 字节 —— 日志里要能对得上真实路径）。
+	std::string ToUtf8(const std::filesystem::path& a_path)
+	{
+		std::string s;
+		REX::UTF16_TO_UTF8(a_path.wstring(), s);
+		return s;
+	}
+
+	// 接管日志：建「限长文件 sink」并把默认 logger 的 sink 全换成它。
+	// 必须在 SFSE::Init 之后调用。
+	//
+	// ★ 需求（AGENTS.md）：日志写在**和 esm 同级**的目录（<游戏>\Data\，MO2 下
+	//   = mod 目录根）；那里建不出文件时回退 SFSE 默认日志目录
+	//   （Documents\My Games\Starfield\SFSE\Logs\）—— 保证任何时候都有日志可查。
+	//
+	// ★ 调用方传了 `.log = false`（不建 commonlibsf 默认的 Documents 日志），
+	//   所以这里要自己把 level / flush_on / pattern 一并设好（值与 commonlibsf
+	//   InitLog 的默认一致：debug 构建 Debug、发布 Info，写一行 flush 一次）。
 	void ApplyLogSizeLimit()
 	{
-		const auto logDir = SFSE::log::log_directory();
-		if (!logDir) {
-			REX::WARN("log directory unavailable; log size limit not applied");
-			return;
-		}
-
 		auto* logger = spdlog::default_logger_raw();
 		if (!logger) {
 			return;
@@ -90,14 +137,45 @@ namespace
 		std::filesystem::path fileName{ kLogName };
 		fileName += ".log";
 
-		// clear() 会析构 commonlibsf 打开的文件 sink（关掉旧句柄）——
-		// 否则新旧两个句柄同时写同一文件会互相打架。
+		std::filesystem::path usedDir;
+		std::shared_ptr<spdlog::sinks::sink> fileSink;
+		if (const auto dir = EsmDir(); !dir.empty()) {
+			try {
+				fileSink = std::make_shared<SizeLimitedFileSink>(dir / fileName, kLogMaxBytes);
+				usedDir = dir;
+			} catch (const std::exception& e) {
+				REX::WARN("esm 同级目录里建日志失败（{}）—— 回退到 SFSE 默认日志目录", e.what());
+			}
+		}
+		if (!fileSink) {
+			if (const auto dir = SFSE::log::log_directory()) {
+				try {
+					fileSink = std::make_shared<SizeLimitedFileSink>(*dir / fileName, kLogMaxBytes);
+					usedDir = *dir;
+				} catch (const std::exception&) {
+				}
+			}
+		}
+		if (!fileSink) {
+			REX::WARN("日志文件建不出来（继续用 MSVC 调试输出；不影响任何功能）");
+			return;
+		}
+
+		// clear() 会把 spdlog 自带的 stdout sink 换掉（GUI 进程里 stdout 本来也没用）。
 		logger->sinks().clear();
 		logger->sinks().push_back(std::make_shared<spdlog::sinks::msvc_sink_mt>());
-		logger->sinks().push_back(std::make_shared<SizeLimitedFileSink>(*logDir / fileName, kLogMaxBytes));
+		logger->sinks().push_back(fileSink);
 
-		// 新加的 sink 要重新套 pattern（串与 commonlibsf InitLog 的默认值一致）。
+		// level / flush_on / pattern：值都对齐 commonlibsf InitLog 的默认。
+#ifdef NDEBUG
+		logger->set_level(spdlog::level::info);
+		logger->flush_on(spdlog::level::info);
+#else
+		logger->set_level(spdlog::level::debug);
+		logger->flush_on(spdlog::level::debug);
+#endif
 		spdlog::set_pattern("[%T.%e] [%=5t] [%L] %v");
+		REX::INFO("日志文件：{}（上限 {} KiB，写满清空重来）", ToUtf8(usedDir / fileName), kLogMaxBytes / 1024);
 	}
 
 	// 插件加载时可能过早（SFSE 的任务系统还没起来），所以在
@@ -130,10 +208,12 @@ namespace
 
 SFSE_PLUGIN_LOAD(const SFSE::LoadInterface* a_sfse)
 {
-	SFSE::Init(a_sfse, { .logName = kLogName });
+	// ★ `.log = false`：不要 commonlibsf 默认那个 Documents\My Games\Starfield\SFSE\Logs\
+	//   文件 sink（需求要求日志在「和 esm 同级目录」，由 ApplyLogSizeLimit() 自己建）。
+	SFSE::Init(a_sfse, { .log = false, .logName = kLogName });
 	ApplyLogSizeLimit();
 
-	REX::INFO("SAS_AlwaysScan v4.15.0 loading (SFSE build {})", SFSE::GetSFSEVersion());
+	REX::INFO("SAS_AlwaysScan v4.16.0 loading (SFSE build {})", SFSE::GetSFSEVersion());
 
 	if (auto* messaging = SFSE::GetMessagingInterface()) {
 		messaging->RegisterListener(OnMessage);

@@ -238,7 +238,17 @@ if (-not $SkipDeploy) {
     }
     Copy-Item -LiteralPath (Join-Path $root "scripts\$bridgeScript.psc") -Destination (Join-Path $scriptSrcDir "$bridgeScript.psc") -Force
 
-    Set-Content -LiteralPath (Join-Path $modRoot 'meta.ini') -Value "[General]`nmodid=0`nversion=4.15.0`ncomment=Always-on scanner highlighting (SFSE)" -Encoding UTF8
+    # ★ v4.16：DLL 把日志写在「和 esm 同级」的目录（= 虚拟 Data 根，MO2 下就是
+    #   mod 目录根）。MO2 的 usvfs 只把「写 mod 目录里**已存在**的文件」重定向回
+    #   mod 目录，新建的文件会落到 overwrite —— 所以这里预置一个空的
+    #   SAS_AlwaysScan.log 把写入"钉"回 esm 旁边。已存在则保留（日志内容不能丢）。
+    $logPath = Join-Path $modRoot "$dllName.log"
+    if (-not (Test-Path -LiteralPath $logPath)) {
+        New-Item -ItemType File -Path $logPath -Force | Out-Null
+        Write-Host "      empty $dllName.log pre-seeded (usvfs 会把日志写回 esm 旁边)" -ForegroundColor DarkGray
+    }
+
+    Set-Content -LiteralPath (Join-Path $modRoot 'meta.ini') -Value "[General]`nmodid=0`nversion=4.16.0`ncomment=Always-on scanner highlighting (SFSE)" -Encoding UTF8
 
     Get-ChildItem -LiteralPath $modRoot -Recurse -File | ForEach-Object {
         Write-Host ("  {0}  ({1} bytes)" -f $_.FullName.Substring($modRoot.Length + 1), $_.Length)

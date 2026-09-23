@@ -12,7 +12,7 @@
 - 给一个快捷键开关mod功能
 - 不要影响玩家与其他实体的交互能力，比如NPC对话，使用可交互物品等
 - 基于SFSE制作
-- 要有日志，但日志文件不能超过1M，旧内容要做到滚动删除
+- 要有日志，但日志文件不能超过1M，旧内容要做到滚动删除，日志文件要生成在和esm文件同级目录里
 
 ## starfield安装位置
 D:\SteamLibrary\steamapps\common\Starfield（sfse已安装）
@@ -22,34 +22,6 @@ D:\SteamLibrary\steamapps\common\Starfield
 
 ## Mod Organizer 2安装位置
 D:\Mod Organizer 2
-
-## DU 系列 Creation 汉化
-
-5 个 du 系列 Creation 的汉化工作说明在 `docs/06-DU系列mod汉化.md`，
-工具在 `tools/re/trtool.py` / `tr_pipeline.py` / `tr_verify.py` 等，
-词典成果在 `tr/lang/`（**必须入库**，可增量续译）。
-4 个已完成并部署，`du_outlaws_01` 的短串、`MESG DESC` 讯息正文与 `BOOK DESC` 书籍正文
-均已完成并部署（`map` 译出 4 472/5 027 = 89.0%），只剩一类长文本（`QUST CNAM` 460）。
-
-## 其他 mod 汉化
-
-`above and beyond.esm` / `morelore_mantislegacy.esm` 的汉化说明在
-`docs/07-AboveAndBeyond与MantisMoreLore汉化.md`（**已全部完成并部署**）。
-同一套流水线；新增辅助工具 `tools/re/tr_official_hits.py`（mod 串查官方逐字命中）、
-`tr_term_probe.py` / `tr_zh_probe.py`（按英文/中文子串查官方对照表）、
-`tr_sid_probe.py`（按字符串 ID 取官方译名，用于「覆盖原版记录」的定名）、
-`tr_mkbatch.py`（按抽取文件行号生成词典批次，避免手抄长英文段落）。
-
-`ase3.esm` / `aseveil.esm` / `aseeverbright.esm` / `kinggathcreations_spaceship.esm`
-的汉化说明在 `docs/09-ASE系列与Kinggath汉化.md`：
-前三个是**内联字符串**插件，走老流水线，**已完成并部署**；
-`kinggathcreations_spaceship` 是**本地化插件（flags 0x81）**，文本在 BA2 的
-`STRINGS/` 里（自带 `_zhhans` 其实是英文副本）⇒ 新增
-`tools/re/tr_locpack.py`（三件套读写，**按原始字节保真**）与 `tools/re/kg_sanity.py`（自检），
-汉化包以**松散文件**部署到 `overwrite\Strings\`（**松散优先于归档，待游戏内实测确认**）；
-UI/终端/物品**已全译**，NPC 对白还剩约 4988 行未译（可增量续译）。
-另新增 `tools/re/tr_lookup.py`（官方对照表精确/前缀查词）、
-`tools/re/tr_check_keys.py`（手写批次英文键逐字命中校验）。
 
 ## 注意事项
 - Visual Studio 2026已安装，MSVC v143 生成工具已包含

@@ -3,11 +3,13 @@
  Always-on scanner highlighting for Starfield
 ========================================================================
 
-Version  : 1.4  (plugin build 4.15.0)
+Version  : 1.5  (plugin build 4.16.0)
+           1.5 = the log file is written next to the mod instead of in
+           your Documents folder (see TROUBLESHOOTING below). No
+           gameplay or INI changes (if you are upgrading, your
+           SAS_AlwaysScan.ini is untouched).
            1.4 = crash fixes only: no more crash while quitting the game,
            and no more rare crash during cell transitions / loading.
-           No gameplay or INI changes (if you are upgrading, your
-           SAS_AlwaysScan.ini is untouched).
 Author   : hzk11o11k11o (Nexus Mods)
 Game     : Starfield 1.16.244.0 (matching version required)
 Requires : SFSE (Starfield Script Extender) 0.2.21+
@@ -165,8 +167,12 @@ Most useful options:
 ------------------------------------------------------------------------
  TROUBLESHOOTING
 ------------------------------------------------------------------------
-Log file:
-  Documents\My Games\Starfield\SFSE\Logs\SAS_AlwaysScan.log
+Log file (since 1.5 it lives right next to the mod):
+  SAS_AlwaysScan.log - same folder as StarfieldAlwaysScan.esm:
+    * Mod Organizer 2 : inside the mod's folder, i.e.
+      ...\mods\Starfield Always Scan (SFSE)\SAS_AlwaysScan.log
+    * manual install  : ...\Starfield\Data\SAS_AlwaysScan.log
+  (In 1.4 and older it was Documents\My Games\Starfield\SFSE\Logs\.)
 
 At startup the log prints the active configuration and whether the
 native outline functions were found ("native outline ready"). While

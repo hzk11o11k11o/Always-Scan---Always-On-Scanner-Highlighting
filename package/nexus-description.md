@@ -19,10 +19,10 @@
 | --- | --- |
 | **Mod name** | `Always Scan - Always-On Scanner Highlighting (SFSE)` |
 | **Summary**（约 250 字符以内） | `Keep the scanner highlight on at all times. No need to hold the handheld scanner: everything inside a configurable radius gets the vanilla outline, color-coded by category. Full-radius highlighting, one toggle hotkey, fully configurable via INI. SFSE plugin.` |
-| **Version** | `1.4`（引擎 build 4.15.0；Nexus 上的 1.0 / 1.1 / 1.2 / 1.3 之后的下一版） |
+| **Version** | `1.5`（引擎 build 4.16.0；Nexus 上的 1.0 / 1.1 / 1.2 / 1.3 / 1.4 之后的下一版） |
 | **Category** | `Gameplay`（Alternate suggestion: `Items and Objects - Gameplay`） |
 | **Requirements（依赖）** | `Starfield Script Extender (SFSE) 0.2.21+`、`(1.16.244.0) SFSE Address Library`、游戏版本 `1.16.244.0` |
-| **主文件（Main file）** | `StarfieldAlwaysScan-1.4.zip` |
+| **主文件（Main file）** | `StarfieldAlwaysScan-1.5.zip` |
 | **Permissions** | 允许转载需注明出处？建议：**不得重新上传（No re-uploading）**；允许个人修改（源码已含 Papyrus 部分） |
 
 ---
@@ -121,7 +121,7 @@ Most used options:
 
 ### Troubleshooting
 
-Log: `Documents\My Games\Starfield\SFSE\Logs\SAS_AlwaysScan.log`
+Log: `SAS_AlwaysScan.log` — since **1.5** it is written **next to the mod's `StarfieldAlwaysScan.esm`** (with Mod Organizer 2: inside the mod's own folder; manual install: `…\Starfield\Data\SAS_AlwaysScan.log`). In 1.4 and older it was `Documents\My Games\Starfield\SFSE\Logs\`.
 
 At startup the log prints the active config and whether the native outline functions were found (`native outline ready`). During play it prints a stats line every 5 seconds: object counts, categories, timings. If something looks wrong, that log is enough to diagnose it.
 
@@ -145,8 +145,9 @@ At startup the log prints the active config and whether the native outline funct
 
 ### Version history
 
-*(This release is **1.4**. The list below uses the plugin's internal build numbers where an older release is concerned.)*
+*(This release is **1.5**. The list below uses the plugin's internal build numbers where an older release is concerned.)*
 
+- **1.5** *(plugin build 4.16.0)* — **The log file now lives next to the plugin**: with Mod Organizer 2 it is written inside the mod's own folder, beside `StarfieldAlwaysScan.esm` (manual install: `…\Starfield\Data\SAS_AlwaysScan.log`), instead of `Documents\My Games\…`. Uninstalling the mod now removes its log too — nothing is left behind. No gameplay or INI changes.
 - **1.4** *(plugin build 4.15.0)* — **Crash fixes only, no gameplay changes.** Two crashes found in crash-dump analysis are gone: (1) the game could crash while *shutting down* — the plugin's own cleanup ran after the address-library mapping had already been torn down, so it ended up calling into the engine one last time; the plugin now keeps its state alive instead of destroying it on exit and touches nothing engine-side while the game is closing. (2) a rare crash during cell transitions / loading, where an object the plugin was still watching had already been deleted and its memory reused by unrelated data — reference objects are now validated (readable, valid vtable, valid form type) and every inventory read goes through exception-free memory reads, so a stale object can only ever be treated as "unknown" (kept lit) instead of crashing. No INI changes.
 - **1.3** *(plugin build 4.14.0)* — Display cases and racks (weapon cases, weapon racks, outpost display cases) are now handled properly: they glow even while closed, and they reliably go dark once you have taken everything out of them — emptying is tracked item by item as you take things out, so "take it all, then close the case" is caught as well. Taking only part of the contents, or opening one without taking anything, keeps it lit (by design). This supersedes the interim attempts in builds 4.8–4.13.
 - **4.7.0** — Highlights survive walking across cell borders outdoors: the area is no longer re-scanned from scratch (both sides of the border stay outlined), and the rare "it was glowing, then suddenly went dark" case is fixed by re-applying an outline when the engine rebuilds an object's 3D. Scanning is also no longer interrupted by small streaming changes while you walk.
@@ -218,6 +219,10 @@ Built with **SFSE** and **CommonLibSF**. Huge thanks to their authors and to eve
 > 单条描边丢失时**自动重挂**（`Verify3DPerScan=32`，日志里 `3D复检: reassert=` 在涨）；
 > 走动时引用数的**轻微变化不再打断扫描**（`StreamJumpTolerance=256`）。
 >
+> **1.5（引擎 4.16）**：**日志文件改到「和 esm 同级」** —— MO2 用户在 mod 自己的目录里、
+> 手动安装在 `Data\`（此前在 `文档\My Games\Starfield\SFSE\Logs\`）。删 mod 时日志一起删掉，
+> 不再往文档目录留残留。玩法与 INI 均无变化。
+>
 > **1.4（引擎 4.15）**：**只修崩溃，不改玩法。** ① 退出游戏时不再崩（本 MOD 自己的清理
 > 代码原本跑在「地址库映射已经拆掉」之后，等于退出时又调了一次引擎；现在状态改成"退出时
 > 不销毁"、关闭过程中不碰引擎）；② 换场景 / 载入途中偶发的崩溃修掉（观察表里可能留着一个
@@ -229,4 +234,4 @@ Built with **SFSE** and **CommonLibSF**. Huge thanks to their authors and to eve
 > 现在「关着也亮」，并且**拿走最后一件东西后就熄灭** —— 拿空按「你真正拿走的物品」**逐件记账**，
 > 所以「拿空后立刻关掉面板」也不会漏判；拿一部分 / 打开不拿就关掉都保持亮（设计如此）。
 
-**日志**：`文档\My Games\Starfield\SFSE\Logs\SAS_AlwaysScan.log`，启动打配置、游戏中每 5 秒打一行统计，排查问题看它即可。
+**日志**：`SAS_AlwaysScan.log`（**1.5 起写在和 esm 同级的地方** —— MO2 用户看 mod 自己的目录、手动安装看 `Data\`；1.4 及以前在 `文档\My Games\Starfield\SFSE\Logs\`），启动打配置、游戏中每 5 秒打一行统计，排查问题看它即可。
