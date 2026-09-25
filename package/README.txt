@@ -3,7 +3,14 @@
  Always-on scanner highlighting for Starfield
 ========================================================================
 
-Version  : 1.7.1  (plugin build 4.19.0)
+Version  : 1.7.2  (plugin build 4.20.0)
+           1.7.2 = the 1.7.1 colors could cover a nearby object so
+           completely (doors, weapons, suits) that you could no longer
+           see what the item itself looked like. Doors, weapons and
+           apparel now render at ~40% opacity (see AlphaXxx in the INI;
+           0 = keep the engine's own value, 255 = fully opaque), so the
+           object's own material shows through while the colour stays
+           easy to tell apart. Nothing else changed.
            1.7.1 = two things. (1) The category colors are now picked for
            maximum contrast - the engine's own palette is all blues in
            the range the pick-up items used, which is why guns, suits
@@ -74,6 +81,12 @@ apart (red / magenta / bright green / yellow / purple, plus the original
 misc blue), so they can be told apart at a single glance. Every category
 gets its colour assigned explicitly by the mod (see ColorXxx in the INI),
 instead of borrowing the engine's default per-state colours.
+
+Since 1.7.2 the strongest colours are also drawn semi-transparent, so
+you can still see the object's own material and shape: doors, weapons
+and apparel use ~40% opacity by default. That is set per category with
+AlphaXxx in the INI (0-255; 0 = leave the engine's own opacity alone,
+255 = fully opaque). 77 is ~30%, 51 is ~20%.
 
 "Resources" are recognised from the item record itself (the game marks
 them with its own ResourceType keywords), so both vanilla and mod-added
@@ -152,6 +165,11 @@ Most useful options:
   ColorContainer=FF9500 Change them freely; note that this writes the
   ColorDevice=00E5FF    engine's global per-state color block, so the same
   ColorDoor=FFFFFF      state of the vanilla scanner changes too (see the INI).
+  AlphaWeapon=102       outline opacity per category (0-255).  0 = keep the
+  AlphaApparel=102      engine's own value (the 1.7.1 look), 255 = fully
+  AlphaDoor=102         opaque.  Defaults: doors / weapons / apparel 102
+                        (~40%) so the item's own material shows through;
+                        all other categories keep the engine value.
   ResourceByKeyword=1   recognise "resources" from the item record's own
                         ResourceType keywords (default on).  0 = every MISC
                         item counts as misc (the 1.5 behaviour).
@@ -258,6 +276,14 @@ categories).
     the per-state values (base colour + pulse). The "renderer params"
     lines show what the renderer actually received (base colour = what
     you see on screen). Set ColorXxx=RRGGBB in the INI and restart.
+* The colour covers the object so you cannot see its material
+    (worst on doors, weapons, suits at close range):
+    lower the opacity for that category: AlphaXxx in the INI, 0-255
+    (0 = keep the engine's own value = the 1.7.1 look).  77 is ~30%,
+    51 is ~20%.  Doors / weapons / apparel already default to 102 (~40%)
+    since 1.7.2.  Log lines to check: "config: colorAlpha ..." at startup,
+    and the "a=" column in "outline colors[...]" / "renderer params[...]"
+    (that "a=" is the opacity the renderer actually uses).
 * Resources are not purple (they show up blue like misc):
     the log line starting with "resource keyword:" says whether the check
     passed. If it says it failed, send me that line. (You can also force

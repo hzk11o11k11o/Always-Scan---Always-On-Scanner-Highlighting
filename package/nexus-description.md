@@ -19,10 +19,10 @@
 | --- | --- |
 | **Mod name** | `Always Scan - Always-On Scanner Highlighting (SFSE)` |
 | **Summary**（约 250 字符以内） | `Keep the scanner highlight on at all times. No need to hold the handheld scanner: everything inside a configurable radius gets the vanilla outline, color-coded by category. Full-radius highlighting, one toggle hotkey, fully configurable via INI. SFSE plugin.` |
-| **Version** | `1.7.1`（引擎 build 4.19.0；Nexus 上的 1.0 / 1.1 / 1.2 / 1.3 / 1.4 / 1.5 / 1.6 / 1.7 之后的下一版） |
+| **Version** | `1.7.2`（引擎 build 4.20.0；Nexus 上的 1.0 / 1.1 / 1.2 / 1.3 / 1.4 / 1.5 / 1.6 / 1.7 / 1.7.1 之后的下一版） |
 | **Category** | `Gameplay`（Alternate suggestion: `Items and Objects - Gameplay`） |
 | **Requirements（依赖）** | `Starfield Script Extender (SFSE) 0.2.21+`、`(1.16.244.0) SFSE Address Library`、游戏版本 `1.16.244.0` |
-| **主文件（Main file）** | `StarfieldAlwaysScan-1.7.1.zip` |
+| **主文件（Main file）** | `StarfieldAlwaysScan-1.7.2.zip` |
 | **Permissions** | 允许转载需注明出处？建议：**不得重新上传（No re-uploading）**；允许个人修改（源码已含 Papyrus 部分） |
 
 ---
@@ -58,6 +58,8 @@ In the vanilla game you have to equip the handheld scanner to see which objects 
   | Flora | harvestable plants | bright green |
 
   The six pick-up categories sit at hues at least ~44° apart, so they are easy to tell apart at a glance (the engine's own palette was all blues in that range — that is what 1.7.1 fixed). Every color above is written explicitly by the mod and can be changed with the `ColorXxx` INI options.
+
+  Since **1.7.2** the strongest colors are also drawn **semi-transparent**, so you can still see the object's own material and shape: doors, weapons and apparel use ~40% opacity by default. That is set per category with the `AlphaXxx` INI options (0 = keep the engine's own opacity, 255 = fully opaque; 77 is ~30%, 51 is ~20%).
 
   Resources are recognised from the item record itself (the game marks them with its own `ResourceType` keywords), so vanilla and mod-added resources both get the resource color. If that check cannot be applied the mod falls back to the misc color — the log tells you which one happened.
 
@@ -105,6 +107,7 @@ Most used options:
 - `StartEnabled=1` — on by default; set to 0 to start disabled
 - `StateWeapon=0` / `StateApparel=1` / `StateAmmoAid=5` / `StateNote=6` / `StateResource=7` / `StateLoot=2` / `StateContainer=9` / `StateDevice=4` / `StateDoor=10` / `StateFlora=5` — outline color state per category (the INI documents all 11 available native colors).
 - `ColorWeapon=FF2E2E` / `ColorApparel=FF3BD4` / `ColorAmmoAid=00FF66` / `ColorNote=FFD700` / `ColorResource=B36BFF` / `ColorContainer=FF9500` / `ColorDevice=00E5FF` / `ColorDoor=FFFFFF` / `ColorLoot=1F8EE2` / `ColorCorpse=FF9500` / `ColorFlora=00FF66` — exact RGB per category (all set by default since 1.7.1). They write the engine's global per-state color block, so the same state of the vanilla scanner changes as well (the INI explains it — change or clear them freely). Log line to watch: `outline colors: state=N 覆盖为 #RRGGBB <- <category>`.
+- `AlphaWeapon=102` / `AlphaApparel=102` / `AlphaDoor=102` — outline opacity per category (0-255) since 1.7.2. 0 = keep the engine's own value (the 1.7.1 look), 255 = fully opaque. Doors / weapons / apparel default to 102 (~40%) so the object's own material shows through; every other category keeps the engine value. Log lines: `config: colorAlpha ...`, and the `a=` column in `outline colors[...]` / `renderer params[...]` (that `a=` is what the renderer actually uses).
 - `ResourceByKeyword=1` — recognise resources from the item record's own `ResourceType` keywords (default on). Set to 0 and every MISC item counts as misc (the 1.5 behaviour).
 - `EnableLoot=1` … `EnableOther=0` — per-category on/off switches (`EnableWeapon` / `EnableApparel` / `EnableAmmoAid` / `EnableNote` / `EnableResource` / `EnableLoot` = misc items / containers / devices / doors / flora / bodies). `EnableOther` covers movable statics (cardboard boxes, tables, crates). It is **off by default** because they cannot be picked up and the vanilla scanner does not outline them either.
 - `EnableCorpse=1` — outline dead bodies (people and creatures); `StateCorpse=9` sets their color.
@@ -139,6 +142,7 @@ At startup the log prints the active config and whether the native outline funct
 - **Nothing is highlighted** — check `StarfieldAlwaysScan.esm` is enabled, SFSE is installed, and the address library matches your game version.
 - **Something is highlighted that you don't want** — set its category to 0 in the INI, or send me the log's `candTypes` line (it shows the form type of everything considered).
 - **Colors too similar** — since 1.7.1 every category has its own high-contrast color, so this should not happen. If you still want different ones: edit the `ColorXxx` values (the `colorOverride` line in the log lists what is active, and the `renderer params` lines show what the renderer actually received).
+- **The color covers the object so you cannot see its material** (worst on doors, weapons and suits at close range) — lower the opacity for that category: `AlphaXxx` in the INI, 0-255 (0 = the engine's own value = the 1.7.1 look; 77 is ~30%, 51 is ~20%). Doors / weapons / apparel already default to 102 (~40%) since 1.7.2.
 
 ### Notes / known limitations
 
@@ -153,11 +157,13 @@ At startup the log prints the active config and whether the native outline funct
 - Outlines can only appear inside the current cell / space (engine limit) — bodies in another loading area are not highlighted.
 - `CorpseUnconscious=1` (default) also lights up the rare knocked-out *living* character. They are lootable while they are down; if one ever stands up while staying outlined, set the option to 0 in the INI.
 - `ColorXxx=RRGGBB` lets you set exact colors, but be aware this writes into the engine's global color table, so the vanilla scanner's color for the same state changes too. Leaving the `ColorXxx` lines empty (default) changes nothing.
+- `AlphaXxx=0-255` sets the outline opacity per category (0 = keep the engine's own value, 255 = fully opaque). It is written into the same per-state color block as `ColorXxx`.
 
 ### Version history
 
-*(This release is **1.7.1**. The list below uses the plugin's internal build numbers where an older release is concerned.)*
+*(This release is **1.7.2**. The list below uses the plugin's internal build numbers where an older release is concerned.)*
 
+- **1.7.2** *(plugin build 4.20.0)* — **The category colors are now semi-transparent where it matters.** With 1.7.1, a strongly colored outline (red weapons, magenta suits, white doors) could cover a nearby object so completely that you could no longer tell what the item itself looked like. Doors, weapons and apparel are now drawn at ~40% opacity, so the object's own material shows through while the color stays easy to read. New INI options `AlphaWeapon` / `AlphaApparel` / `AlphaDoor` (0-255 per category; 0 = the engine's own value = the 1.7.1 look; 77 is ~30%, 51 is ~20%) — every other category is unchanged from 1.7.1. The log now prints the opacity in use: `config: colorAlpha ...`, plus an `a=` column in `outline colors[...]` and `renderer params[...]` (that is the opacity the renderer actually draws with). No other behaviour changes.
 - **1.7.1** *(plugin build 4.19.0)* — **The category colors are now actually visible, and picked to be easy to tell apart.** Two problems fixed at once: (1) the color values were being written into the wrong engine table (a float constant area), so nothing on screen ever changed — the correct per-state color block is used now, and both the pulse colors and the base outline color are set; (2) even the correct engine defaults were near-useless for this purpose, because the states used by pick-up items are all blues (cyan / pale blue / blue / blue). New default palette: weapons **red**, spacesuits & clothing **magenta**, ammo & aid **bright green**, notes **yellow**, resources **purple**, misc items **blue** (unchanged), containers & bodies **orange**, devices **cyan**, doors **white**, flora **bright green** — the six pick-up colors are at least ~44° apart in hue. Also new: a `RendererProbe` diagnostic that logs the colors the renderer actually receives, so any future color issue can be diagnosed from the log alone. No behaviour changes.
 - **1.7** *(plugin build 4.18.0)* — **Fix: the 1.6 category colors could end up not showing at all.** If guns, spacesuits and data slates all looked the same colour, this was why: the custom colors were written into the engine's color tables only *after* the highlight managers had already been created, and a manager reads those tables only at creation time (it is never refreshed afterwards). The colors are now written **before any manager exists**, so the outlines really use them. No INI changes, no other behaviour changes.
 - **1.6** *(plugin build 4.17.0)* — **Lootable items are now colour-coded by inventory category**: weapons & throwables (cyan), spacesuits / helmets / packs / clothing (pale blue), ammo & aid (green), notes (yellow) and resources (purple). **Misc items keep their old blue**, so nothing that was blue before changes. Resources are recognised from the item record's own `ResourceType` keywords, so mod-added resources are covered too. New INI options: `StateWeapon` / `StateApparel` / `StateAmmoAid` / `StateNote` / `StateResource`, `EnableWeapon` … `EnableResource`, `ColorNote` / `ColorResource`, `ResourceByKeyword`. **The configuration file now lives next to the mod's esm** (same folder as the log) — the old `SFSE\Plugins\` copy is still read as a fallback, and the log prints which file was used. Under the hood the mod also now patches the engine's per-state colour correctly (its unused states are made visible), which is what makes the two new colours possible at all.

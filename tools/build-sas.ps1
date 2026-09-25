@@ -274,7 +274,10 @@ if (-not $SkipDeploy) {
     #   ① 订正配色块地址（老代码写的 0x591E088 是 float 常量区，写错表）；
     #   ② 默认给**所有类别**写覆盖色（红/品红/亮绿/黄/紫/橙/青/白…），
     #      不再依赖原生状态色（原生 0/1/2/3 全是蓝色系，肉眼分不开）。
-    Set-Content -LiteralPath (Join-Path $modRoot 'meta.ini') -Value "[General]`nmodid=18268`nversion=1.7.1`ncomment=Always-on scanner highlighting (SFSE)" -Encoding UTF8
+    # ★ 2026-09-25（v4.20 / 发布版 1.7.2）：覆盖太深 → 半透明 ——
+    #   门 / 武器 / 防具 默认 40% 不透明（INI `AlphaXxx`，0 = 保留引擎原值），
+    #   让物品本身材质透出来（用户反馈「完全盖过材质」）。
+    Set-Content -LiteralPath (Join-Path $modRoot 'meta.ini') -Value "[General]`nmodid=18268`nversion=1.7.2`ncomment=Always-on scanner highlighting (SFSE)" -Encoding UTF8
 
     Get-ChildItem -LiteralPath $modRoot -Recurse -File | ForEach-Object {
         Write-Host ("  {0}  ({1} bytes)" -f $_.FullName.Substring($modRoot.Length + 1), $_.Length)

@@ -1023,6 +1023,37 @@ namespace SAS
 				0x00FF9500     // kCorpse      尸体 —— 橙（= 容器）
 			};
 
+			// ★★ v4.20：每个类别的「覆盖不透明度」（0~255；**0 = 特殊值 = 保留引擎原值**）。
+			//   动机（用户实测 + 截图）：v4.19 的高区分度色虽然生效了，但红 / 品红 / 白
+			//   以「引擎原本的不透明度」铺在近处物体上（门 / 武器 / 防具），把物品本身的
+			//   材质完全盖住 —— 用户要求「弄浅一点，能看见物品本身长什么样」。
+			//   ⇒ 让这几类**半透明**：材质透出来，颜色（高饱和）依旧一眼可辨。
+			//   ★ 为什么把「0」当特殊值：引擎每个状态的配色块本来就各带一套 alpha
+			//     （2026-09-25 实测原值：描边基色 0x00 / 0x20 / 0x40 / 0x22 / 0x01 / 0x1E
+			//     各不相同、脉冲 High 多为 0xFF）——「不写」必须能精确表达「别动 alpha」
+			//     （= v4.19 行为），所以只有被用户点名的三类默认带非 0 值，
+			//     其余类别与 v4.19 的观感**完全一致**（不做无谓的改动）。
+			//   ★ 写进哪里：脉冲 High（+0x00）/ 脉冲 Low（+0x20）/ 描边基色（+0x80）
+			//     **三处一起写同一个 alpha**。渲染器到底消费哪一处目前无法离线确认
+			//     （渲染侧 32 字节参数块里基色与脉冲色都带 alpha），三处同值最稳。
+			//   ★ INI 键 `AlphaXxx`（十进制 0~255，0 = 保留引擎原值）：
+			//       AlphaWeapon / AlphaApparel / AlphaDoor  默认 102（≈40%）
+			//       想更淡 = 更小（77 ≈ 30% / 51 ≈ 20%）；要不透明 = 255。
+			std::array<std::uint8_t, kCategoryCount> colorAlpha{
+				0,    // kLoot        杂项 —— 原生蓝本来就是中等亮度，保持 v4.19 行为
+				102,  // kLootWeapon  武器、投掷物 —— ★ 40%（用户点名「覆盖太深」）
+				102,  // kLootApparel 太空服/背包/头盔/服饰 —— ★ 40%（同上）
+				0,    // kLootAmmoAid 弹药、救援
+				0,    // kLootNote    笔记
+				0,    // kLootResource 资源
+				0,    // kContainer   容器
+				0,    // kDevice      设备
+				102,  // kDoor        门 —— ★ 40%（同上；大面积纯白最扎眼）
+				0,    // kFlora       植物
+				0,    // kOther       MSTT（默认关）
+				0     // kCorpse      尸体
+			};
+
 			// ★ v4.19：诊断探针 —— 把「渲染侧实际收到的每状态参数块」打进日志
 			//   （含**基色**= 真正画出来的颜色）。每个会话最多 3 次、只读、带指针校验。
 			//   排「颜色没生效」时非常有用；不想要噪音就写 `RendererProbe=0`。
@@ -3146,6 +3177,33 @@ namespace SAS
 				}
 				REX::INFO("config: colorOverride（实际生效）: {}",
 					colorLog.empty() ? "（无 —— 全部用引擎原生配色）" : colorLog);
+			}
+
+			// --- ★★ v4.20：覆盖不透明度（AlphaXxx，0~255；0 = 保留引擎原值）---
+			//   动机与写法见 Config::colorAlpha 的长注释（用户：门/武器/防具「覆盖太深」）。
+			//   日志只列非 0 的（非 0 = 真的在改不透明度；0 = 与 v4.19 行为一致）。
+			{
+				const char* const kAlphaKeys[kCategoryCount] = {
+					"AlphaLoot", "AlphaWeapon", "AlphaApparel", "AlphaAmmoAid", "AlphaNote", "AlphaResource",
+					"AlphaContainer", "AlphaDevice", "AlphaDoor", "AlphaFlora", "AlphaOther", "AlphaCorpse"
+				};
+				std::string alphaLog;
+				for (std::size_t i = 0; i < kCategoryCount; ++i) {
+					const auto v = std::clamp(getInt(kAlphaKeys[i], static_cast<int>(g_cfg.colorAlpha[i])), 0, 255);
+					g_cfg.colorAlpha[i] = static_cast<std::uint8_t>(v);
+					if (!v) {
+						continue;  // 0 = 保留引擎原值（默认；不打进日志，免得噪音）
+					}
+					if (!alphaLog.empty()) {
+						alphaLog += ", ";
+					}
+					alphaLog += kCategoryName[i];
+					alphaLog += '=';
+					alphaLog += std::to_string(v);
+					alphaLog += " (" + std::to_string((v * 100 + 127) / 255) + "%)";
+				}
+				REX::INFO("config: colorAlpha（覆盖不透明度，0=保留引擎原值，255=不透明）: {}",
+					alphaLog.empty() ? "（全部保留引擎原值 —— 覆盖强度与 v4.19 相同）" : alphaLog);
 			}
 
 			// ★ v4.19：渲染侧参数探针（把「渲染器实际收到的每状态基色/脉冲色」打进日志）
@@ -5681,6 +5739,8 @@ namespace SAS
 			const auto rgbOf = [](std::uint32_t v) {
 				return static_cast<unsigned>(((v >> 16) & 0xFFu) << 16 | ((v >> 8) & 0xFFu) << 8 | (v & 0xFFu));
 			};
+			// ★★ v4.20：加打 `a=`（alpha 字节）—— 覆盖不透明度到底写没写进去，
+			//   看这一列即可（用户反馈「覆盖太深」时就是靠它核对）。
 			for (std::uint32_t i = 0; i < kOutlineManagerUsed; ++i) {
 				const auto rd = [tab, i](std::size_t a_off) {
 					return *reinterpret_cast<const std::uint32_t*>(tab + i * kOutlineParamStride + a_off);
@@ -5688,12 +5748,12 @@ namespace SAS
 				const auto rf = rd(kOffStateBaseColor);
 				const auto hi = rd(kOffStatePulseHigh);
 				const auto lo = rd(kOffStatePulseLow);
-				char buf[192];
+				char buf[224];
 				std::snprintf(buf, sizeof(buf),
-					"  state=%2u %-18s 基色=#%06X (%3u,%3u,%3u) 脉冲High=#%06X 脉冲Low=#%06X",
-					i, kOutlineStateName[i], rgbOf(rf),
+					"  state=%2u %-18s 基色=#%06X a=%02X (%3u,%3u,%3u) 脉冲High=#%06X a=%02X 脉冲Low=#%06X a=%02X",
+					i, kOutlineStateName[i], rgbOf(rf), (rf >> 24) & 0xFFu,
 					(rf >> 16) & 0xFFu, (rf >> 8) & 0xFFu, rf & 0xFFu,
-					rgbOf(hi), rgbOf(lo));
+					rgbOf(hi), (hi >> 24) & 0xFFu, rgbOf(lo), (lo >> 24) & 0xFFu);
 				REX::INFO("outline colors[{}]: {}", a_tag, buf);
 			}
 		}
@@ -5778,8 +5838,11 @@ namespace SAS
 				const auto  pulse = d[2];
 				const auto  f0    = *reinterpret_cast<const float*>(&d[3]);
 				const auto  f1    = *reinterpret_cast<const float*>(&d[4]);
-				REX::INFO("renderer params[{}]: state={:2} id=0x{:X} 槽={:<4} 基色=#{:06X} 脉冲=#{:06X} f0={:.3f} f1={:.3f}",
-					a_tag, st, id, idx, base & 0xFFFFFFu, pulse & 0xFFFFFFu, f0, f1);
+				// ★★ v4.20：`a=` = 渲染侧实际收到的 alpha 字节（覆盖不透明度生效与否的直接证据）
+				REX::INFO("renderer params[{}]: state={:2} id=0x{:X} 槽={:<4} 基色=#{:06X} a={:02X} 脉冲=#{:06X} a={:02X} f0={:.3f} f1={:.3f}",
+					a_tag, st, id, idx,
+					base & 0xFFFFFFu, (base >> 24) & 0xFFu,
+					pulse & 0xFFFFFFu, (pulse >> 24) & 0xFFu, f0, f1);
 				++logged;
 			}
 			if (logged == 0) {
@@ -5805,15 +5868,20 @@ namespace SAS
 		//   ★ v4.19：按**状态**归并后再写 —— 同一状态被两个类别共用（容器+尸体、
 		//     弹药+植物）时只写一次；若两个类别共用同一状态却给了**不同**颜色，
 		//     报警并保留先出现的那个（否则会互相覆盖，表现为「颜色随机变」）。
+		//   ★★ v4.20：新增「覆盖不透明度」（INI `AlphaXxx`，0 = 保留引擎原值）——
+		//     被点名的三类（武器/防具/门）默认 102（≈40%），三处（High/Low/基色）
+		//     一起写 ⇒ 高亮变半透明，物品本身的材质透出来（用户要求「弄浅一点」）。
+		//     其余类别 alpha=0 ⇒ 与 v4.19 逐字节相同（只有 RGB 被换掉）。
 		std::uint32_t WriteColorOverrides(const char* a_tag)
 		{
 			auto* tab = OutlineParamTable(kRvaOutlineParams);
 			if (!tab) {
 				return 0;
 			}
-			// ① 类别 → 状态 → 颜色（含「同状态撞色」检测）
+			// ① 类别 → 状态 → 颜色 + 不透明度（含「同状态撞色 / 撞透明度」检测）
 			std::array<std::uint32_t, kOutlineManagerUsed> stateColor{};
 			stateColor.fill(kColorUnset);
+			std::array<std::uint32_t, kOutlineManagerUsed> stateAlpha{};  // ★ v4.20（0 = 保留原值）
 			std::array<std::string, kOutlineManagerUsed> stateWho{};
 			std::uint32_t conflicts = 0;
 			for (std::size_t c = 0; c < kCategoryCount; ++c) {
@@ -5825,9 +5893,11 @@ namespace SAS
 				if (st >= kOutlineManagerUsed) {
 					continue;
 				}
-				const auto rgb24 = rgb & 0xFFFFFFu;
+				const auto rgb24    = rgb & 0xFFFFFFu;
+				const auto alphaCfg = static_cast<std::uint32_t>(g_cfg.colorAlpha[c]);
 				if (stateColor[st] == kColorUnset) {
 					stateColor[st] = rgb24;
+					stateAlpha[st] = alphaCfg;
 					stateWho[st]   = kCategoryName[c];
 				} else if (stateColor[st] != rgb24) {
 					if (++conflicts <= 4) {
@@ -5836,6 +5906,12 @@ namespace SAS
 							kCategoryName[c], stateWho[st], st, stateColor[st], rgb24, stateWho[st]);
 					}
 				} else {
+					if (stateAlpha[st] != alphaCfg && ++conflicts <= 4) {
+						REX::WARN("outline colors: 类别 {} 与 {} 共用 state={}（颜色相同）但透明度不同（{} 与 {}）"
+								  "-> 保留 {} 的 {}；想让两者都生效，把其中一个的 StateXxx 改到别的状态",
+							kCategoryName[c], stateWho[st], st, stateAlpha[st], alphaCfg,
+							stateWho[st], stateAlpha[st]);
+					}
 					stateWho[st] += ',';
 					stateWho[st] += kCategoryName[c];
 				}
@@ -5846,33 +5922,45 @@ namespace SAS
 				if (stateColor[st] == kColorUnset) {
 					continue;
 				}
-				const auto rgb = stateColor[st];
+				const auto rgb   = stateColor[st];
+				const auto alpha = stateAlpha[st];  // ★ v4.20：0 = 保留引擎原值
 				auto*      blk = tab + st * kOutlineParamStride;
-				const auto patchRgb = [rgb](std::uint8_t* p) {
+				// ★ v4.20：三处统一走这一条 —— 有配置 alpha 就写它（半透明 ⇒ 看得见材质），
+				//   没配置（0）就保留引擎原 alpha（= v4.19 行为，含脉冲的呼吸 alpha）。
+				const auto patchChannel = [rgb, alpha](std::uint8_t* p) {
 					auto v = *reinterpret_cast<std::uint32_t*>(p);
-					v = (v & 0xFF000000u) | rgb;
+					v = (alpha != 0) ? ((alpha << 24) | rgb) : ((v & 0xFF000000u) | rgb);
 					*reinterpret_cast<std::uint32_t*>(p) = v;
 				};
 				const auto baseBefore = *reinterpret_cast<const std::uint32_t*>(blk + kOffStateBaseColor);
 				const auto hiBefore   = *reinterpret_cast<const std::uint32_t*>(blk + kOffStatePulseHigh);
-				patchRgb(blk + kOffStatePulseHigh);  // 脉冲 High
-				patchRgb(blk + kOffStatePulseLow);   // 脉冲 Low
-				// 描边基色：换 RGB；alpha = 0 时补成 0xFF（state 7/8 原生就是 0）
+				patchChannel(blk + kOffStatePulseHigh);  // 脉冲 High
+				patchChannel(blk + kOffStatePulseLow);   // 脉冲 Low
+				patchChannel(blk + kOffStateBaseColor);  // 描边基色
+				// 描边基色兜底：alpha 仍为 0 时补成 0xFF（state 7/8 原生就是 0，不补就画不出来）
 				{
-					auto v = *reinterpret_cast<std::uint32_t*>(blk + kOffStateBaseColor);
-					v = (v & 0xFF000000u) | rgb;
+					auto* p = blk + kOffStateBaseColor;
+					auto  v = *reinterpret_cast<std::uint32_t*>(p);
 					if ((v & 0xFF000000u) == 0) {
 						v |= 0xFF000000u;
+						*reinterpret_cast<std::uint32_t*>(p) = v;
 					}
-					*reinterpret_cast<std::uint32_t*>(blk + kOffStateBaseColor) = v;
 				}
 				++applied;
-				char buf[240];
+				char alphaNote[48];
+				if (alpha != 0) {
+					std::snprintf(alphaNote, sizeof(alphaNote), "%u/255（约 %u%%）",
+						alpha, (alpha * 100u + 127u) / 255u);
+				} else {
+					std::snprintf(alphaNote, sizeof(alphaNote), "保留引擎原值");
+				}
+				char buf[320];
 				std::snprintf(buf, sizeof(buf),
 					"outline colors: state=%u 覆盖为 #%06X <- %s"
-					"（描边基色原值 0x%08X%s；脉冲 High 原值 0x%08X）",
+					"（描边基色原值 0x%08X%s；脉冲 High 原值 0x%08X；不透明度 %s）",
 					st, rgb, stateWho[st].c_str(), baseBefore,
-					(baseBefore & 0xFF000000u) == 0 ? "，alpha=0 已补 0xFF" : "", hiBefore);
+					(baseBefore & 0xFF000000u) == 0 ? "，alpha=0 已补 0xFF" : "", hiBefore,
+					alphaNote);
 				REX::INFO("[{}] {}", a_tag, buf);
 			}
 			return applied;
