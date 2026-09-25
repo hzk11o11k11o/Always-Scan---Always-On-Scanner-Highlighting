@@ -3,7 +3,17 @@
  Always-on scanner highlighting for Starfield
 ========================================================================
 
-Version  : 1.5  (plugin build 4.16.0)
+Version  : 1.6  (plugin build 4.17.0)
+           1.6 = lootable items are now color-coded by inventory
+           category: weapons & throwables (cyan), spacesuits / helmets /
+           packs / clothing (pale blue), ammo & aid (green), notes
+           (yellow), resources (purple). Misc items keep their old blue.
+           See "CATEGORY COLORS" below.
+           Also: the configuration file SAS_AlwaysScan.ini now lives
+           next to the mod's esm (same folder as the log). If you have an
+           older installation with the INI in SFSE\Plugins\, that one is
+           still read as a fallback - but move it next to the esm to keep
+           both in one place (the build script does this automatically).
            1.5 = the log file is written next to the mod instead of in
            your Documents folder (see TROUBLESHOOTING below). No
            gameplay or INI changes (if you are upgrading, your
@@ -28,14 +38,25 @@ The visuals are the game's own outline system - the exact same colors
 and thickness the vanilla scanner uses - so it looks like the vanilla
 feature, just always on.
 
-Highlights are color-coded by category (all values configurable):
-  * Lootable items (misc / books / armor / weapons / ammo / aid ...)  blue
+Highlights are color-coded by category (all values configurable).
+Pick-up items follow the game's own inventory categories:
+  * Weapons and throwables (guns, melee, grenades, mines)            cyan
+  * Spacesuits / helmets / packs / clothing                          pale blue
+  * Ammo and aid (meds, food, drinks)                                green
+  * Notes (notes, data slates, magazines, books)                     yellow
+  * Resources (iron, aluminium, helium-3, organics, ...)             purple
+  * Misc items (digipicks, credits, toys) - unchanged from 1.5       blue
   * Containers (loot the good stuff)                                 orange
   * Bodies / corpses - people, creatures and wrecked robots / turrets
     (anything you can search)                                        orange
   * Interactive devices / computers                                  green
   * Doors                                                            red
   * Flora (harvestable plants)                                       green
+
+"Resources" are recognised from the item record itself (the game marks
+them with its own ResourceType keywords), so both vanilla and mod-added
+resources get the resource color. If the check does not apply for any
+reason the mod simply falls back to the misc color (the log says so).
 
 Looted containers and looted bodies stop glowing as soon as they are
 empty, so the outline always means "there is still something to take".
@@ -67,10 +88,10 @@ Install this archive with Mod Organizer 2 or Vortex. The archive root is
 the Data folder layout, so its contents map to  ...\Starfield\Data\ :
 
   StarfieldAlwaysScan.esm
+  SAS_AlwaysScan.ini                    (configuration - next to the esm)
   Scripts\SAS_Bridge.pex
   Scripts\Source\SAS\SAS_Bridge.psc     (source code, optional at runtime)
   SFSE\Plugins\SAS_AlwaysScan.dll
-  SFSE\Plugins\SAS_AlwaysScan.ini
 
 Then enable "StarfieldAlwaysScan.esm" in your load order.
 
@@ -83,16 +104,36 @@ folders when asked.
 ------------------------------------------------------------------------
  CONFIGURATION
 ------------------------------------------------------------------------
-All options live in  Data\SFSE\Plugins\SAS_AlwaysScan.ini
-(the file is heavily commented). The game reads it once at startup, so
-restart the game after editing.
+All options live in  SAS_AlwaysScan.ini  **next to StarfieldAlwaysScan.esm**
+(with Mod Organizer 2: inside the mod's own folder; manual install:
+...\Starfield\Data\SAS_AlwaysScan.ini). The file is heavily commented and
+read once at game start, so restart the game after editing. (1.5 and older
+kept it in Data\SFSE\Plugins\ - that file is still read if the new one does
+not exist, and the log's "config file:" line tells you which one was used.)
 
 Most useful options:
   StartEnabled=1        start highlighting as soon as you load a save
   HotkeyVK=119          toggle hotkey, 119 = F8 (see the file for a key table)
   RadiusMeters=50       highlight radius around the player
   MaxTargets=256        how many objects are outlined at the same time
-  StateLoot=2           outline color state per category
+  StateWeapon=0         outline color state per category (the INI documents
+  StateApparel=1        all 11 native colors).  Defaults:
+  StateAmmoAid=5          weapons/throwables 0 (cyan)   suits/helmet/pack 1
+  StateNote=6             ammo/aid 5 (green)            notes 6 (yellow)
+  StateResource=7         resources 7 (purple)          misc 2 (blue, = 1.5)
+  StateLoot=2             containers & bodies 9 (orange)  devices 4 (green)
+                          doors 10 (red)   flora 5 (green)
+  ColorNote=FFD700      exact RGB for notes / resources.  These two are set
+  ColorResource=AA6EFF  by default because their outline states have no usable
+                        native color.  Change them freely; note that this
+                        writes the engine's global color table, so the same
+                        state of the vanilla scanner changes too (see the INI).
+  ResourceByKeyword=1   recognise "resources" from the item record's own
+                        ResourceType keywords (default on).  0 = every MISC
+                        item counts as misc (the 1.5 behaviour).
+  EnableWeapon=1 ...    per-category on/off switches (weapon / apparel /
+  EnableResource=1      ammoaid / note / resource / loot(misc) / container /
+                        device / door / flora / corpse).
   EnableOther=0         also outline movable statics (crates, tables).
                         Off by default: they cannot be picked up and the
                         vanilla scanner does not outline them either.
@@ -188,7 +229,13 @@ categories).
     prints the form type of everything that was considered.
 * Colors are hard to tell apart:
     the log's "stateByCategory" line shows which state each category
-    uses; change the StateXxx values and restart.
+    uses; change the StateXxx values and restart. The colours the engine
+    actually has per state are printed in the "outline colors[...]" lines,
+    and the "colorOverride" line lists the exact RGB the mod applies.
+* Resources are not purple (they show up blue like misc):
+    the log line starting with "resource keyword:" says whether the check
+    passed. If it says it failed, send me that line. (You can also force
+    it off with ResourceByKeyword=0.)
 * A specific body is not highlighted:
     - it may be empty (nothing left to take) - that is intended;
     - the log's "actor probe:" lines list every actor around you (dead or

@@ -13,6 +13,7 @@
 - 不要影响玩家与其他实体的交互能力，比如NPC对话，使用可交互物品等
 - 基于SFSE制作
 - 要有日志，但日志文件不能超过1M，旧内容要做到滚动删除，日志文件要生成在和esm文件同级目录里
+- 配置文件要放在和esm文件同级目录里
 
 ## starfield安装位置
 D:\SteamLibrary\steamapps\common\Starfield（sfse已安装）
@@ -33,3 +34,4 @@ D:\Mod Organizer 2
 - 每次任务完成后，需要提交本地git，同时.gitignore也要添加必要忽略项
 - mod文件生成后要部署到Mod Organizer并配置启用
 - mod文件生成后帮我打包成nexus mods能接受的上传包文件，并帮我写一个介绍文案（只关注高亮mod）
+- https://www.nexusmods.com/starfield/mods/18268，这个是本mod的N网地址

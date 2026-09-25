@@ -19,10 +19,10 @@
 | --- | --- |
 | **Mod name** | `Always Scan - Always-On Scanner Highlighting (SFSE)` |
 | **Summary**（约 250 字符以内） | `Keep the scanner highlight on at all times. No need to hold the handheld scanner: everything inside a configurable radius gets the vanilla outline, color-coded by category. Full-radius highlighting, one toggle hotkey, fully configurable via INI. SFSE plugin.` |
-| **Version** | `1.5`（引擎 build 4.16.0；Nexus 上的 1.0 / 1.1 / 1.2 / 1.3 / 1.4 之后的下一版） |
+| **Version** | `1.6`（引擎 build 4.17.0；Nexus 上的 1.0 / 1.1 / 1.2 / 1.3 / 1.4 / 1.5 之后的下一版） |
 | **Category** | `Gameplay`（Alternate suggestion: `Items and Objects - Gameplay`） |
 | **Requirements（依赖）** | `Starfield Script Extender (SFSE) 0.2.21+`、`(1.16.244.0) SFSE Address Library`、游戏版本 `1.16.244.0` |
-| **主文件（Main file）** | `StarfieldAlwaysScan-1.5.zip` |
+| **主文件（Main file）** | `StarfieldAlwaysScan-1.6.zip` |
 | **Permissions** | 允许转载需注明出处？建议：**不得重新上传（No re-uploading）**；允许个人修改（源码已含 Papyrus 部分） |
 
 ---
@@ -41,16 +41,23 @@ In the vanilla game you have to equip the handheld scanner to see which objects 
 
 - **Always on** — highlighting stays visible while you run, fight, loot or fly. The scanner stays in your pocket (or on your back).
 - **Full radius** — objects inside the configured radius are highlighted in every direction, not just the center circle. Radius is configurable from 5 to 500 meters.
-- **Category colors** — each kind of object gets its own outline color (all configurable):
+- **Category colors** — each kind of object gets its own outline color (all configurable). Pick-up items follow the game's own inventory categories:
 
   | Category | Example | Default color |
   | --- | --- | --- |
-  | Lootable items | medkits, books, armor, weapons, ammo | blue |
+  | Weapons & throwables | guns, melee, grenades, mines | cyan |
+  | Spacesuits / helmets / packs / clothing | anything in the Apparel tab | pale blue |
+  | Ammo & aid | ammo, meds, food, drinks | green |
+  | Notes | notes, data slates, magazines, books | yellow |
+  | Resources | iron, aluminium, helium-3, organics, ... | purple |
+  | Misc items | digipicks, credits, toys | **blue (unchanged from 1.5)** |
   | Containers | crates, safes, lockers | orange |
   | Bodies / corpses | dead people, creatures, and wrecked robots / turrets | orange |
   | Interactive devices | switches, terminals, workbenches | green |
   | Doors | — | red |
   | Flora | harvestable plants | green |
+
+  Resources are recognised from the item record itself (the game marks them with its own `ResourceType` keywords), so vanilla and mod-added resources both get the resource color. If that check cannot be applied the mod falls back to the misc color — the log tells you which one happened.
 
 - **Bodies are highlighted** — pre-placed corpses and everything you kill: humans, creatures, robots and turrets alike (including the wrecked machines already lying around). They behave like containers: empty them and the outline goes away.
 - **Looted means dark** — a container or a body that has nothing left to take stops being outlined (about a second later), so an outline always means "there is still something in there".
@@ -75,10 +82,10 @@ Install the archive with **Mod Organizer 2** or **Vortex**. The archive root is 
 
 ```
 StarfieldAlwaysScan.esm              -> Data\
+SAS_AlwaysScan.ini                   -> Data\                (config, next to the esm)
 Scripts\SAS_Bridge.pex               -> Data\Scripts\
 Scripts\Source\SAS\SAS_Bridge.psc    -> Data\Scripts\Source\SAS\  (source, optional)
 SFSE\Plugins\SAS_AlwaysScan.dll      -> Data\SFSE\Plugins\
-SFSE\Plugins\SAS_AlwaysScan.ini      -> Data\SFSE\Plugins\
 ```
 
 Enable `StarfieldAlwaysScan.esm` in your load order and play.
@@ -87,15 +94,17 @@ Enable `StarfieldAlwaysScan.esm` in your load order and play.
 
 ### Configuration
 
-Everything lives in `Data\SFSE\Plugins\SAS_AlwaysScan.ini` — heavily commented, read once at game start.
+Everything lives in `SAS_AlwaysScan.ini`, **next to `StarfieldAlwaysScan.esm`** (with Mod Organizer 2 that is inside the mod's own folder; manual install: `…\Starfield\Data\SAS_AlwaysScan.ini`) — heavily commented, read once at game start. The old location (`Data\SFSE\Plugins\`) is still read as a fallback if the new file does not exist.
 
 Most used options:
 
 - `HotkeyVK=119` — toggle key (119 = F8; the INI has a table of common key codes; set to 0 to disable the hotkey)
 - `RadiusMeters=50` — highlight radius around the player
 - `StartEnabled=1` — on by default; set to 0 to start disabled
-- `StateLoot=2` / `StateContainer=9` / `StateDevice=4` / `StateDoor=10` / `StateFlora=5` — outline color states per category (the INI documents all 11 available native colors)
-- `EnableLoot=1` … `EnableOther=0` — per-category on/off switches. `EnableOther` covers movable statics (cardboard boxes, tables, crates). It is **off by default** because they cannot be picked up and the vanilla scanner does not outline them either.
+- `StateWeapon=0` / `StateApparel=1` / `StateAmmoAid=5` / `StateNote=6` / `StateResource=7` / `StateLoot=2` / `StateContainer=9` / `StateDevice=4` / `StateDoor=10` / `StateFlora=5` — outline color state per category (the INI documents all 11 available native colors).
+- `ColorNote=FFD700` / `ColorResource=AA6EFF` — exact RGB for notes / resources. These two are set by default because the outline states they use have no usable native colour; they write the engine's global colour table, so the same state of the vanilla scanner changes as well (the INI explains it — change or clear them freely).
+- `ResourceByKeyword=1` — recognise resources from the item record's own `ResourceType` keywords (default on). Set to 0 and every MISC item counts as misc (the 1.5 behaviour).
+- `EnableLoot=1` … `EnableOther=0` — per-category on/off switches (`EnableWeapon` / `EnableApparel` / `EnableAmmoAid` / `EnableNote` / `EnableResource` / `EnableLoot` = misc items / containers / devices / doors / flora / bodies). `EnableOther` covers movable statics (cardboard boxes, tables, crates). It is **off by default** because they cannot be picked up and the vanilla scanner does not outline them either.
 - `EnableCorpse=1` — outline dead bodies (people and creatures); `StateCorpse=9` sets their color.
 - `SkipEmptyLoot=1` — stop outlining containers / bodies once they are empty (see below).
 - `TreatNullInvAsEmpty=1` — a reference whose inventory was never created counts as empty (default on). Only relevant if you ever find a body / container you never looted staying dark; set it to 0 to revert to "always outline".
@@ -145,8 +154,9 @@ At startup the log prints the active config and whether the native outline funct
 
 ### Version history
 
-*(This release is **1.5**. The list below uses the plugin's internal build numbers where an older release is concerned.)*
+*(This release is **1.6**. The list below uses the plugin's internal build numbers where an older release is concerned.)*
 
+- **1.6** *(plugin build 4.17.0)* — **Lootable items are now colour-coded by inventory category**: weapons & throwables (cyan), spacesuits / helmets / packs / clothing (pale blue), ammo & aid (green), notes (yellow) and resources (purple). **Misc items keep their old blue**, so nothing that was blue before changes. Resources are recognised from the item record's own `ResourceType` keywords, so mod-added resources are covered too. New INI options: `StateWeapon` / `StateApparel` / `StateAmmoAid` / `StateNote` / `StateResource`, `EnableWeapon` … `EnableResource`, `ColorNote` / `ColorResource`, `ResourceByKeyword`. **The configuration file now lives next to the mod's esm** (same folder as the log) — the old `SFSE\Plugins\` copy is still read as a fallback, and the log prints which file was used. Under the hood the mod also now patches the engine's per-state colour correctly (its unused states are made visible), which is what makes the two new colours possible at all.
 - **1.5** *(plugin build 4.16.0)* — **The log file now lives next to the plugin**: with Mod Organizer 2 it is written inside the mod's own folder, beside `StarfieldAlwaysScan.esm` (manual install: `…\Starfield\Data\SAS_AlwaysScan.log`), instead of `Documents\My Games\…`. Uninstalling the mod now removes its log too — nothing is left behind. No gameplay or INI changes.
 - **1.4** *(plugin build 4.15.0)* — **Crash fixes only, no gameplay changes.** Two crashes found in crash-dump analysis are gone: (1) the game could crash while *shutting down* — the plugin's own cleanup ran after the address-library mapping had already been torn down, so it ended up calling into the engine one last time; the plugin now keeps its state alive instead of destroying it on exit and touches nothing engine-side while the game is closing. (2) a rare crash during cell transitions / loading, where an object the plugin was still watching had already been deleted and its memory reused by unrelated data — reference objects are now validated (readable, valid vtable, valid form type) and every inventory read goes through exception-free memory reads, so a stale object can only ever be treated as "unknown" (kept lit) instead of crashing. No INI changes.
 - **1.3** *(plugin build 4.14.0)* — Display cases and racks (weapon cases, weapon racks, outpost display cases) are now handled properly: they glow even while closed, and they reliably go dark once you have taken everything out of them — emptying is tracked item by item as you take things out, so "take it all, then close the case" is caught as well. Taking only part of the contents, or opening one without taking anything, keeps it lit (by design). This supersedes the interim attempts in builds 4.8–4.13.
@@ -182,7 +192,10 @@ Built with **SFSE** and **CommonLibSF**. Huge thanks to their authors and to eve
 
 - **常驻高亮**：跑动、战斗、搜刮时一直有效，不需要掏出扫描仪；
 - **全半径**：半径内四周所有方向都亮（5~500 米可配）；
-- **分类分色**：可拾取物品（蓝）、容器（橙）、**尸体（橙，含怪物尸体）**、可交互设备（绿）、门（红）、植物（绿），全部可配；
+- **分类分色**（1.6 起**按物品栏分类**给可拾取物品上色，全部可配）：
+  **武器 / 投掷物（青）、太空服 / 头盔 / 背包 / 服饰（淡蓝白）、弹药 / 救援（绿）、
+  笔记（黄）、资源（紫）、杂项（蓝 —— 与 1.5 一模一样，没有变化）**；
+  容器 / 尸体（橙）、可交互设备（绿）、门（红）、植物（绿）；
 - **尸体高亮**：预置的尸体和你打死的敌人都亮 —— **人类、怪物、机器人、炮塔一视同仁**（在游戏数据里它们同构），连地图上原本就躺着的机器报废体也会亮；
 - **搜空即熄灭**：容器 / 尸体被拿空后约 1 秒熄灭 —— 只统计你真能拿走的东西（拿不走的隐形 NPC 装备、尸体身上还穿着的装备都不算），有描边就代表「里面还有东西」；
 - **展示柜也管**：武器箱 / 武器架 / 头盔架 / 背包架 / 数据板架 / 前哨展示柜 —— **关着也亮**（游戏在关闭状态下不把内容放进容器库存），拿走最后一件东西后熄灭；
@@ -198,7 +211,7 @@ Built with **SFSE** and **CommonLibSF**. Huge thanks to their authors and to eve
 
 **安装**：用 MO2 / Vortex 安装压缩包即可（包内就是 Data 目录结构），记得启用 `StarfieldAlwaysScan.esm`；手动安装则解压到 `...\Starfield\Data\` 合并文件夹。
 
-**配置**：`Data\SFSE\Plugins\SAS_AlwaysScan.ini`（注释齐全，改完重进游戏生效）：
+**配置**：`SAS_AlwaysScan.ini`，**就在 `StarfieldAlwaysScan.esm` 旁边**（MO2 用户在 mod 自己的目录里；手动安装是 `...\Starfield\Data\`）—— 注释齐全，改完重进游戏生效：
 半径、热键、各类颜色、每类是否高亮、目标上限、只亮正前方 等，全部可调。
 其中 `EnableOther`（纸箱 / 桌椅这类搬得动但捡不起来的物件）**默认关闭**，与「原版扫描仪不亮它们」保持一致 —— 想复原改 1 即可。
 
@@ -218,6 +231,15 @@ Built with **SFSE** and **CommonLibSF**. Huge thanks to their authors and to eve
 > （`ExteriorContinuous=1` / `SettleOnCellCrossMs=300`）；引擎**流式重建 3D**（LOD ↔ 真模型）导致
 > 单条描边丢失时**自动重挂**（`Verify3DPerScan=32`，日志里 `3D复检: reassert=` 在涨）；
 > 走动时引用数的**轻微变化不再打断扫描**（`StreamJumpTolerance=256`）。
+>
+> **1.6（引擎 4.17）**：**可拾取物品按「物品栏分类」分色** —— 武器 / 投掷物（青）、
+> 太空服 / 头盔 / 背包 / 服饰（淡蓝白）、弹药 / 救援（绿）、笔记（黄）、资源（紫）；
+> **杂项保持原来的蓝**（原先蓝的东西一个都没变）。「资源」判据取自物品记录自己的
+> `ResourceType` 关键词 ⇒ 第三方 mod 新增的资源同样会被上色；判据不生效时自动退回
+> 杂项色（日志里 `resource keyword:` 一行会说明）。新增 INI：`StateWeapon` …
+> `StateResource`、`EnableWeapon` … `EnableResource`、`ColorNote` / `ColorResource`、
+> `ResourceByKeyword`。**配置文件也搬到了「和 esm 同级」**（与日志同一个目录）——
+> 老位置 `SFSE\Plugins\` 仍然兼容（新位置没有时才读它，日志 `config file:` 一行会说明）。
 >
 > **1.5（引擎 4.16）**：**日志文件改到「和 esm 同级」** —— MO2 用户在 mod 自己的目录里、
 > 手动安装在 `Data\`（此前在 `文档\My Games\Starfield\SFSE\Logs\`）。删 mod 时日志一起删掉，

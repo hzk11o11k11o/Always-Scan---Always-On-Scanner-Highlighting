@@ -6,10 +6,10 @@
 #
 #      dist\StarfieldAlwaysScan-<version>.zip
 #        ├─ StarfieldAlwaysScan.esm             ← Data 根
+#        ├─ SAS_AlwaysScan.ini                  ← 和 esm 同级（配置）
 #        ├─ Scripts\SAS_Bridge.pex
 #        ├─ Scripts\Source\SAS\SAS_Bridge.psc   （源码，运行期不需要）
 #        ├─ SFSE\Plugins\SAS_AlwaysScan.dll
-#        ├─ SFSE\Plugins\SAS_AlwaysScan.ini
 #        └─ README.txt                          （取自 package\README.txt）
 #
 #  zip 内**不含**：
@@ -56,10 +56,10 @@ Write-Host "=== Packaging Starfield Always Scan (SFSE) v$Version for Nexus ===" 
 # ------------------------------------------------- 1. 收集文件（相对 Data 根）
 $payload = [ordered]@{
     'StarfieldAlwaysScan.esm'                      = $true
+    'SAS_AlwaysScan.ini'                           = $true   # ★ 2026-09-25：配置改到 esm 同级
     'Scripts\SAS_Bridge.pex'                       = $true
     'Scripts\Source\SAS\SAS_Bridge.psc'            = $true
     'SFSE\Plugins\SAS_AlwaysScan.dll'              = $true
-    'SFSE\Plugins\SAS_AlwaysScan.ini'              = $true
 }
 if ($IncludePdb) { $payload['SFSE\Plugins\SAS_AlwaysScan.pdb'] = $true }
 

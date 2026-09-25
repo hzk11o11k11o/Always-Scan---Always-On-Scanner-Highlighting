@@ -728,16 +728,44 @@ namespace SAS
 		// ====================================================================
 		// ★ v4.0：类别（决定用哪个 outline 状态 = 哪种配色）
 		// --------------------------------------------------------------------
-		// 分类只依赖 base form 的类型（`RE::TESForm::GetFormType()`），零成本。
-		// 下标顺序 = INI 里 StateLoot / StateContainer / ... 的顺序。
+		// 分类只依赖 base form 的类型（`RE::TESForm::GetFormType()`），零成本；
+		// ★ v4.17 起 MISC 还要多看一眼「物品记录上的关键词」（是不是资源，见
+		//   IsResourceBase()）。仍然只有纯内存读。
+		// 下标顺序 = INI 里 StateLoot / StateWeapon / ... 的顺序。
 		// ====================================================================
 		enum class Category : std::uint8_t
 		{
-			kLoot = 0,   // 可拾取（进背包）：MISC/BOOK/ARMO/WEAP/AMMO/ALCH/INGR/KEYM/NOTE/SLGM
-			kContainer,  // 容器：CONT
-			kDevice,     // 可交互设备：ACTI / TERM
-			kDoor,       // 门：DOOR
-			kFlora,      // 植物：FLOR
+			// 杂项 = 其余可拾取物：MISC（**不含资源**）/ KEYM / INGR / SLGM …
+			//   ★ v4.17：用户需求原文「**杂项不变，还是原本的颜色**」⇒ 这一类
+			//     继续用引擎 state 2 的蓝（INI `StateLoot=2`，键名保持不动）。
+			kLoot = 0,
+			// ================================================================
+			// ★★ v4.17（需求 1.6）：按「物品栏分类」把原来那一大坨 kLoot 拆成 6 组
+			// ----------------------------------------------------------------
+			// 用户需求（1.6新需求.md）：
+			//   武器、投掷物 ／ 太空服、背包、头盔、服饰 ／ 弹药、救援 ／ 笔记 ／ 资源
+			//   各给一种颜色；**杂项不变**。
+			// 判据全部**离线取证**（Starfield.esm 1.16.244.0，见 docs/16 与
+			// out/esm_invcat_probe.py / out/esm_resource_probe.py）：
+			//   · 投掷物（`FragGrenade` / `FragMine` / `ShrapnelGrenade` …）在数据里
+			//     就是 **WEAP**（带 `InventoryCategoryWeaponThrowable` 关键词）；
+			//   · 太空服 / 背包 / 头盔 / 服饰 全是 **ARMO**
+			//     （关键词 `InventoryCategoryArmorSuit/ArmorBackpack/ArmorHelmet/Apparel`）；
+			//   · 救援 = **ALCH**（含食品 / 饮料），弹药 = **AMMO**；
+			//   · 笔记 = **BOOK**（备注 / 数据板 / 杂志 / 书 —— Starfield.esm 里
+			//     **没有** NOTE 记录，所以 kNOTE 一并归到这一类）；
+			//   · 资源 = **MISC + `ResourceType*` 关键词**（410 条；而 Digipick /
+			//     Credits / 毛绒玩具 / 盆栽这类**真杂物**没有该关键词）⇒ IsResourceBase()。
+			// ================================================================
+			kLootWeapon,    // 武器、投掷物：WEAP
+			kLootApparel,   // 太空服、背包、头盔、服饰：ARMO
+			kLootAmmoAid,   // 弹药、救援：AMMO + ALCH
+			kLootNote,      // 笔记：BOOK（+ NOTE）
+			kLootResource,  // 资源：MISC + ResourceType* 关键词
+			kContainer,     // 容器：CONT
+			kDevice,        // 可交互设备：ACTI / TERM
+			kDoor,          // 门：DOOR
+			kFlora,         // 植物：FLOR
 			// ★ v4.1：其它 = **MSTT（MovableStatic，可移动静态物）**。
 			//   这一类**绝大多数是不能拾取进背包的装饰物**（纸箱 / 桌椅 / 吧台 /
 			//   飞船模块 …），原版扫描仪也不会高亮它们，所以**默认关闭**
@@ -756,7 +784,70 @@ namespace SAS
 		constexpr std::size_t kCategoryCount = static_cast<std::size_t>(Category::kCount);
 
 		constexpr const char* kCategoryName[kCategoryCount] = {
-			"loot", "container", "device", "door", "flora", "other", "corpse"
+			"loot", "weapon", "apparel", "ammoaid", "note", "resource",
+			"container", "device", "door", "flora", "other", "corpse"
+		};
+
+		// ================================================================
+		// ★★ v4.17：「资源」判据 —— MISC 记录上的 `ResourceType*` 关键词
+		// ----------------------------------------------------------------
+		// 离线取证（Starfield.esm 1.16.244.0；脚本 `out/esm_resource_probe.py`，
+		// 完整结论见 `docs/16-物品栏分类分色.md`）：
+		//   · MISC 记录共 **1319 条**：**410 条**带 `ResourceType*` 关键词 = 资源物品
+		//     （`InorgCommonIron` / `InorgExoticNeon` / `OrganicAdhesive` /
+		//      `Manufactured*` …），**909 条**不带 = 真杂物（Digipick / Credits /
+		//      毛绒玩具 / 雪景球 / 纸巾盒 / 盆栽 / 桌面风扇 …）；
+		//   · `ResourceType*` 关键词共 **28 个**，全部在 Starfield.esm（下表）；
+		//   · 「只带 `ResourceRarity*`、不带 `ResourceType*`」的 MISC = **0 条**
+		//     ⇒ 这条判据不漏（脚本里专门统计过）。
+		// 读法（commonlibsf 声明 + 本项目「形状校验优先」的铁律）：
+		//   `class TESObjectMISC : …, public BGSKeywordForm  // 0x1E8`
+		//   `BGSKeywordForm::keywords（BSTArray<BGSKeyword*>）` 在基类 +0x20
+		//   ⇒ **base + 0x208** 处是 BSTArray 头，布局 = `{ data@+0, _size@+8,
+		//     _capacity@+0xC }`（★ 与常量区 `kOffArray*` 那一套 **不同**：那一套是
+		//     size/capacity 在前、data 在后 —— 这里不套用，按下面的顺序显式校验）。
+		//   ★ 校验链：data 可读 ∧ 1 ≤ size ≤ 64 ∧ capacity ≥ size ∧ 每个元素是
+		//     指向 **KYWD** 的指针。任何一环不过 ⇒ 返回 false（= 按杂项处理）。
+		//     失败方向永远是安全的那一边：宁可少一个颜色，绝不把垃圾内存当资源。
+		//   ★ 启动自检（`ResourceKeywordSelfTest`）：拿两个「已知答案」的原版记录
+		//     验一次（InorgCommonIron 必须命中 / Digipick 必须不命中），不通过就
+		//     整体退回「全部 MISC = 杂项」并打 WARN —— 与「库存标定」同一个套路。
+		// ================================================================
+		constexpr std::size_t   kOffMiscKeywords  = 0x208;  // TESObjectMISC::keywords
+		constexpr std::uint32_t kMiscKeywordMax   = 64;     // 防呆上限（资源物品实测最多 4 个）
+		constexpr std::uint32_t kResKeywordIron    = 0x0005556E;  // InorgCommonIron（自检：资源）
+		constexpr std::uint32_t kResKeywordDigipick = 0x0000000A; // Digipick（自检：杂项）
+		constexpr std::uint32_t kResKeywordCredits = 0x0000000F;  // Credits（自检：杂项）
+		// 28 个 ResourceType* 关键词的 FormID（全部在 Starfield.esm = 无需 load order 前缀）
+		constexpr std::uint32_t kResourceKeywords[] = {
+			0x0003F001,  // ResourceTypeCraftingGeneric
+			0x0016B569,  // ResourceTypeCraftingInorganicCommon
+			0x0004248E,  // ResourceTypeCraftingInorganicExotic
+			0x0004248D,  // ResourceTypeCraftingInorganicRare
+			0x0004248C,  // ResourceTypeCraftingInorganicUncommon
+			0x0004248F,  // ResourceTypeCraftingInorganicUnique
+			0x000424A5,  // ResourceTypeCraftingMfgCommon
+			0x000424A6,  // ResourceTypeCraftingMfgExotic
+			0x000424A7,  // ResourceTypeCraftingMfgRare
+			0x000424A8,  // ResourceTypeCraftingMfgUncommon
+			0x000424A9,  // ResourceTypeCraftingMfgUnique
+			0x00042490,  // ResourceTypeCraftingOrganicCommon
+			0x000424A1,  // ResourceTypeCraftingOrganicExotic
+			0x000424A2,  // ResourceTypeCraftingOrganicRare
+			0x000424A3,  // ResourceTypeCraftingOrganicUncommon
+			0x000424A4,  // ResourceTypeCraftingOrganicUnique
+			0x0006FDB3,  // ResourceTypeFauna
+			0x0006FDB2,  // ResourceTypeFlora
+			0x00299548,  // ResourceTypeGas
+			0x0029954A,  // ResourceTypeLiquid
+			0x0023CEB6,  // ResourceTypeManufactured
+			0x00021377,  // ResourceTypeManufacturedCommon
+			0x00021387,  // ResourceTypeManufacturedExotic
+			0x0002137B,  // ResourceTypeManufacturedRare
+			0x00021378,  // ResourceTypeManufacturedUncommon
+			0x0002139B,  // ResourceTypeManufacturedUnique
+			0x002C5A95,  // ResourceTypeOrganic
+			0x00299549,  // ResourceTypeSolid
 		};
 
 		// ★ v4.0.1：INI 没写自定义颜色时用的哨兵值（写 0 表示「用引擎原生配色」）
@@ -828,9 +919,43 @@ namespace SAS
 			//   （v4.0.1 的默认 0/1/2/3 实测全是蓝色系，看起来「颜色都一样」——
 			//     3 与 2 的 ref 色值完全相同。实测表见 docs/03 第十四节 14.5 / INI 注释。）
 			// ★ v4.0.3：门从 0 青改为 10 红 —— 可拾取是 2 蓝，青/蓝对比太弱，红拉开最大。
-			// ★ v4.2：尸体（下标 6）默认也是 **9 橙**（和容器同色，两者都是「搜刮目标」）；
+			// ★ v4.2：尸体默认也是 **9 橙**（和容器同色，两者都是「搜刮目标」）；
 			//   想区分开就改 INI 的 `StateCorpse`（可用的其它色见 INI 里那张实测配色表）。
-			std::array<int, kCategoryCount> stateByCategory{ 2, 9, 4, 10, 5, 1, 9 };
+			//
+			// ★★ v4.17：物品栏分类分色（需求 1.6）—— 5 个「可拾取」子类各一个新状态，
+			//   其它类别原样不动（**杂项继续 2 蓝**）。状态分配的依据（全部离线实证，
+			//   见 docs/16 §配色 与 out/esm_invcat_probe.py）：
+			//     · state 0/1/2/3/7/8/9 是**引擎自己也会写**的状态（反汇编 0x159ED90：
+			//       原版扫描仪求值只产生 0/1、2/3、7/8、9）⇒ 尽量别动它们；
+			//     · **4 / 5 / 6 / 10 全镜像没有任何代码写**（`func.py callers 0x17D52B0`
+			//       只有那两个调用点）⇒ 这几个状态是「本 MOD 专用」的。
+			//   ⇒ 五个物品子类：0 青（武器，原生）/ 1 淡蓝白（服饰，原生）/
+			//     5 绿（弹药救援，原生；植物共用同一个绿）/ 6 黄（笔记，**覆盖**）/
+			//     7 紫（资源，**覆盖**）。
+			//   ★ 6 与 7 的原生配色不适合当分类色（6 = 与杂项同色，7 = ref 表是
+			//     0x00000000、画不出来）⇒ 用 INI 的 `ColorNote` / `ColorResource`
+			//     覆盖成黄 / 紫（默认值写在本结构体的 colorOverride 里，**不写 INI
+			//     也生效**）。详见 ApplyColorOverrides（含「alpha=0 的槽要补成不透明」）。
+			//   ★ 7 是引擎也会用的状态（原版「TargetScannable」）—— 覆盖它的颜色
+			//     意味着原版扫描仪在该状态下的目标也会跟着变紫（可选副作用；不想要
+			//     就把 `StateResource` 改成 3 或 8，或把 `ColorResource` 写成其它颜色）。
+			//   ★ kOther（MSTT，默认关）从 1 挪到 **3**：state 1 让给「服饰」，
+			//     而 3 与 2 在引擎里是**同一个蓝**（实测 ref 值完全相同），
+			//     所以打开 EnableOther 时看到的是「和杂项同色的蓝」（MSTT 默认关，影响极小）。
+			std::array<int, kCategoryCount> stateByCategory{
+				2,  // kLoot        杂项 —— 蓝（**不变**，用户需求）
+				0,  // kLootWeapon  武器、投掷物 —— 青（原生 state 0）
+				1,  // kLootApparel 太空服/背包/头盔/服饰 —— 淡蓝白（原生 state 1）
+				5,  // kLootAmmoAid 弹药、救援 —— 绿（原生 state 5，与植物同色）
+				6,  // kLootNote    笔记 —— 黄（覆盖；原生 6 与杂项同为蓝）
+				7,  // kLootResource 资源 —— 紫（覆盖；原生 7 的 ref 色是 0，不可见）
+				9,  // kContainer   容器 —— 橙（不变）
+				4,  // kDevice      设备 —— 绿（不变）
+				10, // kDoor        门 —— 红（不变）
+				5,  // kFlora       植物 —— 绿（不变）
+				3,  // kOther       MSTT（默认关）—— 蓝（与杂项同色）
+				9   // kCorpse      尸体 —— 橙（不变）
+			};
 
 			// ================================================================
 			// ★ v4.1：每个类别一个「是否高亮」开关
@@ -847,17 +972,49 @@ namespace SAS
 			// ⇒ 默认 `EnableOther=0`（关掉 kOther = MSTT）；其余 5 类都是真目标，默认开。
 			//
 			// ★ 想恢复高亮 MSTT（或只想留其中几类）就改 INI 的
-			//   `EnableLoot / EnableContainer / EnableDevice / EnableDoor /
-			//    EnableFlora / EnableOther`，改完重进游戏生效。
-			std::array<bool, kCategoryCount> categoryEnabled{ true, true, true, true, true, false, true };
+			//   `EnableLoot / EnableWeapon / EnableApparel / EnableAmmoAid /
+			//    EnableNote / EnableResource / EnableContainer / EnableDevice /
+			//    EnableDoor / EnableFlora / EnableOther`，改完重进游戏生效。
+			//   ★ v4.17：`EnableLoot` 现在的含义 = **杂项**（原来那一坨里剩下的）；
+			//     新增的 5 个物品子类各有自己的开关（默认全开）。
+			std::array<bool, kCategoryCount> categoryEnabled{
+				true,  // kLoot        杂项
+				true,  // kLootWeapon
+				true,  // kLootApparel
+				true,  // kLootAmmoAid
+				true,  // kLootNote
+				true,  // kLootResource
+				true,  // kContainer
+				true,  // kDevice
+				true,  // kDoor
+				true,  // kFlora
+				false, // kOther（MSTT —— 默认关，理由见上）
+				true   // kCorpse
+			};
 
 			// ★ v4.0.1：可选的「自定义类别颜色」（INI 里写 ColorLoot=RRGGBB 之类）。
 			//   kColorUnset = 不覆盖，完全用引擎那个状态的原生配色。
-			//   设了就把 RGB 写进引擎的两张每状态配色表（alpha 保持原值），
-			//   再让引擎刷新管理器 + 整批重挂（详见 ApplyColorOverrides）。
+			//   设了就把 RGB 写进引擎的每状态配色表，再让引擎刷新管理器 + 整批重挂
+			//   （详见 ApplyColorOverrides）。
+			//   ★ v4.17：「笔记」「资源」两个新类别**在这里就带默认色**（黄 / 紫）——
+			//     因为它们挑的 state 6/7 原生配色不可用（6 与杂项同蓝、7 是 0 不可见），
+			//     **没有 INI 也必须覆盖**；其余类别的默认仍是「不覆盖」。
 			std::array<std::uint32_t, kCategoryCount> colorOverride{
-				kColorUnset, kColorUnset, kColorUnset, kColorUnset, kColorUnset, kColorUnset, kColorUnset
+				kColorUnset,   // kLoot        杂项 —— 原生蓝（不变）
+				kColorUnset,   // kLootWeapon  原生青
+				kColorUnset,   // kLootApparel 原生淡蓝白
+				kColorUnset,   // kLootAmmoAid 原生绿
+				0x00FFD700u,   // kLootNote     ★ 默认 黄（#FFD700）—— 覆盖 state 6
+				0x00AA6EFFu,   // kLootResource ★ 默认 紫（#AA6EFF）—— 覆盖 state 7
+				kColorUnset, kColorUnset, kColorUnset, kColorUnset, kColorUnset, kColorUnset
 			};
+
+			// ★★ v4.17：「资源」判据 = 读 MISC 记录上的 `ResourceType*` 关键词
+			//   （离线实证：1319 条 MISC 里 410 条带它 = 资源物品；909 条不带 =
+			//     Digipick / Credits / 玩具 / 盆栽 这类真杂物。见 IsResourceBase()）。
+			//   设 0 = 完全不读关键词（全部 MISC 都算杂项，即 1.5 的行为），
+			//   排查「资源颜色不对」时用；不用换 DLL。
+			bool          resourceByKeyword = true;
 
 			// ★ v4.0：按热键切换时弹一条 HUD 提示（DLL 写 GLOB → 桥脚本轮询）。
 			bool          notifyOnToggle  = true;
@@ -1109,6 +1266,10 @@ namespace SAS
 			std::uint64_t loadGameResets = 0;  // 「载入画面由开变关」触发的重置次数
 			bool          loadingSeen    = false;  // 上一帧载入画面是否开着（每帧都更新）
 			bool          paramsRefreshed = false; // ★ v4.0.1：进世界后是否已做过一次配色刷新
+			// ★★ v4.17：「资源」关键词判据的启动自检结果
+			//   0 = 还没测（每轮扫描试一次，样本还没进内存就下一轮再来）
+			//   1 = 通过（资源分类生效）  2 = 失败（资源归杂项，打 WARN）
+			std::uint8_t  resKeywordTest  = 0;
 
 			// --- 诊断：半径内、但 base form 类型不在白名单而被跳过的类型统计 ---
 			//   统计窗口 = 两条统计日志之间，打完之后清空。
@@ -2725,10 +2886,47 @@ namespace SAS
 			return n;
 		}
 
+		// 某个路径的文件存不存在（只用 WIN32，不引 <filesystem>）
+		bool FileExists(const std::string& a_path)
+		{
+			if (a_path.empty()) {
+				return false;
+			}
+			const auto attr = ::GetFileAttributesA(a_path.c_str());
+			return attr != INVALID_FILE_ATTRIBUTES && (attr & FILE_ATTRIBUTE_DIRECTORY) == 0;
+		}
+
 		void LoadConfig()
 		{
-			g_iniPath          = ModuleDir() + "\\SAS_AlwaysScan.ini";
-			const char* ini    = g_iniPath.c_str();
+			// ★★ 需求（AGENTS.md，2026-09-25）：「**配置文件要放在和 esm 文件同级目录里**」。
+			//   路径规则与日志完全一致（见 main.cpp 的 EsmDir()）：DLL 目录（SFSE\Plugins）
+			//   上溯两级 = `<游戏>\Data`（MO2 下 = mod 目录根）⇒ 就是
+			//   `StarfieldAlwaysScan.esm` 旁边。
+			//   ★ 兼容老安装：新位置**不存在**时回退到老位置（DLL 旁边），并打一条 WARN
+			//     提示搬过去 —— 免得升级用户「改了 INI 却怎么都不生效」。
+			{
+				const std::string dllDir = ModuleDir();
+				std::string       esmDir;
+				if (const auto cut1 = dllDir.find_last_of('\\'); cut1 != std::string::npos && cut1 > 0) {
+					if (const auto cut2 = dllDir.find_last_of('\\', cut1 - 1); cut2 != std::string::npos) {
+						esmDir = dllDir.substr(0, cut2);
+					}
+				}
+				const std::string newIni = esmDir.empty() ? std::string{} : esmDir + "\\SAS_AlwaysScan.ini";
+				const std::string oldIni = dllDir + "\\SAS_AlwaysScan.ini";
+				if (FileExists(newIni)) {
+					g_iniPath = newIni;
+				} else if (FileExists(oldIni)) {
+					g_iniPath = oldIni;
+					REX::WARN("config file: 没找到「和 esm 同级」的 SAS_AlwaysScan.ini（{}）"
+							  "—— 回退到老位置 {}，建议把配置文件搬到 esm 旁边",
+						newIni, oldIni);
+				} else {
+					g_iniPath = newIni.empty() ? oldIni : newIni;  // 两个都没有：报新位置（排查更有用）
+				}
+			}
+			const char* ini = g_iniPath.c_str();
+			REX::INFO("config file: {}（读不到就全部用内置默认值，高亮照常工作）", g_iniPath);
 
 			auto getInt = [&](const char* a_key, int a_def) {
 				return static_cast<int>(::GetPrivateProfileIntA("General", a_key, a_def, ini));
@@ -2770,10 +2968,12 @@ namespace SAS
 
 			// --- ★ v4.0：分类分色（每个类别一个 outline 状态 0..11）---
 			//   （★ v4.2 追加 corpse，默认 9 = 与容器同色，理由见 Config::stateByCategory）
+			//   （★ v4.17 追加 5 个物品栏子类 —— 武器 / 服饰 / 弹药救援 / 笔记 / 资源）
 			const char* const kStateKeys[kCategoryCount] = {
-				"StateLoot", "StateContainer", "StateDevice", "StateDoor", "StateFlora", "StateOther", "StateCorpse"
+				"StateLoot", "StateWeapon", "StateApparel", "StateAmmoAid", "StateNote", "StateResource",
+				"StateContainer", "StateDevice", "StateDoor", "StateFlora", "StateOther", "StateCorpse"
 			};
-			const int kStateDef[kCategoryCount] = { 2, 9, 4, 10, 5, 1, 9 };
+			const int kStateDef[kCategoryCount] = { 2, 0, 1, 5, 6, 7, 9, 4, 10, 5, 3, 9 };
 			for (std::size_t i = 0; i < kCategoryCount; ++i) {
 				g_cfg.stateByCategory[i] = std::clamp(getInt(kStateKeys[i], kStateDef[i]), 0, 11);
 			}
@@ -2781,9 +2981,10 @@ namespace SAS
 			// --- ★ v4.1：类别开关（默认只有 kOther = MSTT 关着，理由见 Config 里的长注释）---
 			{
 				const char* const kEnableKeys[kCategoryCount] = {
-					"EnableLoot", "EnableContainer", "EnableDevice", "EnableDoor", "EnableFlora", "EnableOther", "EnableCorpse"
+					"EnableLoot", "EnableWeapon", "EnableApparel", "EnableAmmoAid", "EnableNote", "EnableResource",
+					"EnableContainer", "EnableDevice", "EnableDoor", "EnableFlora", "EnableOther", "EnableCorpse"
 				};
-				const int kEnableDef[kCategoryCount] = { 1, 1, 1, 1, 1, 0, 1 };
+				const int kEnableDef[kCategoryCount] = { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1 };
 				std::string s;
 				for (std::size_t i = 0; i < kCategoryCount; ++i) {
 					g_cfg.categoryEnabled[i] = getInt(kEnableKeys[i], kEnableDef[i]) != 0;
@@ -2874,11 +3075,14 @@ namespace SAS
 				kInvEvtSourceRva, kQuickOpenSourceRva, kInvEvtSourceVtblRva, kQuickOpenSourceVtblRva);
 
 			// --- ★ v4.0.1：可选的自定义类别颜色（ColorLoot=RRGGBB …，留空 = 用引擎原生配色）---
+			//   ★ v4.17：`ColorNote` / `ColorResource` **留空时保留结构体里的默认值**
+			//     （黄 FFD700 / 紫 AA6EFF）—— 这两个类别挑的 state 原生色不可用，
+			//     必须覆盖；其余类别的默认值仍是 kColorUnset（= 不覆盖）。
 			{
 				const char* const kColorKeys[kCategoryCount] = {
-					"ColorLoot", "ColorContainer", "ColorDevice", "ColorDoor", "ColorFlora", "ColorOther", "ColorCorpse"
+					"ColorLoot", "ColorWeapon", "ColorApparel", "ColorAmmoAid", "ColorNote", "ColorResource",
+					"ColorContainer", "ColorDevice", "ColorDoor", "ColorFlora", "ColorOther", "ColorCorpse"
 				};
-				std::string colorLog;
 				for (std::size_t i = 0; i < kCategoryCount; ++i) {
 					char hex[32]{};
 					::GetPrivateProfileStringA("General", kColorKeys[i], "", hex, sizeof(hex), ini);
@@ -2887,7 +3091,7 @@ namespace SAS
 						++p;
 					}
 					if (*p == '\0') {
-						continue;  // 没写 = 不覆盖
+						continue;  // 没写 = 保持默认（多数类别 = 不覆盖）
 					}
 					char*        end = nullptr;
 					const auto   v   = std::strtoul(p, &end, 16);
@@ -2897,19 +3101,31 @@ namespace SAS
 						continue;
 					}
 					g_cfg.colorOverride[i] = static_cast<std::uint32_t>(v) & 0xFFFFFFu;
+				}
+				// 打「实际生效」的覆盖表（含代码默认值），配色出问题时一眼对上
+				std::string colorLog;
+				for (std::size_t i = 0; i < kCategoryCount; ++i) {
+					if (g_cfg.colorOverride[i] == kColorUnset) {
+						continue;
+					}
 					if (!colorLog.empty()) {
 						colorLog += ", ";
 					}
 					colorLog += kCategoryName[i];
 					colorLog += "=#";
 					char hexv[8];  // 不叫 buf：外层那个 buf[64] 是 getFloat 用的（C4456 遮蔽警告）
-					std::snprintf(hexv, sizeof(hexv), "%06X", g_cfg.colorOverride[i]);
+					std::snprintf(hexv, sizeof(hexv), "%06X", g_cfg.colorOverride[i] & 0xFFFFFFu);
 					colorLog += hexv;
 				}
-				if (!colorLog.empty()) {
-					REX::INFO("config: colorOverride: {}", colorLog);
-				}
+				REX::INFO("config: colorOverride（实际生效）: {}",
+					colorLog.empty() ? "（无 —— 全部用引擎原生配色）" : colorLog);
 			}
+
+			// ★ v4.17：「资源」判据（MISC 的 ResourceType* 关键词）总开关
+			g_cfg.resourceByKeyword = getInt("ResourceByKeyword", 1) != 0;
+			REX::INFO("config: resourceByKeyword={} -> 资源判据{}（MISC 记录上的 ResourceType* 关键词；"
+					  "启动自检通过后才生效，日志里有 `resource keyword:` 一行）",
+				g_cfg.resourceByKeyword, g_cfg.resourceByKeyword ? "启用" : "关闭（全部 MISC 归杂项）");
 
 			REX::INFO("config: radius={:.1f}m targets={} hotkeyVK=0x{:X} startEnabled={}",
 				g_cfg.radiusMeters, g_cfg.maxTargets, g_cfg.hotkeyVk, g_cfg.startEnabled);
@@ -2992,6 +3208,94 @@ namespace SAS
 		}
 
 		// ====================================================================
+		// ★★ v4.17：「资源」判据（MISC + `ResourceType*` 关键词）
+		// ====================================================================
+		// 完整背景、28 个关键词的 FormID、形状校验链见常量区「v4.17 资源判据」。
+		//   这个函数只做纯内存读 + 校验，**零引擎调用**；任何一步校验不过 ⇒ false
+		//   （= 按「杂项」处理 —— 失败方向永远是安全的那一边）。
+		//   ★ 读的是 `TESObjectMISC` 的 `BGSKeywordForm::keywords`（base + 0x208）。
+		bool IsResourceBaseRaw(const RE::TESForm* a_base)
+		{
+			if (!a_base) {
+				return false;
+			}
+			const auto* raw = reinterpret_cast<const std::uint8_t*>(a_base);
+			if (!IsReadable(raw + kOffMiscKeywords, 16)) {
+				return false;
+			}
+			// BSTArray 头（★ 这个数组的布局是 data 在前、size/capacity 在后）
+			const auto data = *reinterpret_cast<const std::uint64_t*>(raw + kOffMiscKeywords + 0);
+			const auto size = *reinterpret_cast<const std::uint32_t*>(raw + kOffMiscKeywords + 8);
+			const auto cap  = *reinterpret_cast<const std::uint32_t*>(raw + kOffMiscKeywords + 12);
+			if (size < 1 || size > kMiscKeywordMax || cap < size) {
+				return false;
+			}
+			if (!IsPlausiblePointer(data) ||
+				!IsReadable(reinterpret_cast<const void*>(data), static_cast<std::size_t>(size) * sizeof(void*))) {
+				return false;
+			}
+			for (std::uint32_t i = 0; i < size; ++i) {
+				const auto kw = *reinterpret_cast<const std::uint64_t*>(
+					reinterpret_cast<const std::uint8_t*>(data) + i * sizeof(void*));
+				if (!IsPlausiblePointer(kw) || !IsReadable(reinterpret_cast<const void*>(kw), kOffFormType + 1)) {
+					return false;
+				}
+				const auto* kwRaw = reinterpret_cast<const std::uint8_t*>(kw);
+				// 元素必须是**关键词记录**（KYWD）—— 这一条能挡住「偏移猜错时读到的垃圾指针」
+				if (kwRaw[kOffFormType] != static_cast<std::uint8_t>(RE::FormType::kKYWD)) {
+					return false;
+				}
+				const auto id = *reinterpret_cast<const std::uint32_t*>(kwRaw + kOffFormID);
+				for (const auto r : kResourceKeywords) {
+					if (r == id) {
+						return true;
+					}
+				}
+			}
+			return false;
+		}
+
+		// 带开关 + 自检门控的版本（ClassifyBase 用这个）。
+		bool IsResourceBase(const RE::TESForm* a_base)
+		{
+			return g_cfg.resourceByKeyword && g_state.resKeywordTest == 1 && IsResourceBaseRaw(a_base);
+		}
+
+		// ★★ v4.17：启动自检 —— 用「已知答案」的原版记录验证上面那条读法。
+		//   · `InorgCommonIron`(0x0005556E) 必须命中（带 ResourceTypeSolid 等 3 个关键词）；
+		//   · `Digipick`(0x0000000A) / `Credits`(0x0000000F) 必须不命中（真杂物）。
+		//   通过 ⇒ g_state.resKeywordTest=1（资源分类生效）；
+		//   失败 ⇒ =2（资源归杂项，打一条 WARN，日志里带三个样本的原始读数）。
+		//   ★ 样本还没进内存（开局那一两秒）就直接返回，下一轮扫描再来 —— 永不放弃
+		//     （与「库存标定」同一个套路，见 CalibrateInventory）。
+		void ResourceKeywordSelfTest()
+		{
+			if (g_state.resKeywordTest != 0) {
+				return;
+			}
+			auto* iron = RE::TESForm::LookupByID(kResKeywordIron);
+			auto* pick = RE::TESForm::LookupByID(kResKeywordDigipick);
+			auto* cred = RE::TESForm::LookupByID(kResKeywordCredits);
+			if (!iron || !pick || !cred) {
+				return;  // 数据还没就绪：下一轮再试
+			}
+			const bool ironHit = IsResourceBaseRaw(iron);
+			const bool pickHit = IsResourceBaseRaw(pick);
+			const bool credHit = IsResourceBaseRaw(cred);
+			g_state.resKeywordTest = (ironHit && !pickHit && !credHit) ? 1 : 2;
+			if (g_state.resKeywordTest == 1) {
+				REX::INFO("resource keyword: 判据自检**通过**（InorgCommonIron=资源 · Digipick/Credits=杂项）"
+						  "-> 「资源」分类生效：state={}（颜色覆盖 #AA6EFF）",
+					g_cfg.stateByCategory[static_cast<std::size_t>(Category::kLootResource)]);
+			} else {
+				REX::WARN("resource keyword: 判据自检**失败**（iron={} digipick={} credits={}）"
+						  "-> 资源暂归「杂项」（颜色不变）。读法/校验链见常量区「v4.17 资源判据」；"
+						  "若要强制关掉这条判据，INI 里写 `ResourceByKeyword=0`",
+					ironHit ? 1 : 0, pickHit ? 1 : 0, credHit ? 1 : 0);
+			}
+		}
+
+		// ====================================================================
 		// 过滤规则（base form 类型 → 类别；-1 = 不高亮）
 		// ====================================================================
 		// NPC_ / ACHR / LVLN 一律排除 —— 「活人不亮」是红线。
@@ -3016,16 +3320,31 @@ namespace SAS
 				break;
 			}
 			switch (a_base->GetFormType()) {
-			// ---- 可拾取 ----
-			case RE::FormType::kMISC:
-			case RE::FormType::kBOOK:
-			case RE::FormType::kARMO:
-			case RE::FormType::kWEAP:
-			case RE::FormType::kAMMO:
-			case RE::FormType::kALCH:
+			// ================================================================
+			// ★★ v4.17：可拾取 —— 按「物品栏分类」分色（用户需求 1.6）
+			//   判据全部离线取证（Starfield.esm，见 docs/16）：
+			//     武器 / 投掷物 = WEAP（`FragGrenade` 实测就是 WEAP）
+			//     太空服 / 背包 / 头盔 / 服饰 = ARMO
+			//     弹药 = AMMO，救援 = ALCH（含食品 / 饮料）
+			//     笔记 = BOOK（备注 / 数据板 / 杂志 / 书；引擎里没有 NOTE 记录）
+			//     资源 = MISC + `ResourceType*` 关键词（见 IsResourceBase）
+			//     其余（含 KEYM 钥匙） = 杂项 ⇒ **颜色与 1.5 完全一致（2 蓝）**
+			// ================================================================
+			case RE::FormType::kWEAP:  // 武器、投掷物
+				return static_cast<int>(Category::kLootWeapon);
+			case RE::FormType::kARMO:  // 太空服、背包、头盔、服饰
+				return static_cast<int>(Category::kLootApparel);
+			case RE::FormType::kAMMO:  // 弹药
+			case RE::FormType::kALCH:  // 救援（含食品 / 饮料 / 飞船修理包）
+				return static_cast<int>(Category::kLootAmmoAid);
+			case RE::FormType::kBOOK:  // 笔记（书 / 杂志 / 数据板 / 便条）
+			case RE::FormType::kNOTE:  // （Starfield.esm 里没有 NOTE 记录，留作兜底）
+				return static_cast<int>(Category::kLootNote);
+			case RE::FormType::kMISC:  // 资源（关键词命中）↔ 杂项
+				return static_cast<int>(IsResourceBase(a_base) ? Category::kLootResource : Category::kLoot);
+			// ---- 杂项（颜色不变）----
 			case RE::FormType::kINGR:
 			case RE::FormType::kKEYM:
-			case RE::FormType::kNOTE:
 			case RE::FormType::kSLGM:
 				return static_cast<int>(Category::kLoot);
 			// ---- 容器（搜刮的主要目标，值得单独一个颜色）----
@@ -5284,8 +5603,9 @@ namespace SAS
 				const auto hi = rd(mgrTab + i * kOutlineParamStride);
 				const auto lo = rd(mgrTab + i * kOutlineParamStride + 0x20);
 				const auto rf = rd(refTab + i * kOutlineParamStride);
-				// dword 的布局是 `0x00RRGGBB`（用截图反证过：state 0 的值 = 青，
-				// 与画面完全一致）。所以 R = >>16 / G = >>8 / B = &0xFF。
+				// dword 的布局是 **`0xAARRGGBB`**（★ v4.17 静态初始化函数实证：
+				// state 0 写进去的就是 0xFF3EADF2 = 青 + 不透明；截图也对得上）。
+				// 这里只打印 RGB 三个通道（alpha 一般 0xFF，state 7/8 是 0）。
 				const auto rgbOf = [](std::uint32_t v) {
 					return static_cast<unsigned>(((v >> 16) & 0xFFu) << 16 | ((v >> 8) & 0xFFu) << 8 | (v & 0xFFu));
 				};
@@ -5299,9 +5619,18 @@ namespace SAS
 			}
 		}
 
-		// 把 INI 里的自定义颜色写进引擎的两张配色表（只对「被类别用到的状态」）。
-		//   dword 布局 = R | G<<8 | B<<16 | A<<24；alpha 保留引擎原值（我们不懂它的语义，
-		//   不改动最安全 —— 只换 RGB）。
+		// 把 INI 里的自定义颜色写进引擎的配色表（只对「被类别用到的状态」）。
+		//   ★★ v4.17 重新核对（反汇编 0x17D4CD0「挂引用」段 + exe 静态初始化函数，
+		//      两条实证都记在 docs/16 §配色）：
+		//     · dword 布局 = **`0xAARRGGBB`**（静态初始化函数写 state 0 的颜色是
+		//       `mov byte [rbp+0x20],0xF2 / mov word [rbp+0x21],0x3EAD /
+		//        mov byte [rbp+0x23],0xFF` ⇒ 0xFF3EADF2 = 青 + 不透明）；
+		//     · **真正画出来的是「引用参数表」+0x00 这个 dword** —— 挂引用时把它
+		//       读出并拆成 4 个 float 颜色分量（与画面实测色一致）；
+		//     · 管理器参数表 +0x00/+0x20（High/Low）是**脉冲插值**用的颜色，实测
+		//       运行时它们的 alpha 是 0x00（与 ref 表不同）⇒ 只改 RGB、alpha 原样。
+		//   ★ v4.17 新增：ref 表 alpha = 0 时**补成 0xFF** —— 只有 7/8 这种从没被
+		//     初始化过的槽会是 0（原版也画不出它们），不补的话覆盖了 RGB 也看不到。
 		//   写完调一次 `0x17D47B0` 让引擎把新参数刷进渲染器，并把已挂的目标整批重申
 		//   （引用参数表是「挂的时候读一次」，所以必须重新 Set 才会生效）。
 		void ApplyColorOverrides()
@@ -5323,18 +5652,31 @@ namespace SAS
 				}
 				auto* mgr = mgrTab + st * kOutlineParamStride;
 				auto* ref = refTab + st * kOutlineParamStride;
+				// 管理器表（脉冲 High/Low）：只换 RGB，alpha 原样（实测它是 0x00）
 				const auto patch = [rgb](std::uint8_t* p) {
 					auto v = *reinterpret_cast<std::uint32_t*>(p);
 					v = (v & 0xFF000000u) | (rgb & 0xFFFFFFu);
 					*reinterpret_cast<std::uint32_t*>(p) = v;
 				};
+				// 引用表（**真正画出来的颜色**）：换 RGB，且 alpha 为 0 时补成 0xFF
+				const auto patchRef = [rgb](std::uint8_t* p) {
+					auto v = *reinterpret_cast<std::uint32_t*>(p);
+					v = (v & 0xFF000000u) | (rgb & 0xFFFFFFu);
+					if ((v & 0xFF000000u) == 0) {
+						v |= 0xFF000000u;  // ★ v4.17：state 7/8 的 ref 槽原生是 0（画不出来）
+					}
+					*reinterpret_cast<std::uint32_t*>(p) = v;
+				};
+				const auto refBefore = *reinterpret_cast<const std::uint32_t*>(ref + 0x00);
 				patch(mgr + 0x00);  // High
 				patch(mgr + 0x20);  // Low（一起改，脉冲时不会变色）
-				patch(ref + 0x00);
+				patchRef(ref + 0x00);
 				++applied;
-				char buf[96];
-				std::snprintf(buf, sizeof(buf), "outline colors: 覆盖 %s 的颜色 -> state=%u #%06X",
-					kCategoryName[c], st, rgb & 0xFFFFFFu);
+				char buf[128];
+				std::snprintf(buf, sizeof(buf),
+					"outline colors: 覆盖 %s 的颜色 -> state=%u #%06X（ref 原值 0x%08X%s）",
+					kCategoryName[c], st, rgb & 0xFFFFFFu, refBefore,
+					(refBefore & 0xFF000000u) == 0 ? "，alpha=0 已补 0xFF" : "");
 				REX::INFO("{}", buf);
 			}
 			if (applied == 0) {
@@ -6134,6 +6476,12 @@ namespace SAS
 			//   热路径里一次 VirtualQuery 都不会有。
 			if (!g_state.invCalibDone && g_cfg.skipEmptyLoot) {
 				CalibrateInventory(list, count);
+			}
+
+			// ★★ v4.17：「资源」关键词判据的启动自检（只做一次；通过/失败后都不再执行）。
+			//   数据没就绪时直接返回，下一轮扫描再来。
+			if (g_state.resKeywordTest == 0 && g_cfg.resourceByKeyword) {
+				ResourceKeywordSelfTest();
 			}
 
 			for (std::uint32_t i = 0; i < count; ++i) {

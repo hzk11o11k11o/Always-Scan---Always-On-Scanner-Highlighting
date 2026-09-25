@@ -208,10 +208,24 @@ if (-not $SkipDeploy) {
     if (Test-Path -LiteralPath $pdbPath) {
         Copy-Item -LiteralPath $pdbPath -Destination (Join-Path $pluginsDir "$dllName.pdb") -Force
     }
-    # 配置 INI：放在 dll 旁边。**用户已经改过的版本不要覆盖**（否则每次构建都会
-    # 把热键/半径重置回默认值）。
+    # 配置 INI：★ 2026-09-25 起放在 **esm 同级**（mod 目录根）—— 用户要求
+    #   「配置文件要放在和 esm 文件同级目录里」（AGENTS.md，与日志同一条规则）。
+    #   DLL 优先读那里，读不到才回退 SFSE\Plugins\（老位置，带 WARN）。
+    #   **用户已经改过的版本不要覆盖**（否则每次构建都会把热键/半径重置回默认值）。
     $iniSrc = Join-Path $root 'resources\SAS_AlwaysScan.ini'
-    $iniDst = Join-Path $pluginsDir 'SAS_AlwaysScan.ini'
+    $iniDst = Join-Path $modRoot 'SAS_AlwaysScan.ini'
+    $iniOld = Join-Path $pluginsDir 'SAS_AlwaysScan.ini'
+    if (Test-Path -LiteralPath $iniOld) {
+        # 老位置还留着（v4.16 及以前部署的）：新位置没有就**搬过去**（保住用户改过的
+        # 值）；新位置已有则把老的改名存档，免得两处各一份、改错文件。
+        if (-not (Test-Path -LiteralPath $iniDst)) {
+            Move-Item -LiteralPath $iniOld -Destination $iniDst -Force
+            Write-Host '      config ini moved next to the esm (mod root).' -ForegroundColor DarkGray
+        } else {
+            Move-Item -LiteralPath $iniOld -Destination "$iniOld.moved-to-esm-dir" -Force
+            Write-Host '      old SFSE\Plugins ini renamed to *.moved-to-esm-dir' -ForegroundColor DarkGray
+        }
+    }
     if ((Test-Path -LiteralPath $iniSrc) -and -not (Test-Path -LiteralPath $iniDst)) {
         Copy-Item -LiteralPath $iniSrc -Destination $iniDst -Force
         Write-Host '      config ini installed (default).' -ForegroundColor DarkGray
@@ -248,7 +262,12 @@ if (-not $SkipDeploy) {
         Write-Host "      empty $dllName.log pre-seeded (usvfs 会把日志写回 esm 旁边)" -ForegroundColor DarkGray
     }
 
-    Set-Content -LiteralPath (Join-Path $modRoot 'meta.ini') -Value "[General]`nmodid=0`nversion=4.16.0`ncomment=Always-on scanner highlighting (SFSE)" -Encoding UTF8
+    # ★ 2026-09-25（v4.17 / 发布版 1.6）：
+    #   · modid = N 网 mod 页 ID（18268）—— **不填 0**：MO2 的「Newest Version」
+    #     靠它去查 N 网，modid=0 时那一列永远是空的（用户反馈「读不到版本」）。
+    #   · version = **N 网公开版号**（1.x），不是 DLL 内部版本（4.17.0）：
+    #     用户要求 MO2 里显示 1.6（与 N 网页面上的 Version 字段对得上）。
+    Set-Content -LiteralPath (Join-Path $modRoot 'meta.ini') -Value "[General]`nmodid=18268`nversion=1.6`ncomment=Always-on scanner highlighting (SFSE)" -Encoding UTF8
 
     Get-ChildItem -LiteralPath $modRoot -Recurse -File | ForEach-Object {
         Write-Host ("  {0}  ({1} bytes)" -f $_.FullName.Substring($modRoot.Length + 1), $_.Length)
