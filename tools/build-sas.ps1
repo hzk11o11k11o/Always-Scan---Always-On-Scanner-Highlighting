@@ -277,7 +277,7 @@ if (-not $SkipDeploy) {
     # ★ 2026-09-25（v4.20 / 发布版 1.7.2）：覆盖太深 → 半透明 ——
     #   门 / 武器 / 防具 默认 40% 不透明（INI `AlphaXxx`，0 = 保留引擎原值），
     #   让物品本身材质透出来（用户反馈「完全盖过材质」）。
-    Set-Content -LiteralPath (Join-Path $modRoot 'meta.ini') -Value "[General]`nmodid=18268`nversion=1.7.2`ncomment=Always-on scanner highlighting (SFSE)" -Encoding UTF8
+    Set-Content -LiteralPath (Join-Path $modRoot 'meta.ini') -Value "[General]`nmodid=18268`nversion=1.7.3`ncomment=Always-on scanner highlighting (SFSE)" -Encoding UTF8
 
     Get-ChildItem -LiteralPath $modRoot -Recurse -File | ForEach-Object {
         Write-Host ("  {0}  ({1} bytes)" -f $_.FullName.Substring($modRoot.Length + 1), $_.Length)

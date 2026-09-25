@@ -3,14 +3,22 @@
  Always-on scanner highlighting for Starfield
 ========================================================================
 
-Version  : 1.7.2  (plugin build 4.20.0)
-           1.7.2 = the 1.7.1 colors could cover a nearby object so
-           completely (doors, weapons, suits) that you could no longer
-           see what the item itself looked like. Doors, weapons and
-           apparel now render at ~40% opacity (see AlphaXxx in the INI;
-           0 = keep the engine's own value, 255 = fully opaque), so the
-           object's own material shows through while the colour stays
-           easy to tell apart. Nothing else changed.
+Version  : 1.7.3  (plugin build 4.21.0)
+           1.7.3 = fix: the 1.7.2 opacity setting turned out to have no
+           effect at all. Pixel measurements on a screenshot showed the
+           covered area was pixel-identical at 40% and at 100% - the
+           engine does not consume that alpha byte, so "semi-transparent"
+           never happened on screen. The outline is now drawn as a
+           contour: the fill layer is switched off (its alpha is written
+           as 0), which is exactly what the engine itself does for its
+           scannable targets. You see the item's own material in full,
+           with the category colour on the contour. NoFill=0 in the INI
+           restores the old filled look. AlphaXxx now only changes the
+           pulse (contour) transparency.
+           1.7.2 = (superseded, see 1.7.3) the 1.7.1 colors could cover a
+           nearby object so completely (doors, weapons, suits) that you
+           could no longer see what the item itself looked like; doors,
+           weapons and apparel rendered at ~40% opacity (AlphaXxx).
            1.7.1 = two things. (1) The category colors are now picked for
            maximum contrast - the engine's own palette is all blues in
            the range the pick-up items used, which is why guns, suits
@@ -82,11 +90,12 @@ misc blue), so they can be told apart at a single glance. Every category
 gets its colour assigned explicitly by the mod (see ColorXxx in the INI),
 instead of borrowing the engine's default per-state colours.
 
-Since 1.7.2 the strongest colours are also drawn semi-transparent, so
-you can still see the object's own material and shape: doors, weapons
-and apparel use ~40% opacity by default. That is set per category with
-AlphaXxx in the INI (0-255; 0 = leave the engine's own opacity alone,
-255 = fully opaque). 77 is ~30%, 51 is ~20%.
+Since 1.7.3 the outline is drawn as a contour instead of a fill: the
+mod writes alpha=0 into the outline's base colour, which is the "no
+fill" state the engine itself uses for its scannable targets. You see
+the item's own material and shape in full, with the category colour
+sitting on the contour / pulse. Set NoFill=0 in the INI to bring the
+old filled look back (the 1.7.1 / 1.7.2 behaviour).
 
 "Resources" are recognised from the item record itself (the game marks
 them with its own ResourceType keywords), so both vanilla and mod-added
@@ -165,11 +174,15 @@ Most useful options:
   ColorContainer=FF9500 Change them freely; note that this writes the
   ColorDevice=00E5FF    engine's global per-state color block, so the same
   ColorDoor=FFFFFF      state of the vanilla scanner changes too (see the INI).
-  AlphaWeapon=102       outline opacity per category (0-255).  0 = keep the
-  AlphaApparel=102      engine's own value (the 1.7.1 look), 255 = fully
-  AlphaDoor=102         opaque.  Defaults: doors / weapons / apparel 102
-                        (~40%) so the item's own material shows through;
-                        all other categories keep the engine value.
+  NoFill=1              draw the outline as a contour only (default since
+                        1.7.3): the fill layer's alpha is written as 0, so
+                        the item's own material stays visible.  NoFill=0 =
+                        the old filled look (1.7.1 / 1.7.2).
+  AlphaWeapon=0         pulse (contour) opacity per category (0-255).
+  AlphaApparel=0        0 = keep the engine's own value (default), 255 = a
+  AlphaDoor=0           fixed, non-breathing contour.  NOTE: this does not
+                        make the fill transparent - use NoFill for that
+                        (the alpha byte is ignored by the renderer).
   ResourceByKeyword=1   recognise "resources" from the item record's own
                         ResourceType keywords (default on).  0 = every MISC
                         item counts as misc (the 1.5 behaviour).
@@ -276,14 +289,13 @@ categories).
     the per-state values (base colour + pulse). The "renderer params"
     lines show what the renderer actually received (base colour = what
     you see on screen). Set ColorXxx=RRGGBB in the INI and restart.
-* The colour covers the object so you cannot see its material
-    (worst on doors, weapons, suits at close range):
-    lower the opacity for that category: AlphaXxx in the INI, 0-255
-    (0 = keep the engine's own value = the 1.7.1 look).  77 is ~30%,
-    51 is ~20%.  Doors / weapons / apparel already default to 102 (~40%)
-    since 1.7.2.  Log lines to check: "config: colorAlpha ..." at startup,
-    and the "a=" column in "outline colors[...]" / "renderer params[...]"
-    (that "a=" is the opacity the renderer actually uses).
+* The colour covers the object so you cannot see its material:
+    that cannot happen since 1.7.3 - the outline is a contour, not a
+    fill.  If you set NoFill=0 yourself, set it back to 1.  Note that
+    AlphaXxx cannot fix a fill: it only affects the pulse (the engine
+    ignores the alpha byte for the fill, which is why 1.7.2 had no
+    visible effect).  Log lines to check: "config: noFill=1 ..." at
+    startup, and the "no fill" wording on each color override line.
 * Resources are not purple (they show up blue like misc):
     the log line starting with "resource keyword:" says whether the check
     passed. If it says it failed, send me that line. (You can also force

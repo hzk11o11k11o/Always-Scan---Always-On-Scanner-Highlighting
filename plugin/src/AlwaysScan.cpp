@@ -1023,36 +1023,47 @@ namespace SAS
 				0x00FF9500     // kCorpse      尸体 —— 橙（= 容器）
 			};
 
-			// ★★ v4.20：每个类别的「覆盖不透明度」（0~255；**0 = 特殊值 = 保留引擎原值**）。
-			//   动机（用户实测 + 截图）：v4.19 的高区分度色虽然生效了，但红 / 品红 / 白
-			//   以「引擎原本的不透明度」铺在近处物体上（门 / 武器 / 防具），把物品本身的
-			//   材质完全盖住 —— 用户要求「弄浅一点，能看见物品本身长什么样」。
-			//   ⇒ 让这几类**半透明**：材质透出来，颜色（高饱和）依旧一眼可辨。
-			//   ★ 为什么把「0」当特殊值：引擎每个状态的配色块本来就各带一套 alpha
-			//     （2026-09-25 实测原值：描边基色 0x00 / 0x20 / 0x40 / 0x22 / 0x01 / 0x1E
-			//     各不相同、脉冲 High 多为 0xFF）——「不写」必须能精确表达「别动 alpha」
-			//     （= v4.19 行为），所以只有被用户点名的三类默认带非 0 值，
-			//     其余类别与 v4.19 的观感**完全一致**（不做无谓的改动）。
-			//   ★ 写进哪里：脉冲 High（+0x00）/ 脉冲 Low（+0x20）/ 描边基色（+0x80）
-			//     **三处一起写同一个 alpha**。渲染器到底消费哪一处目前无法离线确认
-			//     （渲染侧 32 字节参数块里基色与脉冲色都带 alpha），三处同值最稳。
-			//   ★ INI 键 `AlphaXxx`（十进制 0~255，0 = 保留引擎原值）：
-			//       AlphaWeapon / AlphaApparel / AlphaDoor  默认 102（≈40%）
-			//       想更淡 = 更小（77 ≈ 30% / 51 ≈ 20%）；要不透明 = 255。
+			// ★ v4.20：每个类别的「覆盖不透明度」（0~255；**0 = 特殊值 = 保留引擎原值**）。
+			//   ★★ v4.21 订正（用户实测「1.7.2 没起作用」）：**alpha 不被渲染消费** ——
+			//     用户截图量化（`out/analyze_shot.py`）：被白色覆盖的门区域 41 600 px 的
+			//     R/G/B **p5~p95 只差 0~1 个灰阶（stdev=1.1）** ⇒ 画面是**不透明纯色填充**，
+			//     102(40%) 与 255(100%) 在画面上**逐像素相同**。
+			//   ⇒ 本键现在只作用于**脉冲色（轮廓）**，不再用于「让材质透出来」；
+			//     「不填充」改由 `Config::noFill`（基色 alpha=0）负责。
+			//   ⇒ 默认全 0（保留引擎原值）—— 与 v4.19 的轮廓观感逐字节一致。
 			std::array<std::uint8_t, kCategoryCount> colorAlpha{
-				0,    // kLoot        杂项 —— 原生蓝本来就是中等亮度，保持 v4.19 行为
-				102,  // kLootWeapon  武器、投掷物 —— ★ 40%（用户点名「覆盖太深」）
-				102,  // kLootApparel 太空服/背包/头盔/服饰 —— ★ 40%（同上）
+				0,    // kLoot        杂项
+				0,    // kLootWeapon  武器、投掷物
+				0,    // kLootApparel 太空服/背包/头盔/服饰
 				0,    // kLootAmmoAid 弹药、救援
 				0,    // kLootNote    笔记
 				0,    // kLootResource 资源
 				0,    // kContainer   容器
 				0,    // kDevice      设备
-				102,  // kDoor        门 —— ★ 40%（同上；大面积纯白最扎眼）
+				0,    // kDoor        门
 				0,    // kFlora       植物
 				0,    // kOther       MSTT（默认关）
 				0     // kCorpse      尸体
 			};
+
+			// ★★ v4.21：**「不填充」总开关**（本轮定性的落地）。
+			// ----------------------------------------------------------------
+			// 硬证据（2026-09-25 用户截图，工具 `out/analyze_shot.py`）：
+			//   · 门（白色覆盖）41 600 px：R/G/B 的 p5~p95 只差 0~1 个灰阶
+			//     （stdev=1.1）⇒ 渲染 = **不透明纯色填充**，alpha 完全没被消费；
+			//   · 手枪（红色覆盖）同理（p5~p95 只有 14 个灰阶的抖动）。
+			// ⇒ 「覆盖太深、盖住材质」不是 alpha 不够小，而是**引擎在"填充"**。
+			//
+			// ★ 引擎自己的用法：原版扫描仪扫物品用的 state 7/8
+			//   （TargetScannable / TargetScanned）的**描边基色 = 0x00000000（alpha=0）**
+			//   —— 即**不填充**，只有脉冲色（轮廓）在画 ⇒ 原版扫描时物品材质看得见。
+			//   而 v4.19 为了让颜色「画得出来」把 state 0/1 的基色 alpha 从 0 补成
+			//   0xFF ⇒ 亲手打开了「填充」这盏灯（v4.19 起「覆盖太深」的真正来源）。
+			//
+			// ⇒ v4.21：**基色（+0x80）一律写 `RGB + alpha=0`（不填充）**，
+			//   只保留脉冲色（+0x00/+0x20 = 彩色轮廓）⇒ 物品材质透出、颜色仍可辨。
+			// ⇒ INI `NoFill=0` 一键退回 v4.19 的「补 0xFF（实心填充）」行为。
+			bool noFill = true;
 
 			// ★ v4.19：诊断探针 —— 把「渲染侧实际收到的每状态参数块」打进日志
 			//   （含**基色**= 真正画出来的颜色）。每个会话最多 3 次、只读、带指针校验。
@@ -3205,6 +3216,15 @@ namespace SAS
 				REX::INFO("config: colorAlpha（覆盖不透明度，0=保留引擎原值，255=不透明）: {}",
 					alphaLog.empty() ? "（全部保留引擎原值 —— 覆盖强度与 v4.19 相同）" : alphaLog);
 			}
+
+			// --- ★★ v4.21：「不填充」总开关（基色 alpha=0 ⇒ 物品材质透出）---
+			//   动机/证据见 Config::noFill 的长注释（v4.20 的 alpha 实测「逐像素无变化」）。
+			g_cfg.noFill = getInt("NoFill", 1) != 0;
+			REX::INFO("config: noFill={} -> 描边基色（+0x80）写 {}（{}）",
+				g_cfg.noFill,
+				g_cfg.noFill ? "RGB + alpha=0" : "RGB + 引擎原 alpha（alpha=0 时补 0xFF）",
+				g_cfg.noFill ? "不填充：只有彩色轮廓，物品材质透出（v4.21 默认）"
+							 : "填充：v4.19/v4.20 的实心覆盖行为");
 
 			// ★ v4.19：渲染侧参数探针（把「渲染器实际收到的每状态基色/脉冲色」打进日志）
 			g_cfg.rendererProbe = getInt("RendererProbe", 1) != 0;
@@ -5916,7 +5936,7 @@ namespace SAS
 					stateWho[st] += kCategoryName[c];
 				}
 			}
-			// ② 逐状态写三处（High / Low / 描边基色）
+			// ② 逐状态写三处（脉冲 High / 脉冲 Low / 描边基色）
 			std::uint32_t applied = 0;
 			for (std::uint32_t st = 0; st < kOutlineManagerUsed; ++st) {
 				if (stateColor[st] == kColorUnset) {
@@ -5925,8 +5945,8 @@ namespace SAS
 				const auto rgb   = stateColor[st];
 				const auto alpha = stateAlpha[st];  // ★ v4.20：0 = 保留引擎原值
 				auto*      blk = tab + st * kOutlineParamStride;
-				// ★ v4.20：三处统一走这一条 —— 有配置 alpha 就写它（半透明 ⇒ 看得见材质），
-				//   没配置（0）就保留引擎原 alpha（= v4.19 行为，含脉冲的呼吸 alpha）。
+				// ★ v4.20：脉冲两处 —— 有配置 alpha 就写它，没配置（0）就保留引擎原 alpha
+				//   （= v4.19 行为，含脉冲的呼吸 alpha）。
 				const auto patchChannel = [rgb, alpha](std::uint8_t* p) {
 					auto v = *reinterpret_cast<std::uint32_t*>(p);
 					v = (alpha != 0) ? ((alpha << 24) | rgb) : ((v & 0xFF000000u) | rgb);
@@ -5936,12 +5956,16 @@ namespace SAS
 				const auto hiBefore   = *reinterpret_cast<const std::uint32_t*>(blk + kOffStatePulseHigh);
 				patchChannel(blk + kOffStatePulseHigh);  // 脉冲 High
 				patchChannel(blk + kOffStatePulseLow);   // 脉冲 Low
-				patchChannel(blk + kOffStateBaseColor);  // 描边基色
-				// 描边基色兜底：alpha 仍为 0 时补成 0xFF（state 7/8 原生就是 0，不补就画不出来）
-				{
+				// ★★ v4.21：描边基色 —— 默认写 `RGB + alpha=0`（**不填充**：只留脉冲轮廓，
+				//   物品材质透出）。`NoFill=0` 时退回 v4.19 的「alpha=0 补 0xFF（填充）」。
+				//   证据/推导见 Config::noFill 的长注释 + docs/20。
+				if (g_cfg.noFill) {
+					*reinterpret_cast<std::uint32_t*>(blk + kOffStateBaseColor) = rgb;  // alpha=0
+				} else {
+					patchChannel(blk + kOffStateBaseColor);
 					auto* p = blk + kOffStateBaseColor;
 					auto  v = *reinterpret_cast<std::uint32_t*>(p);
-					if ((v & 0xFF000000u) == 0) {
+					if ((v & 0xFF000000u) == 0) {  // v4.19 兜底（实心填充）
 						v |= 0xFF000000u;
 						*reinterpret_cast<std::uint32_t*>(p) = v;
 					}
@@ -5949,18 +5973,19 @@ namespace SAS
 				++applied;
 				char alphaNote[48];
 				if (alpha != 0) {
-					std::snprintf(alphaNote, sizeof(alphaNote), "%u/255（约 %u%%）",
+					std::snprintf(alphaNote, sizeof(alphaNote), "脉冲 %u/255（约 %u%%）",
 						alpha, (alpha * 100u + 127u) / 255u);
 				} else {
-					std::snprintf(alphaNote, sizeof(alphaNote), "保留引擎原值");
+					std::snprintf(alphaNote, sizeof(alphaNote), "脉冲保留引擎原值");
 				}
-				char buf[320];
+				char buf[352];
 				std::snprintf(buf, sizeof(buf),
 					"outline colors: state=%u 覆盖为 #%06X <- %s"
-					"（描边基色原值 0x%08X%s；脉冲 High 原值 0x%08X；不透明度 %s）",
+					"（描边基色原值 0x%08X -> %s；脉冲 High 原值 0x%08X；%s）",
 					st, rgb, stateWho[st].c_str(), baseBefore,
-					(baseBefore & 0xFF000000u) == 0 ? "，alpha=0 已补 0xFF" : "", hiBefore,
-					alphaNote);
+					g_cfg.noFill ? "写为 #RRGGBB + alpha=0（不填充：物品材质透出）"
+								 : "写为 #RRGGBB（填充模式，alpha=0 时补 0xFF）",
+					hiBefore, alphaNote);
 				REX::INFO("[{}] {}", a_tag, buf);
 			}
 			return applied;
