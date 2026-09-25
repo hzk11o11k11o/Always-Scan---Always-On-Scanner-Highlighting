@@ -3,20 +3,28 @@
  Always-on scanner highlighting for Starfield
 ========================================================================
 
-Version  : 1.7  (plugin build 4.18.0)
+Version  : 1.7.1  (plugin build 4.19.0)
+           1.7.1 = two things. (1) The category colors are now picked for
+           maximum contrast - the engine's own palette is all blues in
+           the range the pick-up items used, which is why guns, suits
+           and slates still looked alike. (2) The color override itself
+           was writing into the wrong engine table (a float constant
+           area), so it never changed anything on screen; the correct
+           table is now used and every category is written to it before
+           any highlight manager exists. New defaults: weapons RED,
+           spacesuits/clothing MAGENTA, ammo & aid BRIGHT GREEN, notes
+           YELLOW, resources PURPLE, misc BLUE (unchanged), containers &
+           bodies ORANGE, devices CYAN, doors WHITE, flora BRIGHT GREEN.
+           See "CATEGORY COLORS" below.
            1.7 = fix: with 1.6 the new category colors could end up not
            showing at all (if you saw the same outline color on guns,
            spacesuits and data slates, this is it). The custom colors
            are now written into the engine's color tables *before* any
            highlight manager is created - a manager only reads those
            tables at creation time and is never refreshed afterwards.
-           Weapons / spacesuits / notes / resources now really get their
-           own colors. No INI changes.
+           No INI changes.
            1.6 = lootable items are now color-coded by inventory
-           category: weapons & throwables (cyan), spacesuits / helmets /
-           packs / clothing (pale blue), ammo & aid (green), notes
-           (yellow), resources (purple). Misc items keep their old blue.
-           See "CATEGORY COLORS" below.
+           category. See "CATEGORY COLORS" below.
            Also: the configuration file SAS_AlwaysScan.ini now lives
            next to the mod's esm (same folder as the log). If you have an
            older installation with the INI in SFSE\Plugins\, that one is
@@ -48,18 +56,24 @@ feature, just always on.
 
 Highlights are color-coded by category (all values configurable).
 Pick-up items follow the game's own inventory categories:
-  * Weapons and throwables (guns, melee, grenades, mines)            cyan
-  * Spacesuits / helmets / packs / clothing                          pale blue
-  * Ammo and aid (meds, food, drinks)                                green
-  * Notes (notes, data slates, magazines, books)                     yellow
-  * Resources (iron, aluminium, helium-3, organics, ...)             purple
-  * Misc items (digipicks, credits, toys) - unchanged from 1.5       blue
-  * Containers (loot the good stuff)                                 orange
+  * Weapons and throwables (guns, melee, grenades, mines)            RED
+  * Spacesuits / helmets / packs / clothing                          MAGENTA
+  * Ammo and aid (meds, food, drinks)                                BRIGHT GREEN
+  * Notes (notes, data slates, magazines, books)                     YELLOW
+  * Resources (iron, aluminium, helium-3, organics, ...)             PURPLE
+  * Misc items (digipicks, credits, toys) - unchanged from 1.5       BLUE
+  * Containers (loot the good stuff)                                 ORANGE
   * Bodies / corpses - people, creatures and wrecked robots / turrets
-    (anything you can search)                                        orange
-  * Interactive devices / computers                                  green
-  * Doors                                                            red
-  * Flora (harvestable plants)                                       green
+    (anything you can search)                                        ORANGE
+  * Interactive devices / computers                                  CYAN
+  * Doors                                                            WHITE
+  * Flora (harvestable plants)                                       BRIGHT GREEN
+
+The six pick-up categories sit at hues that are at least ~44 degrees
+apart (red / magenta / bright green / yellow / purple, plus the original
+misc blue), so they can be told apart at a single glance. Every category
+gets its colour assigned explicitly by the mod (see ColorXxx in the INI),
+instead of borrowing the engine's default per-state colours.
 
 "Resources" are recognised from the item record itself (the game marks
 them with its own ResourceType keywords), so both vanilla and mod-added
@@ -124,18 +138,20 @@ Most useful options:
   HotkeyVK=119          toggle hotkey, 119 = F8 (see the file for a key table)
   RadiusMeters=50       highlight radius around the player
   MaxTargets=256        how many objects are outlined at the same time
-  StateWeapon=0         outline color state per category (the INI documents
-  StateApparel=1        all 11 native colors).  Defaults:
-  StateAmmoAid=5          weapons/throwables 0 (cyan)   suits/helmet/pack 1
-  StateNote=6             ammo/aid 5 (green)            notes 6 (yellow)
-  StateResource=7         resources 7 (purple)          misc 2 (blue, = 1.5)
-  StateLoot=2             containers & bodies 9 (orange)  devices 4 (green)
-                          doors 10 (red)   flora 5 (green)
-  ColorNote=FFD700      exact RGB for notes / resources.  These two are set
-  ColorResource=AA6EFF  by default because their outline states have no usable
-                        native color.  Change them freely; note that this
-                        writes the engine's global color table, so the same
-                        state of the vanilla scanner changes too (see the INI).
+  StateWeapon=0         outline color state per category (0..10; the INI
+  StateApparel=1        documents them). Defaults:
+  StateAmmoAid=5          weapons 0   suits/helmet/pack 1   ammo&aid 5
+  StateNote=6             notes 6     resources 7           misc 2 (= 1.5)
+  StateResource=7         containers & bodies 9             devices 4
+  StateLoot=2             doors 10    flora 5
+  ColorWeapon=FF2E2E    exact RGB per category (all set by default):
+  ColorApparel=FF3BD4     weapons red / suits magenta / ammo bright green
+  ColorAmmoAid=00FF66     notes yellow / resources purple / misc blue
+  ColorNote=FFD700        containers & bodies orange / devices cyan
+  ColorResource=B36BFF    doors white / flora bright green / MSTT unset
+  ColorContainer=FF9500 Change them freely; note that this writes the
+  ColorDevice=00E5FF    engine's global per-state color block, so the same
+  ColorDoor=FFFFFF      state of the vanilla scanner changes too (see the INI).
   ResourceByKeyword=1   recognise "resources" from the item record's own
                         ResourceType keywords (default on).  0 = every MISC
                         item counts as misc (the 1.5 behaviour).
@@ -236,10 +252,12 @@ categories).
     set the matching EnableXxx=0 in the INI. The log's "candTypes" line
     prints the form type of everything that was considered.
 * Colors are hard to tell apart:
-    the log's "stateByCategory" line shows which state each category
-    uses; change the StateXxx values and restart. The colours the engine
-    actually has per state are printed in the "outline colors[...]" lines,
-    and the "colorOverride" line lists the exact RGB the mod applies.
+    since 1.7.1 every category has its own colour, so this should not
+    happen - but you can change any of them: the "colorOverride" config
+    line lists the RGB the mod applies, and "outline colors[...]" prints
+    the per-state values (base colour + pulse). The "renderer params"
+    lines show what the renderer actually received (base colour = what
+    you see on screen). Set ColorXxx=RRGGBB in the INI and restart.
 * Resources are not purple (they show up blue like misc):
     the log line starting with "resource keyword:" says whether the check
     passed. If it says it failed, send me that line. (You can also force

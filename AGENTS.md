@@ -14,6 +14,7 @@
 - 基于SFSE制作
 - 要有日志，但日志文件不能超过1M，旧内容要做到滚动删除，日志文件要生成在和esm文件同级目录里
 - 配置文件要放在和esm文件同级目录里
+- 不同类别物品颜色区分度要高，不要弄太相近的颜色，肉眼很难分辨
 
 ## starfield安装位置
 D:\SteamLibrary\steamapps\common\Starfield（sfse已安装）

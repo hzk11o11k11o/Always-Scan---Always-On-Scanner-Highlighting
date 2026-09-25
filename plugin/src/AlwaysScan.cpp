@@ -929,32 +929,29 @@ namespace SAS
 			//       原版扫描仪求值只产生 0/1、2/3、7/8、9）⇒ 尽量别动它们；
 			//     · **4 / 5 / 6 / 10 全镜像没有任何代码写**（`func.py callers 0x17D52B0`
 			//       只有那两个调用点）⇒ 这几个状态是「本 MOD 专用」的。
-			//   ⇒ 五个物品子类：0 青（武器，原生）/ 1 淡蓝白（服饰，原生）/
-			//     5 绿（弹药救援，原生；植物共用同一个绿）/ 6 黄（笔记，**覆盖**）/
-			//     7 紫（资源，**覆盖**）。
-			//   ★ 6 与 7 的原生配色不适合当分类色（6 = 与杂项同色，7 = ref 表是
-			//     0x00000000、画不出来）⇒ 用 INI 的 `ColorNote` / `ColorResource`
-			//     覆盖成黄 / 紫（默认值写在本结构体的 colorOverride 里，**不写 INI
-			//     也生效**）。详见 ApplyColorOverrides（含「alpha=0 的槽要补成不透明」）。
-			//   ★ 7 是引擎也会用的状态（原版「TargetScannable」）—— 覆盖它的颜色
-			//     意味着原版扫描仪在该状态下的目标也会跟着变紫（可选副作用；不想要
-			//     就把 `StateResource` 改成 3 或 8，或把 `ColorResource` 写成其它颜色）。
-			//   ★ kOther（MSTT，默认关）从 1 挪到 **3**：state 1 让给「服饰」，
-			//     而 3 与 2 在引擎里是**同一个蓝**（实测 ref 值完全相同），
-			//     所以打开 EnableOther 时看到的是「和杂项同色的蓝」（MSTT 默认关，影响极小）。
+			//   ★★★ v4.19：**颜色不再依赖状态的原生值** —— 用户实测反馈「不同类别
+			//     看起来是同一个颜色」（原生 state 0/1/2/3 全是蓝色系：青 / 淡蓝白 /
+			//     蓝 / 蓝，根本分不开），要求「区分度要高、别用相近色」。现在按类别
+			//     **逐一覆盖颜色**（见下面的 colorOverride），状态只当「颜色槽」用：
+			//     同一状态 = 同一色 ⇒ 共享状态的类别必须同色（容器+尸体 = 9、
+			//     弹药救援+植物 = 5）。
+			//   ★ 覆盖 state 7 会连带影响原版扫描仪的 "TargetScannable"（它也写 7）——
+			//     现在两边都是同一套类别色，观感一致，属预期副作用。
+			//   ★ kOther（MSTT，默认关）用 3（原生蓝，**不覆盖**）：MSTT 是桌椅 / 纸箱
+			//     这类装饰物，打开时跟杂项同蓝即可。
 			std::array<int, kCategoryCount> stateByCategory{
-				2,  // kLoot        杂项 —— 蓝（**不变**，用户需求）
-				0,  // kLootWeapon  武器、投掷物 —— 青（原生 state 0）
-				1,  // kLootApparel 太空服/背包/头盔/服饰 —— 淡蓝白（原生 state 1）
-				5,  // kLootAmmoAid 弹药、救援 —— 绿（原生 state 5，与植物同色）
-				6,  // kLootNote    笔记 —— 黄（覆盖；原生 6 与杂项同为蓝）
-				7,  // kLootResource 资源 —— 紫（覆盖；原生 7 的 ref 色是 0，不可见）
-				9,  // kContainer   容器 —— 橙（不变）
-				4,  // kDevice      设备 —— 绿（不变）
-				10, // kDoor        门 —— 红（不变）
-				5,  // kFlora       植物 —— 绿（不变）
-				3,  // kOther       MSTT（默认关）—— 蓝（与杂项同色）
-				9   // kCorpse      尸体 —— 橙（不变）
+				2,  // kLoot        杂项 —— 蓝（**原生不变**，用户需求）
+				0,  // kLootWeapon  武器、投掷物 —— ★ 覆盖为 红 #FF2E2E
+				1,  // kLootApparel 太空服/背包/头盔/服饰 —— ★ 覆盖为 品红 #FF3BD4
+				5,  // kLootAmmoAid 弹药、救援 —— ★ 覆盖为 亮绿 #00FF66（与植物同 state ⇒ 同色）
+				6,  // kLootNote    笔记 —— 黄 #FFD700
+				7,  // kLootResource 资源 —— 紫 #B36BFF
+				9,  // kContainer   容器 —— 橙 #FF9500（与尸体同 state ⇒ 同色）
+				4,  // kDevice      设备 —— ★ 覆盖为 青 #00E5FF（原生 4 是绿，会和弹药撞色）
+				10, // kDoor        门 —— ★ 覆盖为 白 #FFFFFF（原生红会和武器红撞色）
+				5,  // kFlora       植物 —— 亮绿（= 弹药救援）
+				3,  // kOther       MSTT（默认关）—— 原生蓝（不覆盖）
+				9   // kCorpse      尸体 —— 橙（= 容器）
 			};
 
 			// ================================================================
@@ -994,20 +991,42 @@ namespace SAS
 
 			// ★ v4.0.1：可选的「自定义类别颜色」（INI 里写 ColorLoot=RRGGBB 之类）。
 			//   kColorUnset = 不覆盖，完全用引擎那个状态的原生配色。
-			//   设了就把 RGB 写进引擎的每状态配色表，再让引擎刷新管理器 + 整批重挂
-			//   （详见 ApplyColorOverrides）。
-			//   ★ v4.17：「笔记」「资源」两个新类别**在这里就带默认色**（黄 / 紫）——
-			//     因为它们挑的 state 6/7 原生配色不可用（6 与杂项同蓝、7 是 0 不可见），
-			//     **没有 INI 也必须覆盖**；其余类别的默认仍是「不覆盖」。
+			//   设了就把 RGB 写进引擎的每状态**配色块**（+0x00/+0x20 脉冲、+0x80 基色），
+			//   再让引擎建/刷管理器 + 整批重挂（详见 WriteColorOverrides / ApplyColorOverrides）。
+			//   ★★ v4.19：「**默认值就是最终配色**」—— 除 kOther（MSTT，默认关）外
+			//     全部类别都带默认色，所以**不写 INI 也有一套高区分度的颜色**；
+			//     INI 里的 `ColorXxx` 只是「想改才写」。INI 缺这些键**不再影响效果**。
+			// ★★★ v4.19：默认配色改为**高区分度调色板**（用户要求「不同类别颜色区分度
+			//   要高，不要弄太相近的颜色，肉眼很难分辨」）。
+			//   配色原则（每条都写进 docs/18）：
+			//     · 六个「物品组」占据六个相隔 ≥44° 的色相：
+			//         武器 红 #FF2E2E(0°) / 服饰 品红 #FF3BD4(316°) / 弹药救援 亮绿 #00FF66(150°)
+			//         / 笔记 黄 #FFD700(51°) / 资源 紫 #B36BFF(268°) / 杂项 蓝 #1F8EE2(207°，**原生不动**)
+			//     · 世界类目标（容器/尸体 橙 #FF9500、设备 青 #00E5FF、门 白 #FFFFFF）
+			//       也都跟上面六个错开；
+			//     · **共享 state 的两组颜色必须一致**（容器+尸体 = 9、弹药救援+植物 = 5），
+			//       否则会互相覆盖（WriteColorOverrides 里有撞色 WARN）。
+			//   ★ 结论：能覆盖的一律覆盖（不再依赖「原生状态色」—— 原生 0/1/2/3 全是蓝色系，
+			//     正是用户说的「看起来一样」）。
 			std::array<std::uint32_t, kCategoryCount> colorOverride{
-				kColorUnset,   // kLoot        杂项 —— 原生蓝（不变）
-				kColorUnset,   // kLootWeapon  原生青
-				kColorUnset,   // kLootApparel 原生淡蓝白
-				kColorUnset,   // kLootAmmoAid 原生绿
-				0x00FFD700u,   // kLootNote     ★ 默认 黄（#FFD700）—— 覆盖 state 6
-				0x00AA6EFFu,   // kLootResource ★ 默认 紫（#AA6EFF）—— 覆盖 state 7
-				kColorUnset, kColorUnset, kColorUnset, kColorUnset, kColorUnset, kColorUnset
+				0x001F8EE2u,   // kLoot        杂项 —— 蓝 #1F8EE2（= 原生值，用户要求「不变」）
+				0x00FF2E2E,    // kLootWeapon  武器、投掷物 —— 红
+				0x00FF3BD4,    // kLootApparel 太空服/背包/头盔/服饰 —— 品红
+				0x0000FF66,    // kLootAmmoAid 弹药、救援 —— 亮绿（与植物同 state 5 ⇒ 必须同色）
+				0x00FFD700,    // kLootNote    笔记 —— 黄
+				0x00B36BFF,    // kLootResource 资源 —— 紫
+				0x00FF9500,    // kContainer   容器 —— 橙（与尸体同 state 9 ⇒ 必须同色）
+				0x0000E5FF,    // kDevice      设备 —— 青
+				0x00FFFFFF,    // kDoor        门 —— 白
+				0x0000FF66,    // kFlora       植物 —— 亮绿（= 弹药救援）
+				kColorUnset,   // kOther       MSTT（默认关）—— 不覆盖（原生蓝）
+				0x00FF9500     // kCorpse      尸体 —— 橙（= 容器）
 			};
+
+			// ★ v4.19：诊断探针 —— 把「渲染侧实际收到的每状态参数块」打进日志
+			//   （含**基色**= 真正画出来的颜色）。每个会话最多 3 次、只读、带指针校验。
+			//   排「颜色没生效」时非常有用；不想要噪音就写 `RendererProbe=0`。
+			bool          rendererProbe   = true;
 
 			// ★★ v4.17：「资源」判据 = 读 MISC 记录上的 `ResourceType*` 关键词
 			//   （离线实证：1319 条 MISC 里 410 条带它 = 资源物品；909 条不带 =
@@ -1569,6 +1588,9 @@ namespace SAS
 			std::size_t   verifyCursor       = 0;  // 轮转游标（覆盖所有已挂目标）
 			std::uint64_t outline3DProbes    = 0;  // 复检了多少次
 			std::uint64_t outline3DReasserts = 0;  // 其中发现 3D 变了、重挂了多少次
+
+			// --- ★ v4.19：渲染侧参数探针跑了多少次（每会话限流 3 次，见 LogRendererParams）---
+			std::uint32_t rendererProbeRuns  = 0;
 
 			// --- ★ v4.7：移动距离（诊断：把「行走」和「跳过」对起来看）---
 			RE::NiPoint3 lastPos{};
@@ -3125,6 +3147,12 @@ namespace SAS
 				REX::INFO("config: colorOverride（实际生效）: {}",
 					colorLog.empty() ? "（无 —— 全部用引擎原生配色）" : colorLog);
 			}
+
+			// ★ v4.19：渲染侧参数探针（把「渲染器实际收到的每状态基色/脉冲色」打进日志）
+			g_cfg.rendererProbe = getInt("RendererProbe", 1) != 0;
+			REX::INFO("config: rendererProbe={} -> 每个会话最多打 3 次 `renderer params[...]`"
+					  "（基色 = 真正画出来的颜色；排「颜色没生效」时看它）",
+				g_cfg.rendererProbe);
 
 			// ★ v4.17：「资源」判据（MISC 的 ResourceType* 关键词）总开关
 			g_cfg.resourceByKeyword = getInt("ResourceByKeyword", 1) != 0;
@@ -5222,20 +5250,36 @@ namespace SAS
 		constexpr std::uintptr_t kRvaOutlineEnsureManagers = 0x17D47B0;
 
 		// ================================================================
-		// ★ v4.0.1：每状态「高亮参数」的两张静态表（颜色就住在这里）
+		// ★★★ v4.19：每状态「高亮参数块」—— 配色就住在这里（地址订正，见 docs/18）
 		// ----------------------------------------------------------------
-		// 逆向推导见 docs/03 第十四节。每张表 stride = 0xA0，颜色在 +0x00 / +0x20
-		// 两个 dword（引擎按脉冲相位在 High/Low 之间插值），字节序 = R,G,B,A。
-		//   · 0x591E088：建/刷新 HighlightManager 时读（`0x17D47B0` 里的
-		//     `movsxd rbp, r8d ... vmovd xmm0,[rax + r15 + 0x5919b08]` 同族）
-		//   · 0x5919B08：把引用挂进管理器时读（`0x17D4CD0` 里
-		//     `lea rax,[rbx+rbx*4]; shl rax,5; vmovd xmm0,[rax+r15+0x5919b08]`）
-		// ★ 这两张表**不是 0 初始化**：进程启动的静态初始化函数就把原版默认配色写进去了
+		// 每状态一块，stride = **0xA0**；块内字段（dword 布局 = `0xAARRGGBB`）：
+		//     +0x00  脉冲 High 色      ┐
+		//     +0x20  脉冲 Low 色       │ `0x17D47B0` 建/刷 HighlightManager 时读它们，
+		//     +0x40  float 插值除数    │ 算出一份 32 字节参数块交给渲染侧
+		//     +0x60  float（原样透传） ┘
+		//     +0x80  ★★ 描边基色 —— 挂引用（`0x17D4CD0`）时读的就是它；引擎交给
+		//             渲染侧的 32 字节参数块的 +0x00 也是它 ⇒ **画出来的就是这个颜色**
+		//            （实证：只覆盖 state 6 的 +0x80 就把笔记描边变成了黄色）
+		//   ⇒ 块基址 = **0x5919A88**（state k 的块 = 基址 + k*0xA0）。
+		//     ★ 老代码/老文档记的「mgr 表 0x591E088」= 基址 + **112**×0xA0 ——
+		//       那其实是**另一片 float 常量区**（镜像里 0x44D471E0 = 1702.11f 这类值）。
+		//       v4.1~v4.18 一直在往那儿写 RGB：**既没有效果，又污染了那张常量表**
+		//       （E3 之后 alpha 字节被我们保留，才没把 float 直接写坏）。
+		//   ★ 订正依据（2026-09-25，反汇编 `0x17D47B0` 的循环体）：
+		//       `lea r14,[rip+0x414525e]` ⇒ r14 = 0x5919AE8 = 块基址 + 0x60；
+		//       循环尾 `add r14,0xA0`、`sub r12,1`（r12 = 0xB = 11 次）；
+		//       循环内读 [r14-0x60] / [r14-0x40] / [r14-0x20] / [r14] / [r14+0x20]，
+		//       其中 [r14+0x20] = 0x5919B08 —— 正是本 MOD 一直在写的「ref 表」。
+		// ★ 这两组值**不是 0 初始化**：进程启动的静态初始化函数就把原版默认配色写进去了
 		//   （反汇编实证：0xF2AD3E 橙、0xFFE872 金、0x695B11 橄榄 …），之后由
 		//   `:Monocle` / `aHighlightScannableOutlineColorHigh|Low_<变体>` 设置刷新。
 		//   动态调试时用 `LogOutlineColors()` 直接把 11 个状态的颜色打出来对着看。
-		constexpr std::uintptr_t kRvaOutlineMgrParams = 0x591E088;
-		constexpr std::uintptr_t kRvaOutlineRefParams = 0x5919B08;
+		constexpr std::uintptr_t kRvaOutlineParams     = 0x5919A88;  // 块基址（state 0 的 +0x00）
+		constexpr std::size_t    kOffStatePulseHigh    = 0x00;       // 脉冲 High（dword）
+		constexpr std::size_t    kOffStatePulseLow     = 0x20;       // 脉冲 Low（dword）
+		constexpr std::size_t    kOffStatePulseDivisor = 0x40;       // float
+		constexpr std::size_t    kOffStateExtra        = 0x60;       // float
+		constexpr std::size_t    kOffStateBaseColor    = 0x80;       // ★ 描边基色（dword）
 
 		// ================================================================
 		// ★★★ 摘掉高亮真正需要的两个引擎函数（v2.1 修正「F8 关不掉」的根因）★★★
@@ -5541,7 +5585,7 @@ namespace SAS
 			//   （world-ready 还会再写一次，兜住「引擎中途改表」；两次都是幂等写。）
 			{
 				const auto applied = WriteColorOverrides("install");
-				REX::INFO("outline colors[install]: 已在管理器创建之前写入 {} 个类别的覆盖色"
+				REX::INFO("outline colors[install]: 已在管理器创建之前写入 {} 个状态的覆盖色"
 						  "（管理器 alive={}/{} —— 若为 0 则后续创建的管理器直接用这些颜色）",
 					applied, CountLiveManagers(), kOutlineManagerUsed);
 			}
@@ -5595,24 +5639,17 @@ namespace SAS
 		}
 
 		// ====================================================================
-		// ★ v4.0.1：每状态配色表（诊断 + 可选覆盖）
+		// ★ v4.0.1 / ★★ v4.19 订正：每状态「配色块」（诊断 + 覆盖）
 		// --------------------------------------------------------------------
-		// 逆向结论（1.16.244.0，见 docs/03 第十四节）：
-		//   引擎为「每个 outline 状态」各存一组高亮参数（0xA0 字节），颜色是**两个
-		//   dword**（低/高，引擎按脉冲相位在两者之间插值），字节序 = R,G,B,A：
-		//
-		//     表 A（管理器参数）RVA 0x591E088 + state*0xA0  —— `0x17D47B0` 建/刷新
-		//          HighlightManager 时读它（+0x00 = High、+0x20 = Low、+0x40 = 插值除数）
-		//     表 B（引用参数）  RVA 0x5919B08 + state*0xA0  —— `0x17D4CD0` 把引用挂进
-		//          管理器时读它（+0x00）
-		//
-		//   这两张表**都不是 0 初始化**：进程启动时的静态初始化函数就把原版默认配色
-		//   写进去了（反汇编实证：0xF2AD3E 橙 / 0xFFE872 金 / 0x695B11 橄榄 …），
-		//   之后由 `:Monocle` 那 11 组 `aHighlightScannableOutlineColorHigh/Low_<变体>`
-		//   设置刷新。
-		//
+		// 每状态一个 0xA0 的块，块基址 = `kRvaOutlineParams`（0x5919A88），字段见常量区：
+		//   +0x00 / +0x20 = 脉冲 High / Low —— `0x17D47B0` 建/刷管理器时读；
+		//   +0x40 = float 插值除数、+0x60 = float（都原样透传给渲染侧）；
+		//   +0x80 = ★★ 描边基色 —— 挂引用（`0x17D4CD0`）时读的就是它，
+		//           引擎交给渲染侧的 32 字节参数块的 +0x00 也是它 ⇒ **画出来的是它**。
 		//   所以「每个状态本来就是不同颜色」，本 MOD 只需要把类别映射到不同的状态
-		//   （或进一步用 INI 覆盖成自己想要的颜色）。
+		//   （或进一步用 INI 的 `ColorXxx` 覆盖成想要的颜色）。
+		// ★ 老版本写/读的 0x591E088 = 块基址 + 112×0xA0，那是**另一片 float 常量区**
+		//   （v4.19 订正：以前是「写错表」，既没效果又污染常量；见 docs/18）。
 		// ====================================================================
 		constexpr std::size_t kOutlineParamStride = 0xA0;
 		// 顺序 = 引擎静态初始化函数里的写入顺序（docs/03 第十四节有推导）。
@@ -5633,29 +5670,27 @@ namespace SAS
 
 		void LogOutlineColors(const char* a_tag)
 		{
-			auto* mgrTab = OutlineParamTable(kRvaOutlineMgrParams);
-			auto* refTab = OutlineParamTable(kRvaOutlineRefParams);
-			if (!mgrTab || !refTab) {
-				REX::WARN("outline colors[{}]: 配色表不可读（RVA 0x{:X}/0x{:X} 在这个版本上变了？）",
-					a_tag, kRvaOutlineMgrParams, kRvaOutlineRefParams);
+			auto* tab = OutlineParamTable(kRvaOutlineParams);
+			if (!tab) {
+				REX::WARN("outline colors[{}]: 配色块不可读（RVA 0x{:X} 在这个版本上变了？）",
+					a_tag, kRvaOutlineParams);
 				return;
 			}
+			// dword 的布局是 **`0xAARRGGBB`**（★ v4.17 静态初始化函数实证：
+			// state 0 写进去的就是 0xFF3EADF2 = 青 + 不透明；截图也对得上）。
+			const auto rgbOf = [](std::uint32_t v) {
+				return static_cast<unsigned>(((v >> 16) & 0xFFu) << 16 | ((v >> 8) & 0xFFu) << 8 | (v & 0xFFu));
+			};
 			for (std::uint32_t i = 0; i < kOutlineManagerUsed; ++i) {
-				const auto rd = [](const std::uint8_t* p) {
-					return *reinterpret_cast<const std::uint32_t*>(p);
+				const auto rd = [tab, i](std::size_t a_off) {
+					return *reinterpret_cast<const std::uint32_t*>(tab + i * kOutlineParamStride + a_off);
 				};
-				const auto hi = rd(mgrTab + i * kOutlineParamStride);
-				const auto lo = rd(mgrTab + i * kOutlineParamStride + 0x20);
-				const auto rf = rd(refTab + i * kOutlineParamStride);
-				// dword 的布局是 **`0xAARRGGBB`**（★ v4.17 静态初始化函数实证：
-				// state 0 写进去的就是 0xFF3EADF2 = 青 + 不透明；截图也对得上）。
-				// 这里只打印 RGB 三个通道（alpha 一般 0xFF，state 7/8 是 0）。
-				const auto rgbOf = [](std::uint32_t v) {
-					return static_cast<unsigned>(((v >> 16) & 0xFFu) << 16 | ((v >> 8) & 0xFFu) << 8 | (v & 0xFFu));
-				};
-				char buf[160];
+				const auto rf = rd(kOffStateBaseColor);
+				const auto hi = rd(kOffStatePulseHigh);
+				const auto lo = rd(kOffStatePulseLow);
+				char buf[192];
 				std::snprintf(buf, sizeof(buf),
-					"  state=%2u %-18s ref=#%06X (%3u,%3u,%3u) mgrHigh=#%06X mgrLow=#%06X",
+					"  state=%2u %-18s 基色=#%06X (%3u,%3u,%3u) 脉冲High=#%06X 脉冲Low=#%06X",
 					i, kOutlineStateName[i], rgbOf(rf),
 					(rf >> 16) & 0xFFu, (rf >> 8) & 0xFFu, rf & 0xFFu,
 					rgbOf(hi), rgbOf(lo));
@@ -5663,43 +5698,124 @@ namespace SAS
 			}
 		}
 
-		// 把 INI 里的自定义颜色写进引擎的配色表（只对「被类别用到的状态」）。
-		//   ★★ v4.17 重新核对（反汇编 0x17D4CD0「挂引用」段 + exe 静态初始化函数，
-		//      两条实证都记在 docs/16 §配色）：
-		//     · dword 布局 = **`0xAARRGGBB`**（静态初始化函数写 state 0 的颜色是
-		//       `mov byte [rbp+0x20],0xF2 / mov word [rbp+0x21],0x3EAD /
-		//        mov byte [rbp+0x23],0xFF` ⇒ 0xFF3EADF2 = 青 + 不透明）；
-		//     · **真正画出来的是「引用参数表」+0x00 这个 dword** —— 挂引用时把它
-		//       读出并拆成 4 个 float 颜色分量（与画面实测色一致）；
-		//     · 管理器参数表 +0x00/+0x20（High/Low）是**脉冲插值**用的颜色，实测
-		//       运行时它们的 alpha 是 0x00（与 ref 表不同）⇒ 只改 RGB、alpha 原样。
-		//   ★ v4.17 新增：ref 表 alpha = 0 时**补成 0xFF** —— 只有 7/8 这种从没被
-		//     初始化过的槽会是 0（原版也画不出它们），不补的话覆盖了 RGB 也看不到。
-		//
-		//   ★★★ v4.18：拆成「只写表」和「写表 + 让引擎用上」两步 —— 这是本轮
-		//     实测「所有东西颜色没区别」的**根因修复**：
-		//     · 反汇编 `0x17D47B0`（建/刷管理器）已实证：
-		//         `mov rcx,[rdi]（managers[i]）; test rcx,rcx; jne 已存在分支`
-		//         已存在分支 = `mov eax,[rcx+0x28]; cmp eax,[rcx+0x30]; je <跳过>`
-		//         —— 两个版本字段相等 ⇒ **整段跳过，不重算颜色**；
-		//         真的创建（`0x6532F0` + `0x653850`）才会把「从 mgr 表算出来的
-		//         颜色参数」交给渲染侧。
-		//       ⇒ **管理器的颜色只在创建那一刻读表**，之后再改表也没用。
-		//     · v4.17 的调用顺序恰好是「先 ensure 建管理器、后写表」
-		//       （RefreshOutlineParamsOnce 里 `ensure → ApplyColorOverrides`）
-		//       ⇒ 管理器带着原生配色出生 ⇒ 用户看到的仍是原版颜色
-		//       （枪青 / 太空服淡蓝白 / 数据板蓝）。
-		//     ⇒ 现在把「写表」提前到 **install（进游戏之前、0/11 管理器）**，
-		//       之后无论引擎还是我们创建管理器，用的都是覆盖后的表；
-		//       world-ready 再写一次（幂等，兜住「引擎中途改表」）。
+		// ====================================================================
+		// ★★ v4.19 诊断：读「渲染侧」每状态实际收到的 32 字节参数块
+		// --------------------------------------------------------------------
+		// 依据（反汇编 `0x653850`「把参数块交给渲染侧」，见 docs/18）：
+		//     rax = [rip+0x5321979]（RVA 0x59751E8）= 高亮宿主对象
+		//     rsi = [rax+0xE8]           = 高亮管理器集合
+		//     [rsi+0x2C8] = u32 数组：managerID → 槽号
+		//     [rsi+0x3C8] = 槽数组：**每槽 32 字节**（= `0x17D47B0` 算出来的参数块）
+		//     managerID   = `[mgr+0x40] & 0xFFFFFF`
+		// 参数块布局（`0x17D47B0` 里那段打包）：
+		//     +0x00 dword = **描边基色**（= 配色块 +0x80，也就是画出来的颜色）
+		//     +0x04 dword = 0
+		//     +0x08 dword = 脉冲色（High/Low 按相位插值后打包）
+		//     +0x0C float = 配色块 +0x60（原样透传）
+		//     +0x10 float = 引擎常量
+		// 用途：`基色` 就是渲染器实际用的颜色 —— 覆盖生效时它应等于我们写的值；
+		//       若仍是原生值 ⇒ 管理器是在写表之前建的（颜色不会变）。
+		// ★ 全程只读、每一步都过 IsReadable；拿不到就记一行 WARN 并放弃（不重试）。
+		// ====================================================================
+		constexpr std::uintptr_t kRvaRenderHost       = 0x59751E8;
+		constexpr std::size_t    kOffHostHighlightSet = 0xE8;
+		constexpr std::size_t    kOffHlIdToSlot       = 0x2C8;
+		constexpr std::size_t    kOffHlSlotData       = 0x3C8;
+		constexpr std::size_t    kOffManagerId        = 0x40;
+		constexpr std::size_t    kRenderSlotStride    = 32;
+		constexpr int            kRendererProbeMax    = 3;  // 每个会话最多跑几次（限流）
+
+		void LogRendererParams(const char* a_tag)
+		{
+			if (!g_cfg.rendererProbe || g_state.rendererProbeRuns >= kRendererProbeMax) {
+				return;
+			}
+			++g_state.rendererProbeRuns;
+			const auto derefPtr = [](std::uintptr_t a_addr) -> std::uintptr_t {
+				if (!IsReadable(reinterpret_cast<const void*>(a_addr), sizeof(std::uintptr_t))) {
+					return 0;
+				}
+				return *reinterpret_cast<const std::uintptr_t*>(a_addr);
+			};
+			const auto host  = derefPtr(ModuleBase() + kRvaRenderHost);
+			const auto hl    = host ? derefPtr(host + kOffHostHighlightSet) : 0;
+			const auto idTab = hl ? derefPtr(hl + kOffHlIdToSlot) : 0;
+			const auto slots = hl ? derefPtr(hl + kOffHlSlotData) : 0;
+			if (!host || !hl || !idTab || !slots) {
+				REX::WARN("renderer params[{}]: 渲染侧指针不可读（host=0x{:X} hl=0x{:X} idTab=0x{:X} slots=0x{:X}）"
+						  "-> 跳过（只是诊断，不影响高亮）",
+					a_tag, host, hl, idTab, slots);
+				return;
+			}
+			std::uint32_t logged = 0;
+			for (std::uint32_t st = 0; st < kOutlineManagerUsed; ++st) {
+				const auto mgr = OutlineManagerFor(st);
+				if (!mgr) {
+					continue;
+				}
+				const auto idAddr = mgr + kOffManagerId;
+				if (!IsReadable(reinterpret_cast<const void*>(idAddr), 4)) {
+					continue;
+				}
+				const auto id = *reinterpret_cast<const std::uint32_t*>(idAddr) & 0xFFFFFFu;
+				if (id > 0xFFFFu) {
+					continue;  // 还没分配 ID（0xFFFFFF = 未分配）
+				}
+				const auto idxAddr = idTab + id * 4;
+				if (!IsReadable(reinterpret_cast<const void*>(idxAddr), 4)) {
+					continue;
+				}
+				const auto idx = *reinterpret_cast<const std::uint32_t*>(idxAddr);
+				if (idx > 0xFFFFFu) {
+					continue;
+				}
+				const auto slot = slots + idx * kRenderSlotStride;
+				if (!IsReadable(reinterpret_cast<const void*>(slot), kRenderSlotStride)) {
+					continue;
+				}
+				const auto* d     = reinterpret_cast<const std::uint32_t*>(slot);
+				const auto  base  = d[0];
+				const auto  pulse = d[2];
+				const auto  f0    = *reinterpret_cast<const float*>(&d[3]);
+				const auto  f1    = *reinterpret_cast<const float*>(&d[4]);
+				REX::INFO("renderer params[{}]: state={:2} id=0x{:X} 槽={:<4} 基色=#{:06X} 脉冲=#{:06X} f0={:.3f} f1={:.3f}",
+					a_tag, st, id, idx, base & 0xFFFFFFu, pulse & 0xFFFFFFu, f0, f1);
+				++logged;
+			}
+			if (logged == 0) {
+				REX::INFO("renderer params[{}]: 管理器还没建（0/{}）-> 渲染侧暂无每状态参数",
+					a_tag, kOutlineManagerUsed);
+			}
+		}
+
+		// 把每个类别的颜色写进引擎的**每状态配色块**（`kRvaOutlineParams`）。
+		//   ★★★ v4.19 订正（写表地址 + 覆盖字段；证据链见常量区与 docs/18）：
+		//     · 以前写的是 **0x591E088** —— 那是块基址 + 112×0xA0 的 **float 常量区**
+		//       ⇒ **写错表**：对描边零影响，还污染了那张常量表（v4.19 彻底改掉）。
+		//     · 真正要写的是同一块里的三处：
+		//         +0x00 脉冲 High ┐ 只换 RGB、alpha 原样（实测 alpha=0）
+		//         +0x20 脉冲 Low  ┘ 一起改 ⇒ 脉冲相位切到 Low 时也不会闪回原生色
+		//         +0x80 ★ 描边基色：换 RGB，且 **alpha = 0 时补 0xFF**
+		//               （只有 7/8 这种从未初始化的槽是 0，不补就永远画不出来）
+		//     · dword 布局 = `0xAARRGGBB`（静态初始化函数实证：state 0 = 0xFF3EADF2 青）。
+		//   ★ 生效时机（v4.18 的教训仍然成立）：管理器**只在创建那一刻**读这块表
+		//     （`0x17D47B0` 对已存在的管理器是 `cmp [mgr+0x28],[mgr+0x30]; je 跳过`），
+		//     所以覆盖必须写在任何管理器创建之前 —— install 阶段（0/11）先写一次，
+		//     world-ready 再写一次兜底，引擎销毁管理器后再写一次。
+		//   ★ v4.19：按**状态**归并后再写 —— 同一状态被两个类别共用（容器+尸体、
+		//     弹药+植物）时只写一次；若两个类别共用同一状态却给了**不同**颜色，
+		//     报警并保留先出现的那个（否则会互相覆盖，表现为「颜色随机变」）。
 		std::uint32_t WriteColorOverrides(const char* a_tag)
 		{
-			auto* mgrTab = OutlineParamTable(kRvaOutlineMgrParams);
-			auto* refTab = OutlineParamTable(kRvaOutlineRefParams);
-			if (!mgrTab || !refTab) {
+			auto* tab = OutlineParamTable(kRvaOutlineParams);
+			if (!tab) {
 				return 0;
 			}
-			std::uint32_t applied = 0;
+			// ① 类别 → 状态 → 颜色（含「同状态撞色」检测）
+			std::array<std::uint32_t, kOutlineManagerUsed> stateColor{};
+			stateColor.fill(kColorUnset);
+			std::array<std::string, kOutlineManagerUsed> stateWho{};
+			std::uint32_t conflicts = 0;
 			for (std::size_t c = 0; c < kCategoryCount; ++c) {
 				const auto rgb = g_cfg.colorOverride[c];
 				if (rgb == kColorUnset) {
@@ -5709,33 +5825,54 @@ namespace SAS
 				if (st >= kOutlineManagerUsed) {
 					continue;
 				}
-				auto* mgr = mgrTab + st * kOutlineParamStride;
-				auto* ref = refTab + st * kOutlineParamStride;
-				// 管理器表（脉冲 High/Low）：只换 RGB，alpha 原样（实测它是 0x00）
-				const auto patch = [rgb](std::uint8_t* p) {
-					auto v = *reinterpret_cast<std::uint32_t*>(p);
-					v = (v & 0xFF000000u) | (rgb & 0xFFFFFFu);
-					*reinterpret_cast<std::uint32_t*>(p) = v;
-				};
-				// 引用表（挂引用时读的颜色）：换 RGB，且 alpha 为 0 时补成 0xFF
-				const auto patchRef = [rgb](std::uint8_t* p) {
-					auto v = *reinterpret_cast<std::uint32_t*>(p);
-					v = (v & 0xFF000000u) | (rgb & 0xFFFFFFu);
-					if ((v & 0xFF000000u) == 0) {
-						v |= 0xFF000000u;  // ★ v4.17：state 7/8 的 ref 槽原生是 0（画不出来）
+				const auto rgb24 = rgb & 0xFFFFFFu;
+				if (stateColor[st] == kColorUnset) {
+					stateColor[st] = rgb24;
+					stateWho[st]   = kCategoryName[c];
+				} else if (stateColor[st] != rgb24) {
+					if (++conflicts <= 4) {
+						REX::WARN("outline colors: 类别 {} 与 {} 共用 state={} 但颜色不同（#{:06X} 与 #{:06X}）"
+								  "-> 保留 {} 的颜色；想让两者都生效，把其中一个的 StateXxx 改到别的状态",
+							kCategoryName[c], stateWho[st], st, stateColor[st], rgb24, stateWho[st]);
 					}
+				} else {
+					stateWho[st] += ',';
+					stateWho[st] += kCategoryName[c];
+				}
+			}
+			// ② 逐状态写三处（High / Low / 描边基色）
+			std::uint32_t applied = 0;
+			for (std::uint32_t st = 0; st < kOutlineManagerUsed; ++st) {
+				if (stateColor[st] == kColorUnset) {
+					continue;
+				}
+				const auto rgb = stateColor[st];
+				auto*      blk = tab + st * kOutlineParamStride;
+				const auto patchRgb = [rgb](std::uint8_t* p) {
+					auto v = *reinterpret_cast<std::uint32_t*>(p);
+					v = (v & 0xFF000000u) | rgb;
 					*reinterpret_cast<std::uint32_t*>(p) = v;
 				};
-				const auto refBefore = *reinterpret_cast<const std::uint32_t*>(ref + 0x00);
-				patch(mgr + 0x00);  // High
-				patch(mgr + 0x20);  // Low（一起改，脉冲时不会变色）
-				patchRef(ref + 0x00);
+				const auto baseBefore = *reinterpret_cast<const std::uint32_t*>(blk + kOffStateBaseColor);
+				const auto hiBefore   = *reinterpret_cast<const std::uint32_t*>(blk + kOffStatePulseHigh);
+				patchRgb(blk + kOffStatePulseHigh);  // 脉冲 High
+				patchRgb(blk + kOffStatePulseLow);   // 脉冲 Low
+				// 描边基色：换 RGB；alpha = 0 时补成 0xFF（state 7/8 原生就是 0）
+				{
+					auto v = *reinterpret_cast<std::uint32_t*>(blk + kOffStateBaseColor);
+					v = (v & 0xFF000000u) | rgb;
+					if ((v & 0xFF000000u) == 0) {
+						v |= 0xFF000000u;
+					}
+					*reinterpret_cast<std::uint32_t*>(blk + kOffStateBaseColor) = v;
+				}
 				++applied;
-				char buf[160];
+				char buf[240];
 				std::snprintf(buf, sizeof(buf),
-					"outline colors: 覆盖 %s 的颜色 -> state=%u #%06X（ref 原值 0x%08X%s）",
-					kCategoryName[c], st, rgb & 0xFFFFFFu, refBefore,
-					(refBefore & 0xFF000000u) == 0 ? "，alpha=0 已补 0xFF" : "");
+					"outline colors: state=%u 覆盖为 #%06X <- %s"
+					"（描边基色原值 0x%08X%s；脉冲 High 原值 0x%08X）",
+					st, rgb, stateWho[st].c_str(), baseBefore,
+					(baseBefore & 0xFF000000u) == 0 ? "，alpha=0 已补 0xFF" : "", hiBefore);
 				REX::INFO("[{}] {}", a_tag, buf);
 			}
 			return applied;
@@ -5755,8 +5892,11 @@ namespace SAS
 				g_outlineEnsure(nullptr);
 			}
 			MarkAllForReassert("颜色覆盖后重刷");
-			REX::INFO("outline colors[{}]: 已覆盖 {} 个类别的颜色（管理器 alive={}/{}；已挂的已转入重挂）",
+			REX::INFO("outline colors[{}]: 已覆盖 {} 个状态的颜色（管理器 alive={}/{}；已挂的已转入重挂）",
 				a_tag, applied, CountLiveManagers(), kOutlineManagerUsed);
+			// ★ v4.19：把「渲染侧实际收到的参数块」打出来 —— 这是「颜色到底有没有
+			//   送进渲染器」的唯一直接证据（以前只能靠肉眼看画面）。
+			LogRendererParams(a_tag);
 		}
 
 		// ★ v4.0.1：进入世界后**再做一次**配色刷新（只做一次）。
@@ -7211,6 +7351,10 @@ namespace SAS
 					g_outlineUnhighlightReady ? 1 : 0,
 					g_outlineGraphRemoveReady ? 1 : 0,
 					ManagerMapCount(OutlineManagerFor(PrimaryState())));
+
+				// ★ v4.19：渲染侧参数快照（每会话最多 3 次，见 LogRendererParams）——
+				//   这里的时机最好：管理器早就建好了、颜色覆盖也早写完了。
+				LogRendererParams("stats");
 
 				// 性能窗口：每轮扫描耗时（max 才是「卡顿」的感觉来源）与单轮引擎调用数。
 				REX::INFO("  timing: scan avg={}ms max={}ms ops={} deferred={} loading={}",

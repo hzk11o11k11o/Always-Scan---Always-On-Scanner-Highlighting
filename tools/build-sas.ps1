@@ -270,7 +270,11 @@ if (-not $SkipDeploy) {
     # ★ 2026-09-25（v4.18 / 发布版 1.7）：修复「分色不生效」——
     #   配色覆盖必须写在任何 HighlightManager 创建之前（见 AlwaysScan.cpp 的
     #   WriteColorOverrides 注释：0x17D47B0 对已存在的管理器不再刷新颜色）。
-    Set-Content -LiteralPath (Join-Path $modRoot 'meta.ini') -Value "[General]`nmodid=18268`nversion=1.7`ncomment=Always-on scanner highlighting (SFSE)" -Encoding UTF8
+    # ★ 2026-09-25（v4.19 / 发布版 1.7.1）：高区分度配色 ——
+    #   ① 订正配色块地址（老代码写的 0x591E088 是 float 常量区，写错表）；
+    #   ② 默认给**所有类别**写覆盖色（红/品红/亮绿/黄/紫/橙/青/白…），
+    #      不再依赖原生状态色（原生 0/1/2/3 全是蓝色系，肉眼分不开）。
+    Set-Content -LiteralPath (Join-Path $modRoot 'meta.ini') -Value "[General]`nmodid=18268`nversion=1.7.1`ncomment=Always-on scanner highlighting (SFSE)" -Encoding UTF8
 
     Get-ChildItem -LiteralPath $modRoot -Recurse -File | ForEach-Object {
         Write-Host ("  {0}  ({1} bytes)" -f $_.FullName.Substring($modRoot.Length + 1), $_.Length)
