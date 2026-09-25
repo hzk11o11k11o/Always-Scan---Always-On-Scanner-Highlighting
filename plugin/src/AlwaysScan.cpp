@@ -1270,6 +1270,11 @@ namespace SAS
 			//   0 = 还没测（每轮扫描试一次，样本还没进内存就下一轮再来）
 			//   1 = 通过（资源分类生效）  2 = 失败（资源归杂项，打 WARN）
 			std::uint8_t  resKeywordTest  = 0;
+			// ★ v4.18：自检的「未就绪」诊断 —— v4.17 是静默重试（日志里什么都看不到，
+			//   实测 `resource=0` 无从定位）。现在每 5 秒最多一条 WARN、最多 6 条。
+			std::uint32_t resKeywordTries    = 0;
+			std::uint32_t resKeywordWarns    = 0;
+			std::uint64_t resKeywordWarnAtMs = 0;
 
 			// --- 诊断：半径内、但 base form 类型不在白名单而被跳过的类型统计 ---
 			//   统计窗口 = 两条统计日志之间，打完之后清空。
@@ -3273,10 +3278,24 @@ namespace SAS
 			if (g_state.resKeywordTest != 0) {
 				return;
 			}
+			++g_state.resKeywordTries;
 			auto* iron = RE::TESForm::LookupByID(kResKeywordIron);
 			auto* pick = RE::TESForm::LookupByID(kResKeywordDigipick);
 			auto* cred = RE::TESForm::LookupByID(kResKeywordCredits);
 			if (!iron || !pick || !cred) {
+				// ★ v4.18：把「样本还没拿到」这件事也写进日志 —— v4.17 是静默重试，
+				//   实测（2026-09-25 那一局）日志里既没有「通过」也没有「失败」，
+				//   只能看到统计行 `resource=0`，无法定位。现在每 5 秒最多一条、
+				//   最多 6 条（含量：三个样本各自拿没拿到 + 尝试次数）。
+				const auto now = NowMs();
+				if (g_state.resKeywordWarns < 6 && now >= g_state.resKeywordWarnAtMs) {
+					++g_state.resKeywordWarns;
+					g_state.resKeywordWarnAtMs = now + 5000;
+					REX::WARN("resource keyword: 自检样本还没进内存（iron={} pick={} cred={}；第 {} 次尝试）"
+							  "-> 「资源」暂归「杂项」；样本 FormID = 0x{:X}/0x{:X}/0x{:X}（离线核对全部正确）",
+						iron ? 1 : 0, pick ? 1 : 0, cred ? 1 : 0, g_state.resKeywordTries,
+						kResKeywordIron, kResKeywordDigipick, kResKeywordCredits);
+				}
 				return;  // 数据还没就绪：下一轮再试
 			}
 			const bool ironHit = IsResourceBaseRaw(iron);
@@ -3326,7 +3345,13 @@ namespace SAS
 			//     武器 / 投掷物 = WEAP（`FragGrenade` 实测就是 WEAP）
 			//     太空服 / 背包 / 头盔 / 服饰 = ARMO
 			//     弹药 = AMMO，救援 = ALCH（含食品 / 饮料）
-			//     笔记 = BOOK（备注 / 数据板 / 杂志 / 书；引擎里没有 NOTE 记录）
+			//     笔记 = BOOK —— ★ 用户要求「书籍 / 技能杂志 / 数据板 / 音频日志**都要**」，
+			//       离线全量核对（`out/esm_notes_probe.py`，Starfield.esm 382 万条记录）：
+			//         · 数据板 EDID 含 `Slate` 的：**BOOK 282 条**（+4 条 MISC 是道具/占位）
+			//         · 音频日志含 `AudioLog/Recording` 的：**BOOK 58 条**
+			//         · 技能杂志含 `Skill_Magazine` 的：**BOOK 115 条**
+			//       ⇒ 这四类在数据里**全是 BOOK**，`kBOOK → 笔记` 一条就全盖住
+			//       （引擎里根本没有 NOTE 记录，下面那行只是留着兜底）。
 			//     资源 = MISC + `ResourceType*` 关键词（见 IsResourceBase）
 			//     其余（含 KEYM 钥匙） = 杂项 ⇒ **颜色与 1.5 完全一致（2 蓝）**
 			// ================================================================
@@ -5384,6 +5409,9 @@ namespace SAS
 		void           LogOutlineColors(const char* a_tag);
 		bool           EnsureManagerFor(std::uint32_t a_state);
 		bool           OutlineUnhighlightRef(RE::TESObjectREFR* a_ref, std::uint32_t a_state);
+		std::uint32_t  WriteColorOverrides(const char* a_tag);
+		void           ApplyColorOverrides(const char* a_tag);
+		std::uint32_t  CountLiveManagers();
 
 		std::uintptr_t ModuleBase()
 		{
@@ -5501,6 +5529,22 @@ namespace SAS
 			LogManagerMapDiag("install", PrimaryState());
 			// ★ v4.0.1：把 11 个状态的实际配色打出来（分类分色出问题时的第一手证据）
 			LogOutlineColors("install");
+
+			// ★★★ v4.18：**配色覆盖必须在任何 HighlightManager 被创建之前写进表** ——
+			//   反汇编 `0x17D47B0` 实证：管理器只在**创建**那一刻从 mgr 表算出颜色参数
+			//   交给渲染侧（`0x6532F0` + `0x653850`）；对**已存在**的管理器，
+			//   `mov eax,[mgr+0x28]; cmp eax,[mgr+0x30]; je <跳过>` —— 两个版本字段相等
+			//   就整段跳过，永远不重算颜色。
+			//   install 阶段管理器是 0/11（上面那行日志可证）⇒ 在这里把表写好，
+			//   之后无论引擎（举扫描仪）还是我们（autoEnsure）创建管理器，用的都是
+			//   覆盖后的颜色 —— 这是「颜色没区别」问题的正解。
+			//   （world-ready 还会再写一次，兜住「引擎中途改表」；两次都是幂等写。）
+			{
+				const auto applied = WriteColorOverrides("install");
+				REX::INFO("outline colors[install]: 已在管理器创建之前写入 {} 个类别的覆盖色"
+						  "（管理器 alive={}/{} —— 若为 0 则后续创建的管理器直接用这些颜色）",
+					applied, CountLiveManagers(), kOutlineManagerUsed);
+			}
 		}
 
 		// 读「第 a_state 个 HighlightManager」指针；0 = 现在不存在
@@ -5631,14 +5675,29 @@ namespace SAS
 		//       运行时它们的 alpha 是 0x00（与 ref 表不同）⇒ 只改 RGB、alpha 原样。
 		//   ★ v4.17 新增：ref 表 alpha = 0 时**补成 0xFF** —— 只有 7/8 这种从没被
 		//     初始化过的槽会是 0（原版也画不出它们），不补的话覆盖了 RGB 也看不到。
-		//   写完调一次 `0x17D47B0` 让引擎把新参数刷进渲染器，并把已挂的目标整批重申
-		//   （引用参数表是「挂的时候读一次」，所以必须重新 Set 才会生效）。
-		void ApplyColorOverrides()
+		//
+		//   ★★★ v4.18：拆成「只写表」和「写表 + 让引擎用上」两步 —— 这是本轮
+		//     实测「所有东西颜色没区别」的**根因修复**：
+		//     · 反汇编 `0x17D47B0`（建/刷管理器）已实证：
+		//         `mov rcx,[rdi]（managers[i]）; test rcx,rcx; jne 已存在分支`
+		//         已存在分支 = `mov eax,[rcx+0x28]; cmp eax,[rcx+0x30]; je <跳过>`
+		//         —— 两个版本字段相等 ⇒ **整段跳过，不重算颜色**；
+		//         真的创建（`0x6532F0` + `0x653850`）才会把「从 mgr 表算出来的
+		//         颜色参数」交给渲染侧。
+		//       ⇒ **管理器的颜色只在创建那一刻读表**，之后再改表也没用。
+		//     · v4.17 的调用顺序恰好是「先 ensure 建管理器、后写表」
+		//       （RefreshOutlineParamsOnce 里 `ensure → ApplyColorOverrides`）
+		//       ⇒ 管理器带着原生配色出生 ⇒ 用户看到的仍是原版颜色
+		//       （枪青 / 太空服淡蓝白 / 数据板蓝）。
+		//     ⇒ 现在把「写表」提前到 **install（进游戏之前、0/11 管理器）**，
+		//       之后无论引擎还是我们创建管理器，用的都是覆盖后的表；
+		//       world-ready 再写一次（幂等，兜住「引擎中途改表」）。
+		std::uint32_t WriteColorOverrides(const char* a_tag)
 		{
 			auto* mgrTab = OutlineParamTable(kRvaOutlineMgrParams);
 			auto* refTab = OutlineParamTable(kRvaOutlineRefParams);
 			if (!mgrTab || !refTab) {
-				return;
+				return 0;
 			}
 			std::uint32_t applied = 0;
 			for (std::size_t c = 0; c < kCategoryCount; ++c) {
@@ -5658,7 +5717,7 @@ namespace SAS
 					v = (v & 0xFF000000u) | (rgb & 0xFFFFFFu);
 					*reinterpret_cast<std::uint32_t*>(p) = v;
 				};
-				// 引用表（**真正画出来的颜色**）：换 RGB，且 alpha 为 0 时补成 0xFF
+				// 引用表（挂引用时读的颜色）：换 RGB，且 alpha 为 0 时补成 0xFF
 				const auto patchRef = [rgb](std::uint8_t* p) {
 					auto v = *reinterpret_cast<std::uint32_t*>(p);
 					v = (v & 0xFF000000u) | (rgb & 0xFFFFFFu);
@@ -5672,22 +5731,32 @@ namespace SAS
 				patch(mgr + 0x20);  // Low（一起改，脉冲时不会变色）
 				patchRef(ref + 0x00);
 				++applied;
-				char buf[128];
+				char buf[160];
 				std::snprintf(buf, sizeof(buf),
 					"outline colors: 覆盖 %s 的颜色 -> state=%u #%06X（ref 原值 0x%08X%s）",
 					kCategoryName[c], st, rgb & 0xFFFFFFu, refBefore,
 					(refBefore & 0xFF000000u) == 0 ? "，alpha=0 已补 0xFF" : "");
-				REX::INFO("{}", buf);
+				REX::INFO("[{}] {}", a_tag, buf);
 			}
+			return applied;
+		}
+
+		// 写表 + 立刻让引擎用上：建/刷管理器（0x17D47B0）+ 已挂的目标整批重申。
+		//   ★ 注意顺序：**先写表、后 ensure** —— 顺序反了就会「管理器带着旧颜色出生」
+		//     （v4.17 的教训）。已挂的目标也必须重新 Set 一次：挂引用时读的那份
+		//     颜色参数是「挂的时候读一次」（0x17D4CD0），不重挂就还是旧色。
+		void ApplyColorOverrides(const char* a_tag)
+		{
+			const auto applied = WriteColorOverrides(a_tag);
 			if (applied == 0) {
 				return;
 			}
 			if (g_outlineEnsure) {
-				g_outlineEnsure(nullptr);  // 让引擎拿新配色刷新 11 个管理器
+				g_outlineEnsure(nullptr);
 			}
-			// 引用参数是「挂的时候读一次」⇒ 已挂的必须重新 Set 才会用上新颜色
 			MarkAllForReassert("颜色覆盖后重刷");
-			REX::INFO("outline colors: 已覆盖 {} 个类别的颜色（并触发一次重挂）", applied);
+			REX::INFO("outline colors[{}]: 已覆盖 {} 个类别的颜色（管理器 alive={}/{}；已挂的已转入重挂）",
+				a_tag, applied, CountLiveManagers(), kOutlineManagerUsed);
 		}
 
 		// ★ v4.0.1：进入世界后**再做一次**配色刷新（只做一次）。
@@ -5703,10 +5772,12 @@ namespace SAS
 			}
 			g_state.paramsRefreshed = true;
 			LogOutlineColors("world-ready");
-			if (g_outlineEnsure) {
-				g_outlineEnsure(nullptr);  // 幂等：已有管理器只刷新参数
-			}
-			ApplyColorOverrides();
+			// ★ v4.18：先写表、再让引擎建/刷管理器（ApplyColorOverrides 内部就是这个顺序）。
+			//   v4.17 在这里是反的（先 ensure、后写表）⇒ 管理器带着旧颜色出生，
+			//   且 `0x17D47B0` 对已存在的管理器不再刷新 ⇒ 覆盖永远不生效。
+			//   写表本身已经在 install 阶段做过一次（管理器在 0/11 时），这里是
+			//   第二道保险：万一引擎中途改过表，这里会把它改回来并重挂。
+			ApplyColorOverrides("world-ready");
 		}
 
 		// --------------------------------------------------------------------

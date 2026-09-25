@@ -19,10 +19,10 @@
 | --- | --- |
 | **Mod name** | `Always Scan - Always-On Scanner Highlighting (SFSE)` |
 | **Summary**（约 250 字符以内） | `Keep the scanner highlight on at all times. No need to hold the handheld scanner: everything inside a configurable radius gets the vanilla outline, color-coded by category. Full-radius highlighting, one toggle hotkey, fully configurable via INI. SFSE plugin.` |
-| **Version** | `1.6`（引擎 build 4.17.0；Nexus 上的 1.0 / 1.1 / 1.2 / 1.3 / 1.4 / 1.5 之后的下一版） |
+| **Version** | `1.7`（引擎 build 4.18.0；Nexus 上的 1.0 / 1.1 / 1.2 / 1.3 / 1.4 / 1.5 / 1.6 之后的下一版） |
 | **Category** | `Gameplay`（Alternate suggestion: `Items and Objects - Gameplay`） |
 | **Requirements（依赖）** | `Starfield Script Extender (SFSE) 0.2.21+`、`(1.16.244.0) SFSE Address Library`、游戏版本 `1.16.244.0` |
-| **主文件（Main file）** | `StarfieldAlwaysScan-1.6.zip` |
+| **主文件（Main file）** | `StarfieldAlwaysScan-1.7.zip` |
 | **Permissions** | 允许转载需注明出处？建议：**不得重新上传（No re-uploading）**；允许个人修改（源码已含 Papyrus 部分） |
 
 ---
@@ -154,8 +154,9 @@ At startup the log prints the active config and whether the native outline funct
 
 ### Version history
 
-*(This release is **1.6**. The list below uses the plugin's internal build numbers where an older release is concerned.)*
+*(This release is **1.7**. The list below uses the plugin's internal build numbers where an older release is concerned.)*
 
+- **1.7** *(plugin build 4.18.0)* — **Fix: the 1.6 category colors could end up not showing at all.** If guns, spacesuits and data slates all looked the same colour, this was why: the custom colors were written into the engine's color tables only *after* the highlight managers had already been created, and a manager reads those tables only at creation time (it is never refreshed afterwards). The colors are now written **before any manager exists**, so the outlines really use them. No INI changes, no other behaviour changes.
 - **1.6** *(plugin build 4.17.0)* — **Lootable items are now colour-coded by inventory category**: weapons & throwables (cyan), spacesuits / helmets / packs / clothing (pale blue), ammo & aid (green), notes (yellow) and resources (purple). **Misc items keep their old blue**, so nothing that was blue before changes. Resources are recognised from the item record's own `ResourceType` keywords, so mod-added resources are covered too. New INI options: `StateWeapon` / `StateApparel` / `StateAmmoAid` / `StateNote` / `StateResource`, `EnableWeapon` … `EnableResource`, `ColorNote` / `ColorResource`, `ResourceByKeyword`. **The configuration file now lives next to the mod's esm** (same folder as the log) — the old `SFSE\Plugins\` copy is still read as a fallback, and the log prints which file was used. Under the hood the mod also now patches the engine's per-state colour correctly (its unused states are made visible), which is what makes the two new colours possible at all.
 - **1.5** *(plugin build 4.16.0)* — **The log file now lives next to the plugin**: with Mod Organizer 2 it is written inside the mod's own folder, beside `StarfieldAlwaysScan.esm` (manual install: `…\Starfield\Data\SAS_AlwaysScan.log`), instead of `Documents\My Games\…`. Uninstalling the mod now removes its log too — nothing is left behind. No gameplay or INI changes.
 - **1.4** *(plugin build 4.15.0)* — **Crash fixes only, no gameplay changes.** Two crashes found in crash-dump analysis are gone: (1) the game could crash while *shutting down* — the plugin's own cleanup ran after the address-library mapping had already been torn down, so it ended up calling into the engine one last time; the plugin now keeps its state alive instead of destroying it on exit and touches nothing engine-side while the game is closing. (2) a rare crash during cell transitions / loading, where an object the plugin was still watching had already been deleted and its memory reused by unrelated data — reference objects are now validated (readable, valid vtable, valid form type) and every inventory read goes through exception-free memory reads, so a stale object can only ever be treated as "unknown" (kept lit) instead of crashing. No INI changes.
@@ -231,6 +232,11 @@ Built with **SFSE** and **CommonLibSF**. Huge thanks to their authors and to eve
 > （`ExteriorContinuous=1` / `SettleOnCellCrossMs=300`）；引擎**流式重建 3D**（LOD ↔ 真模型）导致
 > 单条描边丢失时**自动重挂**（`Verify3DPerScan=32`，日志里 `3D复检: reassert=` 在涨）；
 > 走动时引用数的**轻微变化不再打断扫描**（`StreamJumpTolerance=256`）。
+>
+> **1.7（引擎 4.18）**：**修「1.6 的分色没生效」** —— 如果你看到枪、太空服、数据板
+> 描边都是一个色，就是这个原因：自定义颜色原本写在「高亮管理器已经建好之后」，
+> 而管理器**只在创建那一刻**读配色表、之后永不刷新 ⇒ 写了个寂寞。现在把写表**提前到
+> 任何管理器创建之前**，描边才真的用上新颜色（玩法 / INI 均无变化）。
 >
 > **1.6（引擎 4.17）**：**可拾取物品按「物品栏分类」分色** —— 武器 / 投掷物（青）、
 > 太空服 / 头盔 / 背包 / 服饰（淡蓝白）、弹药 / 救援（绿）、笔记（黄）、资源（紫）；

@@ -3,7 +3,15 @@
  Always-on scanner highlighting for Starfield
 ========================================================================
 
-Version  : 1.6  (plugin build 4.17.0)
+Version  : 1.7  (plugin build 4.18.0)
+           1.7 = fix: with 1.6 the new category colors could end up not
+           showing at all (if you saw the same outline color on guns,
+           spacesuits and data slates, this is it). The custom colors
+           are now written into the engine's color tables *before* any
+           highlight manager is created - a manager only reads those
+           tables at creation time and is never refreshed afterwards.
+           Weapons / spacesuits / notes / resources now really get their
+           own colors. No INI changes.
            1.6 = lootable items are now color-coded by inventory
            category: weapons & throwables (cyan), spacesuits / helmets /
            packs / clothing (pale blue), ammo & aid (green), notes

@@ -265,9 +265,12 @@ if (-not $SkipDeploy) {
     # ★ 2026-09-25（v4.17 / 发布版 1.6）：
     #   · modid = N 网 mod 页 ID（18268）—— **不填 0**：MO2 的「Newest Version」
     #     靠它去查 N 网，modid=0 时那一列永远是空的（用户反馈「读不到版本」）。
-    #   · version = **N 网公开版号**（1.x），不是 DLL 内部版本（4.17.0）：
-    #     用户要求 MO2 里显示 1.6（与 N 网页面上的 Version 字段对得上）。
-    Set-Content -LiteralPath (Join-Path $modRoot 'meta.ini') -Value "[General]`nmodid=18268`nversion=1.6`ncomment=Always-on scanner highlighting (SFSE)" -Encoding UTF8
+    #   · version = **N 网公开版号**（1.x），不是 DLL 内部版本：
+    #     用户要求 MO2 里显示与 N 网页面上的 Version 字段一致。
+    # ★ 2026-09-25（v4.18 / 发布版 1.7）：修复「分色不生效」——
+    #   配色覆盖必须写在任何 HighlightManager 创建之前（见 AlwaysScan.cpp 的
+    #   WriteColorOverrides 注释：0x17D47B0 对已存在的管理器不再刷新颜色）。
+    Set-Content -LiteralPath (Join-Path $modRoot 'meta.ini') -Value "[General]`nmodid=18268`nversion=1.7`ncomment=Always-on scanner highlighting (SFSE)" -Encoding UTF8
 
     Get-ChildItem -LiteralPath $modRoot -Recurse -File | ForEach-Object {
         Write-Host ("  {0}  ({1} bytes)" -f $_.FullName.Substring($modRoot.Length + 1), $_.Length)
