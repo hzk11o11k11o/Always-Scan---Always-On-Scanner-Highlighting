@@ -6362,6 +6362,13 @@ namespace SAS
 			const auto live = CountLiveManagers();
 			if (!fired && !monocleOpen && g_state.lastLiveManagers != 0 && live < g_state.lastLiveManagers) {
 				MarkAllForReassert("HighlightManager 数量下跌");
+				// ★ v4.18：引擎刚销毁过管理器（0x17D4B30 = 销毁 11 个 + 清空状态表，
+				//   典型触发点：用完原版扫描仪、UI/相机大重建）。管理器**只在创建那一刻**
+				//   读配色表（见 WriteColorOverrides 的长注释），所以趁它们还没被重建，
+				//   把覆盖色重新写进表 —— 这样随后 EnsureManagerFor 建出来的管理器
+				//   带的就是我们的颜色（否则会退回原生色）。
+				//   只写表、不 ensure：ensure 会由重挂路径的 EnsureManagerFor 触发。
+				WriteColorOverrides("post-clear");
 			}
 			g_state.lastLiveManagers = live;
 		}
