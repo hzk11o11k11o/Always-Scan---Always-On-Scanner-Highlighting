@@ -357,7 +357,18 @@ if (-not $SkipDeploy) {
     #   （0x6532F0）建 13 条通道 + 复刻引擎的 3D 图 visitor 挂/摘，
     #   **不写状态表、不覆盖引擎配色块** ⇒ 原版颜色 100% 原版、类别颜色互不干扰。
     #   INI `ChannelMode=1`（默认）；失败自动回退旧路径。完整逆向见 docs/32。
-    Set-Content -LiteralPath (Join-Path $modRoot 'meta.ini') -Value "[General]`nmodid=18268`nversion=2.0`ncomment=Always-on scanner highlighting (SFSE)" -Encoding UTF8
+    # ★ 2026-09-27（v5.1 / 发布版 2.1）：**两处修复**（用户实测报告）——
+    #   ① 「矿石、植物扫描前后颜色都是绿色」⇒ 「已扫描」记忆的粒度从 **base**
+    #      （物种 / 资源）改成**引用**（`floraRefKnow`，key = 引用 FormID + base 校验）：
+    #      扫过一个实例不再让同 species / 同资源的所有实例（含跨星球 / 跨存档）
+    #      一起变绿；落盘文件格式同步改成 `引用 base` 两列，旧格式整体忽略。
+    #   ② 「1.8.1 随着游戏进行帧数持续降低」⇒ v4.33 起「引擎状态表捡漏」调的
+    #      `0x17D5BE0`（Lookup**OrAdd**）会**插入**条目 + 对该 REFR 加引用计数
+    #      （每个 flora 引用每次判据未命中一次）⇒ 引擎状态表 / 内存随游玩持续增长。
+    #      v5.1 改成**只读走那棵红黑树**（RVA 0x5949CE0；节点 +0x19 IsNil /
+    #      +0x20 键 / +0x28 值；树头 +0x08 = 条目数），零副作用。
+    #      统计行新增 `引擎状态表: 条目=N` 可直接看它是否稳定。完整证据见 docs/33。
+    Set-Content -LiteralPath (Join-Path $modRoot 'meta.ini') -Value "[General]`nmodid=18268`nversion=2.1`ncomment=Always-on scanner highlighting (SFSE)" -Encoding UTF8
 
     Get-ChildItem -LiteralPath $modRoot -Recurse -File | ForEach-Object {
         Write-Host ("  {0}  ({1} bytes)" -f $_.FullName.Substring($modRoot.Length + 1), $_.Length)

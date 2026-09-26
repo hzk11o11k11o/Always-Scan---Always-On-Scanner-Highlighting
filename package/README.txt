@@ -3,7 +3,42 @@
  Always-on scanner highlighting for Starfield
 ========================================================================
 
-Version  : 2.0  (plugin build 5.0.0)
+Version  : 2.1  (plugin build 5.1.0)
+           2.1 = two fixes, both from player reports.
+           (1) "Ores and plants are green before *and* after scanning."
+               The mod remembers a confirmed "surveyed" verdict so a target
+               cannot fall back to cyan (added in 1.7.9 / 1.8.1), but that
+               memory was keyed by *species* - the record a plant or a
+               deposit is built from - rather than by the individual object.
+               So scanning one plant turned every plant of that species
+               green: every other plant on that planet, the same species on
+               other planets, and the same species in other saves. The
+               memory is now keyed by the individual reference: scanning one
+               plant turns that plant green, everything else stays cyan until
+               you scan it. The file next to the esm
+               (SAS_AlwaysScan.flora-learn.txt) now stores one "reference +
+               species" pair per line; lines in the old (species-only)
+               format are ignored - the log says how many - and you can
+               simply delete the file to start fresh.
+               One-off side effect when you update: things you surveyed with an
+               older version are no longer known to the mod (the old memory
+               was species-based and is skipped). Scanning them once - or
+               simply raising the scanner for a moment - records them again,
+               this time per object. That is the intended reset.
+           (2) "Frame rate keeps dropping the longer I play (1.8.1)."
+               The "read the state the game itself painted" step, added in
+               1.8.1, used the game's own lookup-or-**add** function. When
+               the object is not in the game's table yet, that function
+               *inserts* an entry and takes a reference count on the object.
+               The step runs for every plant / deposit around you, several
+               times a minute, so the game's table - and the memory those
+               references pin - kept growing for the whole session. That is
+               exactly the "it gets slower the longer I play" report, and
+               1.7.3, which predates that step, was fine. The mod now walks
+               that table **read-only**: nothing is inserted, no reference
+               count is taken. The periodic log line now also reports the
+               table's entry count (`引擎状态表: 条目=N`) so you can watch
+               it - it should stay roughly flat no matter how long you play.
            2.0 = the mod now brings its own outline colour channels instead
            of borrowing the game's. The game has eleven outline "states"
            (0..10); six of them are painted by the game itself while the
@@ -59,6 +94,9 @@ Version  : 2.0  (plugin build 5.0.0)
            keyed by species, not by save file (simply a colour effect if
            you play several saves); set FloraLearnPersist=0 for
            session-only behaviour, delete the file to reset.
+           (Superseded in 2.1: the memory is now keyed by the individual
+           reference, so a species surveyed in one save no longer shows
+           green in another. See the 2.1 notes at the top.)
            1.8.0 = the colour classification, final grouping. The set of
            colours and the number of outline states the mod writes are
            unchanged from 1.7.9 - what changed is which categories share
