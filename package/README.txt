@@ -3,7 +3,7 @@
  Always-on scanner highlighting for Starfield
 ========================================================================
 
-Version  : 1.7.7  (plugin build 4.25.0)
+Version  : 1.7.7  (plugin build 4.26.0)
            1.7.7 = fix: with the scanner put away, already-scanned planet
            targets (ores / gas / liquids / plants) still showed the
            "not scanned" cyan. 1.7.6 fixed the other half (with the scanner
@@ -11,16 +11,21 @@ Version  : 1.7.7  (plugin build 4.25.0)
            the mod re-hangs the highlight itself, and it only ever used one
            state - the vanilla "not scanned" cyan pulse - so nothing told
            "already surveyed" and "never surveyed" apart. The mod now asks
-           the game itself: it calls the very function the vanilla scanner
-           uses (the one that checks whether a resource has entered your
-           survey data) and walks the game's own record chain (flora record
-           -> produced item -> its resource). Already-scanned targets use
-           the game's own "scanned" state - GREEN, the same colour and slot
-           the game uses while the scanner is up; unscanned ones keep the
-           cyan pulse. Scan a deposit, lower the scanner: it turns green
-           within about 0.2 s. FloraScannedByResource=0 (or
-           StateFloraScanned=7) brings the old behaviour back without
-           swapping the DLL.
+           the game itself, from two independent sources (either one is
+           enough): (a) while you hold the scanner up, it reads which
+           outline state the game itself paints each target with - the
+           game's green means "already surveyed", and that knowledge is
+           remembered for the session; (b) with the scanner away it calls
+           the very function the vanilla scanner uses (the one that checks
+           whether a resource has entered your survey data) and walks the
+           game's own record chain (flora record -> the item it produces ->
+           that item's resource), auto-detecting the record layout if the
+           game moves it. Already-scanned targets use the game's own
+           "scanned" state - GREEN, the same colour and slot the game uses
+           while the scanner is up; unscanned ones keep the cyan pulse.
+           Scan a deposit, lower the scanner: it turns green within about
+           0.2 s. FloraScannedByResource=0 (or StateFloraScanned=7) brings
+           the old behaviour back without swapping the DLL.
            1.7.6 = fix: scanned planet targets did not turn green.
            The game paints already-scanned planet targets (ores / gas /
            liquids / plants) with two outline states whose native colour is

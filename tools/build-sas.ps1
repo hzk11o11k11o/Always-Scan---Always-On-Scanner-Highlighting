@@ -302,6 +302,12 @@ if (-not $SkipDeploy) {
     #     已扫描 ⇒ StateFloraScanned（默认 5，原生绿 #27C684）、未扫描 ⇒ StateFlora（7，青）。
     #   新键：FloraScannedByResource / StateFloraScanned / FloraScanProbeMax；
     #   让位保护改成按类别（OutlineEntry::cat）、状态变化即时生效（不再等重申时刻）。
+    # ★ 2026-09-26（v4.26 / 发布版仍 1.7.7）：v4.25 的判据**实测第一步就读不到**
+    #   （produce=0x0，连 Starfield.esm 原版矿脉也一样）⇒ 改成**两条证据来源（取或）**：
+    #     ① 引擎亲手画过的颜色（让位期间读一眼引擎写的 outline 状态：4/5 = 已扫描绿）；
+    #     ② 资源链判据 + **自适应偏移**（先试 +0x260/+0x258，再窗口 0x180~0x380 找
+    #        能把整条链走通的指针；标定写会话变量 + 日志）；
+    #   链走不通时打前 3 个 base 的**指针窗口取证**（供下一轮定位偏移）。
     Set-Content -LiteralPath (Join-Path $modRoot 'meta.ini') -Value "[General]`nmodid=18268`nversion=1.7.7`ncomment=Always-on scanner highlighting (SFSE)" -Encoding UTF8
 
     Get-ChildItem -LiteralPath $modRoot -Recurse -File | ForEach-Object {
