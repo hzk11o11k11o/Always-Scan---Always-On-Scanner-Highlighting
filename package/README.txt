@@ -3,7 +3,7 @@
  Always-on scanner highlighting for Starfield
 ========================================================================
 
-Version  : 1.7.7  (plugin build 4.26.0)
+Version  : 1.7.7  (plugin build 4.27.0)
            1.7.7 = fix: with the scanner put away, already-scanned planet
            targets (ores / gas / liquids / plants) still showed the
            "not scanned" cyan. 1.7.6 fixed the other half (with the scanner
@@ -20,7 +20,12 @@ Version  : 1.7.7  (plugin build 4.26.0)
            whether a resource has entered your survey data) and walks the
            game's own record chain (flora record -> the item it produces ->
            that item's resource), auto-detecting the record layout if the
-           game moves it. Already-scanned targets use the game's own
+           game moves it. (1.7.7 was rebuilt with plugin build 4.27.0: source
+           (b) above had a silent bug - the record type it had to recognise
+           was rejected by the mod's own sanity check, so in practice only
+           (a) was doing the work. Both sources are active now, and the log
+           names the record offsets it adopts.)
+           Already-scanned targets use the game's own
            "scanned" state - GREEN, the same colour and slot the game uses
            while the scanner is up; unscanned ones keep the cyan pulse.
            Scan a deposit, lower the scanner: it turns green within about
@@ -478,8 +483,11 @@ categories).
     "flora scanned: ... ready" at startup and the stats line
     "planet targets ... : 未扫描=... 已扫描=... | 判据: 查询=... 命中=...";
     "已扫描" (scanned) should grow once you have surveyed something near you.
-    If "链失败" (chain failures) grows instead, the game's record layout
-    changed - please report that log line.
+    If "链失败" (chain failures) grows instead, you are most likely running
+    the first 1.7.7 build (plugin 4.26.0): its record chain had a silent bug
+    that is fixed in build 4.27.0 (this package), so grab the current file.
+    If the current build still shows it, the game's record layout has
+    changed - please report that log line plus the "flora probe" lines.
 * On a planet, ores / gas vents / liquid pools / plants have no colour
     at all: check EnableFlora=1 in your INI (1.7.4 shipped it as 0).
     Those targets are only painted by the vanilla scanner while it is up,

@@ -2079,7 +2079,15 @@ namespace SAS
 		// 用途：标定「库存列表偏移」时校验「读到的条目里 `object` 字段是不是真的物品」
 		//   —— 标定选错偏移时，读到的多半是垃圾指针，这里会立刻失败。
 		//   判据全是 TESForm 基类的固定成员（本项目长期实测读法正确，且有 static_assert 钉住）：
-		//     formID @+0x28 非 0；formType @+0x2E ∈ (0, 0x60]（引擎的表单类型都在这个区间）。
+		//     formID @+0x28 非 0；formType @+0x2E ∈ (0, kTotal)（commonlibsf FormTypes.h：0x00=kNONE、
+		//     0xD7=kTotal ⇒ 合法类型都在这个区间）。
+		// ★★★ v4.27 订正：上界原来是 **0x60**（"引擎的表单类型都在这个区间"）—— **错了**：
+		//   commonlibsf `RE/F/FormTypes.h` 里 `kIRES = 0x9F`（= BGSResource，资源记录）、
+		//   `kBIOM = 0xA0`、`kCHAL = 0xD6`，一直到 `kTotal = 0xD7`。
+		//   而 v4.26 的「已扫描」链**恰恰要求元素是 IRES**（引擎 0x159F548 `cmp byte [rcx+0x2e],0x9f`）
+		//   ⇒ 于是 `ReadResourceArray()` 的强形状校验**永远过不了**（2026-09-26 17:22 那局实测：
+		//   `链失败 = 查询`、`偏移=0x0/0x0`、每个 base 都是 `资源数组[+0x0]=0个 irES=[无]` —— 证据②全灭）。
+		//   库存链（v4.3 起）没被这条坑到，只是因为物品类型（MISC 0x28 / WEAP 0x30 / BOOK 0x27…）恰好都 < 0x60。
 		// ★ 什么时候**不能**用它：热路径（每轮扫描）。它会调 IsReadable（可能触发
 		//   VirtualQuery）—— 那是 v2.3 实测过 31ms 假卡顿的来源。所以它只用于
 		//   「标定」这种一次性/低频场景。
@@ -2095,7 +2103,7 @@ namespace SAS
 			if (id == 0) {
 				return false;
 			}
-			if (ft == 0 || ft > 0x60) {
+			if (ft == 0 || ft >= static_cast<std::uint8_t>(RE::FormType::kTotal)) {
 				return false;
 			}
 			return true;
@@ -6253,14 +6261,25 @@ namespace SAS
 					static_cast<std::size_t>(size) * kOffResElemStride)) {
 				return false;
 			}
+			// ★ v4.27：逐元素的口径**与引擎完全对齐**（0x159F540 那段循环）：
+			//   `mov rcx,[rbx]`（元素首个字段 = form）/ `test rcx,rcx / je next`（**空元素跳过**）/
+			//   `cmp byte [rcx+0x2e],0x9f`（**只认 IRES**，其余类型也跳过）。
+			//   ★ 注意：这里**不能**再用「ft ≤ 0x60」那种旧判据 —— IRES(0x9F) 会全被否掉（见 IsPlausibleFormPtr 的说明）。
 			bool anyIrES = false;
 			for (std::uint32_t i = 0; i < size && !anyIrES; ++i) {
 				std::uint64_t elem = 0;
-				if (!ReadU64At(data + i * kOffResElemStride, &elem) || !IsPlausibleFormPtr(elem)) {
-					return false;  // 数组里混进垃圾 ⇒ 整个候选作废
+				if (!ReadU64At(data + i * kOffResElemStride, &elem)) {
+					return false;  // 数组读不动 ⇒ 整个候选作废
 				}
-				const auto* er = reinterpret_cast<const std::uint8_t*>(elem);
-				anyIrES        = er[kOffFormType] == static_cast<std::uint8_t>(RE::FormType::kIRES);
+				if (elem == 0) {
+					continue;  // 引擎同款：空元素跳过
+				}
+				std::uint8_t  ft = 0;
+				std::uint32_t id = 0;
+				if (!FormTypeIdOf(elem, &ft, &id)) {
+					return false;  // 不是 form ⇒ 垃圾指针，候选作废
+				}
+				anyIrES = ft == static_cast<std::uint8_t>(RE::FormType::kIRES);
 			}
 			if (!anyIrES) {
 				return false;
