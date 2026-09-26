@@ -319,7 +319,15 @@ if (-not $SkipDeploy) {
     #   跟着变色。修法：0/1 一个字节都不写；「武器 / 服饰」改挂 9 / 10、
     #   「容器 / 尸体 / 门」搬去 1 / 0 并用原版色 ⇒ 覆盖槽位从 7 个降到 5 个
     #   （2/3/6/9/10）。证据链见 docs/28。
-    Set-Content -LiteralPath (Join-Path $modRoot 'meta.ini') -Value "[General]`nmodid=18268`nversion=1.7.8`ncomment=Always-on scanner highlighting (SFSE)" -Encoding UTF8
+    # ★ 2026-09-26（v4.31 / 发布版 1.7.9）：**配色重排（容器橙 / 门白恢复）+
+    #   植物「低概率变回青色」修复** —— 用户实测两条：
+    #   ① 「上次改动把容器 / 尸体 / 门的颜色也变了」⇒ 容器 / 尸体 = 9（覆盖橙）、
+    #      门 = 6（覆盖白，6 是引擎唯一不写的槽位）；代价 = 服饰（→1）/ 笔记（→0）
+    #      改成不覆盖（可借槽位只有 2/3/6/9/10 五个）；
+    #   ② 「已扫描植物低概率变回青色，开扫描仪再关又变绿」⇒ ⓪ 单向学习表
+    #      （base 级，「已扫描」只写 true、本会话不重问）+ 重问拿不到权威答案时
+    #      **沿用旧结论**。证据链 / 取舍表见 docs/29。
+    Set-Content -LiteralPath (Join-Path $modRoot 'meta.ini') -Value "[General]`nmodid=18268`nversion=1.7.9`ncomment=Always-on scanner highlighting (SFSE)" -Encoding UTF8
 
     Get-ChildItem -LiteralPath $modRoot -Recurse -File | ForEach-Object {
         Write-Host ("  {0}  ({1} bytes)" -f $_.FullName.Substring($modRoot.Length + 1), $_.Length)

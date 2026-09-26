@@ -1094,27 +1094,31 @@ namespace SAS
 			//         搜刮目标仍然醒目，门的观感仍近白）。
 			std::array<int, kCategoryCount> stateByCategory{
 				2,  // kLoot        杂项 —— 蓝（**原生不变**，用户需求）
-				9,  // kLootWeapon  武器、投掷物 —— ★★ v4.30：0 → **9**（0/1 归还引擎）；
-					//      覆盖色仍是 **红 #FF2E2E**（见 colorOverride）
-				10, // kLootApparel 太空服/背包/头盔/服饰 —— ★★ v4.30：1 → **10**；
-					//      覆盖色仍是 **品红 #FF3BD4**
+				10, // kLootWeapon  武器、投掷物 —— ★★★ v4.31：9 → **10** + **覆盖为红**。
+					//      10 是 v4.21~v4.29 的老「门」槽位（引擎目标罕见），
+					//      用来纪念「武器红」（见 colorOverride 的 v4.31 段）
+				1,  // kLootApparel 太空服/背包/头盔/服饰 —— ★★★ v4.31：10 → **1**、
+					//      **不覆盖** ⇒ 原版淡蓝白 #B3C1EF（★ 品红已让位，见 v4.31 段）
 				// ★★★ v4.24：state 5 / 4 **归还引擎**（引擎用它们画「已扫描的星球目标」= 绿色；
 					//   证据见 colorOverride 上方的长注释）。这两个类别继续用 4/5，但颜色 =
 					//   原生绿 #27C684（弹药救援仍是「绿」这一组；想自定义见 INI 的 ColorAmmoAid）。
 				5,  // kLootAmmoAid 弹药、救援 —— 原版绿 #27C684（不覆盖，state 5）
-				6,  // kLootNote    笔记 —— 黄 #FFD700
+				0,  // kLootNote    笔记 —— ★★★ v4.31：6 → **0**、**不覆盖**
+					//      ⇒ 原版青 #3EADF2（★ 黄色已让位给「门白」，见 v4.31 段）
 				3,  // kLootResource 资源 —— 紫 #B36BFF（★ v4.22：7 让给原版扫描目标）
-				1,  // kContainer   容器 —— ★★ v4.30：9 → **1**（= 原版「近处通用目标」的
-					//      亮青 `#72E8FF` 脉冲，**不覆盖颜色**；9/10 腾给武器/服饰，
-					//      原因见上方 v4.30 长注释）
+				9,  // kContainer   容器 —— ★★★ v4.31：1 → **9** + **覆盖为橙** ——
+					//      9 的原生色本来就是橙（TargetFullyScanned #FFAA00，v4.19 起
+					//      一直覆盖成 #FF9500：加了 noFill 的「轮廓橙」）⇒ 用户要的
+					//      「恢复容器橙」回来了（见 v4.31 段）
 				4,  // kDevice      设备 —— 原版绿 #27C684（不覆盖，state 4；★ v4.24 归还引擎）
-				0,  // kDoor        门 —— ★★ v4.30：10 → **0**（= 原版「远处通用目标」的
-					//      青 `#3EADF2` 脉冲，**不覆盖颜色**，观感仍接近原来的白）
+				6,  // kDoor        门 —— ★★★ v4.31：0 → **6** + **覆盖为白**。
+					//      6 是**引擎从不写**的唯一槽位（v4.24 订正后的结论）⇒
+					//      用它 = 对原版零影响，「门白」原样恢复（见 v4.31 段）
 				7,  // kFlora       植物 / 矿脉 / 气泉 / 液池 —— ★★★ v4.23：**改回 7**
 				//     （= 原版 `TargetScannable`，颜色**不覆盖** ⇒ 原生青色脉冲轮廓）
 				//     理由见上面 v4.23 段与 categoryEnabled 里的长注释。
 				2,  // kOther       MSTT（默认关）—— 与杂项同 state（同蓝、不覆盖）
-				1   // kCorpse      尸体 —— ★★ v4.30：9 → **1**（= 容器；原版亮青、不覆盖）
+				9   // kCorpse      尸体 —— ★★★ v4.31：1 → **9**（= 容器；橙、与容器同色）
 			};
 
 			// ================================================================
@@ -1255,27 +1259,39 @@ namespace SAS
 			//     引擎画的东西」只剩这五个低风险槽位还可能被改色。
 			std::array<std::uint32_t, kCategoryCount> colorOverride{
 				0x001F8EE2u,   // kLoot        杂项 —— 蓝 #1F8EE2（= 原生值，用户要求「不变」）
-				0x00FF2E2E,    // kLootWeapon  武器、投掷物 —— 红（★ v4.30 起挂在 state 9）
-				0x00FF3BD4,    // kLootApparel 太空服/背包/头盔/服饰 —— 品红（★ v4.30 起挂在 state 10）
+				0x00FF2E2E,    // kLootWeapon  武器、投掷物 —— 红（★ v4.31 起挂在 state 10）
+				// ★★★ v4.31：**不覆盖** —— state 1（引擎画「近处通用引用」的槽位）
+				//   不能写；「品红」让位给「容器橙 / 门白」（见 stateByCategory 的
+				//   v4.31 段）。代价 = 服饰改用原生淡蓝白；想恢复品红 ⇒
+				//   `StateApparel=10` + `ColorApparel=FF3BD4`（会同时失去「武器红」，
+				//   两者只能保一个 —— 因为可借的槽位只有 5 个）。
+				kColorUnset,   // kLootApparel 太空服/背包/头盔/服饰 —— 原版淡蓝白（state 1）
 				// ★★★ v4.24：**不覆盖** —— state 5 是引擎给「已扫描的星球目标（近）」
 				//   画绿色的槽位（见上面长注释的硬证据）；写它 = 用户在星球上永远
 				//   看不到原版扫描后的绿色。原生色 #27C684 = 绿，与「弹药救援 =
 				//   绿」这个分组意图一致，观感变化最小。
 				kColorUnset,   // kLootAmmoAid 弹药、救援 —— 原版绿 #27C684（state 5 归还引擎）
-				0x00FFD700,    // kLootNote    笔记 —— 黄
+				// ★★★ v4.31：**不覆盖** —— 黄色让位给「门白」（同上）。代价 = 笔记
+				//   改用 state 0 的原生青；想恢复黄 ⇒ `StateNote=6` + `ColorNote=FFD700`
+				//   （会同时失去「门白」）。★ 为什么不反过来：6 是唯一「引擎从不写」
+				//   的槽位，给「看得见的门白」比给「少见的笔记黄」收益大。
+				kColorUnset,   // kLootNote    笔记 —— 原版青 #3EADF2（state 0）
 				0x00B36BFF,    // kLootResource 资源 —— 紫（★ v4.22 落在 state 3，不再占 7）
-				// ★★★ v4.30：**不覆盖** —— state 1 是引擎画「近处通用目标」（含活人
-				//   NPC）的槽位（原生 = 亮青脉冲 `#72E8FF`）；写它 = 行人跟着变色
-				//   （用户报的正是这个）。容器 / 尸体改用这个原版色（搜刮目标仍醒目）。
-				kColorUnset,   // kContainer   容器 —— 原版亮青（state 1 归还引擎）
+				// ★★★ v4.31：**覆盖为橙 #FF9500** —— 用户要求「恢复容器 / 尸体的橙色」。
+				//   state 9 的原生色本来就是橙（#FFAA00 = TargetFullyScanned），这里
+				//   沿用 v4.19~v4.29 的橙值（+ noFill ⇒ 轮廓橙）；9 的引擎目标罕见
+				//   （城市实况约 3 个元素），代价与「借 9/10 当色槽」同源。
+				0x00FF9500,    // kContainer   容器 —— 橙 #FF9500（★ v4.31 恢复）
 				// ★★★ v4.24：**不覆盖** —— state 4 是引擎给「已扫描的星球目标（远）」
 				//   画绿色的槽位（同上）。设备（终端 / 开关等）现在显示原版绿
 				//   #27C684；想恢复青色 ⇒ `ColorDevice=00E5FF`（代价：原版扫描后的
 				//   绿色（远目标）会被盖掉，INI 里已注明）。
 				kColorUnset,   // kDevice      设备 —— 原版绿 #27C684（state 4 归还引擎）
-				// ★★★ v4.30：**不覆盖** —— state 0 是引擎画「远处通用目标」的槽位
-				//   （原生 = 青 `#3EADF2` 脉冲）；写它 = 行人跟着变色。
-				kColorUnset,   // kDoor        门 —— 原版青（state 0 归还引擎）
+				// ★★★ v4.31：**覆盖为白 #FFFFFF** —— 用户要求「恢复门白」。
+				//   ★ 为什么这次放在 6：**state 6 是引擎全镜像唯一不写的槽位**
+				//     （v4.24 订正后的结论）⇒ 覆盖它**对原版零影响**（只有 MOD
+				//     挂的门会读它），比 v4.21~v4.29 的「门 = 10」更安全。
+				0x00FFFFFFu,   // kDoor        门 —— 白 #FFFFFF（★ v4.31 恢复，挂在 6）
 				// ★★★ v4.23：植物 / 矿脉 / 气泉 / 液池 **不覆盖颜色** —— 直接用原版
 				//   state 7 的原生配色（脉冲 High `#72E8FF` / Low `#115B69`、基色 alpha=0
 				//   = 不填充），也就是原版扫描仪扫「可扫描目标」时那个青色脉冲轮廓。
@@ -1283,8 +1299,7 @@ namespace SAS
 				//     有）就被抹平 —— 这正是 v4.17~v4.21 那几轮「扫描前后分不出」的来源。
 				kColorUnset,   // kFlora       植物 / 矿脉 —— 原版色（state 7 不覆盖）
 				kColorUnset,   // kOther       MSTT（默认关）—— 不覆盖（原生蓝）
-				// ★★★ v4.30：**不覆盖** —— 同容器（state 1 = 原版亮青）
-				kColorUnset    // kCorpse      尸体 —— 原版亮青（state 1 归还引擎）
+				0x00FF9500     // kCorpse      尸体 —— 橙 #FF9500（★ v4.31 恢复，= 容器）
 			};
 
 			// ★ v4.20：每个类别的「覆盖不透明度」（0~255；**0 = 特殊值 = 保留引擎原值**）。
@@ -1937,7 +1952,7 @@ namespace SAS
 				bool          scanned  = false;
 				std::uint64_t atMs     = 0;
 				std::uint32_t baseFid  = 0;  // 该引用挂的 base（校验指针复用）
-				std::uint8_t  byEngine = 0;  // 1 = 由引擎状态判据（GetOutlineState）定下
+				std::uint8_t  byEngine = 0;  // 1 = 引擎状态判据 / 2 = 单向学习表（★ v4.31）
 			};
 			std::unordered_map<const RE::TESObjectREFR*, FloraScanRec> floraScannedCache;
 			std::uint64_t floraScanQueries    = 0;  // 真正问过引擎几次（累计，诊断）
@@ -1950,6 +1965,9 @@ namespace SAS
 			std::uint64_t floraEngineStateQueries   = 0;  // 问过几次
 			std::uint64_t floraEngineStateScanned   = 0;  // 其中 = 2（已扫描）
 			std::uint64_t floraEngineStateUnscanned = 0;  // 其中 = 1（未扫描）
+			// ★★★ v4.31：「低概率变青」修复的两条诊断（都应该在涨 = 修复在干活）
+			std::uint64_t floraLearnedHits   = 0;  // 判据由「单向学习表」直接命中（没重问引擎）
+			std::uint64_t floraStickyKeeps   = 0;  // 重问拿不到权威答案 ⇒ 沿用旧结论（保住绿）
 			// 窗口内：本轮选中的星球目标里，分别有多少个走「已扫描（绿）」/「未扫描（青）」
 			std::uint64_t floraScannedSel   = 0;
 			std::uint64_t floraUnscannedSel = 0;
@@ -3417,7 +3435,12 @@ namespace SAS
 			// ★★★ v4.23：这张表必须与 Config::stateByCategory 的默认值**逐项一致**
 			//   （INI 缺键时用的就是它；v4.22 忘了同步 resource/other，这次一并订正：
 			//    resource 7→3、flora 5→7、other 3→2）。
-			const int kStateDef[kCategoryCount] = { 2, 0, 1, 5, 6, 3, 9, 4, 10, 7, 2, 9 };
+			//   ★★★ v4.31：整套重排（NPC 原色 ⇒ 容器 / 尸体橙、门白必须回来，
+			//    代价是把「武器红 / 服饰品红 / 笔记黄」里最小的两个让位 ——
+			//    完整推理见 Config::stateByCategory 的 v4.31 段）：
+			//    武器 9→**10**、服饰 10→**1**、笔记 6→**0**、容器 1→**9**、
+			//    门 0→**6**、尸体 1→**9**。
+			const int kStateDef[kCategoryCount] = { 2, 10, 1, 5, 0, 3, 9, 4, 6, 7, 2, 9 };
 			for (std::size_t i = 0; i < kCategoryCount; ++i) {
 				g_cfg.stateByCategory[i] = std::clamp(getInt(kStateKeys[i], kStateDef[i]), 0, 11);
 			}
@@ -3642,21 +3665,24 @@ namespace SAS
 				g_cfg.stateByCategory[static_cast<std::size_t>(Category::kDevice)],
 				g_cfg.stateByCategory[static_cast<std::size_t>(Category::kLootAmmoAid)]);
 
-			// ★★★ v4.30：state 0 / 1 归还引擎 —— 用户实测「扫描中的 NPC 全部变成了
-			//   只有带有赏金的人物才会出现的颜色」。真根因（反汇编 0x159ED90 的
-			//   0/1 分支 + 截图逐像素取色，见 docs/28）：引擎对**通用引用（含活人
-			//   NPC）**写 **state 0（远）/ 1（近）**（`setne dl` ⇒ 0/1），
-			//   而 v4.19~v4.29 把这两个槽位覆盖成「武器 红 / 服饰 品红」⇒ 举着
-			//   扫描仪时所有行人变成红 / 品红（远处红、近处品红）。详见 Config
-			//   配色数组上方的 v4.30 长注释。
-			REX::INFO("config: state0_1 归还引擎 -> state 0/1（引擎画「活人 NPC / 通用目标」"
-					  "的那对槽位）**不再覆盖** ⇒ 举着扫描仪时 NPC 显示原版色（青 / 亮青）；"
-					  "「武器」改建在 state {}（红）、「服饰」改建在 state {}（品红）、"
-					  "「容器 / 尸体」→ state {}、「门」→ state {}（均为原版色）",
+			// ★★★ v4.31：配色重排（用户实测：「上次改动把容器 / 尸体 / 门的颜色也
+			//   变了，不能保持之前版本的颜色吗？」）—— 0/1 归还引擎之后只剩
+			//   2/3/6/9/10 五个可借槽位，而「容器橙 / 门白」必须回来：
+			//     容器 / 尸体 → **9**（覆盖为橙 #FF9500 —— 与 v4.21~v4.29 同观感）、
+			//     门 → **6**（覆盖为白；6 是引擎全镜像唯一不写的槽位 ⇒ 零副作用）、
+			//     武器 → **10**（覆盖为红 #FF2E2E；10 的引擎目标罕见）、
+			//     服饰 → **1**、笔记 → **0**（不覆盖 = 原版淡蓝白 / 青 —— 这两类
+			//     是「让位」的一方：可借槽位只有五个，品红 / 黄色与容器橙 / 门白
+			//     不可兼得。完整推理见 Config::stateByCategory 的 v4.31 段）。
+			REX::INFO("config: 配色重排(v4.31) -> 「容器 / 尸体」= state {}（橙 #FF9500，"
+					  "恢复）、「门」= state {}（白 #FFFFFF，恢复）、「武器」= state {}（红）、"
+					  "「服饰」= state {} 与「笔记」= state {}（不覆盖 = 原版色：品红 / 黄色"
+					  "让位给容器橙 / 门白）；0/1 仍归还引擎 ⇒ NPC 保持原版青",
+				g_cfg.stateByCategory[static_cast<std::size_t>(Category::kContainer)],
+				g_cfg.stateByCategory[static_cast<std::size_t>(Category::kDoor)],
 				g_cfg.stateByCategory[static_cast<std::size_t>(Category::kLootWeapon)],
 				g_cfg.stateByCategory[static_cast<std::size_t>(Category::kLootApparel)],
-				g_cfg.stateByCategory[static_cast<std::size_t>(Category::kContainer)],
-				g_cfg.stateByCategory[static_cast<std::size_t>(Category::kDoor)]);
+				g_cfg.stateByCategory[static_cast<std::size_t>(Category::kLootNote)]);
 
 			// ★★★ v4.25 / v4.28：星球目标「已扫描」⇒ 也用原版那个绿（放下扫描仪之后）
 			{
@@ -6732,17 +6758,48 @@ namespace SAS
 			}
 		}
 
-		// 这个 base 有没有被引擎亲手画过绿（见 NoteFloraEngineState）
+		// 单向学习表的查询：这个 base 是否已被**权威**确认「已扫描」。
+		//   ★ v4.31：它是三个来源的公共出口 —— 引擎状态 == 2 / 资源链命中 /
+		//   「引擎亲手画过绿」（NoteFloraEngineState）；见 NoteFloraScannedBase。
 		bool FloraEngineSaysGreen(std::uint32_t a_fid)
 		{
 			const auto it = g_state.floraEngineSeen.find(a_fid);
 			return it != g_state.floraEngineSeen.end() && it->second;
 		}
 
+		// ★★★ v4.31：把「这个 base 已扫描」写进**单向学习表**（会话级；换场景 /
+		//   读档作废 —— 与 `floraEngineSeen` 同一张表、同一个清空点）。
+		//   三个**权威来源**都会走这里：引擎状态 == 2、资源链命中（LVLI）、以及
+		//   `NoteFloraEngineState` 的「引擎亲手画过绿」。
+		//   为什么需要它（用户实测 bug：「已经扫描完成的植物有低概率变成扫描前的
+		//   颜色，但是开启扫描仪再关闭，就又会变成扫描后的颜色」）：
+		//     引用级缓存的 TTL 是 30 秒，过期后会**重新问引擎**；而引擎有时会
+		//     「拿不到 / 答未扫描」（组件重建、时序等原因）⇒ 上次的「已扫描」结论
+		//     被推翻 ⇒ 植物变回青色。而勘测数据是**单向**的（扫过就不会退回），
+		//     所以一旦被权威确认过「已扫描」，本会话内不必也不该再重问。
+		//   返回 true = 本次**首次**写入（调用方可据此打一条日志）。
+		bool NoteFloraScannedBase(std::uint32_t a_fid, const char* a_reason)
+		{
+			auto& seen = g_state.floraEngineSeen[a_fid];
+			if (seen) {
+				return false;  // 已经是「已扫描」—— 不重复记
+			}
+			seen = true;
+			++g_state.floraEngineGreenBases;
+			REX::INFO("flora scan: base=0x{:X} 记入单向学习表「已扫描」（{}）-> 本会话不再重问引擎"
+					  "（换场景 / 读档才清；这是「变回青色」的根治）",
+				a_fid, a_reason);
+			return true;
+		}
+
 		// ③ 热路径入口：**每个引用**每 kFloraScanCacheTtlMs 最多问引擎一次。
 		//   返回「这个星球目标已经扫描过（原版绿）」。
 		//   ★ v4.28：判据顺序 = ① 引擎状态（`GetOutlineState(ref)`，主判据）
 		//     → ② 引擎亲手画过的绿（会话内学习）→ ③ 资源链（**只对 LVLI 产出**）。
+		//   ★★★ v4.31：在最前面加 **⓪ 单向学习表**（base 级、会话内有效），并把
+		//     「引擎亲手画过的绿」并入它 —— 权威确认过「已扫描」的 base 直接返回；
+		//     另外「重问拿不到权威答案」时**沿用旧结论**（不再一律降成未扫描）。
+		//     两条合起来治用户实测的「已扫描植物低概率变回青色」（见 NoteFloraScannedBase）。
 		bool FloraTargetScanned(const RE::TESObjectREFR* a_ref, const RE::TESForm* a_base)
 		{
 			if (!a_base) {
@@ -6755,16 +6812,44 @@ namespace SAS
 			}
 			const std::uint32_t fid = a_base->GetFormID();
 			const auto          now = NowMs();
-			const auto          it  = g_state.floraScannedCache.find(a_ref);
+			// ★★★ v4.31：缓存过期时先把**旧结论**留着 —— 末尾「沿用」要用它
+			//   （见「低概率变青」的修复说明）。旧记录必须先核对 base（指针复用）。
+			bool prevScanned = false;
+			bool hasPrev     = false;
+			const auto it    = g_state.floraScannedCache.find(a_ref);
 			if (it != g_state.floraScannedCache.end()) {
-				// 缓存命中还要**核对 base**：引用指针可能已被回收去装别的东西
-				if (it->second.baseFid == fid && now - it->second.atMs < kFloraScanCacheTtlMs) {
-					return it->second.scanned;
+				if (it->second.baseFid == fid) {
+					// 缓存命中还要**核对 base**：引用指针可能已被回收去装别的东西
+					if (now - it->second.atMs < kFloraScanCacheTtlMs) {
+						return it->second.scanned;
+					}
+					prevScanned = it->second.scanned;
+					hasPrev     = true;
 				}
 				g_state.floraScannedCache.erase(it);
 			}
 			if (g_state.floraScannedCache.size() >= kFloraScanCacheMax) {
 				g_state.floraScannedCache.clear();  // 兜异常增长（正常情况下几十条）
+			}
+
+			// ⓪ ★★★ v4.31：**单向学习表**（base 级）—— 权威确认过「已扫描」的 base
+			//   直接返回，不再重问引擎、也不再走链。
+			//   为什么：勘测数据不会退回（v4.26 的既定前提），而重问有风险
+			//   （引擎可能「拿不到 / 答未扫描」⇒ 用户实测的「低概率变青」）。
+			//   写入点：① 引擎状态 == 2、② 资源链命中、③ 引擎亲手画过绿
+			//   （NoteFloraEngineState）。全部单向、只写 true。
+			if (FloraEngineSaysGreen(fid)) {
+				g_state.floraScannedCache.emplace(a_ref, State::FloraScanRec{ true, now, fid, 2 });
+				++g_state.floraScanHits;
+				++g_state.floraLearnedHits;
+				if (g_cfg.floraScanProbeMax > 0 &&
+					g_state.floraScanProbes < static_cast<std::uint32_t>(g_cfg.floraScanProbeMax)) {
+					++g_state.floraScanProbes;
+					REX::INFO("flora scan: base=0x{:X} 判据 = 单向学习表（本会话已确认「已扫描」）"
+							  "-> 已扫描 ⇒ 状态 {}（原版「已扫描」绿）",
+						fid, FloraScannedState());
+				}
+				return true;
 			}
 
 			// ① ★★★ v4.28 主判据：引擎自己的「这个引用扫没扫过」
@@ -6781,6 +6866,10 @@ namespace SAS
 				}
 				if (engineState == kScannableStateScanned) {
 					++g_state.floraScanHits;
+					// ★★★ v4.31：写进**单向学习表** —— 之后这个 base 的所有引用
+					//   都直接走 ⓪（不再重问引擎）。这是「低概率变青」的根治：
+					//   30 秒后 TTL 过期重问时，即使引擎这次答 0/1，也不会翻案。
+					NoteFloraScannedBase(fid, "引擎状态 GetOutlineState(ref)=2");
 					g_state.floraScannedCache.emplace(a_ref, State::FloraScanRec{ true, now, fid, 1 });
 					if (g_cfg.floraScanProbeMax > 0 &&
 						g_state.floraScanProbes < static_cast<std::uint32_t>(g_cfg.floraScanProbeMax)) {
@@ -6793,26 +6882,15 @@ namespace SAS
 				}
 			}
 
-			// ② 引擎亲手画过绿（会话内学到、单向）—— 举着扫描仪时引擎写 4/5 就是「已扫描」
-			if (FloraEngineSaysGreen(fid)) {
-				g_state.floraScannedCache.emplace(a_ref, State::FloraScanRec{ true, now, fid, 0 });
-				++g_state.floraScanHits;
-				if (g_cfg.floraScanProbeMax > 0 &&
-					g_state.floraScanProbes < static_cast<std::uint32_t>(g_cfg.floraScanProbeMax)) {
-					++g_state.floraScanProbes;
-					REX::INFO("flora scan: base=0x{:X} 判据 = 「引擎亲手画过绿色」-> 已扫描 ⇒ 状态 {}（{}）",
-						fid, FloraScannedState(), "原版「已扫描」绿");
-				}
-				return true;
-			}
-
-			// ③ 资源链（★ 只对「产出物品是 LVLI」的 FLOR 成立；植物不会走这里）
+			// ② 资源链（★ 只对「产出物品是 LVLI」的 FLOR 成立；植物不会走这里）
 			FloraChain chain{};
 			const bool scanned = chainOn && QueryFloraResourceScanned(a_base, &chain);
 			if (chainOn) {
 				++g_state.floraScanQueries;
 				if (scanned) {
 					++g_state.floraScanHits;
+					// ★★★ v4.31：同样写进单向学习表（资源进了勘测数据 = 单向）
+					NoteFloraScannedBase(fid, "资源链命中（产出物品是 LVLI 的矿脉 / 气泉 / 液池）");
 				}
 				if (!chain.shapeOk) {
 					++g_state.floraScanShapeFails;
@@ -6823,7 +6901,20 @@ namespace SAS
 					}
 				}
 			}
-			g_state.floraScannedCache.emplace(a_ref, State::FloraScanRec{ scanned, now, fid, 0 });
+
+			// ★★★ v4.31：**没有权威答案就沿用旧结论**（不是一律降成「未扫描」）。
+			//   权威答案 = 引擎状态 == 2（上面已 return）∨ 资源链**走通**（shapeOk
+			//   —— 它能给出明确的「是 / 否」）。其余情况（引擎拿不到 / 答未扫描、
+			//   链不适用或没走通）都可能只是「这次问不到」，不足以推翻上次结论，
+			//   而「已扫描」是单向的 ⇒ 旧值 true 就保持 true。
+			//   ★ 这正是用户那句「开启扫描仪再关闭，就又会变成扫描后的颜色」的
+			//     反面：以前重问失败会把绿擦成青，只能等下一次扫描仪把绿「学」回来。
+			bool result = scanned;
+			if (!chain.shapeOk && hasPrev && prevScanned) {
+				result = true;
+				++g_state.floraStickyKeeps;
+			}
+			g_state.floraScannedCache.emplace(a_ref, State::FloraScanRec{ result, now, fid, 0 });
 
 			if (g_cfg.floraScanProbeMax > 0 &&
 				g_state.floraScanProbes < static_cast<std::uint32_t>(g_cfg.floraScanProbeMax)) {
@@ -6843,11 +6934,11 @@ namespace SAS
 				REX::INFO("flora scan: base=0x{:X} 产出字段[+0x{:X}]=0x{:X} misc=0x{:X} 资源数组[+0x{:X}]={}个"
 						  " irES=[{}] | 引擎状态={} | {} -> 已扫描={} ⇒ 状态 {}（{}）",
 					fid, chain.produceOff, chain.produce, chain.misc, chain.arrOff, chain.resSize,
-					p ? res : "无", engineState, how, scanned ? 1 : 0,
-					scanned ? FloraScannedState() : g_cfg.stateByCategory[static_cast<std::size_t>(Category::kFlora)],
-					scanned ? "原版「已扫描」绿" : "原版「未扫描」青色脉冲");
+					p ? res : "无", engineState, how, result ? 1 : 0,
+					result ? FloraScannedState() : g_cfg.stateByCategory[static_cast<std::size_t>(Category::kFlora)],
+					result ? "原版「已扫描」绿" : "原版「未扫描」青色脉冲");
 			}
-			return scanned;
+			return result;
 		}
 
 		// 判据缓存作废。调用点：放下扫描仪（那一局扫描的结果刚刚变了）、换场景 / 读档
@@ -8913,7 +9004,8 @@ namespace SAS
 				//       链失败在涨 = 我们那条 FLOR → LVLI → MISC → IRES 链又对不上了
 				//       （日志里有 `flora scan:` 细节行 + 一条 WARN）。
 				REX::INFO("  planet targets (窗口内): 未扫描={} 已扫描={} | 判据: 查询={} 命中={} 链失败={} 缓存={} 偏移=0x{:X}/0x{:X} "
-						  "| 引擎状态: 问={} 已扫描={} 未扫描={} | 引擎学到: 绿={} base 青={} base | 窗口取证={} ready={}/{}",
+						  "| 引擎状态: 问={} 已扫描={} 未扫描={} | 引擎学到: 绿={} base 青={} base "
+						  "| 学习表: 命中={} 沿用={}（★ v4.31：都 > 0 = 「变回青色」的修复在干活） | 窗口取证={} ready={}/{}",
 					g_state.floraUnscannedSel, g_state.floraScannedSel,
 					g_state.floraScanQueries, g_state.floraScanHits,
 					g_state.floraScanShapeFails, g_state.floraScannedCache.size(),
@@ -8921,6 +9013,7 @@ namespace SAS
 					g_state.floraEngineStateQueries, g_state.floraEngineStateScanned,
 					g_state.floraEngineStateUnscanned,
 					g_state.floraEngineGreenBases, g_state.floraEngineCyanBases,
+					g_state.floraLearnedHits, g_state.floraStickyKeeps,
 					g_state.floraScanDumps,
 					g_isResourceScannedReady ? 1 : 0,
 					g_scannableOutlineStateReady ? 1 : 0);

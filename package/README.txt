@@ -3,7 +3,36 @@
  Always-on scanner highlighting for Starfield
 ========================================================================
 
-Version  : 1.7.8  (plugin build 4.30.0)
+Version  : 1.7.9  (plugin build 4.31.0)
+           1.7.9 = two fixes, one for each report.
+           (1) Containers, corpses and doors lost their colours in 1.7.8
+           (they had been turned into the game's plain cyan in order to free
+           up two outline states for weapons / apparel). Both are back:
+           containers and corpses are ORANGE again, doors are WHITE again,
+           exactly as in 1.7.7 and earlier. There is a hard limit at work
+           here: of the eleven outline states, six are painted by the game
+           itself while the scanner is up (plain references such as NPCs =
+           two, already-scanned planet targets = two, not-yet-scanned ones =
+           two), and 1.7.8 returned all six of them to the game - leaving
+           five states the mod can borrow, while the colours being asked
+           for needed six. So two had to give way: apparel (was magenta) and
+           notes (was yellow) now use the game's own colours (light cyan-
+           blue and cyan). Both swaps are one edit away in the INI
+           (StateApparel / ColorApparel / StateWeapon, and StateNote /
+           ColorNote / StateDoor) - no DLL swap needed.
+           (2) Already-surveyed plants could drop back to the "not yet
+           scanned" cyan, at a low rate; raising and lowering the scanner
+           would turn them green again. The mod re-checks each plant against
+           the game every 30 s; very occasionally that fresh check comes back
+           "no answer / not scanned" (a game component gets rebuilt, or
+           timing), and the previous "scanned" verdict was thrown away with
+           it. Survey data never goes backward, so the verdict is now
+           remembered per species for the rest of the session ("one-way
+           memory"), and a re-check that cannot answer authoritatively keeps
+           the previous verdict instead of erasing it. Two new counters show
+           both mechanisms working in the periodic log line
+           ("学习表: 命中=… 沿用=…"). The flora-related INI keys are
+           unchanged.
            1.7.8 = fix: while the scanner was up, every NPC showed the
            red / magenta colours the game itself reserves for its "bounty"
            markers (report + screenshot: three pedestrians, one red, two
