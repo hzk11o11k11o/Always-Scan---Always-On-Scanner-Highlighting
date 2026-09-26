@@ -3,7 +3,23 @@
  Always-on scanner highlighting for Starfield
 ========================================================================
 
-Version  : 1.7.5  (plugin build 4.23.0)
+Version  : 1.7.6  (plugin build 4.24.0)
+           1.7.6 = fix: scanned planet targets did not turn green.
+           The game paints already-scanned planet targets (ores / gas /
+           liquids / plants) with two outline states whose native colour is
+           GREEN - and the mod had been colouring those exact two states as
+           "devices cyan" and "ammo bright green", so with the scanner up
+           you saw cyan (far targets) / bright green (near ones) instead of
+           the vanilla green. Those two states are now left completely
+           alone (not a single byte written), so the game's own "scanned"
+           green is back - near and far. Practical consequences: ammo & aid
+           and interactive devices still use those two states and therefore
+           now show the game's own green. Write ColorAmmoAid=00FF66 /
+           ColorDevice=00E5FF in the INI if you want the old colours back
+           (that will hide the vanilla green again). Also new:
+           ManagerOccupancyProbe=1 logs how many entries each of the 11
+           outline states holds, 1.5 s after you raise the scanner - handy
+           evidence if any color ever looks wrong.
            1.7.5 = planet targets light up again, and the real reason why
            "resources" looked exactly like "misc".
            (1) Ores, gas vents, liquid pools and plants had no colour at
@@ -101,14 +117,17 @@ Highlights are color-coded by category (all values configurable).
 Pick-up items follow the game's own inventory categories:
   * Weapons and throwables (guns, melee, grenades, mines)            RED
   * Spacesuits / helmets / packs / clothing                          MAGENTA
-  * Ammo and aid (meds, food, drinks)                                BRIGHT GREEN
+  * Ammo and aid (meds, food, drinks) - the game's own green
+    (state 4/5 is shared with the vanilla "scanned planet target" green;
+    write ColorAmmoAid=00FF66 for bright green instead)                GREEN
   * Notes (notes, data slates, magazines, books)                     YELLOW
   * Resources (iron, aluminium, helium-3, organics, ...)             PURPLE
   * Misc items (digipicks, credits, toys) - unchanged from 1.5       BLUE
   * Containers (loot the good stuff)                                 ORANGE
   * Bodies / corpses - people, creatures and wrecked robots / turrets
     (anything you can search)                                        ORANGE
-  * Interactive devices / computers                                  CYAN
+  * Interactive devices / computers - the game's own green (same note as
+    above; write ColorDevice=00E5FF for cyan instead)                  GREEN
   * Doors                                                            WHITE
   * Flora, ores, gas vents, liquid pools (all one record type in the game
     data) - the game's own "scannable target" colour, cyan pulse.
@@ -116,10 +135,12 @@ Pick-up items follow the game's own inventory categories:
     overwritten (see below)                                           CYAN
 
 The six pick-up categories sit at hues that are at least ~44 degrees
-apart (red / magenta / bright green / yellow / purple, plus the original
-misc blue), so they can be told apart at a single glance. Every category
-gets its colour assigned explicitly by the mod (see ColorXxx in the INI),
-instead of borrowing the engine's default per-state colours.
+apart (red / magenta / green / yellow / purple, plus the original misc
+blue), so they can be told apart at a single glance. Every category gets
+its colour assigned explicitly by the mod (see ColorXxx in the INI),
+instead of borrowing the engine's default per-state colours - except the
+planet targets and the two categories that share the game's "scanned
+target" states, which are deliberately left untouched (1.7.5 / 1.7.6).
 
 Since 1.7.3 the outline is drawn as a contour instead of a fill: the
 mod writes alpha=0 into the outline's base colour, which is the "no
@@ -128,17 +149,20 @@ the item's own material and shape in full, with the category colour
 sitting on the contour / pulse. Set NoFill=0 in the INI to bring the
 old filled look back (the 1.7.1 / 1.7.2 behaviour).
 
-Since 1.7.5 the mod stays out of the vanilla scanner's way on planet
-surfaces while you are surveying. The game marks ores, gas vents, liquid
-pools and plants with the same record type (FLOR) and colors them by
-"scanned / not scanned" through two outline states the vanilla scanner
-owns; the mod never overwrites those two states' colours, and while you
-hold the scanner up it leaves that whole category alone (no new
-outlines, no refresh, and it does not remove the ones already there,
-because those entries live in the manager the game is using right now).
-The moment you put the scanner away they are put back (about 0.8 s),
-painted in the game's own cyan, so planets are readable with or without
-the scanner. Resources vs. misc items: "resources" (iron, aluminium,
+Since 1.7.5 / 1.7.6 the mod stays out of the vanilla scanner's way on
+planet surfaces while you are surveying. The game marks ores, gas vents,
+liquid pools and plants with the same record type (FLOR) and colors them
+by "scanned / not scanned" through outline states the vanilla scanner
+owns: the "not scanned" look lives in two states (a cyan pulse) and the
+"scanned" look in two more whose native colour is GREEN. The mod
+overwrites none of those four states' colours (1.7.5 handed the first
+pair back, 1.7.6 the second - before that, a scanned deposit showed up as
+cyan / bright green and never turned green), and while you hold the
+scanner up it leaves that whole category alone (no new outlines, no
+refresh, and it does not remove the ones already there, because those
+entries live in the manager the game is using right now). The moment you
+put the scanner away they are put back (about 0.8 s), painted in the
+game's own cyan, so planets are readable with or without the scanner. Resources vs. misc items: "resources" (iron, aluminium,
 helium-3, organics, ...) are purple, misc items (digipicks, credits,
 toys) are blue. If the resource check ever fails, the log says so and
 everything falls back to the misc color.
@@ -213,17 +237,26 @@ Most useful options:
   StateResource=3         containers & bodies 9             devices 4
   StateLoot=2             doors 10    flora 7 (= the vanilla scannable-
                         target state, colour not overwritten) and MSTT 2
-                        Since 1.7.4 "resources" uses state 3 and states
-                        7 / 8 are never touched: those two are the ones the
-                        vanilla scanner uses for scannable planet targets.
-  ColorWeapon=FF2E2E    exact RGB per category (all set by default):
-  ColorApparel=FF3BD4     weapons red / suits magenta / ammo bright green
-  ColorAmmoAid=00FF66     notes yellow / resources purple / misc blue
-  ColorNote=FFD700        containers & bodies orange / devices cyan
-  ColorResource=B36BFF    doors white / flora unset (= the game's own cyan) / MSTT unset
-  ColorContainer=FF9500 Change them freely; note that this writes the
-  ColorDevice=00E5FF    engine's global per-state color block, so the same
-  ColorDoor=FFFFFF      state of the vanilla scanner changes too (see the INI).
+                        Since 1.7.4 "resources" uses state 3; 7 / 8 (the
+                        vanilla "not scanned planet target" states) and
+                        4 / 5 (the vanilla "scanned planet target" states,
+                        native green) are never touched. Ammo & aid and
+                        devices still use 4 / 5, so they show the game's
+                        own green by default (1.7.6).
+  ColorWeapon=FF2E2E    exact RGB per category (written by default):
+  ColorApparel=FF3BD4     weapons red / suits magenta / notes yellow /
+  ColorNote=FFD700        resources purple / misc blue / containers &
+  ColorResource=B36BFF    bodies orange / doors white
+  ColorContainer=FF9500   ammo & aid and devices are NOT written by
+  ColorDoor=FFFFFF        default (they show the game's own green), and
+                          so are flora (the game's own cyan) and MSTT.
+  ColorAmmoAid / ColorDevice
+                        write these (00FF66 / 00E5FF) only if you want the
+                        old bright green / cyan back - it will hide the
+                        vanilla "scanned planet target" green again.
+                        Note that any ColorXxx writes the engine's global
+                        per-state color block, so the same state of the
+                        vanilla scanner changes too (see the INI).
   NoFill=1              draw the outline as a contour only (default since
                         1.7.3): the fill layer's alpha is written as 0, so
                         the item's own material stays visible.  NoFill=0 =
@@ -244,7 +277,9 @@ Most useful options:
                         record type). Default ON since 1.7.5 - painted in
                         the game's own cyan, and the mod steps aside while
                         you hold the scanner up, so the vanilla
-                        scanned / not-scanned colours stay intact.
+                        scanned / not-scanned colours stay intact (the
+                        "scanned" green is preserved since 1.7.6 - that was
+                        the state 4 / 5 colour, see the version notes).
                         Set it to 0 to leave this category completely to the
                         vanilla scanner (you will only see those targets
                         while the scanner is up), or StateFlora=5 plus
@@ -259,6 +294,14 @@ Most useful options:
                         0 = old behaviour (refresh that category even while
                         the scanner is up). The log's "skip (window)" line
                         shows "yield=N" growing while you survey.
+  ManagerOccupancyProbe=1
+                        diagnostic (default on): 1.5 s after you raise the
+                        scanner, log one line with the number of entries in
+                        each of the 11 outline states, e.g. "manager
+                        occupancy[举着扫描仪]: 0=5 1=2 ... 10=1". Handy
+                        evidence when a colour looks wrong (you can see
+                        which states the game itself is writing). Max 6
+                        lines per session, read-only.
   EnableOther=0         also outline movable statics (crates, tables).
                         Off by default: they cannot be picked up and the
                         vanilla scanner does not outline them either.
@@ -367,6 +410,16 @@ categories).
     (older INI files are not overwritten by the installer - see the note
     in the INI itself); the log's stats line should show "yield=" growing
     while you survey.
+* On a planet, scanned targets do not turn green (they stay cyan, or turn
+  bright green / stay cyan far away):
+    the "scanned planet target" green is the native colour of outline
+    states 4 and 5, and 1.7.6 stopped writing those two states. If you
+    upgrade with your own INI, make sure it does not contain
+    ColorAmmoAid=... or ColorDevice=... (those write the same two states
+    and hide the green again - remove the lines or update the values).
+    In the log, the startup line "outline colors[install]: state= 4 ..."
+    should show "基色=#27C684" (green), and there should be no
+    "state=4 覆盖为" / "state=5 覆盖为" line.
 * On a planet, ores / gas vents / liquid pools / plants have no colour
     at all: check EnableFlora=1 in your INI (1.7.4 shipped it as 0).
     Those targets are only painted by the vanilla scanner while it is up,

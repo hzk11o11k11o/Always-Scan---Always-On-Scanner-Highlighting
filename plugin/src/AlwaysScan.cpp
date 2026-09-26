@@ -978,16 +978,20 @@ namespace SAS
 			// ★★ v4.17：物品栏分类分色（需求 1.6）—— 5 个「可拾取」子类各一个新状态，
 			//   其它类别原样不动（**杂项继续 2 蓝**）。状态分配的依据（全部离线实证，
 			//   见 docs/16 §配色 与 out/esm_invcat_probe.py）：
-			//     · state 0/1/2/3/7/8/9 是**引擎自己也会写**的状态（反汇编 0x159ED90：
-			//       原版扫描仪求值只产生 0/1、2/3、7/8、9）⇒ 尽量别动它们；
-			//     · **4 / 5 / 6 / 10 全镜像没有任何代码写**（`func.py callers 0x17D52B0`
-			//       只有那两个调用点）⇒ 这几个状态是「本 MOD 专用」的。
+			//     · **引擎自己会写**的状态（反汇编 0x159ED90 = 原版扫描仪的逐引用求值：
+			//       0/1、2/3、4/5、7/8、9、10 —— 全部 11 个槽位里**只有 6 号它从不写**）
+			//       ⇒ 尽量别动它们；
+			//     · ★★★ v4.24 订正：v4.17~v4.23 那句「4/5/6/10 全镜像没有任何代码写」
+			//       **是错的**（当时只看了函数尾部 0x159F604~0x159F654 那一段）——
+			//       4/5 由 `add edx,4`（0x159F4AF / 0x159F562）产生，10 由
+			//       `mov edx,0xa`（0x159F601）产生。**4/5 = 已扫描的星球目标（原生绿）**
+			//       ⇒ v4.24 起颜色归还引擎（证据链见 docs/23）。真正的「MOD 专用」只剩 6。
 			//   ★★★ v4.19：**颜色不再依赖状态的原生值** —— 用户实测反馈「不同类别
 			//     看起来是同一个颜色」（原生 state 0/1/2/3 全是蓝色系：青 / 淡蓝白 /
 			//     蓝 / 蓝，根本分不开），要求「区分度要高、别用相近色」。现在按类别
 			//     **逐一覆盖颜色**（见下面的 colorOverride），状态只当「颜色槽」用：
 			//     同一状态 = 同一色 ⇒ 共享状态的类别必须同色（容器+尸体 = 9、
-			//     弹药救援+植物 = 5）。
+			//     设备+弹药救援 = 4/5 —— ★ v4.24：这两个槽位不再覆盖颜色）。
 			//   ★★★ v4.22（用户实测：「星球上的矿石、气体、液体、植物、动物现在扫描前和
 			//     扫描后颜色无法区分了，这两个状态保持游戏原版颜色即可」）：
 			//     **state 7 / 8（TargetScannable / TargetScanned）必须留给引擎** ——
@@ -1007,11 +1011,14 @@ namespace SAS
 				2,  // kLoot        杂项 —— 蓝（**原生不变**，用户需求）
 				0,  // kLootWeapon  武器、投掷物 —— ★ 覆盖为 红 #FF2E2E
 				1,  // kLootApparel 太空服/背包/头盔/服饰 —— ★ 覆盖为 品红 #FF3BD4
-				5,  // kLootAmmoAid 弹药、救援 —— ★ 覆盖为 亮绿 #00FF66（与植物同 state ⇒ 同色）
+				// ★★★ v4.24：state 5 / 4 **归还引擎**（引擎用它们画「已扫描的星球目标」= 绿色；
+					//   证据见 colorOverride 上方的长注释）。这两个类别继续用 4/5，但颜色 =
+					//   原生绿 #27C684（弹药救援仍是「绿」这一组；想自定义见 INI 的 ColorAmmoAid）。
+				5,  // kLootAmmoAid 弹药、救援 —— 原版绿 #27C684（不覆盖，state 5）
 				6,  // kLootNote    笔记 —— 黄 #FFD700
 				3,  // kLootResource 资源 —— 紫 #B36BFF（★ v4.22：7 让给原版扫描目标）
 				9,  // kContainer   容器 —— 橙 #FF9500（与尸体同 state ⇒ 同色）
-				4,  // kDevice      设备 —— ★ 覆盖为 青 #00E5FF（原生 4 是绿，会和弹药撞色）
+				4,  // kDevice      设备 —— 原版绿 #27C684（不覆盖，state 4；★ v4.24 归还引擎）
 				10, // kDoor        门 —— ★ 覆盖为 白 #FFFFFF（原生红会和武器红撞色）
 				7,  // kFlora       植物 / 矿脉 / 气泉 / 液池 —— ★★★ v4.23：**改回 7**
 				//     （= 原版 `TargetScannable`，颜色**不覆盖** ⇒ 原生青色脉冲轮廓）
@@ -1110,23 +1117,56 @@ namespace SAS
 			//   要高，不要弄太相近的颜色，肉眼很难分辨」）。
 			//   配色原则（每条都写进 docs/18）：
 			//     · 六个「物品组」占据六个相隔 ≥44° 的色相：
-			//         武器 红 #FF2E2E(0°) / 服饰 品红 #FF3BD4(316°) / 弹药救援 亮绿 #00FF66(150°)
+			//         武器 红 #FF2E2E(0°) / 服饰 品红 #FF3BD4(316°) / 弹药救援 绿 #27C684(150°，原生)
 			//         / 笔记 黄 #FFD700(51°) / 资源 紫 #B36BFF(268°) / 杂项 蓝 #1F8EE2(207°，**原生不动**)
-			//     · 世界类目标（容器/尸体 橙 #FF9500、设备 青 #00E5FF、门 白 #FFFFFF）
+			//     · 世界类目标（容器/尸体 橙 #FF9500、设备 绿 #27C684、门 白 #FFFFFF）
 			//       也都跟上面六个错开；
-			//     · **共享 state 的两组颜色必须一致**（容器+尸体 = 9、弹药救援+植物 = 5），
+			//     · **共享 state 的两组颜色必须一致**（容器+尸体 = 9、设备+弹药救援 = 4/5），
 			//       否则会互相覆盖（WriteColorOverrides 里有撞色 WARN）。
-			//   ★ 结论：能覆盖的一律覆盖（不再依赖「原生状态色」—— 原生 0/1/2/3 全是蓝色系，
-			//     正是用户说的「看起来一样」）。
+			//   ★ 结论：能覆盖的**都尽量覆盖**（不再依赖「原生状态色」—— 原生 0/1/2/3 全是
+			//     蓝色系，正是用户说的「看起来一样」）。
+			//
+			// ★★★ v4.24：**state 4 / 5 归还引擎** —— 设备 / 弹药救援不再覆盖颜色。
+			//   用户实测反馈（原文）：
+			//     「矿石、气体、液体、植物、动物现在颜色扫描前是原版颜色，但是举起扫描仪
+			//       扫描的颜色不是原版，而且扫描后，没有变成原版扫描后的绿色」
+			//   硬证据（反汇编 0x159ED90，引擎扫描仪的**逐引用求值函数**）：
+			//     · 对**星球的矿石 / 气体 / 液体 / 植物**（base = **FLOR**，0x2E；FLOR 里既有
+			//       植物也有 `MineralDeposit*` 矿脉 / 气泉 / 液池 —— 见 docs/21 §1.1），
+			//       引擎会顺着 `FLOR+0x260`（= `TESProduceForm::produceItem`，一个 **LVLI**）
+			//       → 第一个条目（**MISC**）→ `MISC+0x238`（= `BGSCraftingResourceOwner`
+			//       的 `unk10`，24 字节三元组数组）→ 取里面的 **BGSResource（IRES，0x9F）**，
+			//       再调 `0x1597A50(irES)` = **「这个资源是不是已经扫描过（进了勘测数据）」**；
+			//     · 只要命中 ⇒ `add eax,4` / `add edx,4`（0x159F562 / 0x159F4AF）⇒
+			//       **state 4（远）/ 5（近）** —— 而这两个槽位的原生色就是**绿色 #27C684**
+			//       （`outline colors[install]`：state=4 Bounty / state=5 Social = 39,198,132）。
+			//     ⇒ 用户说的「原版扫描后的绿色」= **state 4 / 5**。
+			//   v4.19~v4.23 把 4 覆盖成「设备 青 #00E5FF」、5 覆盖成「弹药救援 亮绿 #00FF66」
+			//   ⇒ 举着扫描仪时，**已经扫描过的**星球目标显示成青色（远的）/ 亮绿（近的），
+			//     永远看不到原版那个绿色 —— 正是用户这一轮报的两个症状。
+			//   ⇒ 修法：4 / 5 的颜色**一个字节都不写**（与 v4.22 归还 7/8 同一个道理）；
+			//     「设备」「弹药救援」**继续用这两个槽位**（类别逻辑不变），颜色变成
+			//     引擎原生绿 #27C684（弹药救援本来就是绿组，观感变化最小）。
+			//   ★ 教训（写进 docs/23）：11 个槽位里**只有 state 6 是引擎全镜像不写的**
+			//     （0/1、2/3、4/5、7/8、9、10 全会写），所以「借一个状态当自己的颜色」
+			//     永远是在赌「引擎不会在我看得见的地方写它」—— 借之前先看这条注释。
 			std::array<std::uint32_t, kCategoryCount> colorOverride{
 				0x001F8EE2u,   // kLoot        杂项 —— 蓝 #1F8EE2（= 原生值，用户要求「不变」）
 				0x00FF2E2E,    // kLootWeapon  武器、投掷物 —— 红
 				0x00FF3BD4,    // kLootApparel 太空服/背包/头盔/服饰 —— 品红
-				0x0000FF66,    // kLootAmmoAid 弹药、救援 —— 亮绿（与植物同 state 5 ⇒ 必须同色）
+				// ★★★ v4.24：**不覆盖** —— state 5 是引擎给「已扫描的星球目标（近）」
+				//   画绿色的槽位（见上面长注释的硬证据）；写它 = 用户在星球上永远
+				//   看不到原版扫描后的绿色。原生色 #27C684 = 绿，与「弹药救援 =
+				//   绿」这个分组意图一致，观感变化最小。
+				kColorUnset,   // kLootAmmoAid 弹药、救援 —— 原版绿 #27C684（state 5 归还引擎）
 				0x00FFD700,    // kLootNote    笔记 —— 黄
 				0x00B36BFF,    // kLootResource 资源 —— 紫（★ v4.22 落在 state 3，不再占 7）
 				0x00FF9500,    // kContainer   容器 —— 橙（与尸体同 state 9 ⇒ 必须同色）
-				0x0000E5FF,    // kDevice      设备 —— 青
+				// ★★★ v4.24：**不覆盖** —— state 4 是引擎给「已扫描的星球目标（远）」
+				//   画绿色的槽位（同上）。设备（终端 / 开关等）现在显示原版绿
+				//   #27C684；想恢复青色 ⇒ `ColorDevice=00E5FF`（代价：原版扫描后的
+				//   绿色（远目标）会被盖掉，INI 里已注明）。
+				kColorUnset,   // kDevice      设备 —— 原版绿 #27C684（state 4 归还引擎）
 				0x00FFFFFF,    // kDoor        门 —— 白
 				// ★★★ v4.23：植物 / 矿脉 / 气泉 / 液池 **不覆盖颜色** —— 直接用原版
 				//   state 7 的原生配色（脉冲 High `#72E8FF` / Low `#115B69`、基色 alpha=0
@@ -1184,6 +1224,15 @@ namespace SAS
 			//   （含**基色**= 真正画出来的颜色）。每个会话最多 3 次、只读、带指针校验。
 			//   排「颜色没生效」时非常有用；不想要噪音就写 `RendererProbe=0`。
 			bool          rendererProbe   = true;
+
+			// ★★★ v4.24：诊断探针 —— 举着扫描仪约 1.5 秒后，把**11 个 HighlightManager
+			//   各自的元素数**打一行（`manager occupancy[举着扫描仪]: 0=.. 1=.. … 10=..`）。
+			//   用途：直接看**引擎自己在往哪些 state 写**（本轮就是靠「state 4/5 会涨」
+			//   这条实况来验证「已扫描的星球目标 = 绿色」的结论；也用来复盘
+			//   「扫描前 / 扫描后 / 正在扫描」到底落在哪几个槽位）。
+			//   每个会话最多 6 次、发生在「举起扫描仪」之后 1.5s（那一刻引擎已经写完
+			//   至少一轮），全部只读 + 指针校验。不想要噪音就写 `ManagerOccupancyProbe=0`。
+			bool          managerOccupancyProbe = true;
 
 			// ★★ v4.17：「资源」判据 = 读 MISC 记录上的 `ResourceType*` 关键词
 			//   （离线实证：1319 条 MISC 里 410 条带它 = 资源物品；909 条不带 =
@@ -1762,6 +1811,11 @@ namespace SAS
 
 			// --- ★ v4.19：渲染侧参数探针跑了多少次（每会话限流 3 次，见 LogRendererParams）---
 			std::uint32_t rendererProbeRuns  = 0;
+
+			// --- ★★★ v4.24：管理器占用探针（「举起扫描仪」1.5 秒后打一行，每会话 ≤6 次）---
+			bool          manDumpPending = false;
+			std::uint64_t manDumpAtMs    = 0;
+			std::uint32_t manDumpRuns    = 0;
 
 			// --- ★ v4.7：移动距离（诊断：把「行走」和「跳过」对起来看）---
 			RE::NiPoint3 lastPos{};
@@ -3366,6 +3420,13 @@ namespace SAS
 					  "（基色 = 真正画出来的颜色；排「颜色没生效」时看它）",
 				g_cfg.rendererProbe);
 
+			// ★★★ v4.24：管理器占用探针（举着扫描仪 1.5s 后打 11 个管理器的元素数）
+			g_cfg.managerOccupancyProbe = getInt("ManagerOccupancyProbe", 1) != 0;
+			REX::INFO("config: managerOccupancyProbe={} -> 每次「举起扫描仪」1.5 秒后打一行 "
+					  "`manager occupancy[...]`（11 个 state 各自的元素数；直接看引擎在写哪些槽位，"
+					  "每会话最多 6 次）",
+				g_cfg.managerOccupancyProbe);
+
 			// ★ v4.17：「资源」判据（MISC 的 ResourceType* 关键词）总开关
 			g_cfg.resourceByKeyword = getInt("ResourceByKeyword", 1) != 0;
 			REX::INFO("config: resourceByKeyword={} -> 资源判据{}（MISC 记录上的 ResourceType* 关键词；"
@@ -3381,6 +3442,18 @@ namespace SAS
 					? "不挂、不重申、不摘（原版自己的 扫描前/扫描后/正在扫描 颜色原样保留；"
 					  "放下扫描仪后自动整批重挂）；其余类别照常（圆圈外也高亮不受影响）"
 					: "照常重申（= v4.22 行为，会盖掉原版刚写的状态）");
+
+			// ★★★ v4.24：state 4 / 5 归还引擎 —— 用户实测「扫描后没有变成原版扫描后的
+			//   绿色」的真根因：引擎的扫描求值函数（0x159ED90）对**已经扫描过的星球目标**
+			//   （矿石/气体/液体/植物：base=FLOR → produceItem → MISC → BGSResource(IRES)
+			//   → 「该资源已扫描」⇒ `add edx,4`）写 **state 4（远）/ 5（近）**，
+			//   而这两个槽位的原生色 = **绿色 #27C684**（= 用户说的那个绿）。
+			//   详证见 Config 配色数组上方的长注释 / `docs/23`。
+			REX::INFO("config: state4_5 归还引擎 -> 「设备」(state {}) / 「弹药救援」(state {}) "
+					  "的颜色**不再覆盖**（= 引擎原生绿 #27C684）：引擎用这两个槽位画"
+					  "「已扫描的星球目标」（近 = 5 / 远 = 4）⇒ 举着扫描仪时看到的是原版色",
+				g_cfg.stateByCategory[static_cast<std::size_t>(Category::kDevice)],
+				g_cfg.stateByCategory[static_cast<std::size_t>(Category::kLootAmmoAid)]);
 
 			REX::INFO("config: radius={:.1f}m targets={} hotkeyVK=0x{:X} startEnabled={}",
 				g_cfg.radiusMeters, g_cfg.maxTargets, g_cfg.hotkeyVk, g_cfg.startEnabled);
@@ -6105,6 +6178,8 @@ namespace SAS
 		constexpr std::size_t    kOffManagerId        = 0x40;
 		constexpr std::size_t    kRenderSlotStride    = 32;
 		constexpr int            kRendererProbeMax    = 3;  // 每个会话最多跑几次（限流）
+		// ★★★ v4.24：管理器占用探针（见 LogManagerOccupancy）；每会话最多打几次
+		constexpr std::uint32_t  kManagerOccupancyMax = 6;
 
 		void LogRendererParams(const char* a_tag)
 		{
@@ -6397,6 +6472,37 @@ namespace SAS
 			}
 			const auto* p = reinterpret_cast<const std::uint32_t*>(a_mgr + kOffManagerMap + 0x18);
 			return IsReadable(p, sizeof(std::uint32_t)) ? *p : 0;
+		}
+
+		// ★★★ v4.24：11 个 HighlightManager 的「元素数」一行打全（诊断探针）。
+		//   为什么需要：**引擎自己在往哪些 state 写、写了多少**是「原版扫描色落在
+		//   哪个槽位」这类问题的唯一实况证据（本轮就是靠它验证「已扫描的星球目标 =
+		//   state 4/5 = 绿色」这条结论；也用来复盘「扫描前 / 扫描后 / 正在扫描」）。
+		//   全部只读 + 指针校验；由 INI `ManagerOccupancyProbe`（默认 1）控制，
+		//   每会话 ≤ `kManagerOccupancyMax` 次，调用点见 Tick（举起扫描仪后 1.5s）。
+		void LogManagerOccupancy(const char* a_tag)
+		{
+			char        buf[512];
+			std::size_t used = 0;
+			buf[0]           = '\0';
+			for (std::uint32_t i = 0; i < kOutlineManagerUsed; ++i) {
+				if (used + 24 >= sizeof(buf)) {
+					break;
+				}
+				const auto  mgr     = OutlineManagerFor(i);
+				const int   written = mgr
+				                        ? std::snprintf(buf + used, sizeof(buf) - used, "%s%u=%u",
+											  used ? " " : "", i, ManagerMapCount(mgr))
+				                        : std::snprintf(buf + used, sizeof(buf) - used, "%s%u=-",
+											  used ? " " : "", i);
+				if (written <= 0) {
+					break;
+				}
+				used += static_cast<std::size_t>(written);
+			}
+			REX::INFO("manager occupancy[{}]: {}（11 个 outline 状态各自的元素数；"
+					  "引擎在写哪些槽位看这里 —— 4/5 = 已扫描的星球目标【绿】、7/8 = 未扫描【青】）",
+				a_tag, buf);
 		}
 
 		// ★ v2.3：把「取引用的 3D 根节点」这一步单独抽出来（引擎在 0x17D4CD0 里就是
@@ -6900,7 +7006,16 @@ namespace SAS
 			// 这样开关功能不会造成一次假的「由开变关」。
 			const bool monocleOpen = IsMonocleMenuOpen();
 			const bool justClosed  = g_state.monocleOpen && !monocleOpen;
+			const bool justOpened  = !g_state.monocleOpen && monocleOpen;
 			g_state.monocleOpen    = monocleOpen;
+
+			// ★★★ v4.24：刚举起扫描仪 ⇒ 1.5 秒后打一行「管理器占用」快照
+			//   （那一刻引擎的求值循环已经写过至少一轮，11 个槽位里谁有货一目了然；
+			//    见 LogManagerOccupancy。每会话限流 kManagerOccupancyMax 次。）
+			if (justOpened && g_cfg.managerOccupancyProbe && g_state.manDumpRuns < kManagerOccupancyMax) {
+				g_state.manDumpPending = true;
+				g_state.manDumpAtMs    = a_nowMs + 1500;
+			}
 
 			if (!g_state.nativeReady || !g_state.on) {
 				g_state.lastLiveManagers = CountLiveManagers();
@@ -7502,6 +7617,15 @@ namespace SAS
 			//   ★ v4.0：放在读档处理**之后** —— 读档会把已挂目标标成「待摘」，
 			//     顺序反了会被「重挂」覆盖掉（见 DetectEngineOutlineLoss 里的静置期判断）。
 			DetectEngineOutlineLoss(now);
+
+			// ★★★ v4.24：管理器占用探针 —— 「举起扫描仪」1.5 秒后打一次快照
+			//   （引擎此刻至少写过一轮状态；见 LogManagerOccupancy / Config::managerOccupancyProbe）。
+			//   放在 `!g_state.on` 提前返回**之前**：即使 F8 关掉功能也能取证。
+			if (g_state.manDumpPending && g_state.monocleOpen && now >= g_state.manDumpAtMs) {
+				g_state.manDumpPending = false;
+				++g_state.manDumpRuns;
+				LogManagerOccupancy("举着扫描仪");
+			}
 
 			if (!g_state.on) {
 				++g_state.skipOff;

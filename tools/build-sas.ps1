@@ -287,7 +287,15 @@ if (-not $SkipDeploy) {
     #   ② 星球扫描目标（植物 / 矿脉 / 气泉 / 液池）**重新默认开**：state 7 +
     #   颜色不覆盖（用原版青色脉冲轮廓），并新增 `YieldWhileScanning=1`
     #   （举着扫描仪时 MOD 整段让位 ⇒ 原版的「扫描前 / 扫描后」区别不再被盖）。
-    Set-Content -LiteralPath (Join-Path $modRoot 'meta.ini') -Value "[General]`nmodid=18268`nversion=1.7.5`ncomment=Always-on scanner highlighting (SFSE)" -Encoding UTF8
+    # ★ 2026-09-26（v4.24 / 发布版 1.7.6）：**state 4/5 归还引擎** —— 用户实测
+    #   「扫描后没有变成原版扫描后的绿色」的真根因：引擎的扫描求值函数（0x159ED90）
+    #   把「**已经扫描过**」的星球目标（FLOR → produceItem → MISC → BGSResource(IRES)
+    #   →「资源已扫描」命中 ⇒ `add edx,4`）写进 **state 4（远）/ 5（近）**，
+    #   而这两个槽位的原生色就是**绿色 #27C684**；v4.19~v4.23 把它们覆盖成
+    #   「设备 青」/「弹药救援 亮绿」⇒ 扫描后永远看不到那个绿。
+    #   修法：4/5 颜色一个字节都不写（设备 / 弹药救援 继续用这两个槽位，颜色 = 原版绿）;
+    #   另新增诊断 `ManagerOccupancyProbe`（举扫描仪 1.5s 后打 11 个管理器元素数）。
+    Set-Content -LiteralPath (Join-Path $modRoot 'meta.ini') -Value "[General]`nmodid=18268`nversion=1.7.6`ncomment=Always-on scanner highlighting (SFSE)" -Encoding UTF8
 
     Get-ChildItem -LiteralPath $modRoot -Recurse -File | ForEach-Object {
         Write-Host ("  {0}  ({1} bytes)" -f $_.FullName.Substring($modRoot.Length + 1), $_.Length)
