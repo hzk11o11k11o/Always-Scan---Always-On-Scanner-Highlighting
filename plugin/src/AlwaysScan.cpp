@@ -1092,19 +1092,32 @@ namespace SAS
 			//       · 「容器 / 尸体」 9 → **1**、「门」 10 → **0**（改成**原版色**：
 			//         1 = 亮青 #72E8FF 脉冲、0 = 青 #3EADF2 脉冲，都不覆盖 ——
 			//         搜刮目标仍然醒目，门的观感仍近白）。
+			//
+			// ★★★ v4.32：**分组配色定稿**（用户需求 `颜色分类.md`）—— 两条并组，
+			//   不引入任何新槽位 / 新覆盖（这就是它「很安全」的全部原因）：
+			//     · 「太空服 / 背包 / 头盔 / 服饰」 **1 → 10**（并进「武器 / 投掷物」的
+			//       红组 ⇒ 整套装备一个色）；
+			//     · 「笔记」 **0 → 3**（并进「资源」的紫组）。
+			//   其余不动：容器 / 尸体 = 9（橙）、门 = 6（白）、弹药 / 救援 = 5
+			//   （原版绿）、杂项 = 2（原版蓝）、设备 = 4（原版绿）、植物 = 7（原版青）。
+			//   ⇒ 覆盖槽位仍是 5 个（2/3/6/9/10）、覆盖色集合一字未变（红 / 紫 / 白 /
+			//     橙 / 蓝），state 0/1/4/5/7/8 依旧一个字节都不写 ⇒ v4.30 的 NPC
+			//     修复与星球目标「青 ↔ 绿」全部不回归。v4.31 里「服饰 / 笔记让位」
+			//     的妥协就此取消（换组不换色，代价为零）。
 			std::array<int, kCategoryCount> stateByCategory{
 				2,  // kLoot        杂项 —— 蓝（**原生不变**，用户需求）
 				10, // kLootWeapon  武器、投掷物 —— ★★★ v4.31：9 → **10** + **覆盖为红**。
 					//      10 是 v4.21~v4.29 的老「门」槽位（引擎目标罕见），
 					//      用来纪念「武器红」（见 colorOverride 的 v4.31 段）
-				1,  // kLootApparel 太空服/背包/头盔/服饰 —— ★★★ v4.31：10 → **1**、
-					//      **不覆盖** ⇒ 原版淡蓝白 #B3C1EF（★ 品红已让位，见 v4.31 段）
+				10, // kLootApparel 太空服/背包/头盔/服饰 —— ★★★ v4.32：1 → **10**
+					//      （并进「武器」的**红组** —— 用户「颜色分类」：整套装备一个
+					//      色；与武器共槽同色，见 v4.32 段与 colorOverride）
 				// ★★★ v4.24：state 5 / 4 **归还引擎**（引擎用它们画「已扫描的星球目标」= 绿色；
 					//   证据见 colorOverride 上方的长注释）。这两个类别继续用 4/5，但颜色 =
 					//   原生绿 #27C684（弹药救援仍是「绿」这一组；想自定义见 INI 的 ColorAmmoAid）。
 				5,  // kLootAmmoAid 弹药、救援 —— 原版绿 #27C684（不覆盖，state 5）
-				0,  // kLootNote    笔记 —— ★★★ v4.31：6 → **0**、**不覆盖**
-					//      ⇒ 原版青 #3EADF2（★ 黄色已让位给「门白」，见 v4.31 段）
+				3,  // kLootNote    笔记 —— ★★★ v4.32：0 → **3**（并进「资源」的
+					//      **紫组** —— 与资源共槽同色 #B36BFF，见 colorOverride）
 				3,  // kLootResource 资源 —— 紫 #B36BFF（★ v4.22：7 让给原版扫描目标）
 				9,  // kContainer   容器 —— ★★★ v4.31：1 → **9** + **覆盖为橙** ——
 					//      9 的原生色本来就是橙（TargetFullyScanned #FFAA00，v4.19 起
@@ -1260,22 +1273,20 @@ namespace SAS
 			std::array<std::uint32_t, kCategoryCount> colorOverride{
 				0x001F8EE2u,   // kLoot        杂项 —— 蓝 #1F8EE2（= 原生值，用户要求「不变」）
 				0x00FF2E2E,    // kLootWeapon  武器、投掷物 —— 红（★ v4.31 起挂在 state 10）
-				// ★★★ v4.31：**不覆盖** —— state 1（引擎画「近处通用引用」的槽位）
-				//   不能写；「品红」让位给「容器橙 / 门白」（见 stateByCategory 的
-				//   v4.31 段）。代价 = 服饰改用原生淡蓝白；想恢复品红 ⇒
-				//   `StateApparel=10` + `ColorApparel=FF3BD4`（会同时失去「武器红」，
-				//   两者只能保一个 —— 因为可借的槽位只有 5 个）。
-				kColorUnset,   // kLootApparel 太空服/背包/头盔/服饰 —— 原版淡蓝白（state 1）
+				// ★★★ v4.32：**覆盖为红 #FF2E2E**（与「武器」同色 —— 用户需求
+				//   `颜色分类.md` 把整套装备（武器 / 投掷物 / 太空服 / 背包 / 头盔 /
+				//   服饰）并进**红组**，state 10 与武器共用；v4.31 的「原版淡蓝白」
+				//   不再使用。同 state 同色 ⇒ 不会触发撞色 WARN）。
+				0x00FF2E2E,    // kLootApparel 太空服/背包/头盔/服饰 —— 红（★ v4.32 与武器同组）
 				// ★★★ v4.24：**不覆盖** —— state 5 是引擎给「已扫描的星球目标（近）」
 				//   画绿色的槽位（见上面长注释的硬证据）；写它 = 用户在星球上永远
 				//   看不到原版扫描后的绿色。原生色 #27C684 = 绿，与「弹药救援 =
 				//   绿」这个分组意图一致，观感变化最小。
 				kColorUnset,   // kLootAmmoAid 弹药、救援 —— 原版绿 #27C684（state 5 归还引擎）
-				// ★★★ v4.31：**不覆盖** —— 黄色让位给「门白」（同上）。代价 = 笔记
-				//   改用 state 0 的原生青；想恢复黄 ⇒ `StateNote=6` + `ColorNote=FFD700`
-				//   （会同时失去「门白」）。★ 为什么不反过来：6 是唯一「引擎从不写」
-				//   的槽位，给「看得见的门白」比给「少见的笔记黄」收益大。
-				kColorUnset,   // kLootNote    笔记 —— 原版青 #3EADF2（state 0）
+				// ★★★ v4.32：**覆盖为紫 #B36BFF**（与「资源」同色 —— 用户需求
+				//   `颜色分类.md` 把「笔记 + 资源」并进**紫组**，state 3 与资源
+				//   共用；v4.31 的「原版青」不再使用）。
+				0x00B36BFF,    // kLootNote    笔记 —— 紫（★ v4.32 与资源同组）
 				0x00B36BFF,    // kLootResource 资源 —— 紫（★ v4.22 落在 state 3，不再占 7）
 				// ★★★ v4.31：**覆盖为橙 #FF9500** —— 用户要求「恢复容器 / 尸体的橙色」。
 				//   state 9 的原生色本来就是橙（#FFAA00 = TargetFullyScanned），这里
@@ -3440,7 +3451,9 @@ namespace SAS
 			//    完整推理见 Config::stateByCategory 的 v4.31 段）：
 			//    武器 9→**10**、服饰 10→**1**、笔记 6→**0**、容器 1→**9**、
 			//    门 0→**6**、尸体 1→**9**。
-			const int kStateDef[kCategoryCount] = { 2, 10, 1, 5, 0, 3, 9, 4, 6, 7, 2, 9 };
+			//   ★★★ v4.32：分组配色定稿 —— **服饰 1→10**（并进武器红组）、
+			//    **笔记 0→3**（并进资源紫组）；其余不动（见 v4.32 段）。
+			const int kStateDef[kCategoryCount] = { 2, 10, 10, 5, 3, 3, 9, 4, 6, 7, 2, 9 };
 			for (std::size_t i = 0; i < kCategoryCount; ++i) {
 				g_cfg.stateByCategory[i] = std::clamp(getInt(kStateKeys[i], kStateDef[i]), 0, 11);
 			}
@@ -3665,24 +3678,22 @@ namespace SAS
 				g_cfg.stateByCategory[static_cast<std::size_t>(Category::kDevice)],
 				g_cfg.stateByCategory[static_cast<std::size_t>(Category::kLootAmmoAid)]);
 
-			// ★★★ v4.31：配色重排（用户实测：「上次改动把容器 / 尸体 / 门的颜色也
-			//   变了，不能保持之前版本的颜色吗？」）—— 0/1 归还引擎之后只剩
-			//   2/3/6/9/10 五个可借槽位，而「容器橙 / 门白」必须回来：
-			//     容器 / 尸体 → **9**（覆盖为橙 #FF9500 —— 与 v4.21~v4.29 同观感）、
-			//     门 → **6**（覆盖为白；6 是引擎全镜像唯一不写的槽位 ⇒ 零副作用）、
-			//     武器 → **10**（覆盖为红 #FF2E2E；10 的引擎目标罕见）、
-			//     服饰 → **1**、笔记 → **0**（不覆盖 = 原版淡蓝白 / 青 —— 这两类
-			//     是「让位」的一方：可借槽位只有五个，品红 / 黄色与容器橙 / 门白
-			//     不可兼得。完整推理见 Config::stateByCategory 的 v4.31 段）。
-			REX::INFO("config: 配色重排(v4.31) -> 「容器 / 尸体」= state {}（橙 #FF9500，"
-					  "恢复）、「门」= state {}（白 #FFFFFF，恢复）、「武器」= state {}（红）、"
-					  "「服饰」= state {} 与「笔记」= state {}（不覆盖 = 原版色：品红 / 黄色"
-					  "让位给容器橙 / 门白）；0/1 仍归还引擎 ⇒ NPC 保持原版青",
-				g_cfg.stateByCategory[static_cast<std::size_t>(Category::kContainer)],
-				g_cfg.stateByCategory[static_cast<std::size_t>(Category::kDoor)],
+			// ★★★ v4.32：分组配色定稿（用户需求 `颜色分类.md`）—— 只并组、不新增：
+			//   红 = 武器 / 投掷物 / 太空服 / 背包 / 头盔 / 服饰（state 10）、
+			//   橙 = 容器 / 尸体（state 9）、紫 = 笔记 / 资源（state 3）、
+			//   绿 = 弹药 / 救援（state 5，原版绿）、白 = 门（state 6）；
+			//   杂项 = 2（原版蓝）、植物 / 矿石 = 7（原版青）、NPC / 星球目标不动。
+			//   覆盖槽位仍是 **5 个（2/3/6/9/10）**、覆盖色一字未变 ⇒ 零新风险。
+			REX::INFO("config: 配色分组(v4.32) -> 「武器 / 投掷物 / 太空服 / 背包 / 头盔 / 服饰」"
+					  "= state {}（红 #FF2E2E）、「容器 / 尸体」= {}（橙 #FF9500）、"
+					  "「笔记 / 资源」= {}（紫 #B36BFF）、「弹药 / 救援」= {}（原版绿）、"
+					  "「门」= {}（白 #FFFFFF）；杂项 = {}（原版蓝）、0/1/4/5/7/8 仍归还引擎",
 				g_cfg.stateByCategory[static_cast<std::size_t>(Category::kLootWeapon)],
-				g_cfg.stateByCategory[static_cast<std::size_t>(Category::kLootApparel)],
-				g_cfg.stateByCategory[static_cast<std::size_t>(Category::kLootNote)]);
+				g_cfg.stateByCategory[static_cast<std::size_t>(Category::kContainer)],
+				g_cfg.stateByCategory[static_cast<std::size_t>(Category::kLootResource)],
+				g_cfg.stateByCategory[static_cast<std::size_t>(Category::kLootAmmoAid)],
+				g_cfg.stateByCategory[static_cast<std::size_t>(Category::kDoor)],
+				g_cfg.stateByCategory[static_cast<std::size_t>(Category::kLoot)]);
 
 			// ★★★ v4.25 / v4.28：星球目标「已扫描」⇒ 也用原版那个绿（放下扫描仪之后）
 			{

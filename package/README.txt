@@ -3,7 +3,24 @@
  Always-on scanner highlighting for Starfield
 ========================================================================
 
-Version  : 1.7.9  (plugin build 4.31.0)
+Version  : 1.8.0  (plugin build 4.32.0)
+           1.8.0 = the colour classification, final grouping. The set of
+           colours and the number of outline states the mod writes are
+           unchanged from 1.7.9 - what changed is which categories share
+           a colour:
+             RED    = weapons / throwables AND spacesuits / helmets / packs /
+                      clothing (the whole equipment set is one red again;
+                      the suits were the game's own light cyan-blue in 1.7.9)
+             ORANGE = containers and corpses
+             PURPLE = notes AND resources (notes were the game's own cyan
+                      in 1.7.9)
+             GREEN  = ammo and aid (the game's own green, unchanged)
+             WHITE  = doors
+             BLUE   = misc items (the game's own blue, unchanged)
+           Still exactly five outline states are written (2 / 3 / 6 / 9 / 10);
+           states 0 / 1 (people), 4 / 5 and 7 / 8 (planet targets) remain
+           untouched, so NPCs and planet surveying are unchanged. This time
+           no colour had to give way - every requested colour fits.
            1.7.9 = two fixes, one for each report.
            (1) Containers, corpses and doors lost their colours in 1.7.8
            (they had been turned into the game's plain cyan in order to free
@@ -213,21 +230,20 @@ feature, just always on.
 
 Highlights are color-coded by category (all values configurable).
 Pick-up items follow the game's own inventory categories:
-  * Weapons and throwables (guns, melee, grenades, mines)            RED
-  * Spacesuits / helmets / packs / clothing                          MAGENTA
+  * Weapons, throwables and the whole equipment set (guns, melee, grenades,
+    mines, spacesuits, helmets, packs, clothing)                      RED
   * Ammo and aid (meds, food, drinks) - the game's own green
     (state 4/5 is shared with the vanilla "scanned planet target" green;
     write ColorAmmoAid=00FF66 for bright green instead)                GREEN
-  * Notes (notes, data slates, magazines, books)                     YELLOW
-  * Resources (iron, aluminium, helium-3, organics, ...)             PURPLE
-  * Misc items (digipicks, credits, toys) - unchanged from 1.5       BLUE
-  * Containers (loot the good stuff) - the game's own cyan since 1.7.8
-    (state 1; was orange)                                        CYAN
+  * Notes (notes, data slates, magazines, books) and resources (iron,
+    aluminium, helium-3, organics, ...) - one purple               PURPLE
+  * Misc items (digipicks, credits, toys) - unchanged from 1.5        BLUE
+  * Containers (loot the good stuff)                                 ORANGE
   * Bodies / corpses - people, creatures and wrecked robots / turrets
-    (anything you can search) - same state as containers         CYAN
+    (anything you can search) - same state as containers             ORANGE
   * Interactive devices / computers - the game's own green (same note as
     above; write ColorDevice=00E5FF for cyan instead)                  GREEN
-  * Doors - the game's own cyan since 1.7.8 (state 0; was white)      CYAN
+  * Doors                                                             WHITE
   * Flora, ores, gas vents, liquid pools (all one record type in the game
     data) - the game's own "scannable target" colour, a cyan pulse; once
     you have surveyed one it switches to the game's own "scanned" green.
@@ -240,16 +256,18 @@ Pick-up items follow the game's own inventory categories:
     touching those two states in 1.7.8, so NPCs look exactly like they
     do in the vanilla game.
 
-The six pick-up categories sit at hues that are at least ~44 degrees
-apart (red / magenta / green / yellow / purple, plus the original misc
-blue), so they can be told apart at a single glance. Every category gets
-its colour assigned explicitly by the mod (see ColorXxx in the INI), by
-writing into the engine's per-state colour block. Six of the eleven
-states are deliberately left untouched because the game itself paints
-with them - the two "plain reference / NPC" states (0 / 1, native cyan;
-left alone since 1.7.8), the two "scanned planet target" states (4 / 5,
-native green; 1.7.6) and the two "not scanned planet target" states
-(7 / 8, native cyan; 1.7.5) - see the planet-survey section below.
+Since 1.8.0 the categories are grouped into colours that are easy to tell
+apart (red = equipment, orange = lootable world objects, purple = knowledge
+and crafting materials, green = consumables, white = doors, plus the
+original misc blue and the game's own cyan / green for planet targets).
+Every colour is assigned explicitly by the mod (see ColorXxx in the INI),
+by writing into the engine's per-state colour block. Five of the eleven
+states are written in total (2 / 3 / 6 / 9 / 10); the other six are
+deliberately left untouched because the game itself paints with them -
+the two "plain reference / NPC" states (0 / 1, native cyan; left alone
+since 1.7.8), the two "scanned planet target" states (4 / 5, native
+green; 1.7.6) and the two "not scanned planet target" states (7 / 8,
+native cyan; 1.7.5) - see the planet-survey section below.
 
 Since 1.7.3 the outline is drawn as a contour instead of a fill: the
 mod writes alpha=0 into the outline's base colour, which is the "no
@@ -362,26 +380,28 @@ Most useful options:
   HotkeyVK=119          toggle hotkey, 119 = F8 (see the file for a key table)
   RadiusMeters=50       highlight radius around the player
   MaxTargets=256        how many objects are outlined at the same time
-  StateWeapon=9         outline color state per category (0..10; the INI
-  StateApparel=10       documents them). Defaults:
-  StateAmmoAid=5          weapons 9   suits/helmet/pack 10  ammo&aid 5
-  StateNote=6             notes 6     resources 3           misc 2 (= 1.5)
-  StateResource=3         containers & bodies 1             devices 4
-  StateLoot=2             doors 0     flora 7 (= the vanilla scannable-
-                        target state, colour not overwritten) and MSTT 2
-                        Six of the eleven states are never touched:
-                        0 / 1 (the game paints plain references and
-                        people with them - native cyan / light cyan;
+  StateWeapon=10        outline color state per category (0..10; the INI
+  StateApparel=10       documents them). Defaults (since 1.8.0):
+  StateAmmoAid=5          weapons / throwables / suits / helmets / packs /
+  StateNote=3             clothing -> 10 (red)
+  StateResource=3         notes / resources -> 3 (purple)
+  StateLoot=2             ammo & aid -> 5 (the game's own green)
+  StateContainer=9        misc -> 2 (blue, = 1.5)
+  StateDevice=4           containers & bodies -> 9 (orange)
+  StateDoor=6             devices -> 4 (the game's own green)
+  StateFlora=7            doors -> 6 (white)
+                        flora 7 (= the vanilla scannable-target state,
+                        colour not overwritten) and MSTT 2.
+                        Five of the eleven states are written in total
+                        (2 / 3 / 6 / 9 / 10); the other six are never
+                        touched: 0 / 1 (the game paints plain references
+                        and people with them - native cyan / light cyan;
                         left alone since 1.7.8), 7 / 8 (vanilla "not
                         scanned planet target" states; since 1.7.5) and
                         4 / 5 (vanilla "scanned planet target" states,
-                        native green; since 1.7.6). Weapons and apparel
-                        moved from 0 / 1 to 9 / 10 in 1.7.8; containers /
-                        corpses and doors moved from 9 / 10 to 1 / 0 and
-                        now show the game's own cyan. Since 1.7.4
-                        "resources" uses state 3. Ammo & aid and devices
-                        still use 4 / 5, so they show the game's own green
-                        by default (1.7.6). Since 1.7.7 already-scanned
+                        native green; since 1.7.6). Ammo & aid and devices
+                        use 4 / 5, so they show the game's own green by
+                        default (1.7.6). Since 1.7.7 already-scanned
                         planet targets use state 5 as well (see
                         StateFloraScanned below) - same state, same green,
                         so nothing changes visually.
@@ -412,14 +432,14 @@ Most useful options:
                         #27C684). Set it to 7 (= StateFlora) to make
                         scanned and unscanned look the same again.
   ColorWeapon=FF2E2E    exact RGB per category (written by default):
-  ColorApparel=FF3BD4     weapons red / suits magenta / notes yellow /
-  ColorNote=FFD700        resources purple / misc blue. Five states are
-  ColorResource=B36BFF    written in total (states 2 / 3 / 6 / 9 / 10).
-                          Containers / corpses / doors / ammo & aid /
-                          devices / flora / MSTT are NOT written by
-                          default - they show the game's own colours
-                          (cyan / cyan / cyan / green / green / cyan-
-                          green / blue respectively). Since 1.7.6 the two
+  ColorApparel=FF2E2E     equipment (weapons / suits / clothing) red,
+  ColorNote=B36BFF        notes & resources purple, misc blue - plus
+  ColorResource=B36BFF    containers & corpses orange and doors white.
+  ColorContainer=FF9500   Five states are written in total (states
+  ColorDoor=FFFFFF        2 / 3 / 6 / 9 / 10). Ammo & aid / devices /
+                          flora / MSTT are NOT written - they show the
+                          game's own colours (green / green / cyan-green /
+                          blue respectively). Since 1.7.6 the two
                           "scanned planet target" states (4 / 5) are
                           also left untouched, and since 1.7.8 the two
                           "plain reference / NPC" states (0 / 1) as well.

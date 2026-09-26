@@ -327,7 +327,13 @@ if (-not $SkipDeploy) {
     #   ② 「已扫描植物低概率变回青色，开扫描仪再关又变绿」⇒ ⓪ 单向学习表
     #      （base 级，「已扫描」只写 true、本会话不重问）+ 重问拿不到权威答案时
     #      **沿用旧结论**。证据链 / 取舍表见 docs/29。
-    Set-Content -LiteralPath (Join-Path $modRoot 'meta.ini') -Value "[General]`nmodid=18268`nversion=1.7.9`ncomment=Always-on scanner highlighting (SFSE)" -Encoding UTF8
+    # ★ 2026-09-26（v4.32 / 发布版 1.8.0）：**分组配色定稿**（用户需求 `颜色分类.md`）
+    #   —— 红 = 武器 / 投掷物 / 太空服 / 背包 / 头盔 / 服饰、橙 = 容器 / 尸体、
+    #   紫 = 笔记 / 资源、绿 = 弹药 / 救援、白 = 门、原版 = 星球资源 / 杂项 / NPC。
+    #   实现上**只把两个类别并进已存在的组**（服饰 1→10 并进武器红组、笔记 0→3
+    #   并进资源紫组），不引入任何新槽位 / 新覆盖 ⇒ 覆盖仍是 2/3/6/9/10 五个，
+    #   state 0/1/4/5/7/8 一个字节都不写。这就是它「很安全」的原因，见 docs/30。
+    Set-Content -LiteralPath (Join-Path $modRoot 'meta.ini') -Value "[General]`nmodid=18268`nversion=1.8.0`ncomment=Always-on scanner highlighting (SFSE)" -Encoding UTF8
 
     Get-ChildItem -LiteralPath $modRoot -Recurse -File | ForEach-Object {
         Write-Host ("  {0}  ({1} bytes)" -f $_.FullName.Substring($modRoot.Length + 1), $_.Length)
