@@ -3,7 +3,25 @@
  Always-on scanner highlighting for Starfield
 ========================================================================
 
-Version  : 1.7.7  (plugin build 4.29.0)
+Version  : 1.7.8  (plugin build 4.30.0)
+           1.7.8 = fix: while the scanner was up, every NPC showed the
+           red / magenta colours the game itself reserves for its "bounty"
+           markers (report + screenshot: three pedestrians, one red, two
+           magenta). The reason: the game paints ordinary references -
+           people included - with two outline states whose native colours
+           are cyan (far) / light cyan (near), and the mod had been
+           overwriting exactly those two states with "weapons red" and
+           "apparel magenta". Both states are now left completely alone
+           (not a single byte written), so people are back to the vanilla
+           cyan. Weapons and apparel (still red / magenta) moved to two
+           other low-traffic states; containers / corpses and doors used
+           to occupy those two states and now show the game's own cyan as
+           well. Practical consequence: containers, corpses and doors are
+           no longer orange / white - the mod now recolours only five of
+           the eleven outline states in total (misc blue, resources
+           purple, notes yellow, weapons red, apparel magenta). Every
+           state and colour is listed in the INI and can be changed back
+           key by key (no DLL swap).
            1.7.7 = fix: with the scanner put away, already-scanned planet
            targets (ores / gas / liquids / plants) still showed the
            "not scanned" cyan. 1.7.6 fixed the other half (with the scanner
@@ -174,27 +192,35 @@ Pick-up items follow the game's own inventory categories:
   * Notes (notes, data slates, magazines, books)                     YELLOW
   * Resources (iron, aluminium, helium-3, organics, ...)             PURPLE
   * Misc items (digipicks, credits, toys) - unchanged from 1.5       BLUE
-  * Containers (loot the good stuff)                                 ORANGE
+  * Containers (loot the good stuff) - the game's own cyan since 1.7.8
+    (state 1; was orange)                                        CYAN
   * Bodies / corpses - people, creatures and wrecked robots / turrets
-    (anything you can search)                                        ORANGE
+    (anything you can search) - same state as containers         CYAN
   * Interactive devices / computers - the game's own green (same note as
     above; write ColorDevice=00E5FF for cyan instead)                  GREEN
-  * Doors                                                            WHITE
+  * Doors - the game's own cyan since 1.7.8 (state 0; was white)      CYAN
   * Flora, ores, gas vents, liquid pools (all one record type in the game
     data) - the game's own "scannable target" colour, a cyan pulse; once
     you have surveyed one it switches to the game's own "scanned" green.
     Since 1.7.5 this category is ON by default, its colours are never
     overwritten (see below) and since 1.7.7 scanned targets stay green
     even with the scanner put away                        CYAN / GREEN
+  * (Not a mod category, for reference:) while the scanner is up, the
+    game itself outlines people and other plain references with the two
+    states whose native colours are cyan / light cyan. The mod stopped
+    touching those two states in 1.7.8, so NPCs look exactly like they
+    do in the vanilla game.
 
 The six pick-up categories sit at hues that are at least ~44 degrees
 apart (red / magenta / green / yellow / purple, plus the original misc
 blue), so they can be told apart at a single glance. Every category gets
-its colour assigned explicitly by the mod (see ColorXxx in the INI),
-instead of borrowing the engine's default per-state colours - except the
-planet targets and the two categories that share the game's "scanned
-target" states, which are deliberately left untouched
-(1.7.5 / 1.7.6 / 1.7.7 - see the planet-survey section below).
+its colour assigned explicitly by the mod (see ColorXxx in the INI), by
+writing into the engine's per-state colour block. Six of the eleven
+states are deliberately left untouched because the game itself paints
+with them - the two "plain reference / NPC" states (0 / 1, native cyan;
+left alone since 1.7.8), the two "scanned planet target" states (4 / 5,
+native green; 1.7.6) and the two "not scanned planet target" states
+(7 / 8, native cyan; 1.7.5) - see the planet-survey section below.
 
 Since 1.7.3 the outline is drawn as a contour instead of a fill: the
 mod writes alpha=0 into the outline's base colour, which is the "no
@@ -307,20 +333,27 @@ Most useful options:
   HotkeyVK=119          toggle hotkey, 119 = F8 (see the file for a key table)
   RadiusMeters=50       highlight radius around the player
   MaxTargets=256        how many objects are outlined at the same time
-  StateWeapon=0         outline color state per category (0..10; the INI
-  StateApparel=1        documents them). Defaults:
-  StateAmmoAid=5          weapons 0   suits/helmet/pack 1   ammo&aid 5
+  StateWeapon=9         outline color state per category (0..10; the INI
+  StateApparel=10       documents them). Defaults:
+  StateAmmoAid=5          weapons 9   suits/helmet/pack 10  ammo&aid 5
   StateNote=6             notes 6     resources 3           misc 2 (= 1.5)
-  StateResource=3         containers & bodies 9             devices 4
-  StateLoot=2             doors 10    flora 7 (= the vanilla scannable-
+  StateResource=3         containers & bodies 1             devices 4
+  StateLoot=2             doors 0     flora 7 (= the vanilla scannable-
                         target state, colour not overwritten) and MSTT 2
-                        Since 1.7.4 "resources" uses state 3; 7 / 8 (the
-                        vanilla "not scanned planet target" states) and
-                        4 / 5 (the vanilla "scanned planet target" states,
-                        native green) are never touched. Ammo & aid and
-                        devices still use 4 / 5, so they show the game's
-                        own green by default (1.7.6). Since 1.7.7 already-
-                        scanned planet targets use state 5 as well (see
+                        Six of the eleven states are never touched:
+                        0 / 1 (the game paints plain references and
+                        people with them - native cyan / light cyan;
+                        left alone since 1.7.8), 7 / 8 (vanilla "not
+                        scanned planet target" states; since 1.7.5) and
+                        4 / 5 (vanilla "scanned planet target" states,
+                        native green; since 1.7.6). Weapons and apparel
+                        moved from 0 / 1 to 9 / 10 in 1.7.8; containers /
+                        corpses and doors moved from 9 / 10 to 1 / 0 and
+                        now show the game's own cyan. Since 1.7.4
+                        "resources" uses state 3. Ammo & aid and devices
+                        still use 4 / 5, so they show the game's own green
+                        by default (1.7.6). Since 1.7.7 already-scanned
+                        planet targets use state 5 as well (see
                         StateFloraScanned below) - same state, same green,
                         so nothing changes visually.
   FloraScannedByEngineState=1
@@ -351,11 +384,16 @@ Most useful options:
                         scanned and unscanned look the same again.
   ColorWeapon=FF2E2E    exact RGB per category (written by default):
   ColorApparel=FF3BD4     weapons red / suits magenta / notes yellow /
-  ColorNote=FFD700        resources purple / misc blue / containers &
-  ColorResource=B36BFF    bodies orange / doors white
-  ColorContainer=FF9500   ammo & aid and devices are NOT written by
-  ColorDoor=FFFFFF        default (they show the game's own green), and
-                          so are flora (the game's own cyan) and MSTT.
+  ColorNote=FFD700        resources purple / misc blue. Five states are
+  ColorResource=B36BFF    written in total (states 2 / 3 / 6 / 9 / 10).
+                          Containers / corpses / doors / ammo & aid /
+                          devices / flora / MSTT are NOT written by
+                          default - they show the game's own colours
+                          (cyan / cyan / cyan / green / green / cyan-
+                          green / blue respectively). Since 1.7.6 the two
+                          "scanned planet target" states (4 / 5) are
+                          also left untouched, and since 1.7.8 the two
+                          "plain reference / NPC" states (0 / 1) as well.
   ColorAmmoAid / ColorDevice
                         write these (00FF66 / 00E5FF) only if you want the
                         old bright green / cyan back - it will hide the

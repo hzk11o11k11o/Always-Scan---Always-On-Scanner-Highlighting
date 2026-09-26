@@ -308,7 +308,18 @@ if (-not $SkipDeploy) {
     #     ② 资源链判据 + **自适应偏移**（先试 +0x260/+0x258，再窗口 0x180~0x380 找
     #        能把整条链走通的指针；标定写会话变量 + 日志）；
     #   链走不通时打前 3 个 base 的**指针窗口取证**（供下一轮定位偏移）。
-    Set-Content -LiteralPath (Join-Path $modRoot 'meta.ini') -Value "[General]`nmodid=18268`nversion=1.7.7`ncomment=Always-on scanner highlighting (SFSE)" -Encoding UTF8
+    # ★ 2026-09-26（v4.27 / v4.28 / v4.29 / 发布版仍 1.7.7）：判据上界订正（IRES 0x9F
+    #   被 0x60 上界误杀）→ 主判据换成 `GetOutlineState(ref)`（= 原生 IsScanned，
+    #   植物不再「没扫就绿」）→ 放下扫描仪后的「恢复提速」（ResyncBoostMs/Budget=2500/192
+    #   + 状态变化优先换色）。
+    # ★ 2026-09-26（v4.30 / 发布版 1.7.8）：**state 0/1 归还引擎** —— 用户实测
+    #   「扫描中的 NPC 全部变成只有赏金人物才会出现的颜色」：引擎的逐引用求值函数
+    #   （0x159ED90）对**通用引用（含活人 NPC）**写 **state 0（远）/ 1（近）**，
+    #   而 v4.19~v4.29 把 0/1 覆盖成「武器 红 / 服饰 品红」⇒ 举着扫描仪时所有行人
+    #   跟着变色。修法：0/1 一个字节都不写；「武器 / 服饰」改挂 9 / 10、
+    #   「容器 / 尸体 / 门」搬去 1 / 0 并用原版色 ⇒ 覆盖槽位从 7 个降到 5 个
+    #   （2/3/6/9/10）。证据链见 docs/28。
+    Set-Content -LiteralPath (Join-Path $modRoot 'meta.ini') -Value "[General]`nmodid=18268`nversion=1.7.8`ncomment=Always-on scanner highlighting (SFSE)" -Encoding UTF8
 
     Get-ChildItem -LiteralPath $modRoot -Recurse -File | ForEach-Object {
         Write-Host ("  {0}  ({1} bytes)" -f $_.FullName.Substring($modRoot.Length + 1), $_.Length)
