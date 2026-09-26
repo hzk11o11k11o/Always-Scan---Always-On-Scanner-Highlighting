@@ -63,7 +63,15 @@ $payload = [ordered]@{
 }
 if ($IncludePdb) { $payload['SFSE\Plugins\SAS_AlwaysScan.pdb'] = $true }
 
+# ★ v4.33：单向学习表 —— 包内放一个**空文件**占位（MO2 的 usvfs 只把「写已存在的
+#   文件」重定向回 mod 目录 ⇒ 预置空文件后，运行期学到的记录才会落在 mod 目录里、
+#   而不是丢进 overwrite）。**不能**复制部署目录里那份：它可能已经含玩家自己的
+#   学习记录（运行期数据，不该进分发包）。
+$emptyPayload = @('SAS_AlwaysScan.flora-learn.txt')
+foreach ($rel in $emptyPayload) { $payload[$rel] = $false }
+
 foreach ($rel in $payload.Keys.Clone()) {
+    if ($emptyPayload -contains $rel) { continue }
     $src = Join-Path $ModRoot $rel
     if (-not (Test-Path -LiteralPath $src)) { throw "分发包缺少必需文件: $src" }
 }
@@ -85,10 +93,15 @@ if (Test-Path -LiteralPath $staging) { Remove-Item -LiteralPath $staging -Recurs
 New-Item -ItemType Directory -Force -Path $staging | Out-Null
 
 foreach ($rel in $payload.Keys) {
-    if ($rel -eq 'README.txt') { $src = $readmeSrc } else { $src = Join-Path $ModRoot $rel }
     $dst = Join-Path $staging $rel
     New-Item -ItemType Directory -Force -Path (Split-Path -Parent $dst) | Out-Null
-    Copy-Item -LiteralPath $src -Destination $dst -Force
+    if ($rel -eq 'README.txt') {
+        Copy-Item -LiteralPath $readmeSrc -Destination $dst -Force
+    } elseif ($emptyPayload -contains $rel) {
+        New-Item -ItemType File -Path $dst -Force | Out-Null   # 空占位（见上）
+    } else {
+        Copy-Item -LiteralPath (Join-Path $ModRoot $rel) -Destination $dst -Force
+    }
 }
 
 # ------------------------------------------------------------ 3. 打 zip（7z）

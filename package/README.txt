@@ -3,7 +3,29 @@
  Always-on scanner highlighting for Starfield
 ========================================================================
 
-Version  : 1.8.0  (plugin build 4.32.0)
+Version  : 1.8.1  (plugin build 4.33.0)
+           1.8.1 = "surveyed plants sometimes drop back to cyan", second
+           pass - the one that makes it stay fixed. 1.7.9's one-way
+           memory had three holes, all found in a long test session:
+           it was wiped on every load / cell change (the game's "loading
+           screen closed" event), it lived in memory only (so every game
+           session had to re-learn it by raising the scanner once), and
+           the "keep the previous verdict" rule had a condition that could
+           never be true for plants (their record layout makes the chain
+           look "answered" when it answers nothing). All three are fixed:
+           the memory survives loads and cell changes
+           (FloraLearnClearOnLoad=0, new default), it is written to a file
+           next to the esm (SAS_AlwaysScan.flora-learn.txt) and read back
+           on startup (FloraLearnPersist=1, new default - a new session
+           starts already knowing), and the keep-rule now covers plants.
+           A "not scanned" verdict is also re-checked every 5 s instead
+           of 30 s (FloraUnscannedTtlMs), and whenever the mod's own
+           checks cannot answer it now also reads the state the game
+           itself painted (green = surveyed) - so the game's own verdict
+           is picked up even with the scanner put away. Note: the file is
+           keyed by species, not by save file (simply a colour effect if
+           you play several saves); set FloraLearnPersist=0 for
+           session-only behaviour, delete the file to reset.
            1.8.0 = the colour classification, final grouping. The set of
            colours and the number of outline states the mod writes are
            unchanged from 1.7.9 - what changed is which categories share

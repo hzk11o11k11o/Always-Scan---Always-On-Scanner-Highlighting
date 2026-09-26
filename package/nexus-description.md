@@ -19,10 +19,10 @@
 | --- | --- |
 | **Mod name** | `Always Scan - Always-On Scanner Highlighting (SFSE)` |
 | **Summary**（约 250 字符以内） | `Keep the scanner highlight on at all times. No need to hold the handheld scanner: everything inside a configurable radius gets the vanilla outline, color-coded by category. Full-radius highlighting, one toggle hotkey, fully configurable via INI. SFSE plugin.` |
-| **Version** | `1.8.0`（引擎 build 4.32.0；Nexus 上的 1.0 → … → 1.7.8 → 1.7.9 之后的下一版） |
+| **Version** | `1.8.1`（引擎 build 4.33.0；Nexus 上的 1.0 → … → 1.7.9 → 1.8.0 之后的下一版） |
 | **Category** | `Gameplay`（Alternate suggestion: `Items and Objects - Gameplay`） |
 | **Requirements（依赖）** | `Starfield Script Extender (SFSE) 0.2.21+`、`(1.16.244.0) SFSE Address Library`、游戏版本 `1.16.244.0` |
-| **主文件（Main file）** | `StarfieldAlwaysScan-1.8.0.zip` |
+| **主文件（Main file）** | `StarfieldAlwaysScan-1.8.1.zip` |
 | **Permissions** | 允许转载需注明出处？建议：**不得重新上传（No re-uploading）**；允许个人修改（源码已含 Papyrus 部分） |
 
 ---
@@ -55,7 +55,7 @@ In the vanilla game you have to equip the handheld scanner to see which objects 
   | Bodies / corpses | dead people, creatures, and wrecked robots / turrets | **orange** (same colour as containers; back since 1.7.9) |
   | Interactive devices | switches, terminals, workbenches | **the game's own green** (same note as above; `ColorDevice=00E5FF` brings cyan back) |
   | Doors | — | **white** (back since 1.7.9; briefly the game's own cyan in 1.7.8) |
-  | Flora | plants — the game stores ores, gas vents and liquid pools in this same record type too (see below) | **the game's own colours**: cyan pulse while unscanned, **green** once scanned — with or without the scanner up, and an already-scanned plant now **stays green** even after minutes (one-way memory since 1.7.9) |
+  | Flora | plants — the game stores ores, gas vents and liquid pools in this same record type too (see below) | **the game's own colours**: cyan pulse while unscanned, **green** once scanned — with or without the scanner up; a confirmed "surveyed" verdict is remembered per species, across scenes and across game sessions (since 1.8.1), so it cannot drop back to cyan |
 
   Colors are written by the mod through the engine's per-state colour block, and **only five of the eleven states are written at all** (misc blue, notes & resources purple, doors white, containers / corpses orange, equipment red). The other six are owned by the game and are never touched: states **0 / 1** — which the game itself uses while the scanner is up to outline plain references, **people included** (native cyan / light cyan; that is why NPCs look vanilla since 1.7.8) — plus **4 / 5** (scanned planet targets, native green; since 1.7.6) and **7 / 8** (unscanned planet targets, native cyan; since 1.7.5). **Grouping since 1.8.0:** the whole equipment set (weapons, throwables, suits, helmets, packs, clothing) shares one **red**, notes share the resources' **purple**, and ammo & aid keep the game's own **green** — every requested colour now fits inside the five borrowable states with nothing left over, so no colour has to step aside anymore. (1.7.9 still had to give up apparel and notes to bring back "containers orange / doors white"; that trade-off is history — both are back to their group colours now.)
 
@@ -173,8 +173,9 @@ At startup the log prints the active config and whether the native outline funct
 
 ### Version history
 
-*(This release is **1.8.0**. The list below uses the plugin's internal build numbers where an older release is concerned.)*
+*(This release is **1.8.1**. The list below uses the plugin's internal build numbers where an older release is concerned.)*
 
+- **1.8.1** *(plugin build 4.33.0)* — **"Surveyed plants sometimes drop back to cyan" — second pass, so that it actually stays fixed.** 1.7.9 added a one-way "already surveyed" memory, but that memory had three holes that only showed up in a long test session: (1) it was wiped on every load / cell change (the game's "loading screen closed" event), (2) it lived in memory only, so every game session started from zero and had to re-learn by raising the scanner once, and (3) the "keep the previous verdict when a re-check cannot answer" rule had a condition that could never be true for plants, so it never actually protected them — which is why the report could still reproduce after 1.7.9: after a reload the whole area went cyan until the scanner was raised once. All three are fixed: the memory is **no longer cleared** on load / cell change (`FloraLearnClearOnLoad=0`, new default — "surveyed" is a one-way fact per species), it is **written to a file next to the esm** (`SAS_AlwaysScan.flora-learn.txt`) and read back on startup (`FloraLearnPersist=1`, new default — a new session starts already knowing), and the keep-rule now covers plants too. Two more improvements: a "not scanned" verdict is re-checked every **5 s** instead of 30 s (`FloraUnscannedTtlMs`), and the mod now also reads the state the game itself painted (green = surveyed) whenever its own checks cannot answer — so the game's own verdict is picked up even with the scanner put away. Note: the file is keyed by species, not by save file — if you play several saves, a species surveyed in one shows green in another (a colour-only effect; `FloraLearnPersist=0` restricts it to the session, and deleting the file resets it). Two new log counters: `学习表: 命中=… 沿用=… 捡漏=… 落盘=… 写入=…`.
 - **1.8.0** *(plugin build 4.32.0)* — **Colour classification, final grouping — one red for the whole equipment set, and notes join resources on purple.** All colours and the number of outline states the mod writes are unchanged from 1.7.9; what changed is which categories share a colour: **red** = weapons / throwables AND spacesuits / helmets / packs / clothing (the equipment set is one colour again — the suits were the game's own light cyan-blue in 1.7.9), **orange** = containers / corpses, **purple** = notes AND resources (notes were the game's own cyan in 1.7.9), **green** = ammo & aid (the game's own green), **white** = doors, **blue** = misc items (the game's own blue, unchanged). Still exactly five outline states are written (2 / 3 / 6 / 9 / 10), and states 0 / 1 (people), 4 / 5 and 7 / 8 (planet targets) remain untouched — NPCs and planet surveying are unchanged. This grouping is a pure re-assignment: no new state, no new colour, and (unlike 1.7.9) nothing had to step aside. Every value is one INI line, as always.
 - **1.7.9** *(plugin build 4.31.0)* — **Containers / corpses are orange again and doors are white again; and an already-surveyed plant can no longer fall back to cyan.** (1) 1.7.8 had returned the two "people" states to the game, leaving exactly five borrowable states — one short of the full colour set — so this release puts containers / corpses back on **orange** (state 9) and doors back on **white** (state 6, the only state the game itself never writes, so recolouring it cannot affect anything vanilla), while apparel and notes step aside to the game's own colours (light cyan-blue / cyan). Each swap is a single INI edit; the INI spells both out. (2) The mod re-checks every plant against the game every 30 s; occasionally that fresh check answers "no answer / not scanned" (a game component gets rebuilt, or timing), and the previous "surveyed" verdict was discarded along with it — which is exactly the "surveyed plants sometimes drop back to the unscanned colour, until you raise and lower the scanner" report. Survey data never goes backwards, so a confirmed verdict is now remembered per species for the rest of the session ("one-way memory"), and a re-check that cannot answer authoritatively keeps the previous verdict instead of erasing it. Two new counters (`学习表: 命中=… 沿用=…`) appear in the periodic log line.
 - **1.7.8** *(plugin build 4.30.0)* — **Fix: while the scanner was up, every NPC showed the red / magenta the game reserves for its "bounty" markers.** The game itself outlines plain references — pedestrians included — with two outline states whose native colours are cyan (far) / light cyan (near); the mod had been overwriting exactly those two states with the "weapons red" / "apparel magenta" colours, so every pedestrian in sight took the "weapons" / "apparel" colours while you held the scanner up (reported with a screenshot: three pedestrians, one red, two magenta). Both states are now left completely alone — not a single byte written — so NPCs are back to the vanilla cyan. Weapons and apparel (still red / magenta) moved to two low-traffic states (9 / 10), and containers / corpses / doors — which used to occupy those two — now use the game's own cyan as well (they are no longer orange / white). Net effect: the mod now recolours **five of the eleven** outline states in total (`StateWeapon=9` / `StateApparel=10` / `StateContainer=1` / `StateDoor=0`; every value is documented in the INI and can be changed back key by key, no DLL swap). New startup log line: `config: state0_1 归还引擎 -> …`.
@@ -223,16 +224,29 @@ Built with **SFSE** and **CommonLibSF**. Huge thanks to their authors and to eve
 
 - **常驻高亮**：跑动、战斗、搜刮时一直有效，不需要掏出扫描仪；
 - **全半径**：半径内四周所有方向都亮（5~500 米可配）；
-- **分类分色**（1.6 起**按物品栏分类**给可拾取物品上色，大部分可配）：
-  **武器 / 投掷物（红）、太空服 / 头盔 / 背包 / 服饰（品红）、
-  笔记（黄）、资源（紫）、杂项（蓝 —— 与 1.5 一模一样，没有变化）**；
-  **弹药 / 救援（原版绿 —— 1.7.6 起与「已扫描的星球目标」共用原版绿，写
-  `ColorAmmoAid=00FF66` 可换回亮绿）**；**容器 / 尸体（原版青 —— 1.7.8 起与
-  「普通目标 / 行人」共用原版色）**、
-  **可交互设备（原版绿 —— 同上，写 `ColorDevice=00E5FF` 可换回青）**、
-  **门（原版青 —— 1.7.8 起）**、
+- **分类分色**（1.6 起**按物品栏分类**给可拾取物品上色；1.8.0 起**分组定稿**，大部分可配）：
+  **红 = 武器 / 投掷物 + 太空服 / 背包 / 头盔 / 服饰（整组一个红）**、
+  **橙 = 容器 / 尸体**、**紫 = 笔记 + 资源**、
+  **绿 = 弹药 / 救援（原版绿）**、**白 = 门**、
+  **蓝 = 杂项（原版蓝 —— 与 1.5 一模一样，没有变化）**；
   **植物 / 矿脉 / 气泉 / 液池（原版青色脉冲 = 未扫描；扫描完成后 = 原版绿 ——
   这四个槽位的颜色 MOD 一个字节都不改；**背不背扫描仪都一样**，见下）**；
+  **NPC / 普通目标（原版青 / 亮青 —— 一个字节都不写，1.7.8 起）**；
+- **★★★ 1.8.1：修「已扫描植物低概率变回青色」的根** —— 1.7.9 已经加了「单向记忆」，
+  但实测日志发现它有三个洞：① 每次**载入 / 换场景**都被清空（游戏「载入画面关闭」事件）；
+  ② 只活在内存里 ⇒ **每次重开游戏都要再开一遍扫描仪重新学**；③「重问失败时沿用旧结论」
+  的条件对植物**永远不成立**（植物的记录结构恰好让它看起来「已有结论」）⇒ 从来没保护过
+  植物。三条一起修：记忆**不再随载入清空**（`FloraLearnClearOnLoad=0` 新默认）、
+  **落盘到 esm 旁边**（`SAS_AlwaysScan.flora-learn.txt`，`FloraLearnPersist=1` 新默认，
+  重开游戏直接读回）、沿用规则覆盖植物。另外：判成「未扫描」的重问间隔从 30 秒降到
+  **5 秒**（`FloraUnscannedTtlMs`），且判据答不上来时**顺手读一眼引擎亲手画的状态表**
+  （画过绿 = 已扫描）—— 放下扫描仪后引擎留过的绿也不会白丢。
+  ⚠️ 该文件按**物种**记录、不区分存档：多个存档混玩时，一个存档里扫过的物种在另一个
+  存档也会显示绿色（只是颜色观感）；想严格按存档设 `FloraLearnPersist=0`（只在本会话
+  有效），删掉那个文件即可重置。
+- **★★ 1.8.0：配色分组定稿** —— 红 = 武器 / 投掷物 + 太空服 / 背包 / 头盔 / 服饰、
+  橙 = 容器 / 尸体、紫 = 笔记 + 资源、绿 = 弹药 / 救援（原版绿）、白 = 门、
+  蓝 = 杂项（原版蓝）；写出的槽位仍是 2/3/6/9/10 五个，0/1/4/5/7/8 一个字节都不写。
 - **★★ 1.7.8：修「扫描中的 NPC 全部变成赏金色」** —— 举着扫描仪时，引擎自己会用
   两个槽位（原生色 = 青 / 亮青，远处 / 近处）给**普通人形目标（行人）**画轮廓；
   而 MOD 之前把这两个槽位覆盖成了「武器红 / 服饰品红」⇒ 所有行人变成红 / 品红，

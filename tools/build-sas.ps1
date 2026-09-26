@@ -262,6 +262,15 @@ if (-not $SkipDeploy) {
         Write-Host "      empty $dllName.log pre-seeded (usvfs 会把日志写回 esm 旁边)" -ForegroundColor DarkGray
     }
 
+    # ★ v4.33：单向学习表（「已扫描」的星球目标 base）也落在 esm 同级 —— 同一个
+    #   usvfs 规则 ⇒ 同样预置一个空文件把写入"钉"回 mod 目录。**已存在则保留**
+    #   （里面是学到的记录；用户想重置就删掉它）。
+    $learnPath = Join-Path $modRoot "$dllName.flora-learn.txt"
+    if (-not (Test-Path -LiteralPath $learnPath)) {
+        New-Item -ItemType File -Path $learnPath -Force | Out-Null
+        Write-Host "      empty $dllName.flora-learn.txt pre-seeded (★ v4.33 单向学习表落盘)" -ForegroundColor DarkGray
+    }
+
     # ★ 2026-09-25（v4.17 / 发布版 1.6）：
     #   · modid = N 网 mod 页 ID（18268）—— **不填 0**：MO2 的「Newest Version」
     #     靠它去查 N 网，modid=0 时那一列永远是空的（用户反馈「读不到版本」）。
@@ -333,7 +342,15 @@ if (-not $SkipDeploy) {
     #   实现上**只把两个类别并进已存在的组**（服饰 1→10 并进武器红组、笔记 0→3
     #   并进资源紫组），不引入任何新槽位 / 新覆盖 ⇒ 覆盖仍是 2/3/6/9/10 五个，
     #   state 0/1/4/5/7/8 一个字节都不写。这就是它「很安全」的原因，见 docs/30。
-    Set-Content -LiteralPath (Join-Path $modRoot 'meta.ini') -Value "[General]`nmodid=18268`nversion=1.8.0`ncomment=Always-on scanner highlighting (SFSE)" -Encoding UTF8
+    # ★ 2026-09-26（v4.33 / 发布版 1.8.1）：**「已扫描植物低概率变青」二次加固** ——
+    #   日志实证（22:39:49~22:43:11 整片目标判未扫描，开一次扫描仪才恢复）：
+    #   ① 学习表**不再随载入 / 换场景清空**（FloraLearnClearOnLoad=0 默认）；
+    #   ② 学习表**落盘**（SAS_AlwaysScan.flora-learn.txt，跨会话保留，
+    #      FloraLearnPersist=1 默认）⇒ 重开游戏也不用再开一遍扫描仪；
+    #   ③ 「沿用旧结论」条件订正（植物 produceIsMisc 时 shapeOk=true ⇒
+    #      v4.31 的条件对植物永远不成立）+ 未扫描缓存 TTL 5 秒（FloraUnscannedTtlMs）
+    #      + 判据未命中时「引擎状态表捡漏」（读引擎留下的 4/5）。见 docs/31。
+    Set-Content -LiteralPath (Join-Path $modRoot 'meta.ini') -Value "[General]`nmodid=18268`nversion=1.8.1`ncomment=Always-on scanner highlighting (SFSE)" -Encoding UTF8
 
     Get-ChildItem -LiteralPath $modRoot -Recurse -File | ForEach-Object {
         Write-Host ("  {0}  ({1} bytes)" -f $_.FullName.Substring($modRoot.Length + 1), $_.Length)

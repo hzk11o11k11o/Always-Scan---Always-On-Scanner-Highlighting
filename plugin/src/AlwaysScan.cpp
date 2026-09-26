@@ -995,6 +995,39 @@ namespace SAS
 			// 1 = 启用（默认）；0 = 只用资源链（= v4.27 口径，植物会偏绿）。改完重进游戏。
 			bool          floraScannedByEngineState = true;
 
+			// ================================================================
+			// ★★★ v4.33：「已扫描植物低概率变青」的二次加固（用户实测复现 + 日志实证）
+			// ================================================================
+			// 本会话实测日志（2026-09-26 22:39:49 ~ 22:43:11，约 3.5 分钟）：
+			//   换场景 / 读档之后，**窗口内所有星球目标都被判「未扫描」**（整片青），
+			//   直到用户**举一下扫描仪**（引擎重写 state 4/5）才恢复绿色。
+			// 三个可修的点（全部与「单向学习表」有关，证据链见 docs/31）：
+			//   ① `reset (载入画面关闭…)` **每次都清空学习表** —— 而「已扫描」是
+			//      base（物种 / 资源）级的单向事实，读档 / 快速旅行后没有清的理由；
+			//   ② 学习表只活在内存 ⇒ **每次重开游戏都要重新「学」（= 再开一遍扫描仪）**；
+			//   ③ v4.31 的「沿用旧结论」条件 `!chain.shapeOk` 对**植物**永远不成立
+			//      （植物 produceIsMisc ⇒ shapeOk 恰好 = true）⇒ 植物从未被沿用保护。
+			//
+			// 1 = 学习表**落盘**（`SAS_AlwaysScan.flora-learn.txt`，与 esm / INI 同级）：
+			//     每学到一条「已扫描」立刻追加一行，启动时读回 ⇒ 跨会话保留。
+			//     ⚠️ 该表按 **base** 记录、**不区分存档** —— 换存档玩时，另一个存档里
+			//        扫过的物种也会显示绿色（只是颜色观感，不影响任何玩法判定）；
+			//        想严格按存档 ⇒ 设 0（只在本会话内有效）。
+			bool          floraLearnPersist = true;
+
+			// 1 = 载入画面关闭 / 换场景时**清空**内存学习表（= v4.31 / v4.32 行为）；
+			// 0 = 不清（★ v4.33 默认）—— 「已扫描」不会退回，base 级记忆跨场景有效。
+			//     ★ 这是本轮「换场景后整片变青」的直接修复（用户日志实证）。
+			bool          floraLearnClearOnLoad = false;
+
+			// 「未确认已扫描」的判据缓存 TTL（毫秒，默认 **5000**）。
+			//   背景：引擎 `GetOutlineState(ref)` 对**同一个引用**会一会儿答 2、一会儿
+			//   答 1（组件 / 登记未就绪），旧版把结果一律缓存 30 秒 ⇒ 引擎刚变回
+			//   「已扫描」也要等 30 秒才换色。现在：判成「已扫描」的保持 30 秒 TTL，
+			//   **判成未扫描的**按这个键重问 ⇒ 引擎状态一旦恢复立刻（≤5 秒）变绿。
+			//   0 = 退回 30 秒（= v4.32 行为）。
+			int           floraUnscannedTtlMs = 5000;
+
 			// 「已扫描」的星球目标用哪个 outline 状态（0..11）。默认 **5**：
 			//   引擎把「已经在勘测数据里的星球目标」写进 state 4（远）/ 5（近），
 			//   两者原生色都是**绿色 #27C684**（`outline colors` 日志里的
@@ -1994,6 +2027,12 @@ namespace SAS
 			std::unordered_map<std::uint32_t, bool> floraEngineSeen;  // base fid -> 引擎画过绿
 			std::uint64_t floraEngineGreenBases = 0;  // 累计学到几个「绿」base（诊断）
 			std::uint64_t floraEngineCyanBases  = 0;  // 累计见过几个「青」base（诊断）
+			// ★★★ v4.33：本包三处加固的计数（诊断；见 Config 里 v4.33 段与 docs/31）
+			std::uint64_t floraStatusTableHits = 0;  // 判据未命中时「读引擎状态表捡到 4/5」的次数
+			std::uint64_t floraPersistLoaded   = 0;  // 启动时从落盘文件读回的 base 数
+			std::uint64_t floraPersistWrites   = 0;  // 追加写盘的条数
+			bool          floraPersistReady    = false;
+			std::string   floraPersistPath;          // 懒设置（首次用到时算一次）
 
 			// --- ★ v4.7：Tick 间隔诊断（区分「Tick 没被调」和「被早退挡住」）---
 			std::uint64_t lastTickMs     = 0;
@@ -3353,6 +3392,10 @@ namespace SAS
 			return attr != INVALID_FILE_ATTRIBUTES && (attr & FILE_ATTRIBUTE_DIRECTORY) == 0;
 		}
 
+		// ★★★ v4.33：单向学习表落盘（定义见 NoteFloraEngineState 之前）。
+		//   前置声明必须在这里：LoadConfig 里会调用它（载入 = 配置文件读完之后）。
+		void LoadFloraLearnTable();
+
 		void LoadConfig()
 		{
 			// ★★ 需求（AGENTS.md，2026-09-25）：「**配置文件要放在和 esm 文件同级目录里**」。
@@ -3422,6 +3465,10 @@ namespace SAS
 			g_cfg.floraScannedByEngineState = getInt("FloraScannedByEngineState", 1) != 0;
 			g_cfg.stateFloraScanned      = std::clamp(getInt("StateFloraScanned", 5), 0, 11);
 			g_cfg.floraScanProbeMax      = std::clamp(getInt("FloraScanProbeMax", 8), 0, 64);
+			// ★★★ v4.33：「低概率变青」二次加固的三个键（详见 Config 里 v4.33 段）
+			g_cfg.floraLearnPersist     = getInt("FloraLearnPersist", 1) != 0;
+			g_cfg.floraLearnClearOnLoad = getInt("FloraLearnClearOnLoad", 0) != 0;
+			g_cfg.floraUnscannedTtlMs   = std::clamp(getInt("FloraUnscannedTtlMs", 5000), 0, 30000);
 			g_cfg.unhighlightGraceMs = std::clamp(getInt("UnhighlightGraceMs", 1500), 0, 60000);
 			g_cfg.maxOutlineOpsPerScan = std::clamp(getInt("MaxOutlineOpsPerScan", 64), 0, 4096);
 
@@ -3715,6 +3762,16 @@ namespace SAS
 					g_cfg.floraScannedByEngineState, g_cfg.floraScannedByResource,
 					g_cfg.stateFloraScanned, how);
 			}
+
+			// ★★★ v4.33：「已扫描植物低概率变青」二次加固（证据链见 docs/31）
+			REX::INFO("config: floraLearnPersist={} floraLearnClearOnLoad={} floraUnscannedTtlMs={} -> "
+					  "单向学习表：{}；换场景 / 读档{}清空；判成「未扫描」的判据缓存 TTL = {}ms"
+					  "（引擎状态一旦恢复「已扫描」，最多这么久变绿）",
+				g_cfg.floraLearnPersist, g_cfg.floraLearnClearOnLoad, g_cfg.floraUnscannedTtlMs,
+				g_cfg.floraLearnPersist ? "落盘（跨会话保留；文件不存在 = 首次运行）" : "只在内存里",
+				g_cfg.floraLearnClearOnLoad ? "会" : "**不**",
+				g_cfg.floraUnscannedTtlMs > 0 ? g_cfg.floraUnscannedTtlMs : 30000);
+			LoadFloraLearnTable();
 
 			REX::INFO("config: radius={:.1f}m targets={} hotkeyVK=0x{:X} startEnabled={}",
 				g_cfg.radiusMeters, g_cfg.maxTargets, g_cfg.hotkeyVk, g_cfg.startEnabled);
@@ -5871,7 +5928,19 @@ namespace SAS
 			g_state.floraScannedCache.clear();
 			// ★ v4.26：「从引擎状态里学到的绿」也要一起作废 —— 换了存档，
 			//   上一个世界的勘测数据与新存档无关。
-			g_state.floraEngineSeen.clear();
+			// ★★★ v4.33：改成**默认不清**（INI `FloraLearnClearOnLoad=1` 才清）——
+			//   实测日志（docs/31 §一）里 `reset (载入画面关闭…)` 每几十秒一次，
+			//   每次清空学习表后重问引擎大多答「未扫描」⇒ 换场景后整片植物变青，
+			//   必须再开一次扫描仪才恢复。而「已扫描」与 base（物种 / 资源）绑定、
+			//   单向不退回，跨场景 / 快速旅行保留它才是正确语义。
+			if (g_cfg.floraLearnClearOnLoad) {
+				const auto n = g_state.floraEngineSeen.size();
+				g_state.floraEngineSeen.clear();
+				REX::INFO("flora learn: 学习表按配置清空（FloraLearnClearOnLoad=1，清了 {} 条 base）", n);
+			} else if (!g_state.floraEngineSeen.empty()) {
+				REX::INFO("flora learn: 学习表保留（{} 条 base；★ v4.33 起换场景 / 读档不再清空）",
+					g_state.floraEngineSeen.size());
+			}
 			// ★ v4.13：事件队列里排队的记录也是「旧世界」的（FormID / 指针随时可能作废）
 			//   ⇒ 一起丢掉，免得换场景后按旧 FormID 去减账。
 			{
@@ -6729,17 +6798,53 @@ namespace SAS
 				s.empty() ? "（一个都没有）" : s, pcA, pcB);
 		}
 
-		// ★★★ v4.26（第二条证据来源，零逆向）：举着扫描仪时，读一眼**引擎自己给这个
-		//   引用写的 outline 状态**并学下来。状态表就是引擎的「引用 → 状态」表，
+		// ★★★ v4.33：学习表容量保护 —— **优先淘汰「只见过青」的条目**。
+		//   为什么不再整体 clear()（v4.31 的写法）：
+		//     ① v4.33 起学习表跨场景 / 跨会话保留 ⇒ 条目会持续累积
+		//        （每个见过的星球目标 base 一条，青色也会记一条）；
+		//     ② 整体 clear 会把**已确认「已扫描」**的记录一起丢掉 ——
+		//        那正是「变回青色」的直接成因（用户实测 bug）。
+		//   淘汰顺序：先 erase 所有 false（它们只用于诊断、不参与判定），
+		//   仍然超限（> 4096 个 base 都确认过已扫描，理论上不会发生）才整体清空。
+		void EnsureFloraLearnRoom()
+		{
+			if (g_state.floraEngineSeen.size() < kFloraScanCacheMax) {
+				return;
+			}
+			std::size_t dropped = 0;
+			for (auto it = g_state.floraEngineSeen.begin(); it != g_state.floraEngineSeen.end();) {
+				if (!it->second) {
+					it = g_state.floraEngineSeen.erase(it);
+					++dropped;
+				} else {
+					++it;
+				}
+			}
+			if (dropped > 0) {
+				REX::INFO("flora learn: 学习表达上限 {}，淘汰了 {} 条「只见过青」的条目（已扫描记录全部保留）",
+					kFloraScanCacheMax, dropped);
+			}
+			if (g_state.floraEngineSeen.size() >= kFloraScanCacheMax) {
+				REX::WARN("flora learn: 「已扫描」条目也达上限 {}（异常）—— 整体清空重学", kFloraScanCacheMax);
+				g_state.floraEngineSeen.clear();
+			}
+		}
+
+		// ★★★ v4.26（第二条证据来源，零逆向）：读一眼**引擎自己给这个引用写的
+		//   outline 状态**并学下来。状态表就是引擎的「引用 → 状态」表，
 		//   引擎扫描时会把「已扫描的星球目标」写成 **4/5**（原生绿）、「未扫描的」
 		//   写成 **7/8**（青色）—— 见常量区那段反汇编。
 		//   ⇒ 不猜偏移、不碰资源链，直接看引擎画了什么；「已扫描」是**单向**的
-		//     （勘测数据不会退回），所以学到的「绿」在本会话里一直有效。
+		//     （勘测数据不会退回），所以学到的「绿」一直有效。
+		//   ★★★ v4.33：调用点从「只在举着扫描仪（让位）时」扩展到**每次判据未命中
+		//     也会读一眼**（见 FloraTargetScanned ⓪.5）—— 放下扫描仪后引擎留在
+		//     表里的 4/5 也能被捡到。
 		void NoteFloraEngineState(const RE::TESObjectREFR* a_ref, const RE::TESForm* a_base)
 		{
 			if (!g_state.nativeReady || !g_outlineLookupOrAdd || !a_ref || !a_base) {
 				return;
 			}
+			EnsureFloraLearnRoom();
 			RE::TESObjectREFR* slot = const_cast<RE::TESObjectREFR*>(a_ref);
 			auto*               p    = g_outlineLookupOrAdd(nullptr, &slot);
 			if (!p || !IsReadable(p, sizeof(std::uint32_t))) {
@@ -6749,9 +6854,6 @@ namespace SAS
 			const std::uint32_t fid = a_base->GetFormID();
 			if (st == kFloraStateEngineGreenA || st == kFloraStateEngineGreenB) {
 				// 引擎亲手画的绿 =「这个星球目标已经扫描过」——最硬的证据
-				if (g_state.floraEngineSeen.size() >= kFloraScanCacheMax) {
-					g_state.floraEngineSeen.clear();
-				}
 				auto& seen = g_state.floraEngineSeen[fid];
 				if (!seen) {
 					seen = true;
@@ -6766,6 +6868,100 @@ namespace SAS
 					++g_state.floraEngineCyanBases;
 					g_state.floraEngineSeen.emplace(fid, false);
 				}
+			}
+		}
+
+		// ★★★ v4.33：单向学习表的**落盘**（`<esm 同级>\SAS_AlwaysScan.flora-learn.txt`）。
+		//   格式：每行一个 base FormID（十六进制）；`#` 开头 / 空行忽略。
+		//   为什么需要它（用户实测：「低概率变青，开一遍扫描仪才会变回来」）：
+		//     实测日志证明「学习表是唯一可靠判据」—— 引擎 `GetOutlineState` 对
+		//     植物几乎总答「未扫描」（日志 22:43 统计行：问=324 / 已扫描=5 /
+		//     未扫描=217），资源链对植物不适用 ⇒ 绿色只能靠「举过扫描仪时引擎
+		//     亲手画过 4/5」学到。而它原本只活在内存里 ⇒ **每次重开游戏都要
+		//     再开一遍扫描仪重新学**。落盘后跨会话保留，这条体验问题才真正消失。
+		std::string FloraLearnTablePath()
+		{
+			if (!g_state.floraPersistPath.empty()) {
+				return g_state.floraPersistPath;
+			}
+			// 与 INI 同目录（= esm 同级；老安装回退到 DLL 旁时也保持一致）
+			std::string dir;
+			if (const auto cut = g_iniPath.find_last_of('\\'); cut != std::string::npos) {
+				dir = g_iniPath.substr(0, cut);
+			} else {
+				dir = ModuleDir();
+			}
+			g_state.floraPersistPath = dir.empty()
+				? std::string{ "SAS_AlwaysScan.flora-learn.txt" }
+				: dir + "\\SAS_AlwaysScan.flora-learn.txt";
+			return g_state.floraPersistPath;
+		}
+
+		// 启动时读回（只加不减；文件不存在 = 首次运行，属正常）
+		void LoadFloraLearnTable()
+		{
+			const auto path = FloraLearnTablePath();
+			if (!g_cfg.floraLearnPersist) {
+				g_state.floraPersistReady = true;
+				REX::INFO("flora learn: 学习表落盘已关（FloraLearnPersist=0）—— 只在内存里生效（{}）", path);
+				return;
+			}
+			std::FILE* f = nullptr;
+			if (::fopen_s(&f, path.c_str(), "r") != 0 || !f) {
+				REX::INFO("flora learn: 学习表落盘文件不存在（{}）—— 首次运行属正常；"
+						  "以后每学到一条「已扫描」都会追加写进去，重开游戏不用再开扫描仪",
+					path);
+				g_state.floraPersistReady = true;
+				return;
+			}
+			char line[128]{};
+			while (std::fgets(line, sizeof(line), f)) {
+				const char* p = line;
+				while (*p == ' ' || *p == '\t') {
+					++p;
+				}
+				if (*p == '#' || *p == '\r' || *p == '\n' || *p == '\0') {
+					continue;
+				}
+				const char* hex = (p[0] == '0' && (p[1] == 'x' || p[1] == 'X')) ? p + 2 : p;
+				const auto  fid = static_cast<std::uint32_t>(std::strtoul(hex, nullptr, 16));
+				if (fid == 0) {
+					continue;
+				}
+				auto& seen = g_state.floraEngineSeen[fid];
+				if (!seen) {
+					seen = true;
+					++g_state.floraPersistLoaded;
+				}
+			}
+			std::fclose(f);
+			g_state.floraPersistReady = true;
+			REX::INFO("flora learn: 单向学习表已从落盘文件载入 {} 条 base（{}）-> 这些物种 / 资源"
+					  "本会话直接判「已扫描」，**不需要再开一遍扫描仪**（FloraLearnPersist=1）",
+				g_state.floraPersistLoaded, path);
+		}
+
+		// 新学到一条就追加写一行（文件不存在时创建；去重靠内存学习表）
+		void AppendFloraLearnRecord(std::uint32_t a_fid)
+		{
+			if (!g_cfg.floraLearnPersist) {
+				return;
+			}
+			const auto path = FloraLearnTablePath();
+			std::FILE* f = nullptr;
+			if (::fopen_s(&f, path.c_str(), "a") != 0 || !f) {
+				if (g_state.floraPersistWrites == 0) {
+					REX::WARN("flora learn: 学习表落盘文件建不出来（{}）—— 只在内存里生效", path);
+				}
+				return;
+			}
+			std::fprintf(f, "0x%08X\n", a_fid);
+			std::fclose(f);
+			++g_state.floraPersistWrites;
+			if (g_state.floraPersistWrites == 1) {
+				REX::INFO("flora learn: 学习表开始落盘（{}）—— 以后学到的「已扫描」都追加到这里，"
+						  "重开游戏直接读回（想重置就删掉这个文件）",
+					path);
 			}
 		}
 
@@ -6797,20 +6993,27 @@ namespace SAS
 			}
 			seen = true;
 			++g_state.floraEngineGreenBases;
-			REX::INFO("flora scan: base=0x{:X} 记入单向学习表「已扫描」（{}）-> 本会话不再重问引擎"
-					  "（换场景 / 读档才清；这是「变回青色」的根治）",
+			AppendFloraLearnRecord(a_fid);  // ★ v4.33：顺手落盘（跨会话保留）
+			REX::INFO("flora scan: base=0x{:X} 记入单向学习表「已扫描」（{}）-> 不再重问引擎"
+					  "（★ v4.33 起换场景 / 读档也不清、并落盘到 SAS_AlwaysScan.flora-learn.txt；"
+					  "这是「变回青色」的根治）",
 				a_fid, a_reason);
+			EnsureFloraLearnRoom();
 			return true;
 		}
 
-		// ③ 热路径入口：**每个引用**每 kFloraScanCacheTtlMs 最多问引擎一次。
+		// ③ 热路径入口：**每个引用**按 TTL（已扫描 30 秒 / 未扫描见
+		//   `FloraUnscannedTtlMs`）最多问引擎一次。
 		//   返回「这个星球目标已经扫描过（原版绿）」。
 		//   ★ v4.28：判据顺序 = ① 引擎状态（`GetOutlineState(ref)`，主判据）
 		//     → ② 引擎亲手画过的绿（会话内学习）→ ③ 资源链（**只对 LVLI 产出**）。
-		//   ★★★ v4.31：在最前面加 **⓪ 单向学习表**（base 级、会话内有效），并把
-		//     「引擎亲手画过的绿」并入它 —— 权威确认过「已扫描」的 base 直接返回；
-		//     另外「重问拿不到权威答案」时**沿用旧结论**（不再一律降成未扫描）。
-		//     两条合起来治用户实测的「已扫描植物低概率变回青色」（见 NoteFloraScannedBase）。
+		//   ★★★ v4.31：在最前面加 **⓪ 单向学习表**（base 级），并把「引擎亲手
+		//     画过的绿」并入它 —— 权威确认过「已扫描」的 base 直接返回；另外
+		//     「重问拿不到权威答案」时**沿用旧结论**（不再一律降成未扫描）。
+		//   ★★★ v4.33：
+		//     ① ⓪ 与 ① 之间加 **⓪.5 引擎状态表捡漏**（放下扫描仪后也读一眼 4/5）；
+		//     ② 学习表**跨场景 / 跨会话保留**（落盘，见 LoadFloraLearnTable）；
+		//     ③ 「沿用」判据订正：`chain.produceIsMisc || !chain.shapeOk`（见下）。
 		bool FloraTargetScanned(const RE::TESObjectREFR* a_ref, const RE::TESForm* a_base)
 		{
 			if (!a_base) {
@@ -6831,7 +7034,18 @@ namespace SAS
 			if (it != g_state.floraScannedCache.end()) {
 				if (it->second.baseFid == fid) {
 					// 缓存命中还要**核对 base**：引用指针可能已被回收去装别的东西
-					if (now - it->second.atMs < kFloraScanCacheTtlMs) {
+					// ★★★ v4.33：**判成「已扫描」的按 30 秒 TTL；判成「未扫描」的按
+					//   FloraUnscannedTtlMs（默认 5 秒）** —— 引擎状态对同一个引用会
+					//   一会儿答 2、一会儿答 1（组件 / 登记未就绪），旧版一律缓存 30 秒
+					//   ⇒ 引擎刚恢复「已扫描」也要等 30 秒才变绿（用户看到的「变回青色」
+					//   的窗口期就是这么来的）。短 TTL 只影响重问频率（引擎调用很便宜）。
+					const auto ttl = it->second.scanned
+						? kFloraScanCacheTtlMs
+						: (g_cfg.floraUnscannedTtlMs > 0
+								? std::min<std::uint64_t>(kFloraScanCacheTtlMs,
+									  static_cast<std::uint64_t>(g_cfg.floraUnscannedTtlMs))
+								: kFloraScanCacheTtlMs);
+					if (now - it->second.atMs < ttl) {
 						return it->second.scanned;
 					}
 					prevScanned = it->second.scanned;
@@ -6861,6 +7075,29 @@ namespace SAS
 						fid, FloraScannedState());
 				}
 				return true;
+			}
+
+			// ⓪.5 ★★★ v4.33：学习表没命中时**顺手读一眼引擎的状态表**（捡漏）——
+			//   引擎在玩家「举过扫描仪」之后会把已扫描目标的状态留在表里（4/5 绿），
+			//   而 v4.26~v4.32 只在「举着扫描仪（让位）」那一刻读它 ⇒ 放下扫描仪之后
+			//   就不再捡。现在改成判据未命中时读一眼（纯内存读 + 引用级缓存限流，
+			//   同一个引用最多每 FloraUnscannedTtlMs 一次）⇒ 引擎留过的绿不会白丢。
+			if (a_ref) {
+				NoteFloraEngineState(a_ref, a_base);
+				if (FloraEngineSaysGreen(fid)) {
+					++g_state.floraStatusTableHits;
+					++g_state.floraScanHits;
+					++g_state.floraLearnedHits;
+					g_state.floraScannedCache.emplace(a_ref, State::FloraScanRec{ true, now, fid, 2 });
+					if (g_cfg.floraScanProbeMax > 0 &&
+						g_state.floraScanProbes < static_cast<std::uint32_t>(g_cfg.floraScanProbeMax)) {
+						++g_state.floraScanProbes;
+						REX::INFO("flora scan: ref=0x{:X} base=0x{:X} 判据 = 引擎状态表捡漏"
+								  "（引擎亲手画过 state 4/5）-> 已扫描 ⇒ 状态 {}（原版「已扫描」绿）",
+							a_ref->GetFormID(), fid, FloraScannedState());
+					}
+					return true;
+				}
 			}
 
 			// ① ★★★ v4.28 主判据：引擎自己的「这个引用扫没扫过」
@@ -6913,15 +7150,17 @@ namespace SAS
 				}
 			}
 
-			// ★★★ v4.31：**没有权威答案就沿用旧结论**（不是一律降成「未扫描」）。
-			//   权威答案 = 引擎状态 == 2（上面已 return）∨ 资源链**走通**（shapeOk
-			//   —— 它能给出明确的「是 / 否」）。其余情况（引擎拿不到 / 答未扫描、
-			//   链不适用或没走通）都可能只是「这次问不到」，不足以推翻上次结论，
-			//   而「已扫描」是单向的 ⇒ 旧值 true 就保持 true。
-			//   ★ 这正是用户那句「开启扫描仪再关闭，就又会变成扫描后的颜色」的
-			//     反面：以前重问失败会把绿擦成青，只能等下一次扫描仪把绿「学」回来。
-			bool result = scanned;
-			if (!chain.shapeOk && hasPrev && prevScanned) {
+			// ★★★ v4.31 / v4.33：**没有权威答案就沿用旧结论**（不是一律降成「未扫描」）。
+			//   权威答案 = 引擎状态 == 2（上面已 return）∨ 资源链**走通且适用**
+			//   （shapeOk 且**不是**「产出是 MISC 的植物」—— 那一段链对植物根本不用，
+			//   它的 shapeOk 恰好 = true 但给不出任何结论）。
+			//   ★★★ v4.33 修正：v4.31 写的判据是 `!chain.shapeOk`，而植物
+			//     （produceIsMisc）恰好会把 shapeOk 置 true ⇒ 这个条件对植物**永远
+			//     不成立** ⇒ 「沿用」从未保护过植物 —— 这正是「低概率变青」在
+			//     v4.31 之后依然复现的原因之一。
+			bool              result          = scanned;
+			const bool        noAuthoritative = chain.produceIsMisc || !chain.shapeOk;
+			if (noAuthoritative && hasPrev && prevScanned) {
 				result = true;
 				++g_state.floraStickyKeeps;
 			}
@@ -9016,7 +9255,9 @@ namespace SAS
 				//       （日志里有 `flora scan:` 细节行 + 一条 WARN）。
 				REX::INFO("  planet targets (窗口内): 未扫描={} 已扫描={} | 判据: 查询={} 命中={} 链失败={} 缓存={} 偏移=0x{:X}/0x{:X} "
 						  "| 引擎状态: 问={} 已扫描={} 未扫描={} | 引擎学到: 绿={} base 青={} base "
-						  "| 学习表: 命中={} 沿用={}（★ v4.31：都 > 0 = 「变回青色」的修复在干活） | 窗口取证={} ready={}/{}",
+						  "| 学习表: 命中={} 沿用={} 捡漏={} 落盘={} 写入={}"
+						  "（★ v4.33：命中/捡漏 = 「已扫描」判定在干活、沿用 = 保住的绿；落盘 = 启动读回条数 / 写入 = 本会话新增）"
+						  " | 窗口取证={} ready={}/{}",
 					g_state.floraUnscannedSel, g_state.floraScannedSel,
 					g_state.floraScanQueries, g_state.floraScanHits,
 					g_state.floraScanShapeFails, g_state.floraScannedCache.size(),
@@ -9025,6 +9266,8 @@ namespace SAS
 					g_state.floraEngineStateUnscanned,
 					g_state.floraEngineGreenBases, g_state.floraEngineCyanBases,
 					g_state.floraLearnedHits, g_state.floraStickyKeeps,
+					g_state.floraStatusTableHits,
+					g_state.floraPersistLoaded, g_state.floraPersistWrites,
 					g_state.floraScanDumps,
 					g_isResourceScannedReady ? 1 : 0,
 					g_scannableOutlineStateReady ? 1 : 0);
