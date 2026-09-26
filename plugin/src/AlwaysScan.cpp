@@ -6798,6 +6798,10 @@ namespace SAS
 				s.empty() ? "（一个都没有）" : s, pcA, pcB);
 		}
 
+		// ★★★ v4.33：学习表落盘（定义见 FloraEngineSaysGreen 之前；这里要先声明，
+		//   因为 NoteFloraEngineState 的「引擎画绿」分支也要落盘）。
+		void AppendFloraLearnRecord(std::uint32_t a_fid);
+
 		// ★★★ v4.33：学习表容量保护 —— **优先淘汰「只见过青」的条目**。
 		//   为什么不再整体 clear()（v4.31 的写法）：
 		//     ① v4.33 起学习表跨场景 / 跨会话保留 ⇒ 条目会持续累积
@@ -6858,8 +6862,12 @@ namespace SAS
 				if (!seen) {
 					seen = true;
 					++g_state.floraEngineGreenBases;
+					// ★★★ v4.33：这里也必须落盘！—— 本条（引擎亲手画绿）是「举一下
+					//   扫描仪」学到的主要来源（实测日志里 30 个 base 全走这条），
+					//   之前只挂 NoteFloraScannedBase ⇒ 这条来源的成果重开游戏就丢。
+					AppendFloraLearnRecord(fid);
 					REX::INFO("flora scan: 引擎把 base=0x{:X} 画成了绿色（outline state {}）-> 记下「已扫描」"
-							  "（本会话有效，与链判据取或）",
+							  "（与链判据取或；★ v4.33 起落盘、跨会话有效）",
 						fid, st);
 				}
 			} else if (st == kFloraStateEngineCyanA || st == kFloraStateEngineCyanB) {
