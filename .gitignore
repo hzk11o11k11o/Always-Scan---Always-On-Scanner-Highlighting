@@ -82,3 +82,6 @@ tr/lang/dict_full.tsv
 # 文档/配置的一次性备份（合并 INI、精简文档时的 .bak-*）
 *.bak-*
 *.bak
+
+# 临时提交信息文件（防误提交）
+commit-msg-*.txt
