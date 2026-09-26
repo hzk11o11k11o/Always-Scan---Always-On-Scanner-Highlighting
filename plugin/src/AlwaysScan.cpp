@@ -2062,6 +2062,24 @@ namespace SAS
 			std::uint64_t floraRefHits      = 0;  // 被「按引用记忆」直接命中几次（诊断）
 			std::uint64_t floraRefGreenNew  = 0;  // 本会话新增「绿」条目（= 真正学到的）
 			std::uint64_t floraRefCyanNew   = 0;  // 本会话新增「青」条目
+			// ★★★ v5.1.2（订正 R2）：**按物种（base）扩散的会话级表** —— 治用户实测的
+			//   「有些植物扫描后还是青，打开扫描仪再关闭才变绿」。
+			//   根因：引擎知识库是 **species（资源）级**的 —— 只要玩家学过这个物种，
+			//   引擎就给同 species 的**所有**实例画绿（原版行为；v5.1 日志实证：举一下
+			//   扫描仪，同 base 的一串引用被逐个画成 4/5）。但 v5.1 的记忆是**引用级**的
+			//   —— 同 species 里「引擎没画过」（不在扫描仪求值范围 / 视角外 / 数量上限）
+			//   的那些实例就永远学不到 ⇒ 停在青色；再举一次扫描仪它们被画到 ⇒ 才补上
+			//   （= 用户说的「打开扫描仪再关闭又变成绿色」）。
+			//   修法：任一引用被**权威**确认「已扫描」⇒ 把它的 base 记进这张表；
+			//   判定时 base 命中 ⇒ 直接绿（同 species / 同资源全绿，与原版一致）。
+			//   ★ 为什么不落盘：base 级**跨存档**复用正是 v5.1 修掉的「矿石、植物扫描
+			//     前后颜色都是绿色」（docs/33 —— 落盘的 base 来自别的会话 / 别的存档）。
+			//     重启游戏后靠「引用级落盘记忆」在遍历到旧引用时**动态激活**（见
+			//     FloraTargetScanned ⓪）—— 影响面与「引用级记忆」本身完全相同，
+			//     不会额外外溢到别的存档。
+			std::unordered_set<std::uint32_t> floraBaseKnow;  // base FormID（物种 / 资源）
+			std::uint64_t floraBaseHits = 0;  // 被「按物种扩散」直接命中几次（诊断）
+			std::uint64_t floraBaseNew  = 0;  // 本会话记下几个 base（诊断）
 			// ★★★ v5.1：只读探针（引擎状态表）的计数 —— 这一路**零副作用**
 			//   （v4.33 那条调的是 LookupOrAdd，会插入条目 + 加引用计数 ⇒ 长会话变卡）
 			std::uint64_t floraTableProbes   = 0;  // 读了几次
@@ -3842,8 +3860,11 @@ namespace SAS
 				g_cfg.floraLearnClearOnLoad ? "会" : "**不**",
 				g_cfg.floraUnscannedTtlMs > 0 ? g_cfg.floraUnscannedTtlMs : 30000);
 			//   （这里用字面量 RVA：常量区在文件的后面，见 kRvaOutlineStateTree 那段证据）
-			REX::INFO("config: 星球目标记忆(v5.1) -> 粒度 = **引用**（扫过一个实例不再让同 species / 同资源"
-					  "的所有实例一起变绿）；引擎状态表探针 = **只读走树（RVA 0x5F39CE0 + 节点 +0x20/+0x28）**，"
+			REX::INFO("config: 星球目标记忆(v5.1 / 订正 R2) -> 引用级记忆 + **按物种（base）扩散**："
+					  "任一实例被权威确认「已扫描」（引擎画过 4/5 ∨ 引擎状态==2 ∨ 资源链命中）⇒ "
+					  "同 species / 同资源的**所有**实例一起变绿（引擎知识库本来就是这一级）；"
+					  "★ 物种表**不落盘**（避免跨存档外溢），重启后靠引用级落盘记忆**动态激活**；"
+					  "引擎状态表探针 = **只读走树（RVA 0x5F39CE0 + 节点 +0x20/+0x28）**，"
 					  "不再调 LookupOrAdd（那会插入条目 + 对 REFR 加引用计数 ⇒ 玩得越久越卡）；"
 					  "「青」记忆只当提示（不再短路主判据 / 资源链，任何一条给出「已扫描」都会升级成绿）");
 			LoadFloraLearnTable();
@@ -6008,16 +6029,24 @@ namespace SAS
 			//   每次清空学习表后重问引擎大多答「未扫描」⇒ 换场景后整片植物变青，
 			//   必须再开一次扫描仪才恢复。而「已扫描」是**单向**的（勘测数据不退回），
 			//   跨场景 / 快速旅行保留它才是正确语义。
-			//   ★ v5.1：粒度改成**引用** —— 保留的也只是「这一个实例扫过」这件事，
-			//     不会再外溢到同 species / 同资源的其它实例（用户实测的 bug）。
+			//   ★ v5.1：粒度改成**引用** —— 保留的也只是「这一个实例扫过」这件事。
+			//   ★★★ v5.1.2（订正 R2）：**按物种（base）扩散表**同样保留 ——
+			//     换场景 / 快速旅行之间保留「这个物种已学习」才是正确语义
+			//     （引擎知识库是 species 级、且不随场景退回）；只有配置要求
+			//     清空学习表（FloraLearnClearOnLoad=1）时跟着一起清。
 			if (g_cfg.floraLearnClearOnLoad) {
 				const auto n = g_state.floraRefKnow.size();
+				const auto nb = g_state.floraBaseKnow.size();
 				g_state.floraRefKnow.clear();
-				REX::INFO("flora learn: 按引用记忆按配置清空（FloraLearnClearOnLoad=1，清了 {} 条引用）", n);
-			} else if (!g_state.floraRefKnow.empty()) {
-				REX::INFO("flora learn: 按引用记忆保留（{} 条引用；★ v4.33 起换场景 / 读档不再清空、"
-						  "★ v5.1 粒度 = 引用）",
-					g_state.floraRefKnow.size());
+				g_state.floraBaseKnow.clear();  // ★ v5.1.2：物种表跟着清（保持同一语义）
+				REX::INFO("flora learn: 按引用记忆按配置清空（FloraLearnClearOnLoad=1，清了 {} 条引用 / "
+						  "★ v5.1.2 物种表 {} 个 base）",
+					n, nb);
+			} else if (!g_state.floraRefKnow.empty() || !g_state.floraBaseKnow.empty()) {
+				REX::INFO("flora learn: 记忆保留（{} 条引用 / ★ v5.1.2 物种表 {} 个 base；"
+						  "★ v4.33 起换场景 / 读档不再清空、★ v5.1 粒度 = 引用、"
+						  "★ v5.1.2 同 base 实例一起变绿）",
+					g_state.floraRefKnow.size(), g_state.floraBaseKnow.size());
 			}
 			// ★ v4.13：事件队列里排队的记录也是「旧世界」的（FormID / 指针随时可能作废）
 			//   ⇒ 一起丢掉，免得换场景后按旧 FormID 去减账。
@@ -7100,6 +7129,49 @@ namespace SAS
 			}
 		}
 
+		// 按物种（base）扩散表的容量兜底：物种 / 资源总量正常只有几十~几百条。
+		//   真到上限说明判据异常 ⇒ 整体清空重学（不丢正确性：旧条目的引用级
+		//   记忆还在，下轮遇到时会**动态激活**重建）。
+		constexpr std::size_t kFloraBaseKnowMax = 4096;
+
+		// ★★★ v5.1.2（订正 R2）：把「这个 **base（物种 / 资源）** 已扫描」记进会话表。
+		//   权威来源（调用点）：`RememberFloraRef(绿)` 成功时、⓪/⓪.5 的引用级绿记忆
+		//   命中时（= 跨会话**动态激活**）。返回 true = 本次首次记下。
+		//   ★ 依据：引擎知识库是 species（资源）级的 —— 引擎自己的行为就是「学过一个
+		//     实例 ⇒ 同 species 的全部实例画绿」（v5.1 日志实证：举一下扫描仪，
+		//     同 base 的一串引用被逐个画成 4/5）。所以「权威确认过任一个体」⇒
+		//     「同 base 全绿」不是外推，而是**把引擎的行为补全**。
+		bool RememberFloraBase(std::uint32_t a_baseFid, const char* a_reason)
+		{
+			if (!a_baseFid || a_baseFid == 0xFFFFFF) {
+				return false;
+			}
+			if (g_state.floraBaseKnow.size() >= kFloraBaseKnowMax) {
+				REX::WARN("flora learn: 按物种表达上限 {}（异常）—— 整体清空重学（会随引用级记忆动态重建）",
+					kFloraBaseKnowMax);
+				g_state.floraBaseKnow.clear();
+			}
+			if (!g_state.floraBaseKnow.insert(a_baseFid).second) {
+				return false;  // 已在表里
+			}
+			++g_state.floraBaseNew;
+			const auto n = g_state.floraBaseNew;
+			if (n <= 24 || n % 64 == 0) {
+				REX::INFO("flora scan: 按物种记下「已扫描」—— base=0x{:X}（{}）；"
+						  "★ v5.1.2：同 species / 同资源的**所有**实例一起变绿"
+						  "（引擎知识库就是这个粒度，与原版一致；不落盘 ⇒ 不会外溢到别的存档）",
+					a_baseFid, a_reason);
+			}
+			return true;
+		}
+
+		// 查「这个物种 / 资源」是不是已被权威确认过（会话级；见上面长注释）。
+		bool FloraBaseKnown(std::uint32_t a_baseFid)
+		{
+			return a_baseFid != 0 &&
+			       g_state.floraBaseKnow.find(a_baseFid) != g_state.floraBaseKnow.end();
+		}
+
 		// ★★★ v5.1：把「这个**引用**是否已扫描」写进按引用的单向记忆。
 		//   三个**权威**来源都走这里：引擎状态 == 2、引擎亲手画过 4/5、资源链命中。
 		//   返回 true = 本次**首次**写入（调用方可据此打一条日志 / 落盘）。
@@ -7136,6 +7208,9 @@ namespace SAS
 			if (a_green) {
 				++g_state.floraRefGreenNew;
 				AppendFloraLearnRecord(refFid, baseFid);  // ★ 落盘（跨会话保留）
+				// ★★★ v5.1.2（订正 R2）：顺手把 base 记进会话级「物种表」——
+				//   同 base 的其它实例（本轮引擎没画到的那些）靠它一起变绿。
+				RememberFloraBase(baseFid, a_reason);
 			} else {
 				++g_state.floraRefCyanNew;
 			}
@@ -7307,12 +7382,14 @@ namespace SAS
 			std::fclose(f);
 			g_state.floraPersistReady = true;
 			REX::INFO("flora learn: 按引用记忆已从落盘文件载入 {} 条（{}）-> 这些**引用**本会话直接判"
-					  "「已扫描」，不需要再开一遍扫描仪（FloraLearnPersist=1）{}",
+					  "「已扫描」，不需要再开一遍扫描仪（FloraLearnPersist=1）；"
+					  "★ v5.1.2：物种表**不落盘**，遇到这些引用时会**动态激活**其 base ⇒ "
+					  "同 species / 同资源的其它实例**立刻**一起变绿（不会外溢到别的存档）{}",
 				g_state.floraPersistLoaded, path,
 				g_state.floraPersistIgnored
 					? "；★ 旧格式（base 级）行被忽略 " + std::to_string(g_state.floraPersistIgnored) +
-						  " 条 —— 那种粒度会把同 species / 同资源的**所有**实例一起涂绿，"
-						  "正是 v5.1 修掉的问题（想清空直接删这个文件）"
+						  " 条 —— 那种粒度会把同 species / 同资源的**所有**实例一起涂绿、"
+						  "且跨存档生效，正是 v5.1 修掉的问题（想清空直接删这个文件）"
 					: std::string{});
 		}
 
@@ -7421,6 +7498,13 @@ namespace SAS
 					++g_state.floraRefHits;
 					++g_state.floraScanHits;
 					++g_state.floraLearnedHits;
+					// ★★★ v5.1.2（订正 R2）：引用级绿记忆命中 ⇒ 顺手**动态激活**物种表。
+					//   场景：重开游戏（引用级记忆从落盘读回、物种表却是空的）——
+					//   本会话第一次遇到这条记忆时把它的 base 也放行 ⇒ 同 species 的
+					//   其它实例**立刻**一起变绿，不必等玩家再举一次扫描仪。
+					//   ★ 影响面与「引用级记忆」本身完全相同（记忆是绿的 ⇒ 才激活），
+					//     不会额外外溢到别的存档。
+					RememberFloraBase(fid, "引用级记忆命中（跨会话动态激活）");
 					g_state.floraScannedCache.emplace(a_ref,
 						State::FloraScanRec{ true, now, fid, 4 });
 					if (g_cfg.floraScanProbeMax > 0 &&
@@ -7432,6 +7516,28 @@ namespace SAS
 					}
 					return true;
 				}
+			}
+
+			// ⓪.2 ★★★ v5.1.2（订正 R2）：**按物种（base）扩散** —— 纯内存查表，零引擎调用。
+			//   引擎知识库是 species（资源）级的：只要这个物种被权威确认过（任一实例
+			//   被引擎画成 4/5、或引擎状态 == 2、或资源链命中），**同 base 的所有实例**
+			//   都该是原版绿 —— 这正是「打开扫描仪再关闭就变绿」的那批目标
+			//   （它们在引擎的画里本来就是绿的，只是之前没被我们学到）。
+			//   判定放在 ⓪ 之后、⓪.5（探针）之前：省掉一次状态表读取。
+			if (FloraBaseKnown(fid)) {
+				++g_state.floraBaseHits;
+				++g_state.floraScanHits;
+				++g_state.floraLearnedHits;
+				g_state.floraScannedCache.emplace(a_ref,
+					State::FloraScanRec{ true, now, fid, 6 });
+				if (g_cfg.floraScanProbeMax > 0 &&
+					g_state.floraScanProbes < static_cast<std::uint32_t>(g_cfg.floraScanProbeMax)) {
+					++g_state.floraScanProbes;
+					REX::INFO("flora scan: ref=0x{:X} base=0x{:X} 判据 = 按物种扩散（★ v5.1.2："
+							  "同 species / 同资源已被权威确认）-> 已扫描 ⇒ 状态 {}（原版「已扫描」绿）",
+						a_ref->GetFormID(), fid, FloraScannedState());
+				}
+				return true;
 			}
 
 			// ⓪.5 ★★★ v4.33：学习表没命中时**顺手读一眼引擎的状态表**（捡漏）——
@@ -7450,6 +7556,8 @@ namespace SAS
 					++g_state.floraStatusTableHits;
 					++g_state.floraScanHits;
 					++g_state.floraLearnedHits;
+					// ★★★ v5.1.2：同 ⓪ —— 命中即动态激活物种表（见那里的长注释）
+					RememberFloraBase(fid, "状态表捡漏命中（动态激活）");
 					if (g_cfg.floraScanProbeMax > 0 &&
 						g_state.floraScanProbes < static_cast<std::uint32_t>(g_cfg.floraScanProbeMax)) {
 						++g_state.floraScanProbes;
@@ -9978,9 +10086,12 @@ namespace SAS
 				//       （日志里有 `flora scan:` 细节行 + 一条 WARN）。
 				REX::INFO("  planet targets (窗口内): 未扫描={} 已扫描={} | 判据: 查询={} 命中={} 链失败={} 缓存={} 偏移=0x{:X}/0x{:X} "
 						  "| 引擎状态: 问={} 已扫描={} 未扫描={} 未知={} | 按引用记忆(★v5.1): 命中={} 绿={} 青={} 总量={} "
+						  "| 按物种扩散(★v5.1.2): 命中={} 物种表={} 新增={} "
 						  "| 引擎状态表: 条目={} 读={} 绿={} 青={} 无条目={} "
 						  "| 学习表: 沿用={} 捡漏={} 落盘={} 写入={} 旧格式忽略={}"
-						  "（★ v5.1：按引用记忆 = 记忆粒度是引用（不再外溢到同 base）；"
+						  "（★ v5.1：按引用记忆 = 记忆粒度是引用；★ v5.1.2：按物种扩散 = 同 species / "
+						  "同资源被权威确认后，其**所有**实例一起变绿（引擎知识库本来就是这一级；"
+						  "物种表**不落盘**，重启后靠引用级记忆动态激活）；"
 						  "引擎状态表 = 引擎那棵「引用→状态」红黑树的条目数 —— **玩多久都应该基本稳定**，"
 						  "持续单调增长 = 有代码在往里插条目；命中/捡漏 = 判定在干活、沿用 = 保住的绿；"
 						  "落盘 = 启动读回条数 / 写入 = 本会话新增）"
@@ -9993,6 +10104,7 @@ namespace SAS
 					g_state.floraEngineStateUnscanned, g_state.floraEngineStateUnknown,
 					g_state.floraRefHits, g_state.floraRefGreenNew, g_state.floraRefCyanNew,
 					g_state.floraRefKnow.size(),
+					g_state.floraBaseHits, g_state.floraBaseKnow.size(), g_state.floraBaseNew,
 					OutlineStateTableCount(),
 					g_state.floraTableProbes, g_state.floraTableGreen, g_state.floraTableCyan,
 					g_state.floraTableNoEntry,

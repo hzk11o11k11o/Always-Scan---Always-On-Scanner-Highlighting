@@ -213,11 +213,14 @@ SFSE_PLUGIN_LOAD(const SFSE::LoadInterface* a_sfse)
 	SFSE::Init(a_sfse, { .log = false, .logName = kLogName });
 	ApplyLogSizeLimit();
 
-	// ★ 2026-09-27 订正 R1（公开版仍是 2.0，build 号按用户要求不提升）：
-	//   ① 引擎状态表树头 RVA 0x5949CE0 → **0x5F39CE0**（手算 rip 相对地址时少看一位）；
-	//   ② 「青」记忆不再短路主判据 / 资源链（只有「绿」单向短路）。
-	//   这两条一起治「少部分扫描后未变色」—— 启动日志里认这个括号即可确认跑的是订正版。
-	REX::INFO("SAS_AlwaysScan v5.1.0 loading（订正 R1：状态表 0x5F39CE0 + 「青」不短路）(SFSE build {})",
+	// ★ 2026-09-27 订正 R2（公开版仍是 2.0，build 号按用户要求不提升）：
+	//   ① 引擎状态表树头 RVA 0x5949CE0 → **0x5F39CE0**（手算 rip 相对地址时少看一位，R1）；
+	//   ② 「青」记忆不再短路主判据 / 资源链（只有「绿」单向短路，R1）；
+	//   ③ ★ **按物种（base）扩散**：任一实例被权威确认「已扫描」⇒ 同 species / 同资源
+	//      的**所有**实例一起变绿（引擎知识库本来就是这一级）—— 治用户实测的
+	//      「有些植物扫描后还是青，打开扫描仪再关闭才变绿」（R2）。
+	//   这三条一起治「扫描后没变色」—— 启动日志里认这个括号即可确认跑的是订正版。
+	REX::INFO("SAS_AlwaysScan v5.1.0 loading（订正 R2：状态表 0x5F39CE0 + 「青」不短路 + 按物种扩散）(SFSE build {})",
 		SFSE::GetSFSEVersion());
 
 	if (auto* messaging = SFSE::GetMessagingInterface()) {

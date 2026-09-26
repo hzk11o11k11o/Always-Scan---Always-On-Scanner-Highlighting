@@ -5,27 +5,29 @@
 
 Version  : 2.0  (plugin build 5.1.0)
            2.0 = the mod brings its own outline colour channels (described
-           below), plus three fixes, all from player reports.
+           below), plus four fixes, all from player reports.
            (1) "Ores and plants are green before *and* after scanning."
                The mod remembers a confirmed "surveyed" verdict so a target
                cannot fall back to cyan (added in 1.7.9 / 1.8.1), but that
-               memory was keyed by *species* - the record a plant or a
-               deposit is built from - rather than by the individual object.
-               So scanning one plant turned every plant of that species
-               green: every other plant on that planet, the same species on
-               other planets, and the same species in other saves. The
-               memory is now keyed by the individual reference: scanning one
-               plant turns that plant green, everything else stays cyan until
-               you scan it. The file next to the esm
-               (SAS_AlwaysScan.flora-learn.txt) now stores one "reference +
+               memory was keyed by *species* only and was kept across save
+               files - so a plant surveyed once in one save turned that whole
+               species green in every other save as well, before you had
+               surveyed anything there, which is exactly what "green before I
+               scan it" looks like. (Inside one save a species-wide verdict
+               is correct - the game itself tracks species, not single
+               plants; see fix (4) below.) The mod now records the individual
+               reference you actually confirmed, and the species-wide
+               shortcut is rebuilt per session from what this save confirmed
+               - it never leaks into another save. The file next to the esm
+               (SAS_AlwaysScan.flora-learn.txt) stores one "reference +
                species" pair per line; lines in the old (species-only)
                format are ignored - the log says how many - and you can
                simply delete the file to start fresh.
                One-off side effect when you update: things you surveyed with an
                older version are no longer known to the mod (the old memory
                was species-based and is skipped). Scanning them once - or
-               simply raising the scanner for a moment - records them again,
-               this time per object. That is the intended reset.
+               simply raising the scanner for a moment - records them again.
+               That is the intended reset.
            (2) "Frame rate keeps dropping the longer I play (1.8.1)."
                The "read the state the game itself painted" step, added in
                1.8.1, used the game's own lookup-or-**add** function. When
@@ -63,6 +65,23 @@ Version  : 2.0  (plugin build 5.1.0)
                green, while a confirmed "surveyed" verdict remains one-way.
                Nothing to configure; the startup log line now says
                `RVA 0x5F39CE0` and the stats line gained `引擎状态: 未知=N`.
+           (4) "Some plants stay cyan after I scan them - opening the scanner
+               and closing it again turns them green." Fixed 2026-09-27.
+               "Surveyed" is a *species-wide* fact in the game: survey one
+               plant and the game paints every plant of that species green.
+               The mod's memory, however, was keyed by the individual object,
+               so plants the game never painted green during your scanner
+               sweep - out of its evaluation range, behind you, or past its
+               per-frame limit - were never learned, and stayed cyan until a
+               later sweep happened to paint them, which is why raising and
+               lowering the scanner "fixed" them. A confirmed verdict is now
+               spread to the whole species / resource, exactly like the game
+               does it: surveying any one instance turns every instance of it
+               green. The species table lives in memory only and is never
+               written to disk, so it cannot leak into another save; after a
+               game restart it is rebuilt from the per-object records as you
+               walk past them. Nothing to configure; the stats line gained
+               `按物种扩散(★v5.1.2)` counters.
            Also in 2.0 (the headline feature) - the mod brings its own
            outline colour channels instead of borrowing the game's.
            The game has eleven outline "states"
