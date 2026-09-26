@@ -3,7 +3,7 @@
  Always-on scanner highlighting for Starfield
 ========================================================================
 
-Version  : 1.7.7  (plugin build 4.27.0)
+Version  : 1.7.7  (plugin build 4.28.0)
            1.7.7 = fix: with the scanner put away, already-scanned planet
            targets (ores / gas / liquids / plants) still showed the
            "not scanned" cyan. 1.7.6 fixed the other half (with the scanner
@@ -11,25 +11,37 @@ Version  : 1.7.7  (plugin build 4.27.0)
            the mod re-hangs the highlight itself, and it only ever used one
            state - the vanilla "not scanned" cyan pulse - so nothing told
            "already surveyed" and "never surveyed" apart. The mod now asks
-           the game itself, from two independent sources (either one is
-           enough): (a) while you hold the scanner up, it reads which
-           outline state the game itself paints each target with - the
-           game's green means "already surveyed", and that knowledge is
-           remembered for the session; (b) with the scanner away it calls
-           the very function the vanilla scanner uses (the one that checks
-           whether a resource has entered your survey data) and walks the
-           game's own record chain (flora record -> the item it produces ->
-           that item's resource), auto-detecting the record layout if the
-           game moves it. (1.7.7 was rebuilt with plugin build 4.27.0: source
-           (b) above had a silent bug - the record type it had to recognise
-           was rejected by the mod's own sanity check, so in practice only
-           (a) was doing the work. Both sources are active now, and the log
-           names the record offsets it adopts.)
+           the game itself, from three independent sources (any one is
+           enough): (a) it calls the game's own "has this reference been
+           surveyed?" query - that is literally the native function the
+           game exposes as IsScanned, and it answers per reference (the
+           game resolves plants / deposits / creatures internally), so it is
+           correct for plants too; (b) while you hold the scanner up, it
+           reads which outline state the game itself paints each target with
+           - the game's green means "already surveyed" - and remembers that
+           for the session; (c) with the scanner away it calls the very
+           function the vanilla scanner uses (the one that checks whether a
+           resource has entered your survey data) and walks the game's own
+           record chain (flora record -> the item it produces -> that item's
+           resource), auto-detecting the record layout if the game moves it.
+           Source (c) only applies to flora that produce a level list - the
+           ore / gas / liquid deposits; the game itself checks that same
+           record type before walking the chain.
+           (1.7.7 was rebuilt with plugin build 4.28.0. Build 4.27.0 fixed a
+           silent bug in source (c) - the record type it had to recognise was
+           rejected by the mod's own sanity check. Build 4.28.0 fixes the
+           report that PLANTS showed the "already surveyed" green before
+           being scanned: the mod had been applying source (c) to plants as
+           well, and a plant's produced item is a plain item (not a level
+           list), so "the resource this plant yields is in your survey data"
+           was mistaken for "this plant has been surveyed". Plants now go
+           through source (a) / (b) only, exactly like the game does.)
            Already-scanned targets use the game's own
            "scanned" state - GREEN, the same colour and slot the game uses
            while the scanner is up; unscanned ones keep the cyan pulse.
-           Scan a deposit, lower the scanner: it turns green within about
-           0.2 s. FloraScannedByResource=0 (or StateFloraScanned=7) brings
+           Scan a plant or a deposit, lower the scanner: it turns green
+           within about 0.2 s. FloraScannedByEngineState=0 (main source off),
+           FloraScannedByResource=0 (chain off) or StateFloraScanned=7 brings
            the old behaviour back without swapping the DLL.
            1.7.6 = fix: scanned planet targets did not turn green.
            The game paints already-scanned planet targets (ores / gas /
@@ -194,15 +206,26 @@ entries live in the manager the game is using right now). The moment you
 put the scanner away they are put back (about 0.8 s), painted in the
 game's own cyan, so planets are readable with or without the scanner.
 Since 1.7.7 that "put back" pass asks the game whether each target has
-been surveyed already: the mod calls the game's own check function (the
-one the vanilla scanner uses) and walks the game's own record chain
-(flora record -> the item it produces -> that item's resource). Targets
-you have already scanned come back GREEN - the exact state and colour the
-game uses while the scanner is up - and unscanned ones stay cyan, so with
-the scanner away you can tell at a glance what is left to survey. Scan
+been surveyed already, using three independent sources (any one is
+enough): the game's own "has this reference been surveyed?" query (the
+native function the game exposes as IsScanned - it answers per reference,
+so plants are covered), the outline state the game itself painted while
+the scanner was up (remembered for the session), and the game's own check
+function plus record chain (flora record -> the item it produces -> that
+item's resource) for the deposits that produce a level list - which is
+what the game itself requires before it walks that chain. Targets you have
+already scanned come back GREEN - the exact state and colour the game uses
+while the scanner is up - and unscanned ones stay cyan, so with the
+scanner away you can tell at a glance what is left to survey. Scan
 something, put the scanner away: it turns green within ~0.2 s.
-FloraScannedByResource=0 (or StateFloraScanned=7) in the INI restores the
-old "all cyan" behaviour. Resources vs. misc items: "resources" (iron, aluminium,
+★ Build 4.28.0 (this package) fixed "plants showed the scanned green
+before being scanned": the record chain had been applied to plants too,
+but a plant's produced item is a plain item (not a level list), so "the
+resource this plant yields is in your survey data" was mistaken for "this
+plant has been surveyed". Plants now use the first two sources only,
+exactly like the game does; ores / gas / liquids are unchanged.
+FloraScannedByEngineState=0 / FloraScannedByResource=0 (or
+StateFloraScanned=7) in the INI restores the old "all cyan" behaviour. Resources vs. misc items: "resources" (iron, aluminium,
 helium-3, organics, ...) are purple, misc items (digipicks, credits,
 toys) are blue. If the resource check ever fails, the log says so and
 everything falls back to the misc color.
@@ -286,11 +309,28 @@ Most useful options:
                         scanned planet targets use state 5 as well (see
                         StateFloraScanned below) - same state, same green,
                         so nothing changes visually.
+  FloraScannedByEngineState=1
+                        main switch: ask the game itself whether a planet
+                        target has been surveyed already (default on,
+                        build 4.28.0). It calls the game's own query (the
+                        native IsScanned) which answers per reference, so it
+                        is correct for plants, ores, gas vents and liquid
+                        pools alike. 0 = only the record-chain check below
+                        is used (plants then lean green - the 4.27.0
+                        behaviour).
   FloraScannedByResource=1
-                        ask the game whether a planet target has been
-                        surveyed already and paint scanned ones green
-                        (default on, 1.7.7). 0 = old behaviour: the whole
-                        flora category uses StateFlora only.
+                        second switch: also walk the game's own record
+                        chain (flora record -> produced level list -> its
+                        item -> that item's resource) and ask the game
+                        whether that resource has entered your survey data.
+                        ★ Since 4.28.0 it only applies to flora that produce
+                        a level list - the ore / gas / liquid deposits -
+                        exactly like the game itself (a plant's produced
+                        item is a plain item, and treating it as if it were
+                        a deposit was the "plants are green before being
+                        scanned" bug). 0 = chain off.
+                        Both switches off = old behaviour: the whole flora
+                        category uses StateFlora only.
   StateFloraScanned=5   state used for already-scanned planet targets
                         (default 5 = the game's own "scanned" green,
                         #27C684). Set it to 7 (= StateFlora) to make
@@ -333,8 +373,8 @@ Most useful options:
                         "scanned" green is preserved since 1.7.6 - that was
                         the state 4 / 5 colour, see the version notes).
                         Since 1.7.7 surveyed targets come back GREEN with
-                        the scanner away too (FloraScannedByResource /
-                        StateFloraScanned below).
+                        the scanner away too (FloraScannedByEngineState /
+                        FloraScannedByResource / StateFloraScanned below).
                         Set it to 0 to leave this category completely to the
                         vanilla scanner (you will only see those targets
                         while the scanner is up), or StateFlora=5 plus
@@ -477,17 +517,32 @@ categories).
     "state=4 覆盖为" / "state=5 覆盖为" line.
 * On a planet with the scanner AWAY, everything is cyan - scanned targets
     do not show green: that is the 1.7.7 behaviour switch. Check the INI for
-    FloraScannedByResource=1 and StateFloraScanned=5 (an INI from 1.7.6 or
-    older does not contain them - the DLL then uses its built-in defaults,
-    so the feature works even without the new keys). In the log look for
-    "flora scanned: ... ready" at startup and the stats line
-    "planet targets ... : 未扫描=... 已扫描=... | 判据: 查询=... 命中=...";
-    "已扫描" (scanned) should grow once you have surveyed something near you.
+    FloraScannedByEngineState=1, FloraScannedByResource=1 and
+    StateFloraScanned=5 (an INI from 1.7.6 or older does not contain them -
+    the DLL then uses its built-in defaults, so the feature works even
+    without the new keys). In the log look for
+    "flora scanned: 主判据就绪 ... (0x1306E80)" / "... ready" at startup and
+    the stats line "planet targets ... : 未扫描=... 已扫描=... | 引擎状态:
+    问=... 已扫描=... ..."; "已扫描" (scanned) should grow once you have
+    surveyed something near you, and "引擎状态" counts the raw answers the
+    game itself gave (1 = not surveyed / 2 = surveyed).
     If "链失败" (chain failures) grows instead, you are most likely running
     the first 1.7.7 build (plugin 4.26.0): its record chain had a silent bug
-    that is fixed in build 4.27.0 (this package), so grab the current file.
+    that is fixed in build 4.27.0, so grab the current file.
     If the current build still shows it, the game's record layout has
     changed - please report that log line plus the "flora probe" lines.
+* On a planet, PLANTS (not ores) are green before you scan them:
+    that was build 4.27.0 and earlier - the record-chain check was applied
+    to plants as well, whose produced item is a plain item instead of a
+    level list, so "the resource this plant yields is already surveyed" was
+    read as "the plant is surveyed". Fixed in build 4.28.0 (this package):
+    plants answer to the game's own per-reference query only, ores / gas /
+    liquids are unchanged. If you still see it, check the log for the probe
+    lines "flora scan: ... 引擎状态=N ..." and the stats segment
+    "| 引擎状态: 问=... 已扫描=...": if the game itself answers 2 (=already
+    surveyed) for a plant you never scanned, please report those lines.
+    Workaround without swapping the DLL: set FloraScannedByEngineState=0
+    (only the record chain is used - plants go back to always cyan).
 * On a planet, ores / gas vents / liquid pools / plants have no colour
     at all: check EnableFlora=1 in your INI (1.7.4 shipped it as 0).
     Those targets are only painted by the vanilla scanner while it is up,
