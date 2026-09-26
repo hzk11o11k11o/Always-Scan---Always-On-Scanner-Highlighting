@@ -708,6 +708,23 @@ namespace SAS
 		//   背景见 SyncNativeOutline 里的「4) 3D 复检」段。每轮最多复检这么多个已挂目标。
 		constexpr std::uint32_t kVerify3DPerScan = 32;
 
+		// ★★★ v4.29：放下扫描仪后的「恢复提速」窗口 —— 治用户实测的
+		//   「**植物和矿石的高亮速度明显低于其他物品**」。
+		//   背景（v4.28 那一局日志 + 代码核对）：
+		//     ① 每次放下扫描仪，引擎都会拆 Monocle HUD（0x17D4B30：销毁 11 个
+		//        HighlightManager + 清表）⇒ `DetectEngineOutlineLoss` 必须把
+		//        **全部已挂目标**（那一局 268 个）转入「待重申」；
+		//     ② 重挂按 `MaxOutlineOpsPerScan`（默认 64）条/轮慢慢做 ⇒ 268 个要
+		//        5 轮 ≈ **1.05 秒**；而「扫完变绿」的状态变化（青 → 绿）也排在
+		//        这条队列里按距离消耗同一份预算 ⇒ 用户感知「植物 / 矿石慢一拍」。
+		//   做法：resync（放下扫描仪 / 管理器数量下跌）之后的 `kResyncBoostMs`
+		//   毫秒内，把每轮预算提到 `kResyncBoostBudget`（宁快勿慢 —— 这段时间
+		//   玩家刚放下扫描仪，正盯着屏幕看高亮回来），并且把「状态变化」的条目
+		//   排到普通重挂之前（见 SyncNativeOutline 的 2.5 步）。
+		//   INI 可回退：`ResyncBoostMs=0` 或 `ResyncBoostBudget=0` = 退回旧行为。
+		constexpr std::uint64_t kResyncBoostMs     = 2500;
+		constexpr std::uint32_t kResyncBoostBudget = 192;
+
 		// ★ v4.7：Tick（主循环任务）间隔超过这么久就记一笔 —— 用来区分
 		//   「扫描没发生」是「Tick 根本没被引擎调用」（暂停 / 载入 / 主线程忙）
 		//   还是「Tick 调了但被早退挡住」。实测里出现过 39 秒一个 scan 都没有的窗口，
@@ -1469,6 +1486,12 @@ namespace SAS
 			//   引擎侧描边是按 3D 图节点登记的，3D 被重建（外景流式加载 / LOD 切换）
 			//   就会丢，而账本还记着「挂着」⇒ 从此不亮。这一项让 MOD 发现后重挂。
 			int           verify3DPerScan = static_cast<int>(kVerify3DPerScan);
+			// ★★★ v4.29：放下扫描仪后的「恢复提速」窗口（治「植物 / 矿石比其它物品慢一拍」）。
+			//   resyncBoostMs = 提速窗口时长（0 = 关掉，退回旧行为）；
+			//   resyncBoostBudget = 窗口内每轮重挂预算（0 = 关掉，用 MaxOutlineOpsPerScan）。
+			//   完整背景见常量区 kResyncBoostMs 的说明。
+			std::uint64_t resyncBoostMs     = kResyncBoostMs;
+			std::uint32_t resyncBoostBudget = kResyncBoostBudget;
 		};
 
 		// ====================================================================
@@ -1535,6 +1558,11 @@ namespace SAS
 			bool          monocleOpen      = false;  // 上一轮 MonocleMenu 是否打开（= 举着扫描仪）
 			std::uint32_t lastLiveManagers = 0;      // 上一轮存活的管理器数（下跌 = 引擎清过表）
 			std::uint64_t outlineResyncs   = 0;      // 自动重挂次数（诊断：应该只在用扫描仪后 +1）
+			// ★★★ v4.29：resync 后的「恢复提速」截止时刻 —— 在这个窗口内
+			//   SyncNativeOutline 用 `ResyncBoostBudget`（默认 192）条/轮重挂，
+			//   免得 268 个目标按 64 条/轮要走 5 轮 ≈ 1 秒（用户感知：
+			//   「植物和矿石的高亮速度明显低于其他物品」）。见常量区 kResyncBoostMs。
+			std::uint64_t resyncBoostUntilMs = 0;
 
 			// --- 节流 / 统计 ---
 			std::uint64_t lastScanMs    = 0;
@@ -3333,6 +3361,11 @@ namespace SAS
 			g_cfg.settleOnCellCrossMs = std::clamp(getInt("SettleOnCellCrossMs", static_cast<int>(kSettleOnCellCrossMs)), 0, 2000);
 			g_cfg.streamJumpTolerance = std::clamp(getInt("StreamJumpTolerance", static_cast<int>(kRefsStreamJumpMax)), 0, 65536);
 			g_cfg.verify3DPerScan     = std::clamp(getInt("Verify3DPerScan", static_cast<int>(kVerify3DPerScan)), 0, 1024);
+			// ★★★ v4.29：放下扫描仪后的「恢复提速」（见常量区 kResyncBoostMs）
+			g_cfg.resyncBoostMs     = static_cast<std::uint64_t>(
+				std::clamp(getInt("ResyncBoostMs", static_cast<int>(kResyncBoostMs)), 0, 30000));
+			g_cfg.resyncBoostBudget = static_cast<std::uint32_t>(
+				std::clamp(getInt("ResyncBoostBudget", static_cast<int>(kResyncBoostBudget)), 0, 4096));
 
 			// --- ★ v4.0：分类分色（每个类别一个 outline 状态 0..11）---
 			//   （★ v4.2 追加 corpse，默认 9 = 与容器同色，理由见 Config::stateByCategory）
@@ -3603,6 +3636,13 @@ namespace SAS
 			REX::INFO("config: exteriorContinuous={} settleOnCellCross={}ms streamJumpTolerance={} verify3DPerScan={}",
 				g_cfg.exteriorContinuous, g_cfg.settleOnCellCrossMs,
 				g_cfg.streamJumpTolerance, g_cfg.verify3DPerScan);
+			// ★★★ v4.29：放下扫描仪后的「恢复提速」—— 治「植物 / 矿石比其它物品慢一拍」。
+			REX::INFO("config: resyncBoost={}ms budget={} -> 放下扫描仪（引擎拆 Monocle HUD 清表）之后的头 {}ms 内，"
+					  "把「全量重挂」的每轮预算从 {} 提到 {} 条，并让「青→绿」这类状态变化**优先**换色"
+					  "（否则那一局 268 个目标要 5 轮 ≈ 1 秒才铺完）；想回退把两项任一设 0",
+				g_cfg.resyncBoostMs, g_cfg.resyncBoostBudget, g_cfg.resyncBoostMs,
+				g_cfg.maxOutlineOpsPerScan,
+				g_cfg.resyncBoostBudget ? std::to_string(g_cfg.resyncBoostBudget) : std::string{ "off" });
 
 			// 分类分色：把「类别 → outline 状态」逐条打出来（调配色时一眼能对上）
 			{
@@ -7631,9 +7671,16 @@ namespace SAS
 
 			// 单轮的引擎调用预算（0 = 不限）。换场景会积压几百条待办，
 			// 一口气做完就是一个可见的长卡顿，所以摊到后面几轮里慢慢做。
-			const auto budgetLimit = g_cfg.maxOutlineOpsPerScan > 0
-			                           ? static_cast<std::uint32_t>(g_cfg.maxOutlineOpsPerScan)
-			                           : 0xFFFFFFFFu;
+			auto budgetLimit = g_cfg.maxOutlineOpsPerScan > 0
+			                     ? static_cast<std::uint32_t>(g_cfg.maxOutlineOpsPerScan)
+			                     : 0xFFFFFFFFu;
+			// ★★★ v4.29：resync（放下扫描仪 / 管理器数量下跌）之后的提速窗口 ——
+			//   见常量区 kResyncBoostMs。窗口内取 min(boost, 原预算) 与原预算的较大者 ⇒
+			//   「预算比 boost 还大」的配置不会被**降低**（只提速、不降速）。
+			if (budgetLimit != 0xFFFFFFFFu && a_nowMs < g_state.resyncBoostUntilMs &&
+				g_cfg.resyncBoostBudget > budgetLimit) {
+				budgetLimit = g_cfg.resyncBoostBudget;
+			}
 			std::uint32_t budget = budgetLimit;
 			g_state.opsThisScan  = 0;
 			g_state.opsDeferred  = 0;
@@ -7688,11 +7735,55 @@ namespace SAS
 				}
 			}
 
-			// ---- 3) 新目标 / 到重申时刻的（同样受预算限制）----
+			// 重挂后「下次重申时刻」的公共计算（2.5 步与第 3 步共用）。
 			// ★ v4.0：状态不再是全局一个 —— 每个候选带自己的 state（分类分色，
 			//   由 Rescan 里的 ClassifyBase + g_cfg.stateByCategory 算好）。
 			const auto reassert = static_cast<std::uint64_t>(g_cfg.reassertMs);
 			const auto nextMs   = reassert ? a_nowMs + reassert : UINT64_MAX;
+
+			// ---- 2.5) ★★★ v4.29：状态变化优先（青 → 绿 / 绿 → 青）----
+			//   背景（用户实测：「植物和矿石的高亮速度明显低于其他物品」）：
+			//   放下扫描仪后，引擎拆表 ⇒ 全部目标转「待重申」；而「刚扫完 ⇒ 青变绿」
+			//   的状态变化也排在**同一条队列**里按距离消耗预算（268 个 / 64 条每轮
+			//   ⇒ 最多约 1 秒）⇒ 用户看到的就是「植物 / 矿石慢一拍才变色」。
+			//   做法：把「挂着但 state 已经不对」的条目**先处理**（它们通常只有
+			//   几个到几十个），让变色不排队。处理完把 reassertMs 复位成 nextMs，
+			//   免得第 3 步把它再摘挂一次（那里的条件会因此不再成立）。
+			{
+				std::uint32_t changed = 0;
+				for (auto* c : a_chosen) {
+					auto it = g_state.outlined.find(c->ref);
+					if (it == g_state.outlined.end() || it->second.dropAt != 0) {
+						continue;  // 没挂过 / 待摘的走第 3 步（新挂 / 不复活）
+					}
+					if (it->second.state == c->state) {
+						continue;  // 状态一致 ⇒ 没什么可优先的
+					}
+					if (budget == 0) {
+						++g_state.opsDeferred;
+						break;
+					}
+					--budget;
+					++g_state.opsThisScan;
+					++changed;
+					UnoutlineRef(c->ref);  // 先摘（否则两个管理器各留一条 = 双层描边）
+					if (OutlineRef(c->ref, c->state)) {
+						it->second.reassertMs = nextMs;
+						it->second.state      = c->state;
+						it->second.cat        = c->cat;
+						it->second.last3D     = RefGet3D(c->ref).get();
+					} else {
+						it = g_state.outlined.erase(it);
+					}
+				}
+				// 只在「优先换色」真的干活且量较大时留一行（免得刷日志）
+				if (changed >= 8) {
+					REX::INFO("native outline: 状态变化优先换色 {} 个（青→绿 / 绿→青不等队列，★ v4.29）",
+						changed);
+				}
+			}
+
+			// ---- 3) 新目标 / 到重申时刻的（同样受预算限制）----
 			PhaseTimer tAdd{ &g_state.tAddMs };
 			for (auto* c : a_chosen) {
 				auto it = g_state.outlined.find(c->ref);
@@ -7895,10 +7986,21 @@ namespace SAS
 				return;
 			}
 			++g_state.outlineResyncs;
+			// ★★★ v4.29：开「恢复提速」窗口 —— 这段时间内每轮预算提到
+			//   resyncBoostBudget（并且在 SyncNativeOutline 里把状态变化排到最前），
+			//   治用户实测的「植物 / 矿石比其它物品慢一拍」。见常量区 kResyncBoostMs。
+			const bool boostOn = g_cfg.resyncBoostMs > 0 && g_cfg.resyncBoostBudget > 0;
+			if (boostOn) {
+				g_state.resyncBoostUntilMs = NowMs() + g_cfg.resyncBoostMs;
+			}
 			REX::INFO("native outline: 引擎侧高亮疑似丢失（{}）-> {} 个已挂目标转入「待重申」"
-					  "（按每轮 {} 条预算重挂，累计 {} 次）",
+					  "（按每轮 {} 条预算重挂，累计 {} 次{}）",
 				a_reason, touched, g_cfg.maxOutlineOpsPerScan,
-				g_state.outlineResyncs);
+				g_state.outlineResyncs,
+				boostOn ? "；未来 " + std::to_string(g_cfg.resyncBoostMs) + "ms 内提速到每轮 " +
+							  std::to_string(g_cfg.resyncBoostBudget) +
+							  " 条 + 状态变化优先（ResyncBoostMs / ResyncBoostBudget）"
+						: std::string{});
 		}
 
 		void DetectEngineOutlineLoss(std::uint64_t a_nowMs)

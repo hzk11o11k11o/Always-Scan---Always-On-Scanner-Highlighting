@@ -3,7 +3,7 @@
  Always-on scanner highlighting for Starfield
 ========================================================================
 
-Version  : 1.7.7  (plugin build 4.28.0)
+Version  : 1.7.7  (plugin build 4.29.0)
            1.7.7 = fix: with the scanner put away, already-scanned planet
            targets (ores / gas / liquids / plants) still showed the
            "not scanned" cyan. 1.7.6 fixed the other half (with the scanner
@@ -27,7 +27,7 @@ Version  : 1.7.7  (plugin build 4.28.0)
            Source (c) only applies to flora that produce a level list - the
            ore / gas / liquid deposits; the game itself checks that same
            record type before walking the chain.
-           (1.7.7 was rebuilt with plugin build 4.28.0. Build 4.27.0 fixed a
+           (1.7.7 was rebuilt with plugin build 4.29.0. Build 4.27.0 fixed a
            silent bug in source (c) - the record type it had to recognise was
            rejected by the mod's own sanity check. Build 4.28.0 fixes the
            report that PLANTS showed the "already surveyed" green before
@@ -35,7 +35,19 @@ Version  : 1.7.7  (plugin build 4.28.0)
            well, and a plant's produced item is a plain item (not a level
            list), so "the resource this plant yields is in your survey data"
            was mistaken for "this plant has been surveyed". Plants now go
-           through source (a) / (b) only, exactly like the game does.)
+           through source (a) / (b) only, exactly like the game does.
+           Build 4.29.0 (this package) makes putting the scanner away much
+           snappier for planet targets. Every time you lower the scanner the
+           game tears its highlight managers down, so the mod has to re-hang
+           every target it keeps lit; that "re-hang" pass was spread out at
+           64 items per frame no matter what, so in a busy scene (268 lit
+           targets in the test session) plants and ores visibly lagged about
+           a second behind everything else - including the "cyan -> green"
+           repaint of something you had just scanned. The first 2.5 s after
+           you lower the scanner now run at a bigger per-frame budget (192),
+           and targets whose colour has to change are repainted before the
+           rest of the queue. Tune or turn off with ResyncBoostMs /
+           ResyncBoostBudget in the INI; no DLL swap needed.)
            Already-scanned targets use the game's own
            "scanned" state - GREEN, the same colour and slot the game uses
            while the scanner is up; unscanned ones keep the cyan pulse.
@@ -203,8 +215,10 @@ cyan / bright green and never turned green), and while you hold the
 scanner up it leaves that whole category alone (no new outlines, no
 refresh, and it does not remove the ones already there, because those
 entries live in the manager the game is using right now). The moment you
-put the scanner away they are put back (about 0.8 s), painted in the
-game's own cyan, so planets are readable with or without the scanner.
+put the scanner away they are put back (well under a second; since build
+4.29.0 the pass runs at a bigger per-frame budget for the first 2.5 s and
+repaints colour changes first), painted in the game's own cyan, so planets
+are readable with or without the scanner.
 Since 1.7.7 that "put back" pass asks the game whether each target has
 been surveyed already, using three independent sources (any one is
 enough): the game's own "has this reference been surveyed?" query (the
@@ -218,7 +232,7 @@ already scanned come back GREEN - the exact state and colour the game uses
 while the scanner is up - and unscanned ones stay cyan, so with the
 scanner away you can tell at a glance what is left to survey. Scan
 something, put the scanner away: it turns green within ~0.2 s.
-★ Build 4.28.0 (this package) fixed "plants showed the scanned green
+★ Build 4.28.0 fixed "plants showed the scanned green
 before being scanned": the record chain had been applied to plants too,
 but a plant's produced item is a plain item (not a level list), so "the
 resource this plant yields is in your survey data" was mistaken for "this
@@ -535,7 +549,7 @@ categories).
     that was build 4.27.0 and earlier - the record-chain check was applied
     to plants as well, whose produced item is a plain item instead of a
     level list, so "the resource this plant yields is already surveyed" was
-    read as "the plant is surveyed". Fixed in build 4.28.0 (this package):
+    read as "the plant is surveyed". Fixed in build 4.28.0:
     plants answer to the game's own per-reference query only, ores / gas /
     liquids are unchanged. If you still see it, check the log for the probe
     lines "flora scan: ... 引擎状态=N ..." and the stats segment
