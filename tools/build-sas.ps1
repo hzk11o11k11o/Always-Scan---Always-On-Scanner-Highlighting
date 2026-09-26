@@ -365,10 +365,23 @@ if (-not $SkipDeploy) {
     #   ② 「1.8.1 随着游戏进行帧数持续降低」⇒ v4.33 起「引擎状态表捡漏」调的
     #      `0x17D5BE0`（Lookup**OrAdd**）会**插入**条目 + 对该 REFR 加引用计数
     #      （每个 flora 引用每次判据未命中一次）⇒ 引擎状态表 / 内存随游玩持续增长。
-    #      v5.1 改成**只读走那棵红黑树**（RVA 0x5949CE0；节点 +0x19 IsNil /
-    #      +0x20 键 / +0x28 值；树头 +0x08 = 条目数），零副作用。
+    #      v5.1 改成**只读走那棵红黑树**（节点 +0x19 IsNil / +0x20 键 / +0x28 值；
+    #      树头 +0x08 = 条目数），零副作用。
     #      统计行新增 `引擎状态表: 条目=N` 可直接看它是否稳定。完整证据见 docs/33。
-    Set-Content -LiteralPath (Join-Path $modRoot 'meta.ini') -Value "[General]`nmodid=18268`nversion=2.1`ncomment=Always-on scanner highlighting (SFSE)" -Encoding UTF8
+    # ★ 2026-09-27（v5.1 修订 / 发布版仍是 **2.0**）：**「少部分扫描后未变色」修复**
+    #   （用户实测报告：两个都扫过的目标，其中一个没变色；低概率偶发）——
+    #   ① ★ 真根因：v5.1 的只读树头 RVA 写成了 **0x5949CE0**（手算 rip 相对地址时
+    #      少看一位；disp 是 4 字节 **0x04764066**，0x17D5C7A + 0x04764066 =
+    #      **0x5F39CE0**）⇒ 探针一直在读一段全 FF 的无关数据（老日志 `条目=
+    #      18446744073709551615` + `读=0` 就是铁证）⇒ 「引擎亲手画过的 4/5」这条
+    #      最硬的证据从未被读到 ⇒ 扫描后只剩主判据（实测 20% 的询问答「0 = 不知道」）
+    #      ⇒ 那一小部分扫过的目标不变绿。
+    #   ② 「青」记忆不再短路主判据 / 资源链（只有「绿」单向短路）⇒ 任何一条
+    #      后来给出「已扫描」都能把它升级成绿。
+    #   ③ 统计行新增 `引擎状态: 未知=`（引擎答 0 的次数）。见 docs/34。
+    #   ★ 用户要求（2026-09-27）：**公开版号保持 2.0、不再自行提升版本号**（等通知）；
+    #     2.1 包已删除；DLL 内部 build 号也保持 5.1.0（日志用 `RVA 0x5F39CE0` 区分）。
+    Set-Content -LiteralPath (Join-Path $modRoot 'meta.ini') -Value "[General]`nmodid=18268`nversion=2.0`ncomment=Always-on scanner highlighting (SFSE)" -Encoding UTF8
 
     Get-ChildItem -LiteralPath $modRoot -Recurse -File | ForEach-Object {
         Write-Host ("  {0}  ({1} bytes)" -f $_.FullName.Substring($modRoot.Length + 1), $_.Length)

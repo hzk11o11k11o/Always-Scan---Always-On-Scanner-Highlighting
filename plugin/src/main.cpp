@@ -213,7 +213,12 @@ SFSE_PLUGIN_LOAD(const SFSE::LoadInterface* a_sfse)
 	SFSE::Init(a_sfse, { .log = false, .logName = kLogName });
 	ApplyLogSizeLimit();
 
-	REX::INFO("SAS_AlwaysScan v5.1.0 loading (SFSE build {})", SFSE::GetSFSEVersion());
+	// ★ 2026-09-27 订正 R1（公开版仍是 2.0，build 号按用户要求不提升）：
+	//   ① 引擎状态表树头 RVA 0x5949CE0 → **0x5F39CE0**（手算 rip 相对地址时少看一位）；
+	//   ② 「青」记忆不再短路主判据 / 资源链（只有「绿」单向短路）。
+	//   这两条一起治「少部分扫描后未变色」—— 启动日志里认这个括号即可确认跑的是订正版。
+	REX::INFO("SAS_AlwaysScan v5.1.0 loading（订正 R1：状态表 0x5F39CE0 + 「青」不短路）(SFSE build {})",
+		SFSE::GetSFSEVersion());
 
 	if (auto* messaging = SFSE::GetMessagingInterface()) {
 		messaging->RegisterListener(OnMessage);

@@ -3,8 +3,9 @@
  Always-on scanner highlighting for Starfield
 ========================================================================
 
-Version  : 2.1  (plugin build 5.1.0)
-           2.1 = two fixes, both from player reports.
+Version  : 2.0  (plugin build 5.1.0)
+           2.0 = the mod brings its own outline colour channels (described
+           below), plus three fixes, all from player reports.
            (1) "Ores and plants are green before *and* after scanning."
                The mod remembers a confirmed "surveyed" verdict so a target
                cannot fall back to cyan (added in 1.7.9 / 1.8.1), but that
@@ -39,8 +40,32 @@ Version  : 2.1  (plugin build 5.1.0)
                count is taken. The periodic log line now also reports the
                table's entry count (`引擎状态表: 条目=N`) so you can watch
                it - it should stay roughly flat no matter how long you play.
-           2.0 = the mod now brings its own outline colour channels instead
-           of borrowing the game's. The game has eleven outline "states"
+           (3) "A few targets stay cyan after you scan them." Fixed
+               2026-09-27. Two things were wrong in the check that decides
+               whether a surveyed target turns green. First, the mod reads
+               the state the game itself painted (green = surveyed) by
+               walking the game's own "reference -> state" table read-only -
+               but it was pointed at the wrong address (the constant was
+               computed one digit short while adding a rip-relative
+               displacement), so that read always came up empty: the
+               periodic log line showed a nonsense entry count
+               (`条目=18446744073709551615`, `读=0`) and the strongest piece
+               of evidence - "the game itself painted this one green" - was
+               never actually used. That left the fallback query, and the
+               game answers "I don't know" (neither surveyed nor not) for
+               about one object in five, so those stayed cyan. Second, a
+               "not surveyed yet" note learned for an object used to end the
+               check right there, so nothing could ever upgrade it later.
+               Both are fixed: the address is corrected (0x5F39CE0, and it
+               cross-checks with the manager array that sits 0x10 further
+               on) and a "not surveyed" note is now a hint only - the game's
+               own query and the survey-data check can still turn the object
+               green, while a confirmed "surveyed" verdict remains one-way.
+               Nothing to configure; the startup log line now says
+               `RVA 0x5F39CE0` and the stats line gained `引擎状态: 未知=N`.
+           Also in 2.0 (the headline feature) - the mod brings its own
+           outline colour channels instead of borrowing the game's.
+           The game has eleven outline "states"
            (0..10); six of them are painted by the game itself while the
            scanner is up (ordinary references such as people, and planet
            targets before / after surveying). Previous releases borrowed
@@ -94,9 +119,9 @@ Version  : 2.1  (plugin build 5.1.0)
            keyed by species, not by save file (simply a colour effect if
            you play several saves); set FloraLearnPersist=0 for
            session-only behaviour, delete the file to reset.
-           (Superseded in 2.1: the memory is now keyed by the individual
+           (Superseded in 2.0: the memory is now keyed by the individual
            reference, so a species surveyed in one save no longer shows
-           green in another. See the 2.1 notes at the top.)
+           green in another. See the 2.0 notes at the top.)
            1.8.0 = the colour classification, final grouping. The set of
            colours and the number of outline states the mod writes are
            unchanged from 1.7.9 - what changed is which categories share

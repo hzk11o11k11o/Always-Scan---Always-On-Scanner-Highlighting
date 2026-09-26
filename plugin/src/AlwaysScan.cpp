@@ -2029,6 +2029,9 @@ namespace SAS
 			std::uint64_t floraEngineStateQueries   = 0;  // 问过几次
 			std::uint64_t floraEngineStateScanned   = 0;  // 其中 = 2（已扫描）
 			std::uint64_t floraEngineStateUnscanned = 0;  // 其中 = 1（未扫描）
+			// ★★★ v5.1.1：其中 = 0 / 非 1 非 2（引擎「不知道」）—— 实测占 ~20%，
+			//   这一档以前在日志里看不见，而它正是「扫过了却说没扫」的那一批。
+			std::uint64_t floraEngineStateUnknown   = 0;
 			// ★★★ v4.31：「低概率变青」修复的两条诊断（都应该在涨 = 修复在干活）
 			std::uint64_t floraLearnedHits   = 0;  // 判据由「单向学习表」直接命中（没重问引擎）
 			std::uint64_t floraStickyKeeps   = 0;  // 重问拿不到权威答案 ⇒ 沿用旧结论（保住绿）
@@ -3840,8 +3843,9 @@ namespace SAS
 				g_cfg.floraUnscannedTtlMs > 0 ? g_cfg.floraUnscannedTtlMs : 30000);
 			//   （这里用字面量 RVA：常量区在文件的后面，见 kRvaOutlineStateTree 那段证据）
 			REX::INFO("config: 星球目标记忆(v5.1) -> 粒度 = **引用**（扫过一个实例不再让同 species / 同资源"
-					  "的所有实例一起变绿）；引擎状态表探针 = **只读走树（RVA 0x5949CE0 + 节点 +0x20/+0x28）**，"
-					  "不再调 LookupOrAdd（那会插入条目 + 对 REFR 加引用计数 ⇒ 玩得越久越卡）");
+					  "的所有实例一起变绿）；引擎状态表探针 = **只读走树（RVA 0x5F39CE0 + 节点 +0x20/+0x28）**，"
+					  "不再调 LookupOrAdd（那会插入条目 + 对 REFR 加引用计数 ⇒ 玩得越久越卡）；"
+					  "「青」记忆只当提示（不再短路主判据 / 资源链，任何一条给出「已扫描」都会升级成绿）");
 			LoadFloraLearnTable();
 
 			REX::INFO("config: radius={:.1f}m targets={} hotkeyVK=0x{:X} startEnabled={}",
@@ -6122,16 +6126,19 @@ namespace SAS
 		// ----------------------------------------------------------------
 		// 证据（1.16.244.0，`tools/re/disasm.py`）：
 		//   · 0x17D5BE0（LookupOrAdd）里树头地址 = `lea rbp,[rip+0x4764066]`
-		//     ⇒ RVA **0x5949CE0**；同一地址在函数开头是 `mov rbx,[rip+0x47640e2]`
+		//     ⇒ RVA **0x5F39CE0**；同一地址在函数开头是 `mov rbx,[rip+0x47640e2]`
 		//     （读 = 取哨兵节点指针）。
 		//   · 节点布局（MSVC _Tree，逐条从 0x17D5BE0 / 0x3222E0 对出来）：
 		//       +0x00 左子 / +0x08 父 / +0x10 右子 / +0x18 颜色 / +0x19 IsNil
 		//       +0x20 键（= TESObjectREFR*）/ +0x28 值（= outline 状态 dword ★ 我们要的）
 		//   · 树头：+0x00 = 哨兵节点指针（哨兵 +0x08 = 根）/ +0x08 = 条目数
-		//     （0x3222E0 = 插入函数，第一条指令就是 `inc qword ptr [rcx+8]`，rcx = 0x5949CE0）。
+		//     （0x3222E0 = 插入函数，第一条指令就是 `inc qword ptr [rcx+8]`，rcx = 0x5F39CE0）。
 		//   · 「查不到就插入」的插入路径在 0x17D5C5C 起：new 0x30 字节节点 →
 		//     `lock xadd [ref+8], 0x80000200001`（对 REFR 做一次**引用计数 ++**）→
 		//     写状态 0 → 插进红黑树。
+		//   · 引擎拆 Monocle HUD（0x17D4B30）时会**清空这张表**：函数尾
+		//     `mov [rip+0x476503f], rbp(=0)` = `树头+0x08 = 0`（条目数归零）+ 哨兵
+		//     三个链接指回自己 ⇒ 「举着扫描仪时有条目、放下就没了」。
 		//
 		// ★★ 为什么必须自己走树、而不是继续调 0x17D5BE0（v5.1 的 FPS 修复核心）：
 		//   0x17D5BE0 的名字就是 Lookup**OrAdd** —— 它会插入。v4.33 起「⓪.5 状态表
@@ -6143,8 +6150,18 @@ namespace SAS
 		//   这两条都会让「玩得越久，引擎越慢」—— 正是用户报告的
 		//   「1.8.1 随着游戏进行帧数持续降低」最可能的来源（v4.33 = 1.8.1）。
 		//   只读走树 = 零副作用（不插入 / 不动引用计数），所以「捡漏」可以一直开着。
+		//
+		// ★★★ 2026-09-27 订正（本轮）：v5.1 的 **0x5949CE0 是手算 rip 相对地址时
+		//   少看了一位**（`[rip+0x4764066]` 的 disp 是 4 字节 = **0x04764066**，
+		//   0x17D5C7A + 0x04764066 = **0x5F39CE0**）。后果：v5.1 的只读探针一直在读
+		//   一段**全 FF 的无关数据**（统计行 `条目=18446744073709551615` + `读=0`
+		//   `绿=0` 就是铁证）⇒ 「引擎亲手画过的 4/5」这条最硬的证据在 v5.1 里
+		//   **从未被读到过** ⇒ 扫描完的植物 / 矿脉有 ~20% 只能靠主判据
+		//   （GetOutlineState 会答 0/1）⇒ 用户看到的「少部分扫描后未变色」。
+		//   ★ 交叉验证：管理器数组 `kRvaOutlineManagers = 0x5F39CF0` = 树头 + 0x10
+		//     （= 8 字节 _Myhead + 8 字节 _Mysize）—— 两个常量正好相邻，自洽。
 		// ================================================================
-		constexpr std::uintptr_t kRvaOutlineStateTree      = 0x5949CE0;
+		constexpr std::uintptr_t kRvaOutlineStateTree      = 0x5F39CE0;
 		constexpr std::size_t    kOffStateTreeNodeLeft     = 0x00;
 		constexpr std::size_t    kOffStateTreeNodeRight    = 0x10;
 		constexpr std::size_t    kOffStateTreeNodeIsNil    = 0x19;
@@ -7388,33 +7405,32 @@ namespace SAS
 			//   1) 「已扫描」：权威确认过 ⇒ 直接返回，不再重问引擎、也不再走链
 			//      （「低概率变青」的根治：引擎有时会「拿不到 / 答未扫描」，
 			//       而重问会把上次的结论推翻）；
-			//   2) 「未扫描」：只信「引擎亲手画过 7/8」这一条 —— 引擎那次**明确**
-			//      把它当未扫描目标画过，就没必要每几秒再问一次。
+			//   2) 「未扫描」（青）：**只是提示，不再短路**（★★ v5.1.1 订正）。
+			//      v5.1 原本在这里直接 `return false` —— 而这条「青」记忆只有
+			//      「引擎亲手画过 7/8」一个来源（= 举着扫描仪时被我们探针看到），
+			//      一旦记下就**再也不会被主判据 / 资源链翻案** ⇒ 玩家随后真的扫了它，
+			//      只要探针没赶上引擎写 4/5 的那一小段窗口，它就**永远停在青色**
+			//      （用户报告：「少部分扫描后未变色」）。现在「青」只当提示：
+			//      继续往下走 ⓪.5（引擎状态表只读探针）→ ① 主判据 → ② 资源链，
+			//      任何一条给出「已扫描」都会把它升级成绿（绿仍然单向、不会被翻回）。
 			//   ★ 粒度 = **引用**（+ base 校验）：同 base 的其它实例**不受影响** ——
 			//     v4.31~v5.0 记的是 base，那会让整片同 species / 同资源一起变绿。
 			if (a_ref) {
 				bool knownGreen = false;
-				if (FloraRefKnown(a_ref, fid, &knownGreen)) {
+				if (FloraRefKnown(a_ref, fid, &knownGreen) && knownGreen) {
 					++g_state.floraRefHits;
-					if (knownGreen) {
-						++g_state.floraScanHits;
-						++g_state.floraLearnedHits;
-					}
+					++g_state.floraScanHits;
+					++g_state.floraLearnedHits;
 					g_state.floraScannedCache.emplace(a_ref,
-						State::FloraScanRec{ knownGreen, now, fid,
-							static_cast<std::uint8_t>(knownGreen ? 4 : 3) });
+						State::FloraScanRec{ true, now, fid, 4 });
 					if (g_cfg.floraScanProbeMax > 0 &&
 						g_state.floraScanProbes < static_cast<std::uint32_t>(g_cfg.floraScanProbeMax)) {
 						++g_state.floraScanProbes;
 						REX::INFO("flora scan: ref=0x{:X} base=0x{:X} 判据 = 按引用记忆（★ v5.1）"
-								  "-> {} ⇒ 状态 {}（{}）",
-							a_ref->GetFormID(), fid,
-							knownGreen ? "已扫描" : "未扫描",
-							knownGreen ? FloraScannedState()
-									   : g_cfg.stateByCategory[static_cast<std::size_t>(Category::kFlora)],
-							knownGreen ? "原版「已扫描」绿" : "原版「未扫描」青色脉冲");
+								  "-> 已扫描 ⇒ 状态 {}（原版「已扫描」绿）",
+							a_ref->GetFormID(), fid, FloraScannedState());
 					}
-					return knownGreen;
+					return true;
 				}
 			}
 
@@ -7426,24 +7442,24 @@ namespace SAS
 			if (a_ref) {
 				ProbeFloraEngineState(a_ref, a_base);
 				bool greenKnown = false;
-				if (FloraRefKnown(a_ref, fid, &greenKnown)) {
-					// 探针刚按**这个引用**记下的结论（4/5 ⇒ 绿；7/8 ⇒ 青）
-					if (greenKnown) {
-						++g_state.floraStatusTableHits;
-						++g_state.floraScanHits;
-						++g_state.floraLearnedHits;
-						if (g_cfg.floraScanProbeMax > 0 &&
-							g_state.floraScanProbes < static_cast<std::uint32_t>(g_cfg.floraScanProbeMax)) {
-							++g_state.floraScanProbes;
-							REX::INFO("flora scan: ref=0x{:X} base=0x{:X} 判据 = 引擎状态表捡漏"
-									  "（引擎亲手画过 state 4/5）-> 已扫描 ⇒ 状态 {}（原版「已扫描」绿）",
-								a_ref->GetFormID(), fid, FloraScannedState());
-						}
+				// ★★ v5.1.1：这里同样**只让「绿」短路**。v5.1 的写法是
+				//   「只要记忆里有结论（含「青」）就 return」—— 而记忆里的「青」
+				//   可能是很久以前探针记下的（此刻引擎表里早就没有它了），
+				//   于是每一轮都在这里被它挡住，① 主判据 / ② 资源链永远跑不到。
+				if (FloraRefKnown(a_ref, fid, &greenKnown) && greenKnown) {
+					++g_state.floraStatusTableHits;
+					++g_state.floraScanHits;
+					++g_state.floraLearnedHits;
+					if (g_cfg.floraScanProbeMax > 0 &&
+						g_state.floraScanProbes < static_cast<std::uint32_t>(g_cfg.floraScanProbeMax)) {
+						++g_state.floraScanProbes;
+						REX::INFO("flora scan: ref=0x{:X} base=0x{:X} 判据 = 引擎状态表捡漏"
+								  "（引擎亲手画过 state 4/5）-> 已扫描 ⇒ 状态 {}（原版「已扫描」绿）",
+							a_ref->GetFormID(), fid, FloraScannedState());
 					}
 					g_state.floraScannedCache.emplace(a_ref,
-						State::FloraScanRec{ greenKnown, now, fid,
-							static_cast<std::uint8_t>(greenKnown ? 5 : 3) });
-					return greenKnown;
+						State::FloraScanRec{ true, now, fid, 5 });
+					return true;
 				}
 			}
 
@@ -7458,6 +7474,12 @@ namespace SAS
 					++g_state.floraEngineStateScanned;
 				} else if (engineState == 1) {
 					++g_state.floraEngineStateUnscanned;
+				} else {
+					// ★★★ v5.1.1：引擎「不知道」（反汇编 0x1306E80 里有这条路径：
+					//   组件缺失 + 玩家知识库查不到 ⇒ 返回 **0**）。实测占约 20%，
+					//   老日志里这一档是「问=833 已扫描=7 未扫描=655」那 171 个差额。
+					//   它只能当「没有权威答案」，绝不能被当成「已扫描」反推。
+					++g_state.floraEngineStateUnknown;
 				}
 				if (engineState == kScannableStateScanned) {
 					++g_state.floraScanHits;
@@ -9955,7 +9977,7 @@ namespace SAS
 				//       链失败在涨 = 我们那条 FLOR → LVLI → MISC → IRES 链又对不上了
 				//       （日志里有 `flora scan:` 细节行 + 一条 WARN）。
 				REX::INFO("  planet targets (窗口内): 未扫描={} 已扫描={} | 判据: 查询={} 命中={} 链失败={} 缓存={} 偏移=0x{:X}/0x{:X} "
-						  "| 引擎状态: 问={} 已扫描={} 未扫描={} | 按引用记忆(★v5.1): 命中={} 绿={} 青={} 总量={} "
+						  "| 引擎状态: 问={} 已扫描={} 未扫描={} 未知={} | 按引用记忆(★v5.1): 命中={} 绿={} 青={} 总量={} "
 						  "| 引擎状态表: 条目={} 读={} 绿={} 青={} 无条目={} "
 						  "| 学习表: 沿用={} 捡漏={} 落盘={} 写入={} 旧格式忽略={}"
 						  "（★ v5.1：按引用记忆 = 记忆粒度是引用（不再外溢到同 base）；"
@@ -9968,7 +9990,7 @@ namespace SAS
 					g_state.floraScanShapeFails, g_state.floraScannedCache.size(),
 					g_floraProduceOff, g_floraResArrayOff,
 					g_state.floraEngineStateQueries, g_state.floraEngineStateScanned,
-					g_state.floraEngineStateUnscanned,
+					g_state.floraEngineStateUnscanned, g_state.floraEngineStateUnknown,
 					g_state.floraRefHits, g_state.floraRefGreenNew, g_state.floraRefCyanNew,
 					g_state.floraRefKnow.size(),
 					OutlineStateTableCount(),
