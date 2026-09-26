@@ -350,7 +350,14 @@ if (-not $SkipDeploy) {
     #   ③ 「沿用旧结论」条件订正（植物 produceIsMisc 时 shapeOk=true ⇒
     #      v4.31 的条件对植物永远不成立）+ 未扫描缓存 TTL 5 秒（FloraUnscannedTtlMs）
     #      + 判据未命中时「引擎状态表捡漏」（读引擎留下的 4/5）。见 docs/31。
-    Set-Content -LiteralPath (Join-Path $modRoot 'meta.ini') -Value "[General]`nmodid=18268`nversion=1.8.1`ncomment=Always-on scanner highlighting (SFSE)" -Encoding UTF8
+    # ★ 2026-09-26（v5.0 / 发布版 2.0）：**完全自建颜色通道**（用户：
+    #   「原版引擎颜色只有 11 条通道，导致很多限制和不安全性 ⇒ 研究完全自建」）
+    #   —— 引擎的 11 条限制只在「状态表 → 管理器」层；渲染层是两张按 id 动态增长的
+    #   存储（manager_id→32B 参数 / ref_id→manager_id）。v5.0 自己调管理器 ctor
+    #   （0x6532F0）建 13 条通道 + 复刻引擎的 3D 图 visitor 挂/摘，
+    #   **不写状态表、不覆盖引擎配色块** ⇒ 原版颜色 100% 原版、类别颜色互不干扰。
+    #   INI `ChannelMode=1`（默认）；失败自动回退旧路径。完整逆向见 docs/32。
+    Set-Content -LiteralPath (Join-Path $modRoot 'meta.ini') -Value "[General]`nmodid=18268`nversion=2.0`ncomment=Always-on scanner highlighting (SFSE)" -Encoding UTF8
 
     Get-ChildItem -LiteralPath $modRoot -Recurse -File | ForEach-Object {
         Write-Host ("  {0}  ({1} bytes)" -f $_.FullName.Substring($modRoot.Length + 1), $_.Length)

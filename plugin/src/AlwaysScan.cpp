@@ -1388,6 +1388,21 @@ namespace SAS
 			// ⇒ INI `NoFill=0` 一键退回 v4.19 的「补 0xFF（实心填充）」行为。
 			bool noFill = true;
 
+			// ================================================================
+			// ★★★ v5.0：**完全自建颜色通道**总开关（默认 1 = 开）
+			// ----------------------------------------------------------------
+			// 1 = 走自建通道（docs/32）：13 条自建 HighlightManager 各自一份 32 字节
+			//     参数；**不写引擎状态表、不覆盖引擎配色块** ⇒ 原版扫描仪 / NPC /
+			//     星球目标的颜色 100% 原版；类别配色互不干扰（不再并组 / 让位）。
+			// 0 = 完全回到 v4.33 的旧路径（state 覆盖；回退用，一行 INI 切换）。
+			// ★ 自建通道不可用时（引擎版本变化导致签名不符 / 模板标定失败）会
+			//   **自动回退旧路径**并打 WARN —— 不需要手动改这个键。
+			// ================================================================
+			bool channelMode = true;
+			// 「植物已扫描」通道的颜色（kColorUnset = 内置原版绿 #27C684）。
+			// 只影响自建通道模式（旧路径下「已扫描植物」用 StateFloraScanned）。
+			std::uint32_t colorFloraScanned = kColorUnset;
+
 			// ★ v4.19：诊断探针 —— 把「渲染侧实际收到的每状态参数块」打进日志
 			//   （含**基色**= 真正画出来的颜色）。每个会话最多 3 次、只读、带指针校验。
 			//   排「颜色没生效」时非常有用；不想要噪音就写 `RendererProbe=0`。
@@ -1624,6 +1639,11 @@ namespace SAS
 			//   槽位，漏保护 = 放下扫描仪后 MOD 会把引擎刚挂的那条摘掉）。
 			//   ⇒ 改成按类别判断，与状态取值彻底解耦。
 			std::uint8_t                     cat        = 0xFF;
+			// ★★★ v5.0：自建颜色通道号（ChannelMode=1 时用；见 docs/32）。
+			//   0..kCategoryCount-1 = 类别通道；kCategoryCount = 「植物已扫描」通道。
+			//   通道模式下 `state` 不再参与挂载/比较/摘除（那三项都看 channel），
+			//   只保留给「让位 / 日志」等旧语义。
+			std::uint32_t                    channel    = 0xFFFFFFFFu;
 		};
 
 		struct State
@@ -3646,6 +3666,33 @@ namespace SAS
 				}
 				REX::INFO("config: colorOverride（实际生效）: {}",
 					colorLog.empty() ? "（无 —— 全部用引擎原生配色）" : colorLog);
+			}
+
+			// ★★★ v5.0：完全自建颜色通道（总开关 + 「植物已扫描」通道色；见 docs/32）
+			g_cfg.channelMode = getInt("ChannelMode", 1) != 0;
+			{
+				char hex[32]{};
+				::GetPrivateProfileStringA("General", "ColorFloraScanned", "", hex, sizeof(hex), ini);
+				char* p = hex;
+				if (*p == '#') {
+					++p;
+				}
+				if (*p != '\0') {
+					char*        end = nullptr;
+					const auto   v   = std::strtoul(p, &end, 16);
+					if (end == p || v > 0xFFFFFFu) {
+						REX::WARN("config: ColorFloraScanned='{}' 解析失败（要 6 位十六进制）-> 用内置绿 #27C684", p);
+					} else {
+						g_cfg.colorFloraScanned = static_cast<std::uint32_t>(v) & 0xFFFFFFu;
+					}
+				}
+				REX::INFO("config: channelMode={} -> {}",
+					g_cfg.channelMode,
+					g_cfg.channelMode
+						? "★ v5.0 自建颜色通道：13 条独立通道（不写状态表 / 不覆盖引擎配色块；"
+						  "原版扫描仪 / NPC / 星球目标颜色 100% 原版）；"
+						  "引擎签名不符或模板标定失败时自动回退旧路径"
+						: "旧路径（v4.33 行为：借 state 槽位 + 覆盖引擎配色块）");
 			}
 
 			// --- ★★ v4.20：覆盖不透明度（AlphaXxx，0~255；0 = 保留引擎原值）---
@@ -6006,6 +6053,9 @@ namespace SAS
 			// ★ v4.0：这个目标该用哪个 outline 状态（= 分类分色），由 ClassifyBase 决定
 			std::uint32_t      state = 0;
 			std::uint8_t       cat   = 0;  // Category（诊断：分类命中数）
+			// ★★★ v5.0：自建通道号（ChannelMode=1 时用；旧路径忽略）。
+			//   = 该目标该挂到哪条自建颜色通道（见 docs/32 与 EnsureChannels）。
+			std::uint32_t      channel = 0;
 		};
 
 		// ====================================================================
@@ -6192,6 +6242,48 @@ namespace SAS
 		//   0x17D47B0 的建表循环也是 `mov r12d, 0xB`。所以 11 = 全部。
 		constexpr std::uint32_t kOutlineStateNone = 12;
 
+		// ================================================================
+		// ★★★ v5.0：完全自建颜色通道（完整逆向 / 方案 / 验收见 docs/32）★★★
+		// ----------------------------------------------------------------
+		// 一句话：引擎的「11 条通道」只存在于「状态表 → 管理器」这一层路由上；
+		//   真正画描边的渲染层是**两张按 id 动态增长的存储表**：
+		//       H+0xE8 → 存储 A：manager_id → 32 字节参数（颜色/脉冲/系数）★ 画出来的颜色
+		//       H+0xF0 → 存储 B：ref_id     → manager_id（4 字节）      ★ 这个 ref 用哪套参数
+		//   （H = [RVA 0x59751E8]；两个存储的 +0x2C8 = idTab、+0x3C8 = 数据数组，
+		//     EnsureSlot 0x2936540 / 0x2910480 都是池化动态分配，没有任何 11 项检查。）
+		//
+		//   ⇒ 自己调管理器 ctor（0x6532F0）就能创建**任意多条**独立通道：
+		//       对象内部：vtable / +0x18 内嵌哈希表 / +0x40 = 全局句柄 id（0x7CB120 分配）
+		//       ctor 末尾自动把 32 字节参数注册进存储 A（0x653850）。
+		//     挂载完全复刻引擎 Set 内部（0x17D4CD0）的 3D 图 visitor：
+		//       visitor{vtbl=0x4B2FA10, data=&{mgr, mgr->0x40}} + 0x24181E0（递归遍历）
+		//         → 0x653DD0：写存储 B（0x653A50）+ 管理器内嵌哈希表插入
+		//       visitor{vtbl=0x4B2F9F0, data=&mgr} + 0x24181E0（递归遍历）
+		//         → 0x653F60：Remove(map,&id) → Deactivate(0x653040)（清存储 B）
+		//     ★ 两个 visitor 的 data 语义**不同**（挂上 = {mgr,id} 值本身；
+		//       摘除 = &mgr（先解引用一次才是管理器）—— v2.3 起代码里就是这么用的，本轮坐实）。
+		//
+		//   全程**不写状态表**（LookupOrAdd/Set 一个字节不动）、**不碰引擎配色块** ⇒
+		//   原版扫描仪 / NPC / 星球目标颜色 100% 原版；引擎清表（0x17D4B30）也碰不到我们
+		//   （自建管理器不在 g_outlineManagers 数组里、ref 不在状态表里）。
+		// ================================================================
+		constexpr std::uintptr_t kRvaOutlineHost       = 0x59751E8;  // void** → 高亮宿主 H
+		constexpr std::size_t    kOffHostParamStore    = 0xE8;       // H+0xE8 = 存储 A 对象
+		constexpr std::size_t    kOffStoreIdTab        = 0x2C8;      // store+0x2C8 = u32*（id→槽号）
+		constexpr std::size_t    kOffStoreData         = 0x3C8;      // store+0x3C8 = u8*（数据数组）
+		constexpr std::size_t    kChannelParamBytes    = 0x20;       // 存储 A 每槽 32 字节
+		constexpr std::uintptr_t kRvaChannelMgrCtor    = 0x6532F0;   // HighlightManager*(mem, &params32)
+		constexpr std::uintptr_t kRvaChannelMountVisor = 0x4B2FA10;  // 挂上 visitor vtable
+		constexpr std::uintptr_t kRvaChannelMountCb    = 0x653FC0;   // 挂上回调（add rcx,8; jmp 0x653DD0）
+		constexpr std::uintptr_t kRvaChannelDeactVtCf  = 0x653F60;   // 摘除回调（已有 vtable 0x4B2F9F0）
+		constexpr std::uint32_t  kChannelMgrBytes      = 0x48;       // 管理器对象大小（与 0x17D47B0 一致）
+		// 32 字节参数块里的两个颜色 dword（布局见 docs/32 §2.3）：
+		constexpr std::size_t    kOffChannelBaseColor  = 0x00;       // 基色（★ 真正画出来的颜色）
+		constexpr std::size_t    kOffChannelPulseColor = 0x08;       // 脉冲色
+		// 通道数 = 12 个类别各一条 + 1 条「植物已扫描」（青 / 绿两态各一条）。
+		constexpr std::size_t    kChannelCount         = kCategoryCount + 1;
+		constexpr std::size_t    kChannelFloraScanned  = kCategoryCount;
+
 		// 函数首 16 字节签名 —— 游戏版本一变，RVA 就不再可靠，这里直接拦下来。
 		constexpr std::uint8_t kSigOutlineLookupOrAdd[16] = {
 			0x48, 0x89, 0x5C, 0x24, 0x08, 0x48, 0x89, 0x6C, 0x24, 0x10, 0x48, 0x89, 0x74, 0x24, 0x18, 0x57
@@ -6212,6 +6304,11 @@ namespace SAS
 		// void Deactivate(std::uint32_t id)
 		constexpr std::uint8_t kSigOutlineDeactivate[16] = {
 			0x48, 0x83, 0xEC, 0x28, 0x81, 0xF9, 0xFF, 0xFF, 0xFF, 0x00, 0x74, 0x40, 0x4C, 0x8B, 0x0D, 0x25
+		};
+		// ★ v5.0：HighlightManager ctor（`HighlightManager*(mem, &params32)`）首 16 字节签名。
+		//   这是「自建颜色通道」的入口函数（见 docs/32 §2.3）。
+		constexpr std::uint8_t kSigChannelMgrCtor[16] = {
+			0x48, 0x89, 0x5C, 0x24, 0x18, 0x48, 0x89, 0x4C, 0x24, 0x08, 0x55, 0x56, 0x57, 0x48, 0x83, 0xEC
 		};
 
 		using OutlineLookupOrAdd_t = std::uint32_t* (*)(void*, RE::TESObjectREFR**);
@@ -6241,6 +6338,31 @@ namespace SAS
 		OutlineVisit_t        g_outlineVisit        = nullptr;
 		std::uintptr_t        g_outlineRemoveVisorVt = 0;
 		bool                  g_outlineGraphRemoveReady = false;
+
+		// ================================================================
+		// ★★★ v5.0：自建颜色通道的运行时状态（见 docs/32）
+		// ----------------------------------------------------------------
+		// 管理器对象用**插件静态内存**（0x48 × 13 = 936 字节）：
+		//   · 引擎只在 ctor / 挂载 / 摘除时写对象内部（全部 ≤0x48 字节）；
+		//   · 引擎的销毁路径（0x17D4B30）只遍历它自己的 11 个数组槽 ⇒ 永远不会 free 这块；
+		//   · 我们不销毁 ⇒ 不需要引擎的 operator new/delete 配对（也就不依赖分配器 RVA）。
+		// ★ 数组必须是**地址稳定**的固定大小：摘除 visitor 的 data 需要 `&slot`
+		//   （管理器指针的地址）—— 用 vector 扩容搬走就越界了。
+		// ================================================================
+		alignas(16) std::uint8_t g_channelMgrMem[kChannelCount][kChannelMgrBytes]{};
+		struct ChannelSlot
+		{
+			void*         mgr   = nullptr;    // 自建 HighlightManager（= g_channelMgrMem[i]）
+			std::uint32_t mgrId = 0xFFFFFFu;  // 全局句柄 id（ctor 写在 mgr+0x40）
+		};
+		ChannelSlot   g_channels[kChannelCount]{};
+		bool          g_channelsReady  = false;  // 13 条全部建好（通道模式才挂载）
+		bool          g_channelsFailed = false;  // 模板标定失败（只报一次；自动回退旧路径）
+		std::uint32_t g_channelRetries = 0;      // 模板重试轮数（防死循环刷日志）
+		// `HighlightManager* ctor(void* mem, void* params32)`（0x6532F0）
+		using ChannelMgrCtor_t = void* (*)(void*, void*);
+		ChannelMgrCtor_t g_channelMgrCtor = nullptr;
+		std::uintptr_t   g_channelMountVisorVt = 0;  // 挂上 visitor vtable（0x4B2FA10）
 
 		// ================================================================
 		// ★★★ v4.25：星球目标「已经扫描过吗」—— **直接问引擎**（唯一权威来源）
@@ -7301,6 +7423,34 @@ namespace SAS
 					visorVtOk ? "ok" : "bad-vtbl",
 					g_outlineUnhighlightReady ? "ok" : "unavailable");
 			}
+
+			// ★★★ v5.0：自建颜色通道的两个前置（见 docs/32）——
+			//   ① 管理器 ctor `0x6532F0`：按首 16 字节签名核对；
+			//   ② 「挂上」visitor vtable `0x4B2FA10`：+0x08 / +0x10 两个槽必须都指向
+			//      回调 `0x653FC0`（= `add rcx,8; jmp 0x653DD0`）。
+			//   （摘除 visitor vtable `0x4B2F9F0` 已在上面校验过。）
+			//   两者任一不可用 ⇒ ChannelMode 自动回退旧路径（只少一种模式，不影响功能）。
+			const auto addrMgrCtor      = base + kRvaChannelMgrCtor;
+			const auto addrMountVisorVt = base + kRvaChannelMountVisor;
+			bool       mountVisorOk     = false;
+			if (IsReadable(reinterpret_cast<const void*>(addrMountVisorVt), 0x18)) {
+				const auto* vt = reinterpret_cast<const std::uintptr_t*>(addrMountVisorVt);
+				mountVisorOk = (vt[1] == base + kRvaChannelMountCb) &&
+				               (vt[2] == base + kRvaChannelMountCb);
+			}
+			const bool ctorOk = SigMatches(addrMgrCtor, kSigChannelMgrCtor);
+			if (ctorOk && mountVisorOk) {
+				g_channelMgrCtor      = reinterpret_cast<ChannelMgrCtor_t>(addrMgrCtor);
+				g_channelMountVisorVt = addrMountVisorVt;
+				REX::INFO("channel: 自建颜色通道就绪 —— mgrCtor=+0x{:X} mountVtbl=+0x{:X}（sig verified）",
+					kRvaChannelMgrCtor, kRvaChannelMountVisor);
+			} else {
+				g_channelMgrCtor = nullptr;
+				REX::WARN("channel: 自建颜色通道不可用（mgrCtor={} mountVtbl={}）"
+						  "-> ChannelMode 自动回退旧路径（state 覆盖）",
+					ctorOk ? "ok" : "sig-mismatch",
+					mountVisorOk ? "ok" : "bad-vtbl");
+			}
 			// ★★★ v4.25：星球目标「已扫描」判据用的那个引擎函数
 			//   （0x1597A50 =「这个 BGSResource 已经扫描过（进了勘测数据）？」）。
 			//   它被引擎自己的扫描求值函数 `0x159ED90` 调用（`0x159F54E`），因此语义
@@ -7700,6 +7850,15 @@ namespace SAS
 		//     颜色参数是「挂的时候读一次」（0x17D4CD0），不重挂就还是旧色。
 		void ApplyColorOverrides(const char* a_tag)
 		{
+			// ★★★ v5.0：通道模式下**不写引擎配色块**（颜色只进自建通道的 32B 参数）。
+			//   注意：`g_channelsFailed`（模板标定失败）后自动落到旧路径 —— 那时
+			//   这一层会照常覆盖（功能不丢，只是回到 v4.33 行为）。
+			if (g_cfg.channelMode && !g_channelsFailed) {
+				REX::INFO("outline colors[{}]: ChannelMode=1 -> 跳过引擎配色覆盖"
+						  "（自建通道用自己的参数块，原版配色一个字节不动）",
+					a_tag);
+				return;
+			}
 			const auto applied = WriteColorOverrides(a_tag);
 			if (applied == 0) {
 				return;
@@ -7890,6 +8049,264 @@ namespace SAS
 			return true;
 		}
 
+		// ====================================================================
+		// ★★★ v5.0：完全自建颜色通道（完整逆向 / 方案 / 验收见 docs/32）★★★
+		// --------------------------------------------------------------------
+		// 与旧路径（状态表 + 引擎配色块覆盖）完全平行的一套挂载/摘除：
+		//   · 通道 = 一个自建 HighlightManager（ctor 0x6532F0）+ 一份 32 字节参数；
+		//   · 挂载 = 复刻 0x17D4CD0 的「挂上」visitor（vtable 0x4B2FA10）；
+		//   · 摘除 = 复刻 0x17D4CD0 开头的「摘除」visitor（vtable 0x4B2F9F0）；
+		//   · **不写状态表、不碰引擎配色块** ⇒ 原版颜色 100% 不受影响。
+		// ====================================================================
+
+		// 通道 i 的最终颜色（0xRRGGBB）：
+		//   ① INI `ColorXxx`（!= kColorUnset）优先；
+		//   ② 否则用内置通道默认表（= v4.32 分组配色的「观感」逐项固化）。
+		constexpr std::uint32_t kChannelColorDef[kCategoryCount] = {
+			0x1F8EE2u,  // kLoot        杂项 —— 原版蓝
+			0xFF2E2Eu,  // kLootWeapon  武器 / 投掷物 —— 红
+			0xFF2E2Eu,  // kLootApparel 太空服 / 背包 / 头盔 / 服饰 —— 红（与武器同组）
+			0x27C684u,  // kLootAmmoAid 弹药 / 救援 —— 原版绿
+			0xB36BFFu,  // kLootNote    笔记 —— 紫
+			0xB36BFFu,  // kLootResource 资源 —— 紫（与笔记同组）
+			0xFF9500u,  // kContainer   容器 —— 橙
+			0x27C684u,  // kDevice      设备 —— 原版绿
+			0xFFFFFFu,  // kDoor        门 —— 白
+			0x72E8FFu,  // kFlora       植物 / 矿脉（未扫描）—— 原版青脉冲的脉冲色
+			0x1F8EE2u,  // kOther       MSTT（默认关）—— 与杂项同蓝
+			0xFF9500u,  // kCorpse      尸体 —— 橙（与容器同色）
+		};
+
+		std::uint32_t ChannelColorFor(std::size_t a_ch)
+		{
+			if (a_ch == kChannelFloraScanned) {
+				// 「植物已扫描」：INI ColorFloraScanned 优先，否则原版绿。
+				return g_cfg.colorFloraScanned != kColorUnset
+				         ? (g_cfg.colorFloraScanned & 0xFFFFFFu)
+				         : 0x27C684u;
+			}
+			if (a_ch >= kCategoryCount) {
+				return 0xFFFFFFu;
+			}
+			const auto ov = g_cfg.colorOverride[a_ch];
+			return (ov != kColorUnset) ? (ov & 0xFFFFFFu) : kChannelColorDef[a_ch];
+		}
+
+		// 从引擎 state 0 的管理器读 32 字节参数作为模板（颜色之外的系数 = 引擎值）。
+		bool ReadChannelParamTemplate(std::uint8_t* a_out)
+		{
+			const auto base = ModuleBase();
+			if (!base) {
+				return false;
+			}
+			auto* hostSlot = reinterpret_cast<void**>(base + kRvaOutlineHost);
+			if (!IsReadable(hostSlot, sizeof(void*)) || !*hostSlot) {
+				return false;
+			}
+			auto* host = *hostSlot;
+			if (!IsReadable(host, kOffHostParamStore + sizeof(void*))) {
+				return false;
+			}
+			auto* store = *reinterpret_cast<void**>(static_cast<std::uint8_t*>(host) + kOffHostParamStore);
+			if (!store || !IsReadable(store, kOffStoreData + sizeof(void*))) {
+				return false;
+			}
+			auto* idTab = *reinterpret_cast<std::uint32_t**>(static_cast<std::uint8_t*>(store) + kOffStoreIdTab);
+			auto* data  = *reinterpret_cast<std::uint8_t**>(static_cast<std::uint8_t*>(store) + kOffStoreData);
+			if (!idTab || !data) {
+				return false;
+			}
+			const auto mgrAddr = OutlineManagerFor(0);  // uintptr_t（0 = 不存在）
+			if (!mgrAddr || !IsReadable(reinterpret_cast<const void*>(mgrAddr), kChannelMgrBytes)) {
+				return false;
+			}
+			const auto id = *reinterpret_cast<const std::uint32_t*>(mgrAddr + 0x40);
+			if (id == 0xFFFFFFu || (id & 0xFFFFFFu) >= 0xCBF00u) {
+				return false;
+			}
+			if (!IsReadable(idTab + id, sizeof(std::uint32_t))) {
+				return false;
+			}
+			const auto slot = idTab[id];
+			if (slot == 0) {
+				return false;  // 尚未注册参数（正常不会发生：ctor 末尾就注册）
+			}
+			auto* const src = data + static_cast<std::uint64_t>(slot) * kChannelParamBytes;
+			if (!IsReadable(src, kChannelParamBytes)) {
+				return false;
+			}
+			std::memcpy(a_out, src, kChannelParamBytes);
+			return true;
+		}
+
+		// 通道模式是否「该走通道」：INI 开 + 引擎函数都就绪 + 没判定失败。
+		bool ChannelsWanted()
+		{
+			return g_cfg.channelMode && g_channelMgrCtor && g_channelMountVisorVt &&
+			       g_outlineVisit && g_state.nativeReady && !g_channelsFailed;
+		}
+
+		// 账本（g_state.outlined）里「这条高亮挂在哪」的比较键：
+		//   通道模式（已建好）= 通道号；旧路径 = state。
+		//   ★ g_channelsReady 一旦为 true 就不会回退（g_channelsFailed 只在建好前发生），
+		//     所以同一会话内键的语义是稳定的。
+		bool ChannelLedgerMode()
+		{
+			return g_channelsReady;
+		}
+		std::uint32_t LedgerKeyOf(const Candidate& a_c)
+		{
+			return ChannelLedgerMode() ? a_c.channel : a_c.state;
+		}
+		std::uint32_t LedgerKeyOf(const OutlineEntry& a_e)
+		{
+			return ChannelLedgerMode() ? a_e.channel : a_e.state;
+		}
+
+		// 懒创建 13 条通道（模板就绪后一次建满；失败有重试上限与自动回退）。
+		// 常量：每 200ms 一轮扫描最多重试 1 次 ⇒ 50 轮 ≈ 10 秒。
+		constexpr std::uint32_t kChannelRetryWarnAt = 50;
+		constexpr std::uint32_t kChannelRetryFailAt = 100;
+		bool EnsureChannels()
+		{
+			if (g_channelsReady) {
+				return true;
+			}
+			if (!ChannelsWanted()) {
+				return false;
+			}
+			// 模板来源 = 引擎 state 0 的管理器（不存在就先让引擎建满，幂等）
+			if (!OutlineManagerFor(0)) {
+				if (g_outlineEnsure) {
+					g_outlineEnsure(nullptr);
+				}
+				return false;  // 下一轮再试
+			}
+			std::uint8_t tmpl[kChannelParamBytes]{};
+			if (!ReadChannelParamTemplate(tmpl)) {
+				++g_channelRetries;
+				if (g_channelRetries == kChannelRetryWarnAt) {
+					REX::WARN("channel: 32 字节参数模板标定失败（已重试 {} 轮）—— 形状校验没过，继续等待（不挂载）",
+						g_channelRetries);
+				}
+				if (g_channelRetries >= kChannelRetryFailAt) {
+					g_channelsFailed = true;
+					REX::WARN("channel: 模板标定连续失败 {} 轮 -> 自建通道不可用，**自动回退旧路径**（state 覆盖）",
+						g_channelRetries);
+				}
+				return false;
+			}
+			// 逐条建：模板 + 覆盖两个颜色 dword
+			std::uint32_t built = 0;
+			for (std::size_t i = 0; i < kChannelCount && built == i; ++i) {
+				std::uint8_t params[kChannelParamBytes];
+				std::memcpy(params, tmpl, kChannelParamBytes);
+
+				const auto rgb   = ChannelColorFor(i);
+				const auto aCat  = (i < kCategoryCount) ? i : static_cast<std::size_t>(Category::kFlora);
+				const auto alpha = static_cast<std::uint32_t>(g_cfg.colorAlpha[aCat]);
+
+				// 基色：NoFill=1 写 alpha=0（不填充，物品材质透出）；否则填充（alpha=0 补 0xFF）
+				auto* const baseDword = reinterpret_cast<std::uint32_t*>(params + kOffChannelBaseColor);
+				*baseDword = g_cfg.noFill
+				               ? rgb
+				               : ((alpha != 0) ? ((alpha << 24) | rgb) : (0xFF000000u | rgb));
+				// 脉冲色：alpha 配了就用配置，否则保留模板 alpha（= 引擎的呼吸透明度）
+				auto* const pulseDword = reinterpret_cast<std::uint32_t*>(params + kOffChannelPulseColor);
+				*pulseDword = (alpha != 0)
+				                ? ((alpha << 24) | rgb)
+				                : ((*pulseDword & 0xFF000000u) | rgb);
+
+				auto* const mgr = g_channelMgrCtor(g_channelMgrMem[i], params);
+				if (!mgr) {
+					REX::WARN("channel: ctor 返回空（第 {} 条）-> 放弃自建通道，回退旧路径", i);
+					g_channelsFailed = true;
+					return false;
+				}
+				g_channels[i].mgr   = mgr;
+				g_channels[i].mgrId = *reinterpret_cast<const std::uint32_t*>(
+					static_cast<const std::uint8_t*>(mgr) + 0x40);
+				++built;
+			}
+			g_channelsReady = true;
+			// 汇总日志：一行汇总 + 一行逐通道颜色（便于 grep 核对）
+			char buf[512];
+			std::size_t used = 0;
+			buf[0]           = '\0';
+			for (std::size_t i = 0; i < kChannelCount; ++i) {
+				const int n = std::snprintf(buf + used, sizeof(buf) - used, "%s%s=#%06X",
+					used ? " " : "", (i == kChannelFloraScanned) ? "floraScanned" : kCategoryName[i],
+					ChannelColorFor(i));
+				if (n <= 0) {
+					break;
+				}
+				used += static_cast<std::size_t>(n);
+			}
+			REX::INFO("channel: ✅ 已创建 {} 个自建颜色通道（模板 = 引擎 state0 参数块；"
+					  "NoFill={} -> {}；不写状态表 / 不覆盖引擎配色）| colors: {}",
+				kChannelCount, g_cfg.noFill,
+				g_cfg.noFill ? "只留轮廓" : "实心填充", buf);
+			return true;
+		}
+
+		// 挂载：复刻引擎 0x17D4CD0 的「挂上」visitor。
+		//   visitor = { vtable = 0x4B2FA10, data = &{manager, manager->0x40} }
+		//   ★ 回调（0x653FC0 = add rcx,8; jmp 0x653DD0）期望 rcx = visitor+8，
+		//     即 data 指向的 8 字节里存的就是「data 字段的值」—— 两个字段都要照抄。
+		bool OutlineRefViaChannel(RE::TESObjectREFR* a_ref, std::uint32_t a_ch)
+		{
+			if (!g_channelsReady || a_ch >= kChannelCount) {
+				return false;
+			}
+			auto* const mgr = g_channels[a_ch].mgr;
+			if (!mgr) {
+				return false;
+			}
+			const auto root = RefGet3D(a_ref);
+			if (!root) {
+				return false;  // 3D 还没加载 ⇒ 与旧路径一致：等下一轮
+			}
+			struct MountData
+			{
+				void*         mgr;
+				std::uint32_t id;
+				std::uint32_t pad;
+			};
+			struct Visitor
+			{
+				void* vtbl;
+				void* data;
+			};
+			MountData data{ mgr, g_channels[a_ch].mgrId, 0 };
+			Visitor   visitor{ reinterpret_cast<void*>(g_channelMountVisorVt), &data };
+			g_outlineVisit(&visitor, root.get());
+			return true;
+		}
+
+		// 摘除：复刻引擎 0x17D4CD0 开头的「摘除」visitor。
+		//   visitor = { vtable = 0x4B2F9F0, data = &manager }（★ 先解引用一次才是管理器）
+		bool UnoutlineRefViaChannel(RE::TESObjectREFR* a_ref, std::uint32_t a_ch)
+		{
+			if (!g_channelsReady || !g_outlineGraphRemoveReady || a_ch >= kChannelCount) {
+				return false;
+			}
+			if (!g_channels[a_ch].mgr) {
+				return false;
+			}
+			const auto root = RefGet3D(a_ref);
+			if (!root) {
+				return false;
+			}
+			struct Visitor
+			{
+				void* vtbl;
+				void* mgrSlot;  // = &g_channels[a_ch].mgr（数组固定 ⇒ 地址稳定）
+			};
+			Visitor visitor{ reinterpret_cast<void*>(g_outlineRemoveVisorVt), &g_channels[a_ch].mgr };
+			g_outlineVisit(&visitor, root.get());
+			return true;
+		}
+
 		// 确保目标状态的管理器存在。不存在就调用引擎自己的「重建管理器」函数
 		// （它会把 12 个管理器按当前 GMST 配色建好，幂等）。
 		// ★ 返回 false 时**绝对不能**调 SetOutlineState —— 那会空指针解引用崩游戏。
@@ -7905,12 +8322,23 @@ namespace SAS
 			return OutlineManagerFor(a_state) != 0;
 		}
 
-		// 把引用挂到（或重申到）原生 outline 的 a_state 状态
-		bool OutlineRef(RE::TESObjectREFR* a_ref, std::uint32_t a_state)
+		// 把引用挂到（或重申到）原生 outline 的 a_state 状态。
+		// ★★★ v5.0：a_ch = 自建通道号（ChannelMode=1 时用；0xFFFFFFFF = 不带通道信息）。
+		bool OutlineRef(RE::TESObjectREFR* a_ref, std::uint32_t a_state, std::uint32_t a_ch = 0xFFFFFFFFu)
 		{
 			if (!g_state.nativeReady || !a_ref) {
 				return false;
 			}
+			// ★★★ v5.0：通道模式 —— 走自建通道（不读状态表、不碰引擎配色块）。
+			//   未就绪时返回 false（本轮不挂；下一轮 EnsureChannels 建好后再挂，
+			//   通常在首次扫描的一两轮内完成）。g_channelsFailed 后自动落到旧路径。
+			if (g_cfg.channelMode && !g_channelsFailed) {
+				if (!EnsureChannels() || a_ch >= kChannelCount) {
+					return false;
+				}
+				return OutlineRefViaChannel(a_ref, a_ch);
+			}
+			// ↓↓↓ 旧路径（ChannelMode=0，或通道自动回退后）↓↓↓
 			// ★ 必须先确认管理器存在：SetOutlineState 内部会直接解引用
 			//   managers[state]，为空就是 0xC0000005。
 			if (!EnsureManagerFor(a_state)) {
@@ -7969,10 +8397,34 @@ namespace SAS
 			return true;
 		}
 
-		void UnoutlineRef(RE::TESObjectREFR* a_ref)
+		// ★★★ v5.0：a_chHint = 账本里记的自建通道号（通道模式用；0xFFFFFFFF = 未知）。
+		void UnoutlineRef(RE::TESObjectREFR* a_ref, std::uint32_t a_chHint = 0xFFFFFFFFu)
 		{
 			if (!g_state.nativeReady || !a_ref) {
 				return;
+			}
+			// ★★★ v5.0：通道模式 —— 摘除走自建通道（不读 / 不写引擎状态表）。
+			//   ① 已就绪：按 hint 摘（hint 缺失时兜底遍历全部通道 —— 罕见路径）；
+			//   ② 未就绪但通道模式开着（= 从没挂过）：什么都不用做；
+			//   ③ 其余（ChannelMode=0 或已回退）：落到下面的旧路径。
+			if (g_channelsReady) {
+				if (a_chHint < kChannelCount) {
+					if (UnoutlineRefViaChannel(a_ref, a_chHint)) {
+						++g_state.outlineRemoved;
+					}
+				} else {
+					bool any = false;
+					for (std::uint32_t i = 0; i < kChannelCount; ++i) {
+						any = UnoutlineRefViaChannel(a_ref, i) || any;
+					}
+					if (any) {
+						++g_state.outlineRemoved;
+					}
+				}
+				return;
+			}
+			if (g_cfg.channelMode && !g_channelsFailed) {
+				return;  // 通道未就绪 = 没挂过（挂载分支会等通道就绪）
 			}
 			RE::TESObjectREFR* slot = a_ref;
 			auto*              p    = g_outlineLookupOrAdd(nullptr, &slot);
@@ -8135,7 +8587,7 @@ namespace SAS
 					}
 					--budget;
 					++g_state.opsThisScan;
-					UnoutlineRef(it->second.ref.get());
+					UnoutlineRef(it->second.ref.get(), it->second.channel);
 					it = g_state.outlined.erase(it);
 				}
 			}
@@ -8161,8 +8613,8 @@ namespace SAS
 					if (it == g_state.outlined.end() || it->second.dropAt != 0) {
 						continue;  // 没挂过 / 待摘的走第 3 步（新挂 / 不复活）
 					}
-					if (it->second.state == c->state) {
-						continue;  // 状态一致 ⇒ 没什么可优先的
+					if (LedgerKeyOf(it->second) == LedgerKeyOf(*c)) {
+						continue;  // 挂的键一致（state / 通道）⇒ 没什么可优先的
 					}
 					if (budget == 0) {
 						++g_state.opsDeferred;
@@ -8171,10 +8623,11 @@ namespace SAS
 					--budget;
 					++g_state.opsThisScan;
 					++changed;
-					UnoutlineRef(c->ref);  // 先摘（否则两个管理器各留一条 = 双层描边）
-					if (OutlineRef(c->ref, c->state)) {
+					UnoutlineRef(c->ref, it->second.channel);  // 先摘（否则两条通道各留一条 = 双层描边）
+					if (OutlineRef(c->ref, c->state, c->channel)) {
 						it->second.reassertMs = nextMs;
 						it->second.state      = c->state;
+						it->second.channel    = c->channel;  // ★ v5.0
 						it->second.cat        = c->cat;
 						it->second.last3D     = RefGet3D(c->ref).get();
 					} else {
@@ -8199,18 +8652,19 @@ namespace SAS
 					}
 					--budget;
 					++g_state.opsThisScan;
-					if (OutlineRef(c->ref, c->state)) {
+					if (OutlineRef(c->ref, c->state, c->channel)) {
 						OutlineEntry e;
 						e.ref        = RE::NiPointer<RE::TESObjectREFR>{ c->ref };
 						e.reassertMs = nextMs;
 						e.state      = c->state;
+						e.channel    = c->channel;  // ★ v5.0：通道模式用
 						e.cat        = c->cat;  // ★ v4.25：让位保护按类别判断
 						// ★ v4.7：记下挂的时候的 3D 根（之后只要它变了就说明 3D 被重建过 ⇒
 						//   引擎侧那条登记已经丢了 ⇒ 见「4) 3D 复检」）
 						e.last3D = RefGet3D(c->ref).get();
 						g_state.outlined[c->ref] = std::move(e);
 					}
-				} else if (a_nowMs >= it->second.reassertMs || it->second.state != c->state) {
+				} else if (a_nowMs >= it->second.reassertMs || LedgerKeyOf(it->second) != LedgerKeyOf(*c)) {
 					// ★★★ v4.25：`it->second.state != c->state` 这一条是**必须的** ——
 					//   默认 `ReassertMs=0` 时 reassertMs 写成 UINT64_MAX（= 永不重申），
 					//   若只按时间判断，「星球目标刚被扫描完 ⇒ 该从青色换成绿色」这件事
@@ -8223,14 +8677,15 @@ namespace SAS
 					}
 					--budget;
 					++g_state.opsThisScan;
-					// 状态变了：先把旧的摘掉，
+					// 状态 / 通道变了：先把旧的摘掉，
 					// 否则同一个引用会同时留在两个管理器里 ⇒ 两层描边。
-					if (it->second.state != c->state) {
-						UnoutlineRef(c->ref);
+					if (LedgerKeyOf(it->second) != LedgerKeyOf(*c)) {
+						UnoutlineRef(c->ref, it->second.channel);
 					}
-					if (OutlineRef(c->ref, c->state)) {
+					if (OutlineRef(c->ref, c->state, c->channel)) {
 						it->second.reassertMs = nextMs;
 						it->second.state      = c->state;
+						it->second.channel    = c->channel;  // ★ v5.0
 						it->second.cat        = c->cat;  // ★ v4.25
 						it->second.last3D     = RefGet3D(c->ref).get();  // ★ v4.7
 					} else {
@@ -8290,7 +8745,7 @@ namespace SAS
 					}
 					--budget;
 					++g_state.opsThisScan;
-					if (OutlineRef(c->ref, c->state)) {
+					if (OutlineRef(c->ref, c->state, c->channel)) {
 						it->second.last3D = cur;
 						++g_state.outline3DReasserts;
 						// 只打前 32 条 + 之后每 100 条一条（外景走动时可能很频繁，
@@ -8321,7 +8776,7 @@ namespace SAS
 			const auto missWas   = g_state.outlineRemoveMiss;
 			const auto uhMissWas = g_state.outlineUnhighlightMiss;
 			for (auto& [key, entry] : g_state.outlined) {
-				UnoutlineRef(entry.ref.get());
+				UnoutlineRef(entry.ref.get(), entry.channel);
 			}
 			g_state.outlined.clear();
 			REX::INFO("native outline cleared (n={} ok={} unhMiss={} removeMiss={} totalOk={})",
@@ -8853,6 +9308,9 @@ namespace SAS
 				// ★ v4.0：分类分色 —— 类别 → 该用哪个 outline 状态
 				c.state = static_cast<std::uint32_t>(g_cfg.stateByCategory[static_cast<std::size_t>(cat)]);
 				c.cat   = static_cast<std::uint8_t>(cat);
+				// ★★★ v5.0：自建通道号（通道模式用；旧路径忽略）——
+				//   默认 = 类别号（每类一条独立通道）；「已扫描的植物」见下面那段。
+				c.channel = static_cast<std::uint32_t>(cat);
 				// ★★★ v4.25：星球目标（「植物」= FLOR：矿石 / 气体 / 液体 / 植物）——
 				//   **已经扫描过的**换成「已扫描」状态（默认 5 = 原版那个绿），
 				//   没扫描过的保持 StateFlora（7 = 原版青色脉冲）。
@@ -8867,6 +9325,9 @@ namespace SAS
 				if (cat == static_cast<int>(Category::kFlora) && floraJudgeOn) {
 					if (FloraTargetScanned(ref, base)) {
 						c.state = FloraScannedState();
+						// ★★★ v5.0：通道模式下「已扫描」走专属通道（绿），
+						//   与「未扫描」（kFlora = 青）分开 —— 与 state 7/5 的分法同构。
+						c.channel = static_cast<std::uint32_t>(kChannelFloraScanned);
 						++g_state.floraScannedSel;
 					} else {
 						++g_state.floraUnscannedSel;
@@ -9250,6 +9711,17 @@ namespace SAS
 					//   （默认只有 kOther/MSTT 关着；它应该持续是一个正数）
 					REX::INFO("  category (本轮选中): {} | 类别开关跳过 disabled={}", cats, g_state.disabledSkips);
 					g_state.disabledSkips = 0;
+				}
+
+				// ★★★ v5.0：自建颜色通道状态（通道模式下这一行说明一切）
+				if (g_cfg.channelMode) {
+					const char* st = g_channelsReady
+					                   ? "已就绪"
+					                   : (g_channelsFailed ? "失败(已回退旧路径)" : "等待模板标定");
+					REX::INFO("  channel (自建颜色通道): 状态={} 通道={}/{} 已挂={} | "
+							  "不写引擎状态表 / 不覆盖引擎配色（原版颜色 100% 原版）",
+						st, g_channelsReady ? kChannelCount : 0, kChannelCount,
+						g_state.outlined.size());
 				}
 
 				// ★★★ v4.25：星球目标「扫没扫过」的分流（用户反馈「放下扫描仪后还是扫描前的

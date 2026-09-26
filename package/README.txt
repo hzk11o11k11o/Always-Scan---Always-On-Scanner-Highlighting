@@ -3,7 +3,40 @@
  Always-on scanner highlighting for Starfield
 ========================================================================
 
-Version  : 1.8.1  (plugin build 4.33.0)
+Version  : 2.0  (plugin build 5.0.0)
+           2.0 = the mod now brings its own outline colour channels instead
+           of borrowing the game's. The game has eleven outline "states"
+           (0..10); six of them are painted by the game itself while the
+           scanner is up (ordinary references such as people, and planet
+           targets before / after surveying). Previous releases borrowed
+           the remaining five - that is why colours had to be grouped and
+           why changing one of them also changed the same state inside the
+           vanilla scanner. The renderer underneath, however, keeps two
+           per-id tables that grow on demand ("colour parameters" per
+           manager id, and "which manager paints this reference"); the
+           eleven states are only the game's own book-keeping on top of
+           that. So 2.0 creates its own colour channels - thirteen of them,
+           one per category plus one for surveyed plants - without touching
+           the game's state table or its colour blocks at all.
+           What you get:
+             - vanilla colours are never modified: people, planet targets
+               and the vanilla scanner look exactly stock;
+             - every category is independent: weapons / apparel / notes /
+               resources keep the grouped colours (red / red / purple /
+               purple) only because that is the requested layout - give
+               them separate ColorXxx values and they will differ;
+             - the game can no longer wipe the mod's highlights when it
+               tears down its own scanner book-keeping (the mod's channels
+               are not part of it).
+           INI: ChannelMode=1 (default) enables the new channels;
+           ChannelMode=0 restores the previous behaviour (the mod writes
+           into the game's own outline states, exactly as in 1.8.1).
+           If the engine's function signatures ever change, the mod falls
+           back to the old path automatically and logs a warning - no
+           manual INI edit needed. ColorFloraScanned sets the "already
+           surveyed" plant colour (default: the game's green #27C684);
+           unscanned plants use ColorFlora (default: the game's cyan
+           #72E8FF).
            1.8.1 = "surveyed plants sometimes drop back to cyan", second
            pass - the one that makes it stay fixed. 1.7.9's one-way
            memory had three holes, all found in a long test session:
@@ -476,6 +509,19 @@ Most useful options:
                         1.7.3): the fill layer's alpha is written as 0, so
                         the item's own material stays visible.  NoFill=0 =
                         the old filled look (1.7.1 / 1.7.2).
+  ChannelMode=1         own outline colour channels (default since 2.0).
+                        See the 2.0 notes at the top of this file: vanilla
+                        colours (people, planet targets, the scanner itself)
+                        are never modified, and every category is
+                        independent.  ChannelMode=0 = the 1.8.1 behaviour
+                        (borrow the game's own outline states).  If the
+                        engine's function signatures ever change, the mod
+                        falls back to 1.8.1 behaviour automatically and
+                        logs a warning line starting with "channel:".
+  ColorFloraScanned     colour of an already-surveyed plant / mineral
+                        deposit in ChannelMode=1 (default: the game's green
+                        #27C684).  Unscanned ones use ColorFlora (default:
+                        the game's cyan #72E8FF).
   AlphaWeapon=0         pulse (contour) opacity per category (0-255).
   AlphaApparel=0        0 = keep the engine's own value (default), 255 = a
   AlphaDoor=0           fixed, non-breathing contour.  NOTE: this does not
