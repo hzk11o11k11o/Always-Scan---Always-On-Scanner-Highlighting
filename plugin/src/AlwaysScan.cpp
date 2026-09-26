@@ -803,18 +803,33 @@ namespace SAS
 		// 读法（commonlibsf 声明 + 本项目「形状校验优先」的铁律）：
 		//   `class TESObjectMISC : …, public BGSKeywordForm  // 0x1E8`
 		//   `BGSKeywordForm::keywords（BSTArray<BGSKeyword*>）` 在基类 +0x20
-		//   ⇒ **base + 0x208** 处是 BSTArray 头，布局 = `{ data@+0, _size@+8,
-		//     _capacity@+0xC }`（★ 与常量区 `kOffArray*` 那一套 **不同**：那一套是
-		//     size/capacity 在前、data 在后 —— 这里不套用，按下面的顺序显式校验）。
-		//   ★ 校验链：data 可读 ∧ 1 ≤ size ≤ 64 ∧ capacity ≥ size ∧ 每个元素是
-		//     指向 **KYWD** 的指针。任何一环不过 ⇒ 返回 false（= 按杂项处理）。
+		//   ⇒ **base + 0x208** 处是 BSTArray 头。
+		//   ★★★ v4.23 **订正布局**（旧注释在这里写了「data 在前、size/capacity 在后，
+		//     与常量区 `kOffArray*` 那一套不同，这里不套用」—— 那句话是错的，而且
+		//     正是「资源判据全程静默失效」的根因）：commonlibsf `BSTArray.h` 里
+		//       `BSTArrayBase{ _size@+0, _capacity@+4 }`（第 52 行）
+		//       `BSTArray : BSTArrayBase, Allocator { …; void* _data; }`（第 136/380 行）
+		//     ⇒ 布局 = **`{ _size@+0x00, _capacity@+0x04, _data@+0x08 }`**，与常量区
+		//       那一套**完全相同**。旧读法把 `data` 读成 `size|capacity<<32`（小数）
+		//       ⇒ 每个 MISC 都判 false ⇒ 资源永远归杂项。完整证据链见 docs/22 §一。
+		//   ★ 校验链：1 ≤ size ≤ 64 ∧ size ≤ capacity ≤ 4096 ∧ data 可读 ∧
+		//     每个元素是指向 **KYWD** 的指针。任何一环不过 ⇒ 返回 false（= 按杂项处理）。
 		//     失败方向永远是安全的那一边：宁可少一个颜色，绝不把垃圾内存当资源。
-		//   ★ 启动自检（`ResourceKeywordSelfTest`）：拿两个「已知答案」的原版记录
-		//     验一次（InorgCommonIron 必须命中 / Digipick 必须不命中），不通过就
-		//     整体退回「全部 MISC = 杂项」并打 WARN —— 与「库存标定」同一个套路。
+		//   ★ 偏移自适应：候选表逐个试，第一个「形状合格且非空」的偏移被采纳并缓存
+		//     （`resource keyword: 关键词数组标定 = …` 一行 INFO 可核对）；全不合格
+		//     时打 `misc kw probe:`（≤6 条）把原始读数摆出来。
+		//   ★ 启动自检（`ResourceKeywordSelfTest`）：用「已知答案」的原版记录验一次
+		//     （资源正样本必须命中 / Digipick、Credits 必须不命中），只在拿到明确
+		//     反证时才整体退回「全部 MISC = 杂项」。
 		// ================================================================
-		constexpr std::size_t   kOffMiscKeywords  = 0x208;  // TESObjectMISC::keywords
+		// ★★★ v4.23：`TESObjectMISC` 的 `BGSKeywordForm::keywords` 偏移**不写死一个** ——
+		//   首选 0x208（commonlibsf：`TESObjectMISC` 的 `BGSKeywordForm` 基类 @+0x1E8
+		//   + `BGSKeywordForm::keywords` @+0x20），其余是「偏移万一又整体漂移」时的
+		//   自适应备份（形状校验全过才采纳；见 IsResourceBaseRaw / ScanKeywordsAt）。
+		constexpr std::size_t   kMiscKwOffCandidates[] = { 0x208, 0x200, 0x1F8, 0x210, 0x218 };
 		constexpr std::uint32_t kMiscKeywordMax   = 64;     // 防呆上限（资源物品实测最多 4 个）
+		constexpr std::uint32_t kMiscKeywordCapMax = 4096;  // capacity 合理性上限
+		constexpr std::uint32_t kMiscKwProbeMax   = 6;      // `misc kw probe:` 每会话最多几条
 		constexpr std::uint32_t kResKeywordDigipick = 0x0000000A; // Digipick（自检：杂项）
 		constexpr std::uint32_t kResKeywordCredits = 0x0000000F;  // Credits（自检：杂项）
 		// ★★ v4.22：自检的**正样本池**（资源 MISC 物品；任一「拿得到且命中」即算通过）。
@@ -907,6 +922,29 @@ namespace SAS
 			//     要按两下 F8（先关再开）才回来」。
 			bool          resyncOnScannerClose = true;
 
+			// --- ★★★ v4.23：举着原版扫描仪时，**星球扫描目标类别让位原版** ---
+			// 1 = 只要 `MonocleMenu` 开着（= 玩家举着手持扫描仪），**「植物」类别**
+			//     （FLOR = 星球上的植物 / 矿脉 / 气泉 / 液池，MOD 用 state 7 挂它们）
+			//     就不参与本轮的挂 / 摘 / 重申 —— 既不写新状态，也不摘掉已挂的。
+			//   ★ 为什么需要（用户实测反馈，见 docs/22）：
+			//     原版扫描仪在星球上给「可扫描目标」上色走的是引擎自己的逐引用求值
+			//     （RVA 0x159ED90 → 写 state 7/8/9/10，写完立刻被渲染消费）。
+			//     MOD 每 200ms 一轮重申自己的类别状态，就会把引擎刚写上的
+			//     「扫描前 / 扫描后 / 正在扫描」盖掉 —— 用户看到的就是
+			//     「扫描前和扫描后颜色无法区分了」。
+			//   ★ 为什么只让「植物」这一类让位、而不是整段停摆：
+			//     ① 只有 state 7/8（以及被引擎临时写上的 9/10）是原版扫描目标槽位，
+			//        MOD 其它类别（武器 / 服饰 / 弹药 / 笔记 / 资源 / 容器 / 尸体 /
+			//        设备 / 门）用的是别处，重申它们**不会**影响原版；
+			//     ② 引擎在扫描仪 HUD 建立时会销毁管理器 + 清空状态表
+			//        （RVA 0x17D4B30，见 v3.2），整段停摆就等于举着扫描仪时
+			//        **「屏幕中央圆圈之外也高亮」这个卖点也没了** ⇒ 只让该让的让。
+			//   ⇒ 让位期间：FLOR 不挂新、不重申、也不摘（`SyncNativeOutline` 里对
+			//     这类条目**不排摘除**，避免把引擎自己挂的那条 highlight 也摘掉）；
+			//     放下扫描仪那一刻，v3.2 的 `MarkAllForReassert` 会把它们整批铺回来。
+			//   0 = 退回 v4.22 行为（举着扫描仪也按 state 7 重申）；改完重进游戏生效。
+			bool          yieldTargetsWhileScanning = true;
+
 			// --- ★ v2.2：治「轻微卡顿」的两个闸门 ---
 			// 「掉队」宽限期（毫秒）：一个目标掉出选中集合后，先留着高亮这么久，
 			// 到期还没回到集合里才真正摘掉。
@@ -975,7 +1013,9 @@ namespace SAS
 				9,  // kContainer   容器 —— 橙 #FF9500（与尸体同 state ⇒ 同色）
 				4,  // kDevice      设备 —— ★ 覆盖为 青 #00E5FF（原生 4 是绿，会和弹药撞色）
 				10, // kDoor        门 —— ★ 覆盖为 白 #FFFFFF（原生红会和武器红撞色）
-				5,  // kFlora       植物 —— 亮绿（= 弹药救援）
+				7,  // kFlora       植物 / 矿脉 / 气泉 / 液池 —— ★★★ v4.23：**改回 7**
+				//     （= 原版 `TargetScannable`，颜色**不覆盖** ⇒ 原生青色脉冲轮廓）
+				//     理由见上面 v4.23 段与 categoryEnabled 里的长注释。
 				2,  // kOther       MSTT（默认关）—— 与杂项同 state（同蓝、不覆盖）
 				9   // kCorpse      尸体 —— 橙（= 容器）
 			};
@@ -1012,20 +1052,49 @@ namespace SAS
 			//       ⇒ 它们**全是原版扫描仪的「可扫描目标」**，原版靠 state 7/8 这对槽位
 			//         区分「扫描前 / 扫描后」。MOD 一旦常亮涂成亮绿（state 5），
 			//         这一对槽位的区别就被永久盖掉 —— 用户在星球上就再也分不出扫没扫过。
-			//     ⇒ 默认把整个「植物」类别关掉（**留给原版引擎自己上色**）；
+			//     ⇒ v4.22 把整个「植物」类别关掉（**留给原版引擎自己上色**）；
 			//       想恢复 MOD 的常亮绿，INI 里写 `EnableFlora=1`（代价 = 又看不到
 			//       扫描前后的区别，二者不可兼得）。
+			//
+			//   ★★★ v4.23 订正（用户实测反馈 1：「星球上的矿石、气体、液体、植物、
+			//     动物**现在颜色完全不显示了**」）：v4.22 的「交还原版」在本 MOD 的
+			//     语境里等于「什么都没有」—— **原版只在举着扫描仪时上色**，而本 MOD
+			//     的存在意义正是「不举扫描仪也有高亮」。所以不是「开着就看不到扫描
+			//     前后的区别」这一个二选一，而是**三个约束可以同时满足**：
+			//       ① 不举扫描仪 ⇒ 本 MOD 用 **state 7** 挂上（原版 `TargetScannable`
+			//          槽位 + **不覆盖颜色** ⇒ 青色脉冲轮廓），星球上一直看得见；
+			//       ② 举着扫描仪 ⇒ `YieldTargetsWhileScanning=1` **这一类让位原版**
+			//          （不挂新 / 不重申 / 不摘），引擎自己的 7/8/9/10 与
+			//          「扫描前 / 扫描后 / 正在扫描」的区别原样呈现；
+			//          其余类别照常重申 ⇒ 「圆圈之外也高亮」不受影响；
+			//       ③ 放下扫描仪 ⇒ v3.2 的 `DetectEngineOutlineLoss`（MonocleMenu
+			//          由开变关）整批重申 ⇒ 回到 ①。
+			//     ⇒ 「植物」类别**默认开**、state = 7、`ColorFlora` 保持 unset。
+			//       想退回 v4.22 的「完全不碰 FLOR」⇒ `EnableFlora=0`。
+			//       想回到 v4.17~v4.21 的常亮亮绿 ⇒ `EnableFlora=1` + `StateFlora=5`
+			//       （+ `ColorFlora=00FF66`，若 INI 模板里那行已被注释掉则无需）。
 			std::array<bool, kCategoryCount> categoryEnabled{
-				true,  // kLoot        杂项
-				true,  // kLootWeapon
-				true,  // kLootApparel
-				true,  // kLootAmmoAid
-				true,  // kLootNote
-				true,  // kLootResource
-				true,  // kContainer
-				true,  // kDevice
-				true,  // kDoor
-				false, // kFlora（★ v4.22：默认关 —— 矿脉 / 气泉 / 液池 / 植物都归原版扫描仪）
+				true, // kLoot        杂项
+				true, // kLootWeapon
+				true, // kLootApparel
+				true, // kLootAmmoAid
+				true, // kLootNote
+				true, // kLootResource
+				true, // kContainer
+				true, // kDevice
+				true, // kDoor
+				// ★★★ v4.23：**「植物 / 矿脉」重新默认开**（v4.22 曾默认关，用户实测
+				//   「星球上的矿石、气体、液体、植物、动物现在颜色完全不显示了」）。
+				//   v4.22 的思路是「整类交还原版」，但原版只在**举着扫描仪**时上色 ——
+				//   而本 MOD 的立身之本就是「不举扫描仪也有高亮」⇒ 交还原版就等于
+				//   在星球上什么都看不到。正解是**两者兼得**：
+				//     · 本类 state = **7**（原版 `TargetScannable` 槽位）、
+				//       `ColorFlora = kColorUnset` ⇒ **用原版颜色**（青色脉冲轮廓，
+				//       与「杂项蓝 / 资源紫 / 弹药绿」区分得很开），不是 MOD 自造色；
+				//     · 举着扫描仪时这一类让位原版（`YieldTargetsWhileScanning=1`）⇒
+				//       「扫描前 / 扫描后 / 正在扫描」的原版状态与颜色**一个都不被盖**。
+				//   ⇒ 不用扫描仪 = 青色常亮；用扫描仪 = 完全原版（含扫描前后的区别）。
+				true,  // kFlora
 				false, // kOther（MSTT —— 默认关，理由见上）
 				true   // kCorpse
 			};
@@ -1059,7 +1128,12 @@ namespace SAS
 				0x00FF9500,    // kContainer   容器 —— 橙（与尸体同 state 9 ⇒ 必须同色）
 				0x0000E5FF,    // kDevice      设备 —— 青
 				0x00FFFFFF,    // kDoor        门 —— 白
-				0x0000FF66,    // kFlora       植物 —— 亮绿（= 弹药救援）
+				// ★★★ v4.23：植物 / 矿脉 / 气泉 / 液池 **不覆盖颜色** —— 直接用原版
+				//   state 7 的原生配色（脉冲 High `#72E8FF` / Low `#115B69`、基色 alpha=0
+				//   = 不填充），也就是原版扫描仪扫「可扫描目标」时那个青色脉冲轮廓。
+				//   ★ 必须 unset：只要一覆盖，engine 自己在 state 7/8 上的区分（如果
+				//     有）就被抹平 —— 这正是 v4.17~v4.21 那几轮「扫描前后分不出」的来源。
+				kColorUnset,   // kFlora       植物 / 矿脉 —— 原版色（state 7 不覆盖）
 				kColorUnset,   // kOther       MSTT（默认关）—— 不覆盖（原生蓝）
 				0x00FF9500     // kCorpse      尸体 —— 橙（= 容器）
 			};
@@ -1380,6 +1454,13 @@ namespace SAS
 			// ★ v4.22：自检节流（一圈会遍历 1~8 个 cell ⇒ 每个都调一次太亏）+ 首个命中诊断。
 			std::uint64_t resKeywordNextTryMs  = 0;
 			std::uint32_t resKeywordFirstHit   = 0;  // 世界里首个被判成「资源」的 base FormID
+			// ★★★ v4.23：关键词数组的**偏移标定**（0 = 还没定）—— 见 IsResourceBaseRaw。
+			//   一旦从某个候选偏移读出「形状合格且非空」的数组就采纳它（会话级缓存），
+			//   之后热路径只读这一个偏移；日志里 `关键词数组标定 = base+0x…` 一行可核对。
+			std::size_t   resKwOff             = 0;
+			// ★ v4.23：`misc kw probe:` 探针额度（每会话 ≤ kMiscKwProbeMax 条）——
+			//   5 个候选偏移都不像关键词数组时打出原始读数（偏移/布局又不对的唯一证据）。
+			std::uint32_t miscKwProbes         = 0;
 
 			// --- 诊断：半径内、但 base form 类型不在白名单而被跳过的类型统计 ---
 			//   统计窗口 = 两条统计日志之间，打完之后清空。
@@ -1663,6 +1744,10 @@ namespace SAS
 			std::uint64_t skipSettle    = 0;  // 换场景 / 连续过渡后的静置期内
 			std::uint64_t skipUnstable  = 0;  // 引用数组还没定 / 长度突变
 			std::uint64_t skipWarmup    = 0;  // 等稳定轮数（kRefsStableRounds）
+			// ★★★ v4.23：举着原版扫描仪 ⇒ 「星球扫描目标」类别让位（YieldTargets-
+			//   WhileScanning，见 Config）。这个计数**只在让位窗口里、且本轮确实
+			//   跳过了该类的候选**时才增长 —— 用它确认「让位」真的只在扫描时发生。
+			std::uint64_t skipYield     = 0;
 
 			// --- ★ v4.7：Tick 间隔诊断（区分「Tick 没被调」和「被早退挡住」）---
 			std::uint64_t lastTickMs     = 0;
@@ -3070,6 +3155,8 @@ namespace SAS
 			g_cfg.reassertMs    = std::clamp(getInt("ReassertMs", 0), 0, 60000);  // 0 = 不重申
 			g_cfg.autoEnsureManagers = getInt("AutoEnsureManagers", 1) != 0;
 			g_cfg.resyncOnScannerClose = getInt("ResyncOnScannerClose", 1) != 0;
+			// ★★★ v4.23：举着原版扫描仪时「星球扫描目标」类别让位（理由见 Config）
+			g_cfg.yieldTargetsWhileScanning = getInt("YieldTargetsWhileScanning", 1) != 0;
 			g_cfg.unhighlightGraceMs = std::clamp(getInt("UnhighlightGraceMs", 1500), 0, 60000);
 			g_cfg.maxOutlineOpsPerScan = std::clamp(getInt("MaxOutlineOpsPerScan", 64), 0, 4096);
 
@@ -3086,7 +3173,10 @@ namespace SAS
 				"StateLoot", "StateWeapon", "StateApparel", "StateAmmoAid", "StateNote", "StateResource",
 				"StateContainer", "StateDevice", "StateDoor", "StateFlora", "StateOther", "StateCorpse"
 			};
-			const int kStateDef[kCategoryCount] = { 2, 0, 1, 5, 6, 7, 9, 4, 10, 5, 3, 9 };
+			// ★★★ v4.23：这张表必须与 Config::stateByCategory 的默认值**逐项一致**
+			//   （INI 缺键时用的就是它；v4.22 忘了同步 resource/other，这次一并订正：
+			//    resource 7→3、flora 5→7、other 3→2）。
+			const int kStateDef[kCategoryCount] = { 2, 0, 1, 5, 6, 3, 9, 4, 10, 7, 2, 9 };
 			for (std::size_t i = 0; i < kCategoryCount; ++i) {
 				g_cfg.stateByCategory[i] = std::clamp(getInt(kStateKeys[i], kStateDef[i]), 0, 11);
 			}
@@ -3279,8 +3369,18 @@ namespace SAS
 			// ★ v4.17：「资源」判据（MISC 的 ResourceType* 关键词）总开关
 			g_cfg.resourceByKeyword = getInt("ResourceByKeyword", 1) != 0;
 			REX::INFO("config: resourceByKeyword={} -> 资源判据{}（MISC 记录上的 ResourceType* 关键词；"
-					  "启动自检通过后才生效，日志里有 `resource keyword:` 一行）",
+					  "★★ v4.23 已订正 BSTArray 布局，日志里有 `关键词数组标定 = base+0x…` 一行可核对）",
 				g_cfg.resourceByKeyword, g_cfg.resourceByKeyword ? "启用" : "关闭（全部 MISC 归杂项）");
+
+			// ★★★ v4.23：举着原版扫描仪时「星球扫描目标」类别让位原版（理由见 Config）
+			REX::INFO("config: yieldTargetsWhileScanning={} -> 举着扫描仪（MonocleMenu）时，"
+					  "「植物 / 矿脉 / 气泉 / 液池」（state {} = 原版扫描目标槽位）{}",
+				g_cfg.yieldTargetsWhileScanning,
+				g_cfg.stateByCategory[static_cast<std::size_t>(Category::kFlora)],
+				g_cfg.yieldTargetsWhileScanning
+					? "不挂、不重申、不摘（原版自己的 扫描前/扫描后/正在扫描 颜色原样保留；"
+					  "放下扫描仪后自动整批重挂）；其余类别照常（圆圈外也高亮不受影响）"
+					: "照常重申（= v4.22 行为，会盖掉原版刚写的状态）");
 
 			REX::INFO("config: radius={:.1f}m targets={} hotkeyVK=0x{:X} startEnabled={}",
 				g_cfg.radiusMeters, g_cfg.maxTargets, g_cfg.hotkeyVk, g_cfg.startEnabled);
@@ -3363,26 +3463,63 @@ namespace SAS
 		}
 
 		// ====================================================================
-		// ★★ v4.17：「资源」判据（MISC + `ResourceType*` 关键词）
+		// ★★ v4.17 / ★★★ v4.23：「资源」判据（MISC + `ResourceType*` 关键词）
 		// ====================================================================
 		// 完整背景、28 个关键词的 FormID、形状校验链见常量区「v4.17 资源判据」。
 		//   这个函数只做纯内存读 + 校验，**零引擎调用**；任何一步校验不过 ⇒ false
 		//   （= 按「杂项」处理 —— 失败方向永远是安全的那一边）。
-		//   ★ 读的是 `TESObjectMISC` 的 `BGSKeywordForm::keywords`（base + 0x208）。
-		bool IsResourceBaseRaw(const RE::TESForm* a_base)
+		//   读的是 `TESObjectMISC` 的 `BGSKeywordForm::keywords`（首选 base + 0x208）。
+		//
+		// ★★★ v4.23 **订正 BSTArray 布局**（这是「资源和杂物同色」的真根因）：
+		//   v4.17~v4.22 一直按「`data@+0 / size@+8 / capacity@+0xC`」读，而 commonlibsf
+		//   的 `BSTArray` 是：
+		//     ```cpp
+		//     class BSTArrayBase { std::uint32_t _size;      // +0x00
+		//                          std::uint32_t _capacity;  // +0x04
+		//                          static_assert(sizeof(BSTArrayBase) == 0x8); };
+		//     template <class T, class Allocator = BSTArrayHeapAllocator>
+		//     class BSTArray : public BSTArrayBase, public Allocator
+		//     { … void* _data{ nullptr };  // +0x08  ⇒ sizeof == 0x10 };   // BSTArray.h:52/136/380
+		//     ```
+		//   ⇒ 正确布局 = **`size@+0x00 / capacity@+0x04 / data@+0x08`**。
+		//   旧读法里 `data = *(+0x00)` 拿到的其实是 `size | capacity<<32`（一个几万的小
+		//   整数）⇒ `IsPlausiblePointer` 必然否掉 ⇒ **任何 MISC 都判不出「资源」**，
+		//   全程静默归「杂项」（用户实测 46 条统计行 `resource=` 恒为 0；那一局
+		//   `resource keyword:` 连一条「通过」都没有 —— 7 个正样本里唯一在内存里的那个
+		//   也不命中，正是因为读法本身错了，见 docs/22 §一）。
+		//   ★ 同文件里 cell 引用数组用的 `kOffArraySize/Capacity/Data`（+0/+4/+8）**一直
+		//     是对的**，这里的常量注释当年还特意写了「不套用那一套」——错的就是这一句。
+		//
+		// ★★ v4.23 自适应：`commonlibsf` 的成员偏移错过不止一次（`TESObjectCELL` 整体
+		//   +8，见 docs/02），所以偏移不写死一个：按候选表逐个试，**形状校验全过**
+		//   （头自洽 + data 可读 + 每个元素都是 KYWD 记录）才采纳，并缓存到会话结束。
+		//   猜错的最坏结果仍然只是「不命中 ⇒ 资源归杂项」，而且会在日志里留下
+		//   `misc kw probe:` 的原始读数（下一条见下）。
+		//
+		//   ★ 诊断（一眼定性，不用再猜）：
+		//     `resource keyword: 关键词数组标定 = base+0x208（…）首样本 … kw=[…]` = 读法找到了；
+		//     `misc kw probe: base=… 候选全不合格 …` = 5 个候选都不像关键词数组 ⇒
+		//       偏移/布局又不对（把这行发出来即可）。
+		bool ScanKeywordsAt(const std::uint8_t* a_raw, std::size_t a_off, bool* a_outShapeOk,
+			std::uint32_t* a_outCount, std::uint32_t* a_outKw, std::uint32_t a_outKwMax)
 		{
-			if (!a_base) {
+			*a_outShapeOk = false;
+			*a_outCount   = 0;
+			if (!IsReadable(a_raw + a_off, 16)) {
 				return false;
 			}
-			const auto* raw = reinterpret_cast<const std::uint8_t*>(a_base);
-			if (!IsReadable(raw + kOffMiscKeywords, 16)) {
+			// ★★ v4.23：布局 = size@+0 / capacity@+4 / data@+8（见上面的长注释）
+			const std::uint32_t size = *reinterpret_cast<const std::uint32_t*>(a_raw + a_off + kOffArraySize);
+			const std::uint32_t cap  = *reinterpret_cast<const std::uint32_t*>(a_raw + a_off + kOffArrayCapacity);
+			const std::uint64_t data = *reinterpret_cast<const std::uint64_t*>(a_raw + a_off + kOffArrayData);
+			if (size == 0 && cap == 0) {
+				*a_outShapeOk = true;  // 合法空数组（MISC 可以一个关键词都没有，如 Credits）
 				return false;
 			}
-			// BSTArray 头（★ 这个数组的布局是 data 在前、size/capacity 在后）
-			const auto data = *reinterpret_cast<const std::uint64_t*>(raw + kOffMiscKeywords + 0);
-			const auto size = *reinterpret_cast<const std::uint32_t*>(raw + kOffMiscKeywords + 8);
-			const auto cap  = *reinterpret_cast<const std::uint32_t*>(raw + kOffMiscKeywords + 12);
-			if (size < 1 || size > kMiscKeywordMax || cap < size) {
+			if (size < 1 || size > kMiscKeywordMax) {
+				return false;
+			}
+			if (cap < size || cap > kMiscKeywordCapMax) {
 				return false;
 			}
 			if (!IsPlausiblePointer(data) ||
@@ -3397,15 +3534,85 @@ namespace SAS
 				}
 				const auto* kwRaw = reinterpret_cast<const std::uint8_t*>(kw);
 				// 元素必须是**关键词记录**（KYWD）—— 这一条能挡住「偏移猜错时读到的垃圾指针」
+				//   （例如 0x1F8 = `formFolderKeywordLists`，元素是 BGSFormFolderKeywordList*）
 				if (kwRaw[kOffFormType] != static_cast<std::uint8_t>(RE::FormType::kKYWD)) {
 					return false;
 				}
 				const auto id = *reinterpret_cast<const std::uint32_t*>(kwRaw + kOffFormID);
+				if (i < a_outKwMax) {
+					a_outKw[i] = id;
+				}
 				for (const auto r : kResourceKeywords) {
 					if (r == id) {
+						*a_outShapeOk = true;
+						*a_outCount   = size;
 						return true;
 					}
 				}
+			}
+			*a_outShapeOk = true;  // 全数组都验过 = 形状合格（只是没命中资源关键词）
+			*a_outCount   = size;
+			return false;
+		}
+
+		bool IsResourceBaseRaw(const RE::TESForm* a_base)
+		{
+			if (!a_base) {
+				return false;
+			}
+			const auto* raw = reinterpret_cast<const std::uint8_t*>(a_base);
+
+			// ① 已标定：只看那一个偏移（热路径 = 1 次头读 + ≤4 个元素校验，零额外成本）
+			if (g_state.resKwOff != 0) {
+				bool          shapeOk = false;
+				std::uint32_t count   = 0;
+				return ScanKeywordsAt(raw, g_state.resKwOff, &shapeOk, &count, nullptr, 0);
+			}
+
+			// ② 未标定：逐个候选试；**第一个给出「形状合格且非空」的偏移**被采纳（会话级）。
+			//    （空的合法数组不能用来标定 —— 很多垃圾位置也能「碰巧」读成全 0。）
+			for (const auto off : kMiscKwOffCandidates) {
+				bool          shapeOk = false;
+				std::uint32_t count   = 0;
+				std::uint32_t kw[8]{};
+				const bool hit = ScanKeywordsAt(raw, off, &shapeOk, &count, kw, 8);
+				if (shapeOk && count > 0) {
+					g_state.resKwOff = off;
+					char kwList[160];
+					std::size_t p = 0;
+					const std::uint32_t shown = count < 8 ? count : 8;
+					for (std::uint32_t i = 0; i < shown && p + 16 < sizeof(kwList); ++i) {
+						p += static_cast<std::size_t>(std::snprintf(kwList + p, sizeof(kwList) - p,
+							"%s0x%08X", i ? "," : "", kw[i]));
+					}
+					REX::INFO("resource keyword: 关键词数组标定 = base+0x{:X}（布局 size@+0 / capacity@+4 / "
+							  "data@+8；首样本 base=0x{:08X} n={} kw=[{}]）-> {}",
+						off, a_base->GetFormID(), count, kwList,
+						hit ? "★ 命中 ResourceType* ⇒ 「资源」分类生效（state 3，颜色 #B36BFF）"
+							: "该样本不是资源（判据仍需逐个命中 ResourceType*）");
+					return hit;
+				}
+			}
+
+			// ③ 5 个候选全不合格 ⇒ 限流打一条原始读数探针（这是「偏移/布局又不对」的唯一证据）
+			if (g_state.miscKwProbes < kMiscKwProbeMax) {
+				++g_state.miscKwProbes;
+				char detail[320];
+				std::size_t p = 0;
+				for (const auto off : kMiscKwOffCandidates) {
+					if (p + 40 >= sizeof(detail) || !IsReadable(raw + off, 16)) {
+						continue;
+					}
+					p += static_cast<std::size_t>(std::snprintf(detail + p, sizeof(detail) - p,
+						"%s0x%X(s=%u,c=%u,d=0x%llX)", p ? " " : "", static_cast<unsigned>(off),
+						*reinterpret_cast<const std::uint32_t*>(raw + off + kOffArraySize),
+						*reinterpret_cast<const std::uint32_t*>(raw + off + kOffArrayCapacity),
+						static_cast<unsigned long long>(
+							*reinterpret_cast<const std::uint64_t*>(raw + off + kOffArrayData))));
+				}
+				REX::WARN("misc kw probe: base=0x{:08X} 候选偏移全不合格（都不像「元素是 KYWD 的 BSTArray」）"
+						  " -> 该 MISC 按「杂项」处理；原始读数 {} —— 把这一行发出来即可定位偏移/布局",
+					a_base->GetFormID(), detail);
 			}
 			return false;
 		}
@@ -6441,7 +6648,20 @@ namespace SAS
 			//   Set/Remove 抖动（主线程被这些调用磨出 hitch）；有了它，绝大多数
 			//   「进出」都只是改一个时间戳，**零引擎调用**。
 			const auto grace = static_cast<std::uint64_t>(g_cfg.unhighlightGraceMs);
+			// ★★★ v4.23：举着扫描仪时，「星球扫描目标」类别的条目**既不重申也不排摘除**
+			//   （原因：它们进的正是原版扫描目标的 state 槽位，而引擎此刻正在用；
+			//    若照常走宽限期，~1.5 秒后 UnoutlineRef 会把管理器里那条 highlight
+			//    摘掉 —— 那可能正是引擎刚给这个目标挂上的）。
+			//   放下扫描仪那一刻 DetectEngineOutlineLoss → MarkAllForReassert 会把
+			//   dropAt 清零并按预算整批重申（状态仍是 7 = 原版青色），行为自洽。
+			const std::uint32_t floraState = static_cast<std::uint32_t>(
+				std::clamp(g_cfg.stateByCategory[static_cast<std::size_t>(Category::kFlora)], 0, 11));
+			const bool yieldTargets = g_cfg.yieldTargetsWhileScanning && g_state.monocleOpen;
 			for (auto& [ref, e] : g_state.outlined) {
+				if (yieldTargets && e.state == floraState) {
+					e.dropAt = 0;
+					continue;
+				}
 				if (chosenSet.find(ref) != chosenSet.end()) {
 					e.dropAt = 0;  // 又回来了：什么都不用做
 				} else if (e.dropAt == 0) {
@@ -6725,6 +6945,11 @@ namespace SAS
 		// ====================================================================
 		void Rescan(std::uint64_t a_nowMs, RE::PlayerCharacter* a_player)
 		{
+			// ★★★ v4.23：「让位原版」只针对**星球扫描目标**（见 Config::yieldTargets-
+			//   WhileScanning 的长注释）—— 判断放在类别循环里（下面 `cat` 处），
+			//   因为其它类别必须在举着扫描仪时照常重申（否则引擎建 HUD 时清掉管理器，
+			//   「圆圈外也高亮」就断了）。这里只做「当前是否在让位窗口里」的快照。
+			const bool yieldTargets = g_cfg.yieldTargetsWhileScanning && g_state.monocleOpen;
 			auto* cell = a_player->parentCell;
 			if (!cell) {
 				++g_state.skipNoCell;
@@ -6948,6 +7173,16 @@ namespace SAS
 				//   与「不在白名单」分开计数，日志里 `disabled=N` 能确认开关真的生效。
 				if (!g_cfg.categoryEnabled[static_cast<std::size_t>(cat)]) {
 					++g_state.disabledSkips;
+					continue;
+				}
+				// ★★★ v4.23：举着扫描仪时，**星球扫描目标（「植物」= FLOR）让位原版** ——
+				//   它们用的是 state 7（原版 `TargetScannable`），引擎此刻正在往这个
+				//   槽位写「扫描前 / 扫描后 / 正在扫描」；MOD 一重申就把原版色盖掉
+				//   （用户实测：「扫描前和扫描后颜色无法区分」/「颜色完全不显示」）。
+				//   让位 = 不进候选集合（因而既不新挂、也不重申、也不会被排摘除 ——
+				//   摘除保护见 SyncNativeOutline 第 1 步里同一开关）。
+				if (yieldTargets && cat == static_cast<int>(Category::kFlora)) {
+					++g_state.skipYield;
 					continue;
 				}
 				// ★ v4.2：容器 / 尸体「搜空即熄灭」——库存为空就不进候选集合。
@@ -7403,10 +7638,11 @@ namespace SAS
 				//   · 流式变化 = 引用数轻微增删但照常扫描的次数（外景走动时应该 >0）
 				//   · 3D复检: probes/reassert —— reassert 增长 = 引擎侧描边真的丢过、
 				//     且被这条自愈重新挂上了（「高亮丢失」的直接证据）
-				REX::INFO("  skip (窗口内): off={} throttle={} loading={} noplayer={} nocell={} settle={} shape={} unstable={} warmup={}",
+				REX::INFO("  skip (窗口内): off={} throttle={} loading={} noplayer={} nocell={} settle={} shape={} unstable={} warmup={} yield={}",
 					g_state.skipOff, g_state.skipThrottle, g_state.skipLoading,
 					g_state.skipNoPlayer, g_state.skipNoCell, g_state.skipSettle,
-					g_state.refsRejected, g_state.skipUnstable, g_state.skipWarmup);
+					g_state.refsRejected, g_state.skipUnstable, g_state.skipWarmup,
+					g_state.skipYield);
 				REX::INFO("  tick/场景 (窗口内): tick间隔>{}ms={} maxGap={}ms 合计={}ms | cell: changes={} 连续过渡={} | 环: cell={} skipped={} | 流式变化={} | 3D复检: probes={} reassert={} | move={:.1f}m",
 					kTickGapLogMs, g_state.tickGaps, g_state.tickGapMsMax, g_state.tickGapMsTotal,
 					g_state.cellChanges, g_state.cellContinuous,
@@ -7423,6 +7659,7 @@ namespace SAS
 				g_state.refsRejected   = 0;
 				g_state.skipUnstable   = 0;
 				g_state.skipWarmup     = 0;
+				g_state.skipYield      = 0;
 				g_state.tickGaps       = 0;
 				g_state.tickGapMsMax   = 0;
 				g_state.tickGapMsTotal = 0;

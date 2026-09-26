@@ -19,10 +19,10 @@
 | --- | --- |
 | **Mod name** | `Always Scan - Always-On Scanner Highlighting (SFSE)` |
 | **Summary**（约 250 字符以内） | `Keep the scanner highlight on at all times. No need to hold the handheld scanner: everything inside a configurable radius gets the vanilla outline, color-coded by category. Full-radius highlighting, one toggle hotkey, fully configurable via INI. SFSE plugin.` |
-| **Version** | `1.7.4`（引擎 build 4.22.0；Nexus 上的 1.0 / 1.1 / 1.2 / 1.3 / 1.4 / 1.5 / 1.6 / 1.7 / 1.7.1 / 1.7.2 / 1.7.3 之后的下一版） |
+| **Version** | `1.7.5`（引擎 build 4.23.0；Nexus 上的 1.0 / 1.1 / 1.2 / 1.3 / 1.4 / 1.5 / 1.6 / 1.7 / 1.7.1 / 1.7.2 / 1.7.3 / 1.7.4 之后的下一版） |
 | **Category** | `Gameplay`（Alternate suggestion: `Items and Objects - Gameplay`） |
 | **Requirements（依赖）** | `Starfield Script Extender (SFSE) 0.2.21+`、`(1.16.244.0) SFSE Address Library`、游戏版本 `1.16.244.0` |
-| **主文件（Main file）** | `StarfieldAlwaysScan-1.7.4.zip` |
+| **主文件（Main file）** | `StarfieldAlwaysScan-1.7.5.zip` |
 | **Permissions** | 允许转载需注明出处？建议：**不得重新上传（No re-uploading）**；允许个人修改（源码已含 Papyrus 部分） |
 
 ---
@@ -55,15 +55,15 @@ In the vanilla game you have to equip the handheld scanner to see which objects 
   | Bodies / corpses | dead people, creatures, and wrecked robots / turrets | orange |
   | Interactive devices | switches, terminals, workbenches | cyan |
   | Doors | — | white |
-  | Flora | plants (ores / gas / liquid deposits are stored as flora too — see below) | bright green, **category off by default since 1.7.4** |
+  | Flora | plants — the game stores ores, gas vents and liquid pools in this same record type too (see below) | **the game's own cyan pulse** (colour never overwritten; category on by default since 1.7.5) |
 
   The six pick-up categories sit at hues at least ~44° apart, so they are easy to tell apart at a glance (the engine's own palette was all blues in that range — that is what 1.7.1 fixed). Every color above is written explicitly by the mod and can be changed with the `ColorXxx` INI options.
 
   Since **1.7.3** the outline is drawn as a **contour instead of a fill**: the mod writes alpha=0 into the outline's base color — the same "no fill" state the engine itself uses for its scannable targets — so you see the item's own material and shape in full, with the category color sitting on the contour. Set `NoFill=0` in the INI to restore the old filled look (1.7.1 / 1.7.2). Note for upgraders from 1.7.2: that release's opacity options (`AlphaXxx`) turned out to have **no visible effect at all** — pixel measurements on a screenshot showed the covered area was pixel-identical at 40% and 100%, because the engine ignores that alpha byte for the fill. `AlphaXxx` now only changes the pulse (contour) transparency.
 
-  Since **1.7.4** the mod also stays out of the vanilla scanner's way on planet surfaces. The game stores ores, gas vents, liquid pools **and** plants in the same record type (FLOR) and colors them by "scanned / not scanned" through two outline states that the vanilla scanner owns. The mod no longer paints those records and no longer writes those two states, so a planet's resources and flora keep the vanilla "scanned / not scanned" colors while you survey. Flora is therefore **off by default** (set `EnableFlora=1` to get the always-on green contour back, at the cost of that distinction); the resource color moved to a different outline state so nothing collides with the vanilla scanner.
+  **Planet surveying (1.7.5).** The game stores ores, gas vents, liquid pools **and** plants in the same record type (FLOR) and colors them by "scanned / not scanned" through two outline states that the vanilla scanner owns. The mod never overwrites those two states' colors, and it paints this category with the game's own "scannable target" color (a cyan pulse) — so with the scanner away you can still see every deposit, and while you hold the scanner up the mod steps aside for this category only (`YieldTargetsWhileScanning=1`, on by default): it writes nothing, so the game's own "scanned / not scanned / being scanned" colors are exactly what you see. Every other category is still refreshed while the scanner is up, so highlighting beyond the scanner's centre circle keeps working during a survey. (1.7.4 switched this category off entirely to leave it to the vanilla scanner — which turned out to mean "no color at all on planets", because the vanilla scanner only paints those targets while you hold it up.)
 
-  Resources are recognised from the item record itself (the game marks them with its own `ResourceType` keywords), so vanilla and mod-added resources both get the resource color. If that check cannot be applied the mod falls back to the misc color — the log tells you which one happened.
+  Resources are recognised from the item record itself (the game marks them with its own `ResourceType` keywords), so vanilla and mod-added resources both get the resource color. 1.7.4 and earlier read that keyword array in the wrong byte order, so **no item ever matched** and every resource silently fell back to the misc color; 1.7.5 reads it correctly (and re-calibrates the offset by itself if the game ever moves it — the log says which layout was adopted). If the check cannot be applied the mod falls back to the misc color — the log tells you which one happened.
 
 - **Bodies are highlighted** — pre-placed corpses and everything you kill: humans, creatures, robots and turrets alike (including the wrecked machines already lying around). They behave like containers: empty them and the outline goes away.
 - **Looted means dark** — a container or a body that has nothing left to take stops being outlined (about a second later), so an outline always means "there is still something in there".
@@ -107,12 +107,13 @@ Most used options:
 - `HotkeyVK=119` — toggle key (119 = F8; the INI has a table of common key codes; set to 0 to disable the hotkey)
 - `RadiusMeters=50` — highlight radius around the player
 - `StartEnabled=1` — on by default; set to 0 to start disabled
-- `StateWeapon=0` / `StateApparel=1` / `StateAmmoAid=5` / `StateNote=6` / `StateResource=7` / `StateLoot=2` / `StateContainer=9` / `StateDevice=4` / `StateDoor=10` / `StateFlora=5` — outline color state per category (the INI documents all 11 available native colors).
-- `ColorWeapon=FF2E2E` / `ColorApparel=FF3BD4` / `ColorAmmoAid=00FF66` / `ColorNote=FFD700` / `ColorResource=B36BFF` / `ColorContainer=FF9500` / `ColorDevice=00E5FF` / `ColorDoor=FFFFFF` / `ColorLoot=1F8EE2` / `ColorCorpse=FF9500` / `ColorFlora=00FF66` — exact RGB per category (all set by default since 1.7.1). They write the engine's global per-state color block, so the same state of the vanilla scanner changes as well (the INI explains it — change or clear them freely). Log line to watch: `outline colors: state=N 覆盖为 #RRGGBB <- <category>`.
+- `StateWeapon=0` / `StateApparel=1` / `StateAmmoAid=5` / `StateNote=6` / `StateResource=3` / `StateLoot=2` / `StateContainer=9` / `StateDevice=4` / `StateDoor=10` / `StateFlora=7` — outline color state per category (the INI documents all 11 available native colors). States **7 / 8 are the vanilla scanner's "scannable planet target" slots** and their colors are never written by the mod since 1.7.4; flora (ores / gas / liquid deposits / plants) uses state 7 with the game's own colour since 1.7.5, and resources use state 3 (purple).
+- `ColorWeapon=FF2E2E` / `ColorApparel=FF3BD4` / `ColorAmmoAid=00FF66` / `ColorNote=FFD700` / `ColorResource=B36BFF` / `ColorContainer=FF9500` / `ColorDevice=00E5FF` / `ColorDoor=FFFFFF` / `ColorLoot=1F8EE2` / `ColorCorpse=FF9500` — exact RGB per category (all set by default since 1.7.1). `ColorFlora` is **left unset on purpose** (the game's own cyan); writing it would paint over the vanilla scanner's color for planet targets. They write the engine's global per-state color block, so the same state of the vanilla scanner changes as well (the INI explains it — change or clear them freely). Log line to watch: `outline colors: state=N 覆盖为 #RRGGBB <- <category>`.
 - `NoFill=1` — draw the outline as a **contour only** (default since 1.7.3): the fill layer's alpha is written as 0, so the item's own material stays visible. Set `NoFill=0` for the old filled look (1.7.1 / 1.7.2). Log line: `config: noFill=1 ...`, plus the "no fill" wording on every `outline colors: state=N ...` line.
 - `AlphaWeapon=0` / `AlphaApparel=0` / `AlphaDoor=0` / … — **pulse (contour) opacity** per category (0-255). 0 = keep the engine's own value (the default), 255 = a fixed, non-breathing contour. **This cannot make the fill transparent** (the engine ignores that alpha byte for the fill — that is why 1.7.2 had no visible effect); use `NoFill` for that. Log lines: `config: colorAlpha ...`, and the `a=` column in `outline colors[...]` / `renderer params[...]`.
-- `ResourceByKeyword=1` — recognise resources from the item record's own `ResourceType` keywords (default on). Set to 0 and every MISC item counts as misc (the 1.5 behaviour).
-- `EnableLoot=1` … `EnableOther=0` — per-category on/off switches (`EnableWeapon` / `EnableApparel` / `EnableAmmoAid` / `EnableNote` / `EnableResource` / `EnableLoot` = misc items / containers / devices / doors / flora / bodies). `EnableOther` covers movable statics (cardboard boxes, tables, crates). It is **off by default** because they cannot be picked up and the vanilla scanner does not outline them either.
+- `ResourceByKeyword=1` — recognise resources from the item record's own `ResourceType` keywords (default on). 1.7.5 fixed the byte order this array was read with (1.7.4 and earlier never matched anything) and added a self-calibrating offset; the log prints `关键词数组标定 = base+0x…` once. Set to 0 and every MISC item counts as misc (the 1.5 behaviour).
+- `YieldTargetsWhileScanning=1` — while you hold the scanner up, leave the flora / mineral-deposit category alone (default on). The vanilla scanner paints scannable planet targets itself, so keeping this on is what preserves the game's own "scanned / not scanned / being scanned" colours. Every other category is still refreshed (highlighting beyond the scanner's centre circle keeps working). 0 = old behaviour (refresh that category even while the scanner is up); the log's `skip (窗口内)` line shows `yield=N` growing while you survey.
+- `EnableLoot=1` … `EnableOther=0` — per-category on/off switches (`EnableWeapon` / `EnableApparel` / `EnableAmmoAid` / `EnableNote` / `EnableResource` / `EnableLoot` = misc items / containers / devices / doors / flora / bodies). `EnableFlora=1` (default since 1.7.5; it was 0 in 1.7.4) outlines flora / mineral deposits in the game's own cyan; set it to 0 to leave that category entirely to the vanilla scanner (you will only see those targets while the scanner is up). `EnableOther` covers movable statics (cardboard boxes, tables, crates). It is **off by default** because they cannot be picked up and the vanilla scanner does not outline them either.
 - `EnableCorpse=1` — outline dead bodies (people and creatures); `StateCorpse=9` sets their color.
 - `SkipEmptyLoot=1` — stop outlining containers / bodies once they are empty (see below).
 - `TreatNullInvAsEmpty=1` — a reference whose inventory was never created counts as empty (default on). Only relevant if you ever find a body / container you never looted staying dark; set it to 0 to revert to "always outline".
@@ -164,7 +165,9 @@ At startup the log prints the active config and whether the native outline funct
 
 ### Version history
 
-*(This release is **1.7.4**. The list below uses the plugin's internal build numbers where an older release is concerned.)*
+*(This release is **1.7.5**. The list below uses the plugin's internal build numbers where an older release is concerned.)*
+
+- **1.7.5** *(plugin build 4.23.0)* — **Planet targets light up again, and the real reason "resources" looked like "misc".** (1) With 1.7.4, ores / gas vents / liquid pools / plants had **no colour at all** on planets: 1.7.4 had switched that category off to hand it back to the vanilla scanner, but the vanilla scanner only colors those targets while you are holding it up — and this mod exists exactly for the times when you are not. The category is on again, painted with the game's own "scannable target" colour (a cyan pulse, its palette entry is never overwritten), and a new option `YieldTargetsWhileScanning=1` (default on) makes the mod **step aside for this category only** while you hold the scanner up, so the vanilla "scanned / not scanned / being scanned" colours stay exactly the game's; every other category is still refreshed, so highlighting beyond the scanner's centre circle keeps working during a survey. (2) "Resources" and "misc" had the same colour because of a **read bug**: the mod read the item keyword array with the wrong byte order (`data` first instead of `size` / `capacity` first), so no item ever matched and every resource silently fell back to the misc colour. Fixed, plus a self-calibrating offset (the game data has been known to move) and two log lines for diagnosis: `resource keyword: 关键词数组标定 = base+0x…` and `misc kw probe: …`. Resources are purple again, misc items stay blue. No other behaviour changes.
 
 - **1.7.4** *(plugin build 4.22.0)* — **Two colour fixes: planet surveying and resources.** (1) Ores, gas vents, liquid pools, plants and creatures now keep the game's own "scanned / not scanned" colors. The mod used to paint every FLOR record bright green — but in the game's data the mineral deposits (ores, gas, liquids) are FLOR records too, not just plants, so that always-on colour hid the vanilla distinction while you surveyed a planet. Flora is now off by default (`EnableFlora=1` brings the always-on green back) and the two outline states the vanilla scanner uses for those targets (states 7 and 8) are **no longer written at all**; the resource colour moved to another state. (2) "Resources" and "misc" items no longer look the same: the resource check is validated at startup against known items, and if that sample item never loads into memory the old code silently froze resources onto the misc colour — the check is now on by default (it keeps its own safety checks) and only a clearly failed test turns it off. New log line on success: `resource keyword: 首个资源命中 base=0x... -> ...`. No other behaviour changes.
 - **1.7.3** *(plugin build 4.21.0)* — **Fix: the 1.7.2 opacity setting had no effect at all, and the outline is now a contour instead of a fill.** Pixel measurements on a screenshot showed the covered area was pixel-identical at 40% and at 100% — the engine ignores that alpha byte, so "semi-transparent" never happened on screen. The outline's base color is now written with alpha=0, the "no fill" state the engine itself uses for its scannable targets: you see the object's own material in full while the category color stays on the contour / pulse. New INI option `NoFill` (default 1; set `NoFill=0` to restore the 1.7.1 / 1.7.2 filled look). `AlphaXxx` now only affects the pulse (contour) transparency. No other behaviour changes.
@@ -210,12 +213,18 @@ Built with **SFSE** and **CommonLibSF**. Huge thanks to their authors and to eve
 - **分类分色**（1.6 起**按物品栏分类**给可拾取物品上色，全部可配）：
   **武器 / 投掷物（红）、太空服 / 头盔 / 背包 / 服饰（品红）、弹药 / 救援（亮绿）、
   笔记（黄）、资源（紫）、杂项（蓝 —— 与 1.5 一模一样，没有变化）**；
-  容器 / 尸体（橙）、可交互设备（青）、门（白）、植物（亮绿，★ 1.7.4 起该类默认关）；
-- **★ 1.7.4：星球扫描原版化** —— 矿石 / 气体 / 液体 / 植物 / 动物在数据里同属
-  FLOR 记录，原版扫描仪靠它自己的两个描边状态区分「扫描前 / 扫描后」；MOD 现在
-  **既不涂这些对象、也不写那两个状态**，星球上的扫描前后颜色与原版完全一致
-  （想让植物恢复常亮绿就写 `EnableFlora=1`）。同时修掉「资源和杂物同色」：
-  资源判据不再被启动自检卡死，**资源 = 紫、杂物 = 蓝**；
+  容器 / 尸体（橙）、可交互设备（青）、门（白）、**植物 / 矿脉 / 气泉 / 液池
+  （原版那个青色脉冲 —— 用的是游戏自带配色，MOD 不覆盖）**；
+- **★★ 1.7.5：星球目标重新点亮 + 「资源」判据真根因** —— ① 矿石 / 气体 / 液体 /
+  植物在数据里同属 FLOR 记录：上一版把整类关掉「交还原版」，但**原版只在举着扫描仪
+  时才给它们上色**，而本 MOD 的卖点正是「不举扫描仪也有高亮」⇒ 星球上等于什么都看不见。
+  现在该类重新默认开（state 7 + **原版色**），并新增 `YieldTargetsWhileScanning=1`：
+  **举着扫描仪时这一类让位原版**（不挂、不重申、也不摘）⇒ 原版的
+  「扫描前 / 扫描后 / 正在扫描」颜色一个都不被盖；其余类别照常重申，
+  所以**「屏幕中央圆圈之外也高亮」不受影响**。② 「资源和杂物同色」的真根因是
+  **读物品关键词数组时字节序读反了**（`data` 在前 / `size`、`capacity` 在后写反），
+  ⇒ 任何物品都匹配不上、资源**静默**归杂项；现已订正并加了偏移自适应与
+  `关键词数组标定 = base+0x…` 一行日志。**资源 = 紫、杂物 = 蓝**；
 - **尸体高亮**：预置的尸体和你打死的敌人都亮 —— **人类、怪物、机器人、炮塔一视同仁**（在游戏数据里它们同构），连地图上原本就躺着的机器报废体也会亮；
 - **搜空即熄灭**：容器 / 尸体被拿空后约 1 秒熄灭 —— 只统计你真能拿走的东西（拿不走的隐形 NPC 装备、尸体身上还穿着的装备都不算），有描边就代表「里面还有东西」；
 - **展示柜也管**：武器箱 / 武器架 / 头盔架 / 背包架 / 数据板架 / 前哨展示柜 —— **关着也亮**（游戏在关闭状态下不把内容放进容器库存），拿走最后一件东西后熄灭；

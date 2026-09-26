@@ -281,7 +281,13 @@ if (-not $SkipDeploy) {
     #   矿石 / 气体 / 液体 / 植物 / 动物靠它们区分「扫描前 / 扫描后」，不再覆盖）⇒
     #   「资源」改用 state 3（紫）；② 「植物」类别默认关（FLOR 里含矿脉 / 气泉 / 液池）；
     #   ③ 修「资源判据自检被样本不在内存卡死 ⇒ 资源静默归杂项（和杂物同色）」。
-    Set-Content -LiteralPath (Join-Path $modRoot 'meta.ini') -Value "[General]`nmodid=18268`nversion=1.7.4`ncomment=Always-on scanner highlighting (SFSE)" -Encoding UTF8
+    # ★ 2026-09-26（v4.23 / 发布版 1.7.5）：① 修「资源」判据**真根因** ——
+    #   BSTArray 布局读反了（data 实际在 +0x08，旧代码读 +0x00 ⇒ 任何 MISC 都判不出
+    #   资源，全程静默归杂项）+ 偏移自适应 + `关键词数组标定` 日志；
+    #   ② 星球扫描目标（植物 / 矿脉 / 气泉 / 液池）**重新默认开**：state 7 +
+    #   颜色不覆盖（用原版青色脉冲轮廓），并新增 `YieldWhileScanning=1`
+    #   （举着扫描仪时 MOD 整段让位 ⇒ 原版的「扫描前 / 扫描后」区别不再被盖）。
+    Set-Content -LiteralPath (Join-Path $modRoot 'meta.ini') -Value "[General]`nmodid=18268`nversion=1.7.5`ncomment=Always-on scanner highlighting (SFSE)" -Encoding UTF8
 
     Get-ChildItem -LiteralPath $modRoot -Recurse -File | ForEach-Object {
         Write-Host ("  {0}  ({1} bytes)" -f $_.FullName.Substring($modRoot.Length + 1), $_.Length)
