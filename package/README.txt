@@ -3,7 +3,26 @@
  Always-on scanner highlighting for Starfield
 ========================================================================
 
-Version  : 1.7.3  (plugin build 4.21.0)
+Version  : 1.7.4  (plugin build 4.22.0)
+           1.7.4 = two fixes, both about telling colors apart.
+           (1) Planet surveying: ores, gas vents, liquid pools, plants
+           and creatures now keep the game's own colors for "scanned" and
+           "not scanned". The mod used to paint every FLOR record bright
+           green - and in the game data the mineral deposits (ores / gas /
+           liquid) are FLOR records too, not just plants - so the vanilla
+           before / after distinction was hidden. Flora is now left to the
+           vanilla scanner by default (EnableFlora=1 brings the always-on
+           green back) and the two outline states the vanilla scanner uses
+           for those targets (state 7 / 8) are no longer overwritten at
+           all; the "resource" color moved to another state (3).
+           (2) "Resources" and "misc" items no longer look the same. The
+           resource check is validated at startup against known items, and
+           on some systems the iron sample simply never loads into memory,
+           which silently froze "resources" onto the misc color. The check
+           is now on by default (it has its own safety checks) and only a
+           clearly failed test turns it off; the log prints
+           "resource keyword: 首个资源命中 base=0x..." the first time a
+           resource is recognized.
            1.7.3 = fix: the 1.7.2 opacity setting turned out to have no
            effect at all. Pixel measurements on a screenshot showed the
            covered area was pixel-identical at 40% and at 100% - the
@@ -82,7 +101,8 @@ Pick-up items follow the game's own inventory categories:
     (anything you can search)                                        ORANGE
   * Interactive devices / computers                                  CYAN
   * Doors                                                            WHITE
-  * Flora (harvestable plants)                                       BRIGHT GREEN
+  * Flora (plants) - OFF by default since 1.7.4 (see below); when the
+    category is switched back on                                  BRIGHT GREEN
 
 The six pick-up categories sit at hues that are at least ~44 degrees
 apart (red / magenta / bright green / yellow / purple, plus the original
@@ -96,6 +116,16 @@ fill" state the engine itself uses for its scannable targets. You see
 the item's own material and shape in full, with the category colour
 sitting on the contour / pulse. Set NoFill=0 in the INI to bring the
 old filled look back (the 1.7.1 / 1.7.2 behaviour).
+
+Since 1.7.4 the mod stays out of the vanilla scanner's way on planet
+surfaces. The game marks ores, gas vents, liquid pools and plants with
+the same record type (FLOR) and colors them by "scanned / not scanned"
+through two outline states the vanilla scanner owns; the mod no longer
+writes those two states and no longer paints FLOR records itself, so
+that distinction works exactly like vanilla. Resources vs. misc items:
+"resources" (iron, aluminium, helium-3, organics, ...) are purple, misc
+items (digipicks, credits, toys) are blue. If the resource check ever
+fails, the log says so and everything falls back to the misc color.
 
 "Resources" are recognised from the item record itself (the game marks
 them with its own ResourceType keywords), so both vanilla and mod-added
@@ -163,9 +193,12 @@ Most useful options:
   StateWeapon=0         outline color state per category (0..10; the INI
   StateApparel=1        documents them). Defaults:
   StateAmmoAid=5          weapons 0   suits/helmet/pack 1   ammo&aid 5
-  StateNote=6             notes 6     resources 7           misc 2 (= 1.5)
-  StateResource=7         containers & bodies 9             devices 4
-  StateLoot=2             doors 10    flora 5
+  StateNote=6             notes 6     resources 3           misc 2 (= 1.5)
+  StateResource=3         containers & bodies 9             devices 4
+  StateLoot=2             doors 10    flora 5 (category off)  MSTT 2
+                        Since 1.7.4 "resources" uses state 3 and states
+                        7 / 8 are never touched: those two are the ones the
+                        vanilla scanner uses for scannable planet targets.
   ColorWeapon=FF2E2E    exact RGB per category (all set by default):
   ColorApparel=FF3BD4     weapons red / suits magenta / ammo bright green
   ColorAmmoAid=00FF66     notes yellow / resources purple / misc blue
@@ -189,6 +222,13 @@ Most useful options:
   EnableWeapon=1 ...    per-category on/off switches (weapon / apparel /
   EnableResource=1      ammoaid / note / resource / loot(misc) / container /
                         device / door / flora / corpse).
+  EnableFlora=0         since 1.7.4 flora (plants) is OFF by default: the
+                        game stores ores / gas vents / liquid pools in the
+                        same record type, and the vanilla scanner's
+                        scanned / not-scanned colors for them are the only
+                        way to tell a planet's resources apart while
+                        surveying. Set it to 1 to get the always-on green
+                        contour back (you lose that distinction again).
   EnableOther=0         also outline movable statics (crates, tables).
                         Off by default: they cannot be picked up and the
                         vanilla scanner does not outline them either.
@@ -289,6 +329,12 @@ categories).
     the per-state values (base colour + pulse). The "renderer params"
     lines show what the renderer actually received (base colour = what
     you see on screen). Set ColorXxx=RRGGBB in the INI and restart.
+* On a planet, "scanned" and "not scanned" look the same:
+    since 1.7.4 the mod leaves those objects (ores, gas vents, liquid
+    pools, plants - all stored as FLOR records) to the vanilla scanner,
+    so this should not happen anymore. If it does, check that your INI
+    has EnableFlora=0 and StateResource=3 (older INI files are not
+    overwritten by the installer - see the note in the INI itself).
 * The colour covers the object so you cannot see its material:
     that cannot happen since 1.7.3 - the outline is a contour, not a
     fill.  If you set NoFill=0 yourself, set it back to 1.  Note that
@@ -297,9 +343,11 @@ categories).
     visible effect).  Log lines to check: "config: noFill=1 ..." at
     startup, and the "no fill" wording on each color override line.
 * Resources are not purple (they show up blue like misc):
-    the log line starting with "resource keyword:" says whether the check
-    passed. If it says it failed, send me that line. (You can also force
-    it off with ResourceByKeyword=0.)
+    since 1.7.4 the resource check is on by default and the log prints
+    "resource keyword: 首个资源命中 base=0x... -> ..." the first time a
+    resource is recognized. If that line never appears, grab the log
+    lines starting with "resource keyword:" and send them over. (You can
+    also force the check off with ResourceByKeyword=0.)
 * A specific body is not highlighted:
     - it may be empty (nothing left to take) - that is intended;
     - the log's "actor probe:" lines list every actor around you (dead or

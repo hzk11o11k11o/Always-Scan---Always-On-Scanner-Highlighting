@@ -9,7 +9,7 @@
 set_xmakever("3.0.0")
 
 set_project("SAS_AlwaysScan")
-set_version("4.21.0")
+set_version("4.22.0")
 set_arch("x64")
 set_languages("c++23")
 set_encodings("utf-8")
@@ -23,7 +23,7 @@ includes(commonlibsf_dir)
 
 target("SAS_AlwaysScan", function()
     set_default(true)
-    set_version("4.21.0")
+    set_version("4.22.0")
     set_license("GPL-3.0-or-later")
 
     add_rules("commonlibsf.plugin", {

@@ -277,7 +277,11 @@ if (-not $SkipDeploy) {
     # ★ 2026-09-25（v4.20 / 发布版 1.7.2）：覆盖太深 → 半透明 ——
     #   门 / 武器 / 防具 默认 40% 不透明（INI `AlphaXxx`，0 = 保留引擎原值），
     #   让物品本身材质透出来（用户反馈「完全盖过材质」）。
-    Set-Content -LiteralPath (Join-Path $modRoot 'meta.ini') -Value "[General]`nmodid=18268`nversion=1.7.3`ncomment=Always-on scanner highlighting (SFSE)" -Encoding UTF8
+    # ★ 2026-09-26（v4.22 / 发布版 1.7.4）：① state 7/8 归还原版扫描仪（星球上的
+    #   矿石 / 气体 / 液体 / 植物 / 动物靠它们区分「扫描前 / 扫描后」，不再覆盖）⇒
+    #   「资源」改用 state 3（紫）；② 「植物」类别默认关（FLOR 里含矿脉 / 气泉 / 液池）；
+    #   ③ 修「资源判据自检被样本不在内存卡死 ⇒ 资源静默归杂项（和杂物同色）」。
+    Set-Content -LiteralPath (Join-Path $modRoot 'meta.ini') -Value "[General]`nmodid=18268`nversion=1.7.4`ncomment=Always-on scanner highlighting (SFSE)" -Encoding UTF8
 
     Get-ChildItem -LiteralPath $modRoot -Recurse -File | ForEach-Object {
         Write-Host ("  {0}  ({1} bytes)" -f $_.FullName.Substring($modRoot.Length + 1), $_.Length)

@@ -19,10 +19,10 @@
 | --- | --- |
 | **Mod name** | `Always Scan - Always-On Scanner Highlighting (SFSE)` |
 | **Summary**（约 250 字符以内） | `Keep the scanner highlight on at all times. No need to hold the handheld scanner: everything inside a configurable radius gets the vanilla outline, color-coded by category. Full-radius highlighting, one toggle hotkey, fully configurable via INI. SFSE plugin.` |
-| **Version** | `1.7.3`（引擎 build 4.21.0；Nexus 上的 1.0 / 1.1 / 1.2 / 1.3 / 1.4 / 1.5 / 1.6 / 1.7 / 1.7.1 / 1.7.2 之后的下一版） |
+| **Version** | `1.7.4`（引擎 build 4.22.0；Nexus 上的 1.0 / 1.1 / 1.2 / 1.3 / 1.4 / 1.5 / 1.6 / 1.7 / 1.7.1 / 1.7.2 / 1.7.3 之后的下一版） |
 | **Category** | `Gameplay`（Alternate suggestion: `Items and Objects - Gameplay`） |
 | **Requirements（依赖）** | `Starfield Script Extender (SFSE) 0.2.21+`、`(1.16.244.0) SFSE Address Library`、游戏版本 `1.16.244.0` |
-| **主文件（Main file）** | `StarfieldAlwaysScan-1.7.3.zip` |
+| **主文件（Main file）** | `StarfieldAlwaysScan-1.7.4.zip` |
 | **Permissions** | 允许转载需注明出处？建议：**不得重新上传（No re-uploading）**；允许个人修改（源码已含 Papyrus 部分） |
 
 ---
@@ -55,11 +55,13 @@ In the vanilla game you have to equip the handheld scanner to see which objects 
   | Bodies / corpses | dead people, creatures, and wrecked robots / turrets | orange |
   | Interactive devices | switches, terminals, workbenches | cyan |
   | Doors | — | white |
-  | Flora | harvestable plants | bright green |
+  | Flora | plants (ores / gas / liquid deposits are stored as flora too — see below) | bright green, **category off by default since 1.7.4** |
 
   The six pick-up categories sit at hues at least ~44° apart, so they are easy to tell apart at a glance (the engine's own palette was all blues in that range — that is what 1.7.1 fixed). Every color above is written explicitly by the mod and can be changed with the `ColorXxx` INI options.
 
   Since **1.7.3** the outline is drawn as a **contour instead of a fill**: the mod writes alpha=0 into the outline's base color — the same "no fill" state the engine itself uses for its scannable targets — so you see the item's own material and shape in full, with the category color sitting on the contour. Set `NoFill=0` in the INI to restore the old filled look (1.7.1 / 1.7.2). Note for upgraders from 1.7.2: that release's opacity options (`AlphaXxx`) turned out to have **no visible effect at all** — pixel measurements on a screenshot showed the covered area was pixel-identical at 40% and 100%, because the engine ignores that alpha byte for the fill. `AlphaXxx` now only changes the pulse (contour) transparency.
+
+  Since **1.7.4** the mod also stays out of the vanilla scanner's way on planet surfaces. The game stores ores, gas vents, liquid pools **and** plants in the same record type (FLOR) and colors them by "scanned / not scanned" through two outline states that the vanilla scanner owns. The mod no longer paints those records and no longer writes those two states, so a planet's resources and flora keep the vanilla "scanned / not scanned" colors while you survey. Flora is therefore **off by default** (set `EnableFlora=1` to get the always-on green contour back, at the cost of that distinction); the resource color moved to a different outline state so nothing collides with the vanilla scanner.
 
   Resources are recognised from the item record itself (the game marks them with its own `ResourceType` keywords), so vanilla and mod-added resources both get the resource color. If that check cannot be applied the mod falls back to the misc color — the log tells you which one happened.
 
@@ -162,8 +164,9 @@ At startup the log prints the active config and whether the native outline funct
 
 ### Version history
 
-*(This release is **1.7.3**. The list below uses the plugin's internal build numbers where an older release is concerned.)*
+*(This release is **1.7.4**. The list below uses the plugin's internal build numbers where an older release is concerned.)*
 
+- **1.7.4** *(plugin build 4.22.0)* — **Two colour fixes: planet surveying and resources.** (1) Ores, gas vents, liquid pools, plants and creatures now keep the game's own "scanned / not scanned" colors. The mod used to paint every FLOR record bright green — but in the game's data the mineral deposits (ores, gas, liquids) are FLOR records too, not just plants, so that always-on colour hid the vanilla distinction while you surveyed a planet. Flora is now off by default (`EnableFlora=1` brings the always-on green back) and the two outline states the vanilla scanner uses for those targets (states 7 and 8) are **no longer written at all**; the resource colour moved to another state. (2) "Resources" and "misc" items no longer look the same: the resource check is validated at startup against known items, and if that sample item never loads into memory the old code silently froze resources onto the misc colour — the check is now on by default (it keeps its own safety checks) and only a clearly failed test turns it off. New log line on success: `resource keyword: 首个资源命中 base=0x... -> ...`. No other behaviour changes.
 - **1.7.3** *(plugin build 4.21.0)* — **Fix: the 1.7.2 opacity setting had no effect at all, and the outline is now a contour instead of a fill.** Pixel measurements on a screenshot showed the covered area was pixel-identical at 40% and at 100% — the engine ignores that alpha byte, so "semi-transparent" never happened on screen. The outline's base color is now written with alpha=0, the "no fill" state the engine itself uses for its scannable targets: you see the object's own material in full while the category color stays on the contour / pulse. New INI option `NoFill` (default 1; set `NoFill=0` to restore the 1.7.1 / 1.7.2 filled look). `AlphaXxx` now only affects the pulse (contour) transparency. No other behaviour changes.
 - **1.7.2** *(plugin build 4.20.0)* — **The category colors are now semi-transparent where it matters.** With 1.7.1, a strongly colored outline (red weapons, magenta suits, white doors) could cover a nearby object so completely that you could no longer tell what the item itself looked like. Doors, weapons and apparel are now drawn at ~40% opacity, so the object's own material shows through while the color stays easy to read. New INI options `AlphaWeapon` / `AlphaApparel` / `AlphaDoor` (0-255 per category; 0 = the engine's own value = the 1.7.1 look; 77 is ~30%, 51 is ~20%) — every other category is unchanged from 1.7.1. The log now prints the opacity in use: `config: colorAlpha ...`, plus an `a=` column in `outline colors[...]` and `renderer params[...]` (that is the opacity the renderer actually draws with). No other behaviour changes.
 - **1.7.1** *(plugin build 4.19.0)* — **The category colors are now actually visible, and picked to be easy to tell apart.** Two problems fixed at once: (1) the color values were being written into the wrong engine table (a float constant area), so nothing on screen ever changed — the correct per-state color block is used now, and both the pulse colors and the base outline color are set; (2) even the correct engine defaults were near-useless for this purpose, because the states used by pick-up items are all blues (cyan / pale blue / blue / blue). New default palette: weapons **red**, spacesuits & clothing **magenta**, ammo & aid **bright green**, notes **yellow**, resources **purple**, misc items **blue** (unchanged), containers & bodies **orange**, devices **cyan**, doors **white**, flora **bright green** — the six pick-up colors are at least ~44° apart in hue. Also new: a `RendererProbe` diagnostic that logs the colors the renderer actually receives, so any future color issue can be diagnosed from the log alone. No behaviour changes.
@@ -205,9 +208,14 @@ Built with **SFSE** and **CommonLibSF**. Huge thanks to their authors and to eve
 - **常驻高亮**：跑动、战斗、搜刮时一直有效，不需要掏出扫描仪；
 - **全半径**：半径内四周所有方向都亮（5~500 米可配）；
 - **分类分色**（1.6 起**按物品栏分类**给可拾取物品上色，全部可配）：
-  **武器 / 投掷物（青）、太空服 / 头盔 / 背包 / 服饰（淡蓝白）、弹药 / 救援（绿）、
+  **武器 / 投掷物（红）、太空服 / 头盔 / 背包 / 服饰（品红）、弹药 / 救援（亮绿）、
   笔记（黄）、资源（紫）、杂项（蓝 —— 与 1.5 一模一样，没有变化）**；
-  容器 / 尸体（橙）、可交互设备（绿）、门（红）、植物（绿）；
+  容器 / 尸体（橙）、可交互设备（青）、门（白）、植物（亮绿，★ 1.7.4 起该类默认关）；
+- **★ 1.7.4：星球扫描原版化** —— 矿石 / 气体 / 液体 / 植物 / 动物在数据里同属
+  FLOR 记录，原版扫描仪靠它自己的两个描边状态区分「扫描前 / 扫描后」；MOD 现在
+  **既不涂这些对象、也不写那两个状态**，星球上的扫描前后颜色与原版完全一致
+  （想让植物恢复常亮绿就写 `EnableFlora=1`）。同时修掉「资源和杂物同色」：
+  资源判据不再被启动自检卡死，**资源 = 紫、杂物 = 蓝**；
 - **尸体高亮**：预置的尸体和你打死的敌人都亮 —— **人类、怪物、机器人、炮塔一视同仁**（在游戏数据里它们同构），连地图上原本就躺着的机器报废体也会亮；
 - **搜空即熄灭**：容器 / 尸体被拿空后约 1 秒熄灭 —— 只统计你真能拿走的东西（拿不走的隐形 NPC 装备、尸体身上还穿着的装备都不算），有描边就代表「里面还有东西」；
 - **展示柜也管**：武器箱 / 武器架 / 头盔架 / 背包架 / 数据板架 / 前哨展示柜 —— **关着也亮**（游戏在关闭状态下不把内容放进容器库存），拿走最后一件东西后熄灭；

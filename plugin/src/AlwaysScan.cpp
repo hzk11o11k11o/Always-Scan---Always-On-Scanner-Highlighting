@@ -815,9 +815,24 @@ namespace SAS
 		// ================================================================
 		constexpr std::size_t   kOffMiscKeywords  = 0x208;  // TESObjectMISC::keywords
 		constexpr std::uint32_t kMiscKeywordMax   = 64;     // 防呆上限（资源物品实测最多 4 个）
-		constexpr std::uint32_t kResKeywordIron    = 0x0005556E;  // InorgCommonIron（自检：资源）
 		constexpr std::uint32_t kResKeywordDigipick = 0x0000000A; // Digipick（自检：杂项）
 		constexpr std::uint32_t kResKeywordCredits = 0x0000000F;  // Credits（自检：杂项）
+		// ★★ v4.22：自检的**正样本池**（资源 MISC 物品；任一「拿得到且命中」即算通过）。
+		//   为什么不是一个样本：**实测 0x5556E（InorgCommonIron）整局 `LookupByID` 都是
+		//   null**（用户那一局 121 次尝试全是 `iron=0`，而 Digipick / Credits 一次就拿到；
+		//   离线 ESM 里 0x5556E 确实是 `InorgCommonIron` + `ResourceTypeSolid`）。
+		//   旧代码「单样本 + 拿不到就不生效」⇒ 「资源」被永久冻在「杂项」上，正是用户
+		//   实测反馈的「资源和杂物无法区分（都是原版扫描仪的蓝色）」（见 docs/21）。
+		//   FormID 全部离线核对过（`out/esm_resnode_probe.py`，都带 ResourceType* 关键词）：
+		constexpr std::uint32_t kResSelfTestSamples[] = {
+			0x0005556E,  // InorgCommonIron
+			0x00055568,  // InorgCommonLead
+			0x00055572,  // InorgCommonNickel
+			0x0005556B,  // InorgUncommonTungsten
+			0x0005556D,  // InorgRareTitanium
+			0x00055573,  // InorgRarePlatinum
+			0x00055570,  // InorgUncommonAlkanes（Gas）
+		};
 		// 28 个 ResourceType* 关键词的 FormID（全部在 Starfield.esm = 无需 load order 前缀）
 		constexpr std::uint32_t kResourceKeywords[] = {
 			0x0003F001,  // ResourceTypeCraftingGeneric
@@ -935,22 +950,33 @@ namespace SAS
 			//     **逐一覆盖颜色**（见下面的 colorOverride），状态只当「颜色槽」用：
 			//     同一状态 = 同一色 ⇒ 共享状态的类别必须同色（容器+尸体 = 9、
 			//     弹药救援+植物 = 5）。
-			//   ★ 覆盖 state 7 会连带影响原版扫描仪的 "TargetScannable"（它也写 7）——
-			//     现在两边都是同一套类别色，观感一致，属预期副作用。
-			//   ★ kOther（MSTT，默认关）用 3（原生蓝，**不覆盖**）：MSTT 是桌椅 / 纸箱
-			//     这类装饰物，打开时跟杂项同蓝即可。
+			//   ★★★ v4.22（用户实测：「星球上的矿石、气体、液体、植物、动物现在扫描前和
+			//     扫描后颜色无法区分了，这两个状态保持游戏原版颜色即可」）：
+			//     **state 7 / 8（TargetScannable / TargetScanned）必须留给引擎** ——
+			//     原版扫描仪在星球上扫「矿石 / 气体 / 液体 / 植物 / 动物」用的就是这一对
+			//     槽位（离线 dump 那对槽位的原值：基色 0x00000000、脉冲 #72E8FF/#115B69，
+			//     7 与 8 完全一致 ⇒ 原版的「扫描前 / 扫描后」区别**只可能**来自引擎自己
+			//     往这两个槽位里写的东西）。我们一旦覆盖 7 的 RGB，就等于把这一对槽位
+			//     改成同一种颜色 ⇒ 「扫描前后分不出」。
+			//     ⇒ 「资源」**不再借用 state 7**，改用 **3（Tracked）**并覆盖成紫：
+			//       3 的原生色与 2 同为蓝 #1F8EE2，是引擎写的最少用的一路
+			//       （0/1 通用、2/3 完全扫描/追踪、7/8 目标、9 目标完全扫描），
+			//       借它当「资源色」对原版观感的代价最小（`StateResource` 可再改）。
+			//   ★ kOther（MSTT，默认关）改回 **2（与杂项同 state 同色）** ——
+			//     MSTT 是桌椅 / 纸箱这类装饰物，「跟杂项一个蓝」本来就是设计意图
+			//     （同 state 同色，不会触发撞色 WARN）。
 			std::array<int, kCategoryCount> stateByCategory{
 				2,  // kLoot        杂项 —— 蓝（**原生不变**，用户需求）
 				0,  // kLootWeapon  武器、投掷物 —— ★ 覆盖为 红 #FF2E2E
 				1,  // kLootApparel 太空服/背包/头盔/服饰 —— ★ 覆盖为 品红 #FF3BD4
 				5,  // kLootAmmoAid 弹药、救援 —— ★ 覆盖为 亮绿 #00FF66（与植物同 state ⇒ 同色）
 				6,  // kLootNote    笔记 —— 黄 #FFD700
-				7,  // kLootResource 资源 —— 紫 #B36BFF
+				3,  // kLootResource 资源 —— 紫 #B36BFF（★ v4.22：7 让给原版扫描目标）
 				9,  // kContainer   容器 —— 橙 #FF9500（与尸体同 state ⇒ 同色）
 				4,  // kDevice      设备 —— ★ 覆盖为 青 #00E5FF（原生 4 是绿，会和弹药撞色）
 				10, // kDoor        门 —— ★ 覆盖为 白 #FFFFFF（原生红会和武器红撞色）
 				5,  // kFlora       植物 —— 亮绿（= 弹药救援）
-				3,  // kOther       MSTT（默认关）—— 原生蓝（不覆盖）
+				2,  // kOther       MSTT（默认关）—— 与杂项同 state（同蓝、不覆盖）
 				9   // kCorpse      尸体 —— 橙（= 容器）
 			};
 
@@ -974,6 +1000,21 @@ namespace SAS
 			//    EnableDoor / EnableFlora / EnableOther`，改完重进游戏生效。
 			//   ★ v4.17：`EnableLoot` 现在的含义 = **杂项**（原来那一坨里剩下的）；
 			//     新增的 5 个物品子类各有自己的开关（默认全开）。
+			//
+			//   ★★★ v4.22：**「植物」默认关**（用户实测需求 1 原文：
+			//     「星球上的矿石、气体、液体、植物、动物现在扫描前和扫描后颜色无法区分了，
+			//      这两个状态保持游戏原版颜色即可」）。
+			//     根因（离线全量取证，`out/esm_resnode_probe.py`，Starfield.esm 382 万条）：
+			//       **FLOR 记录里既有植物、也有星球上的矿脉 / 气泉 / 液池** ——
+			//         · 植物：`FloraBloodStoneTall` 等（关键词 `FloraTypeOrganic`，169 条）
+			//         · 矿石 / 气体 / 液体：`MineralDeposit*`（关键词 `FloraTypeInorganic`
+			//           + `FloraTypeSolid / FloraTypeGas / FloraTypeLiquid`，125 条）
+			//       ⇒ 它们**全是原版扫描仪的「可扫描目标」**，原版靠 state 7/8 这对槽位
+			//         区分「扫描前 / 扫描后」。MOD 一旦常亮涂成亮绿（state 5），
+			//         这一对槽位的区别就被永久盖掉 —— 用户在星球上就再也分不出扫没扫过。
+			//     ⇒ 默认把整个「植物」类别关掉（**留给原版引擎自己上色**）；
+			//       想恢复 MOD 的常亮绿，INI 里写 `EnableFlora=1`（代价 = 又看不到
+			//       扫描前后的区别，二者不可兼得）。
 			std::array<bool, kCategoryCount> categoryEnabled{
 				true,  // kLoot        杂项
 				true,  // kLootWeapon
@@ -984,7 +1025,7 @@ namespace SAS
 				true,  // kContainer
 				true,  // kDevice
 				true,  // kDoor
-				true,  // kFlora
+				false, // kFlora（★ v4.22：默认关 —— 矿脉 / 气泉 / 液池 / 植物都归原版扫描仪）
 				false, // kOther（MSTT —— 默认关，理由见上）
 				true   // kCorpse
 			};
@@ -1014,7 +1055,7 @@ namespace SAS
 				0x00FF3BD4,    // kLootApparel 太空服/背包/头盔/服饰 —— 品红
 				0x0000FF66,    // kLootAmmoAid 弹药、救援 —— 亮绿（与植物同 state 5 ⇒ 必须同色）
 				0x00FFD700,    // kLootNote    笔记 —— 黄
-				0x00B36BFF,    // kLootResource 资源 —— 紫
+				0x00B36BFF,    // kLootResource 资源 —— 紫（★ v4.22 落在 state 3，不再占 7）
 				0x00FF9500,    // kContainer   容器 —— 橙（与尸体同 state 9 ⇒ 必须同色）
 				0x0000E5FF,    // kDevice      设备 —— 青
 				0x00FFFFFF,    // kDoor        门 —— 白
@@ -1328,14 +1369,17 @@ namespace SAS
 			bool          loadingSeen    = false;  // 上一帧载入画面是否开着（每帧都更新）
 			bool          paramsRefreshed = false; // ★ v4.0.1：进世界后是否已做过一次配色刷新
 			// ★★ v4.17：「资源」关键词判据的启动自检结果
-			//   0 = 还没测（每轮扫描试一次，样本还没进内存就下一轮再来）
-			//   1 = 通过（资源分类生效）  2 = 失败（资源归杂项，打 WARN）
+			//   0 = 还没定论（自检继续尝试；**判据此刻已经生效** —— 见 IsResourceBase）
+			//   1 = 通过（有正样本命中）  2 = 否决（负样本命中 / 正样本全不命中）
 			std::uint8_t  resKeywordTest  = 0;
 			// ★ v4.18：自检的「未就绪」诊断 —— v4.17 是静默重试（日志里什么都看不到，
 			//   实测 `resource=0` 无从定位）。现在每 5 秒最多一条 WARN、最多 6 条。
 			std::uint32_t resKeywordTries    = 0;
 			std::uint32_t resKeywordWarns    = 0;
 			std::uint64_t resKeywordWarnAtMs = 0;
+			// ★ v4.22：自检节流（一圈会遍历 1~8 个 cell ⇒ 每个都调一次太亏）+ 首个命中诊断。
+			std::uint64_t resKeywordNextTryMs  = 0;
+			std::uint32_t resKeywordFirstHit   = 0;  // 世界里首个被判成「资源」的 base FormID
 
 			// --- 诊断：半径内、但 base form 类型不在白名单而被跳过的类型统计 ---
 			//   统计窗口 = 两条统计日志之间，打完之后清空。
@@ -3367,56 +3411,94 @@ namespace SAS
 		}
 
 		// 带开关 + 自检门控的版本（ClassifyBase 用这个）。
+		//   ★★★ v4.22：门控从「必须自检通过（== 1）」改成「**只要没被自检否决**（!= 2）」。
+		//   理由（用户实测反馈 2：「资源和杂物也无法区分（都是原版扫描仪的蓝色）」）：
+		//   0x5556E 在整局里 LookupByID 都是 null（自检永远等不到正样本），旧门控把
+		//   「资源」**静默**冻在「杂项」上 ⇒ 两者同色。现在是「默认生效」：
+		//   · 读法本身已有三层形状校验（BSTArray 头自洽 + 每个元素可读且 formType==KYWD
+		//     + 命中 28 个 ResourceType* FormID 之一）⇒ 偏移猜错时最坏是**不命中**
+		//     （资源归杂项），不会误判；
+		//   · 自检只在拿到**明确反证**时才否决（负样本命中，或 ≥2 个正样本都不命中）。
 		bool IsResourceBase(const RE::TESForm* a_base)
 		{
-			return g_cfg.resourceByKeyword && g_state.resKeywordTest == 1 && IsResourceBaseRaw(a_base);
+			return g_cfg.resourceByKeyword && g_state.resKeywordTest != 2 && IsResourceBaseRaw(a_base);
 		}
 
-		// ★★ v4.17：启动自检 —— 用「已知答案」的原版记录验证上面那条读法。
-		//   · `InorgCommonIron`(0x0005556E) 必须命中（带 ResourceTypeSolid 等 3 个关键词）；
+		// ★★ v4.17 起：启动自检 —— 用「已知答案」的原版记录验证上面那条读法。
+		//   · 正样本池 `kResSelfTestSamples`（7 个资源 MISC）：**任一**「拿得到且命中」即通过；
 		//   · `Digipick`(0x0000000A) / `Credits`(0x0000000F) 必须不命中（真杂物）。
-		//   通过 ⇒ g_state.resKeywordTest=1（资源分类生效）；
-		//   失败 ⇒ =2（资源归杂项，打一条 WARN，日志里带三个样本的原始读数）。
-		//   ★ 样本还没进内存（开局那一两秒）就直接返回，下一轮扫描再来 —— 永不放弃
-		//     （与「库存标定」同一个套路，见 CalibrateInventory）。
+		//   ★★ v4.22 重做（旧版见 docs/21 §二）：
+		//     通过（有正样本命中） ⇒ resKeywordTest = 1（日志一条 INFO，带命中样本 FormID）；
+		//     **否决**（负样本命中 ∨ 拿到 ≥2 个正样本但全不命中） ⇒ =2（资源归杂项 + WARN）；
+		//     **样本不足**（都没进内存） ⇒ 保持 0（= 判据照常生效，只限流打一条说明）。
+		//     这样「样本不在内存」再也不会让资源分类静默失效。
 		void ResourceKeywordSelfTest()
 		{
 			if (g_state.resKeywordTest != 0) {
 				return;
 			}
+			// ★ v4.22：节流 —— 这个自检是在「逐 cell」的循环里被调的（一圈最多 8 个 cell），
+			//   样本没进内存时每轮要白跑 ~9 次 LookupByID ⇒ 限成 500ms 最多一次。
+			const auto nowMs = NowMs();
+			if (nowMs < g_state.resKeywordNextTryMs) {
+				return;
+			}
+			g_state.resKeywordNextTryMs = nowMs + 500;
 			++g_state.resKeywordTries;
-			auto* iron = RE::TESForm::LookupByID(kResKeywordIron);
+			// ---- 正样本：能拿到几个拿几个，任一命中即算「读法正确」 ----
+			std::uint32_t resolved = 0;
+			std::uint32_t hits     = 0;
+			std::uint32_t firstHit = 0;
+			for (const auto id : kResSelfTestSamples) {
+				auto* f = RE::TESForm::LookupByID(id);
+				if (!f) {
+					continue;  // 这个样本还没进内存（实测很常见，见常量区注释）
+				}
+				++resolved;
+				if (IsResourceBaseRaw(f)) {
+					++hits;
+					if (firstHit == 0) {
+						firstHit = id;
+					}
+				}
+			}
+			// ---- 负样本：真杂物命中 = 判据有误（会误报资源） ----
 			auto* pick = RE::TESForm::LookupByID(kResKeywordDigipick);
 			auto* cred = RE::TESForm::LookupByID(kResKeywordCredits);
-			if (!iron || !pick || !cred) {
-				// ★ v4.18：把「样本还没拿到」这件事也写进日志 —— v4.17 是静默重试，
-				//   实测（2026-09-25 那一局）日志里既没有「通过」也没有「失败」，
-				//   只能看到统计行 `resource=0`，无法定位。现在每 5 秒最多一条、
-				//   最多 6 条（含量：三个样本各自拿没拿到 + 尝试次数）。
-				const auto now = NowMs();
-				if (g_state.resKeywordWarns < 6 && now >= g_state.resKeywordWarnAtMs) {
-					++g_state.resKeywordWarns;
-					g_state.resKeywordWarnAtMs = now + 5000;
-					REX::WARN("resource keyword: 自检样本还没进内存（iron={} pick={} cred={}；第 {} 次尝试）"
-							  "-> 「资源」暂归「杂项」；样本 FormID = 0x{:X}/0x{:X}/0x{:X}（离线核对全部正确）",
-						iron ? 1 : 0, pick ? 1 : 0, cred ? 1 : 0, g_state.resKeywordTries,
-						kResKeywordIron, kResKeywordDigipick, kResKeywordCredits);
-				}
-				return;  // 数据还没就绪：下一轮再试
-			}
-			const bool ironHit = IsResourceBaseRaw(iron);
-			const bool pickHit = IsResourceBaseRaw(pick);
-			const bool credHit = IsResourceBaseRaw(cred);
-			g_state.resKeywordTest = (ironHit && !pickHit && !credHit) ? 1 : 2;
-			if (g_state.resKeywordTest == 1) {
-				REX::INFO("resource keyword: 判据自检**通过**（InorgCommonIron=资源 · Digipick/Credits=杂项）"
-						  "-> 「资源」分类生效：state={}（颜色覆盖 #AA6EFF）",
-					g_cfg.stateByCategory[static_cast<std::size_t>(Category::kLootResource)]);
-			} else {
-				REX::WARN("resource keyword: 判据自检**失败**（iron={} digipick={} credits={}）"
+			const bool pickHit = pick && IsResourceBaseRaw(pick);
+			const bool credHit = cred && IsResourceBaseRaw(cred);
+			if (pickHit || credHit) {
+				g_state.resKeywordTest = 2;
+				REX::WARN("resource keyword: 判据自检**否决**（真杂物被误判：digipick={} credits={}）"
 						  "-> 资源暂归「杂项」（颜色不变）。读法/校验链见常量区「v4.17 资源判据」；"
 						  "若要强制关掉这条判据，INI 里写 `ResourceByKeyword=0`",
-					ironHit ? 1 : 0, pickHit ? 1 : 0, credHit ? 1 : 0);
+					pickHit ? 1 : 0, credHit ? 1 : 0);
+				return;
+			}
+			if (hits > 0) {
+				g_state.resKeywordTest = 1;
+				REX::INFO("resource keyword: 判据自检**通过**（正样本 {}/{} 个在内存、命中 {} 个，"
+						  "如 0x{:X}；Digipick/Credits=杂项）-> 「资源」分类生效：state={}（颜色 #B36BFF）",
+					resolved, static_cast<std::uint32_t>(std::size(kResSelfTestSamples)), hits, firstHit,
+					g_cfg.stateByCategory[static_cast<std::size_t>(Category::kLootResource)]);
+				return;
+			}
+			if (resolved >= 2) {
+				g_state.resKeywordTest = 2;
+				REX::WARN("resource keyword: 判据自检**否决**（拿到 {} 个正样本但一个都没命中，"
+						  "离线核对 ResourceType* 都在）-> 资源暂归「杂项」（颜色不变）；"
+						  "读法/校验链见常量区「v4.17 资源判据」",
+					resolved);
+				return;
+			}
+			// 样本不足：**不否决**（判据按形状校验兜底继续生效），限流打一条说明。
+			const auto now = NowMs();
+			if (g_state.resKeywordWarns < 6 && now >= g_state.resKeywordWarnAtMs) {
+				++g_state.resKeywordWarns;
+				g_state.resKeywordWarnAtMs = now + 5000;
+				REX::WARN("resource keyword: 自检正样本还没进内存（{} 个样本只拿到 {} 个；第 {} 次尝试）"
+						  "-> 「资源」判据**仍在生效**（形状校验兜底），首次命中会另行打一条 INFO",
+					static_cast<std::uint32_t>(std::size(kResSelfTestSamples)), resolved, g_state.resKeywordTries);
 			}
 		}
 
@@ -3472,7 +3554,19 @@ namespace SAS
 			case RE::FormType::kNOTE:  // （Starfield.esm 里没有 NOTE 记录，留作兜底）
 				return static_cast<int>(Category::kLootNote);
 			case RE::FormType::kMISC:  // 资源（关键词命中）↔ 杂项
-				return static_cast<int>(IsResourceBase(a_base) ? Category::kLootResource : Category::kLoot);
+				if (IsResourceBase(a_base)) {
+					// ★ v4.22：世界里**首个**命中 —— 「资源分类真的在干活」的最快证据
+					//   （用户实测过「资源和杂物同色」，复盘时就 grep 这一行）。
+					if (g_state.resKeywordFirstHit == 0) {
+						g_state.resKeywordFirstHit = a_base->GetFormID();
+						REX::INFO("resource keyword: 首个资源命中 base=0x{:08X} -> 资源分类生效"
+								  "（state={}，颜色 #B36BFF）",
+							g_state.resKeywordFirstHit,
+							g_cfg.stateByCategory[static_cast<std::size_t>(Category::kLootResource)]);
+					}
+					return static_cast<int>(Category::kLootResource);
+				}
+				return static_cast<int>(Category::kLoot);
 			// ---- 杂项（颜色不变）----
 			case RE::FormType::kINGR:
 			case RE::FormType::kKEYM:
