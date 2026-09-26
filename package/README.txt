@@ -3,7 +3,24 @@
  Always-on scanner highlighting for Starfield
 ========================================================================
 
-Version  : 1.7.6  (plugin build 4.24.0)
+Version  : 1.7.7  (plugin build 4.25.0)
+           1.7.7 = fix: with the scanner put away, already-scanned planet
+           targets (ores / gas / liquids / plants) still showed the
+           "not scanned" cyan. 1.7.6 fixed the other half (with the scanner
+           UP, the vanilla green is back); but once you lower the scanner
+           the mod re-hangs the highlight itself, and it only ever used one
+           state - the vanilla "not scanned" cyan pulse - so nothing told
+           "already surveyed" and "never surveyed" apart. The mod now asks
+           the game itself: it calls the very function the vanilla scanner
+           uses (the one that checks whether a resource has entered your
+           survey data) and walks the game's own record chain (flora record
+           -> produced item -> its resource). Already-scanned targets use
+           the game's own "scanned" state - GREEN, the same colour and slot
+           the game uses while the scanner is up; unscanned ones keep the
+           cyan pulse. Scan a deposit, lower the scanner: it turns green
+           within about 0.2 s. FloraScannedByResource=0 (or
+           StateFloraScanned=7) brings the old behaviour back without
+           swapping the DLL.
            1.7.6 = fix: scanned planet targets did not turn green.
            The game paints already-scanned planet targets (ores / gas /
            liquids / plants) with two outline states whose native colour is
@@ -130,9 +147,11 @@ Pick-up items follow the game's own inventory categories:
     above; write ColorDevice=00E5FF for cyan instead)                  GREEN
   * Doors                                                            WHITE
   * Flora, ores, gas vents, liquid pools (all one record type in the game
-    data) - the game's own "scannable target" colour, cyan pulse.
-    Since 1.7.5 this category is ON by default and its colour is never
-    overwritten (see below)                                           CYAN
+    data) - the game's own "scannable target" colour, a cyan pulse; once
+    you have surveyed one it switches to the game's own "scanned" green.
+    Since 1.7.5 this category is ON by default, its colours are never
+    overwritten (see below) and since 1.7.7 scanned targets stay green
+    even with the scanner put away                        CYAN / GREEN
 
 The six pick-up categories sit at hues that are at least ~44 degrees
 apart (red / magenta / green / yellow / purple, plus the original misc
@@ -140,7 +159,8 @@ blue), so they can be told apart at a single glance. Every category gets
 its colour assigned explicitly by the mod (see ColorXxx in the INI),
 instead of borrowing the engine's default per-state colours - except the
 planet targets and the two categories that share the game's "scanned
-target" states, which are deliberately left untouched (1.7.5 / 1.7.6).
+target" states, which are deliberately left untouched
+(1.7.5 / 1.7.6 / 1.7.7 - see the planet-survey section below).
 
 Since 1.7.3 the outline is drawn as a contour instead of a fill: the
 mod writes alpha=0 into the outline's base colour, which is the "no
@@ -162,7 +182,17 @@ scanner up it leaves that whole category alone (no new outlines, no
 refresh, and it does not remove the ones already there, because those
 entries live in the manager the game is using right now). The moment you
 put the scanner away they are put back (about 0.8 s), painted in the
-game's own cyan, so planets are readable with or without the scanner. Resources vs. misc items: "resources" (iron, aluminium,
+game's own cyan, so planets are readable with or without the scanner.
+Since 1.7.7 that "put back" pass asks the game whether each target has
+been surveyed already: the mod calls the game's own check function (the
+one the vanilla scanner uses) and walks the game's own record chain
+(flora record -> the item it produces -> that item's resource). Targets
+you have already scanned come back GREEN - the exact state and colour the
+game uses while the scanner is up - and unscanned ones stay cyan, so with
+the scanner away you can tell at a glance what is left to survey. Scan
+something, put the scanner away: it turns green within ~0.2 s.
+FloraScannedByResource=0 (or StateFloraScanned=7) in the INI restores the
+old "all cyan" behaviour. Resources vs. misc items: "resources" (iron, aluminium,
 helium-3, organics, ...) are purple, misc items (digipicks, credits,
 toys) are blue. If the resource check ever fails, the log says so and
 everything falls back to the misc color.
@@ -242,7 +272,19 @@ Most useful options:
                         4 / 5 (the vanilla "scanned planet target" states,
                         native green) are never touched. Ammo & aid and
                         devices still use 4 / 5, so they show the game's
-                        own green by default (1.7.6).
+                        own green by default (1.7.6). Since 1.7.7 already-
+                        scanned planet targets use state 5 as well (see
+                        StateFloraScanned below) - same state, same green,
+                        so nothing changes visually.
+  FloraScannedByResource=1
+                        ask the game whether a planet target has been
+                        surveyed already and paint scanned ones green
+                        (default on, 1.7.7). 0 = old behaviour: the whole
+                        flora category uses StateFlora only.
+  StateFloraScanned=5   state used for already-scanned planet targets
+                        (default 5 = the game's own "scanned" green,
+                        #27C684). Set it to 7 (= StateFlora) to make
+                        scanned and unscanned look the same again.
   ColorWeapon=FF2E2E    exact RGB per category (written by default):
   ColorApparel=FF3BD4     weapons red / suits magenta / notes yellow /
   ColorNote=FFD700        resources purple / misc blue / containers &
@@ -280,6 +322,9 @@ Most useful options:
                         scanned / not-scanned colours stay intact (the
                         "scanned" green is preserved since 1.7.6 - that was
                         the state 4 / 5 colour, see the version notes).
+                        Since 1.7.7 surveyed targets come back GREEN with
+                        the scanner away too (FloraScannedByResource /
+                        StateFloraScanned below).
                         Set it to 0 to leave this category completely to the
                         vanilla scanner (you will only see those targets
                         while the scanner is up), or StateFlora=5 plus
@@ -420,6 +465,16 @@ categories).
     In the log, the startup line "outline colors[install]: state= 4 ..."
     should show "基色=#27C684" (green), and there should be no
     "state=4 覆盖为" / "state=5 覆盖为" line.
+* On a planet with the scanner AWAY, everything is cyan - scanned targets
+    do not show green: that is the 1.7.7 behaviour switch. Check the INI for
+    FloraScannedByResource=1 and StateFloraScanned=5 (an INI from 1.7.6 or
+    older does not contain them - the DLL then uses its built-in defaults,
+    so the feature works even without the new keys). In the log look for
+    "flora scanned: ... ready" at startup and the stats line
+    "planet targets ... : 未扫描=... 已扫描=... | 判据: 查询=... 命中=...";
+    "已扫描" (scanned) should grow once you have surveyed something near you.
+    If "链失败" (chain failures) grows instead, the game's record layout
+    changed - please report that log line.
 * On a planet, ores / gas vents / liquid pools / plants have no colour
     at all: check EnableFlora=1 in your INI (1.7.4 shipped it as 0).
     Those targets are only painted by the vanilla scanner while it is up,

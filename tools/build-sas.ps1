@@ -295,7 +295,14 @@ if (-not $SkipDeploy) {
     #   「设备 青」/「弹药救援 亮绿」⇒ 扫描后永远看不到那个绿。
     #   修法：4/5 颜色一个字节都不写（设备 / 弹药救援 继续用这两个槽位，颜色 = 原版绿）;
     #   另新增诊断 `ManagerOccupancyProbe`（举扫描仪 1.5s 后打 11 个管理器元素数）。
-    Set-Content -LiteralPath (Join-Path $modRoot 'meta.ini') -Value "[General]`nmodid=18268`nversion=1.7.6`ncomment=Always-on scanner highlighting (SFSE)" -Encoding UTF8
+    # ★ 2026-09-26（v4.25 / 发布版 1.7.7）：**放下扫描仪之后也区分「扫没扫过」** ——
+    #   用户实测「矿石/气体/液体/植物 收起扫描后还是扫描前的青色」。MOD 现在直接调
+    #   引擎自己的判据函数（RVA 0x1597A50「该资源是否已进勘测数据」），照抄引擎那条链
+    #   （FLOR+0x260 produceItem → 首条目 MISC → MISC+0x238 资源数组 → BGSResource(IRES)）：
+    #     已扫描 ⇒ StateFloraScanned（默认 5，原生绿 #27C684）、未扫描 ⇒ StateFlora（7，青）。
+    #   新键：FloraScannedByResource / StateFloraScanned / FloraScanProbeMax；
+    #   让位保护改成按类别（OutlineEntry::cat）、状态变化即时生效（不再等重申时刻）。
+    Set-Content -LiteralPath (Join-Path $modRoot 'meta.ini') -Value "[General]`nmodid=18268`nversion=1.7.7`ncomment=Always-on scanner highlighting (SFSE)" -Encoding UTF8
 
     Get-ChildItem -LiteralPath $modRoot -Recurse -File | ForEach-Object {
         Write-Host ("  {0}  ({1} bytes)" -f $_.FullName.Substring($modRoot.Length + 1), $_.Length)

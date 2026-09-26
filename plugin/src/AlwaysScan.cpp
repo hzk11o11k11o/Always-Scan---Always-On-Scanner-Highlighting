@@ -945,6 +945,44 @@ namespace SAS
 			//   0 = 退回 v4.22 行为（举着扫描仪也按 state 7 重申）；改完重进游戏生效。
 			bool          yieldTargetsWhileScanning = true;
 
+			// ================================================================
+			// ★★★ v4.25：星球目标「已扫描」⇒ 也用原版那个绿（放下扫描仪之后）
+			// ================================================================
+			// 起因（用户实测反馈）：
+			//   「矿石、气体、液体、植物、动物现在扫描后，在扫描仪里的颜色是原版颜色了，
+			//     但是收起扫描以后，在 MOD 的高亮颜色里还是扫描前的原版蓝色，
+			//     这个也要跟着一起变成原版绿色」
+			// v4.24 修好的是「举着扫描仪时」那一半（state 4/5 归还引擎）；这一项修的是
+			// 「放下扫描仪之后」那一半 —— MOD 自己重挂时也得区分扫没扫过。
+			//
+			// 1 = 用**引擎自己的判据**（RVA 0x1597A50「这个资源已扫描（进了勘测数据）？」，
+			//     走 FLOR → produceItem → MISC → BGSResource 那条链，见常量区证据链）：
+			//       已扫描 ⇒ 挂 StateFloraScanned（默认 5 = 原版「已扫描」绿 #27C684）；
+			//       未扫描 ⇒ 挂 StateFlora（7 = 原版青色脉冲）；
+			//     ★ 放下扫描仪那一刻 + 换场景 / 读档时缓存作废 ⇒ 刚扫完的东西
+			//       立刻（下一个扫描节拍，≤200ms）变绿。
+			// 0 = 退回 v4.24 行为（整个「植物」类别只用 StateFlora 一个状态）。
+			bool          floraScannedByResource = true;
+
+			// 「已扫描」的星球目标用哪个 outline 状态（0..11）。默认 **5**：
+			//   引擎把「已经在勘测数据里的星球目标」写进 state 4（远）/ 5（近），
+			//   两者原生色都是**绿色 #27C684**（`outline colors` 日志里的
+			//   state=4 Bounty / state=5 Social），所以选 5（原版近处用的那个）不会
+			//   引入任何新颜色；想让它退成「和未扫描一样」就把这里设成与
+			//   StateFlora 相同的值（7）。
+			//   ⚠️ 5 也是「弹药、救援」用的槽位（v4.24 起那个槽位的颜色同样交给引擎
+			//      = 原版绿）⇒ 两者同色，不冲突；若你把 StateFloraScanned 改成 4，
+			//      则与「设备」同槽位（同样是原版绿）。
+			int           stateFloraScanned = 5;
+
+			// ★★★ v4.25（诊断）：`flora scan:` 探针最多打几条（默认 8；0 = 关掉）
+			//   每条 = 一次**真实的判据查询**（带缓存，所以一个 base 最多每 2 秒一条），
+			//   内容：`base=… produceItem=…(LVLI) misc=…(MISC) irES=…(IRES) -> 已扫描=1/0`。
+			//   用途：① 确认判据真的在跑（`已扫描=1` 出现 = 引擎说这个资源扫过了）；
+			//         ② 出问题时（永远 0 / 形状校验 WARN）这一行带上链上三个指针，
+			//            可以直接和离线反汇编对照 —— 偏移是不是又变了。
+			int           floraScanProbeMax = 8;
+
 			// --- ★ v2.2：治「轻微卡顿」的两个闸门 ---
 			// 「掉队」宽限期（毫秒）：一个目标掉出选中集合后，先留着高亮这么久，
 			// 到期还没回到集合里才真正摘掉。
@@ -1442,6 +1480,14 @@ namespace SAS
 			//   地址一变（或从 null 变非 null）就说明该重挂了 —— 见 SyncNativeOutline
 			//   的「4) 3D 复检」段。
 			const void*                      last3D     = nullptr;
+			// ★★★ v4.25：这条高亮属于哪个类别（Category）。
+			//   为什么需要它：v4.23 的「举着扫描仪时让位原版」是按**状态**判断的
+			//   （`state == StateFlora`），而 v4.25 起「植物」类别会在
+			//   StateFlora（未扫描，青）与 StateFloraScanned（已扫描，绿）之间切换 ——
+			//   按状态判断就会漏掉「已扫描」那一半（它用的 state 5 正是引擎此刻在用的
+			//   槽位，漏保护 = 放下扫描仪后 MOD 会把引擎刚挂的那条摘掉）。
+			//   ⇒ 改成按类别判断，与状态取值彻底解耦。
+			std::uint8_t                     cat        = 0xFF;
 		};
 
 		struct State
@@ -1797,6 +1843,25 @@ namespace SAS
 			//   WhileScanning，见 Config）。这个计数**只在让位窗口里、且本轮确实
 			//   跳过了该类的候选**时才增长 —— 用它确认「让位」真的只在扫描时发生。
 			std::uint64_t skipYield     = 0;
+
+			// --- ★★★ v4.25：星球目标「已扫描」判据（见常量区 kRvaIsResourceScanned）---
+			//   缓存：base FormID → 「它产出的资源已扫描」（带 TTL；放下扫描仪 / 换场景
+			//   时整体作废 —— 见 InvalidateFloraScannedCache 的调用点）。
+			struct FloraScanRec
+			{
+				bool          scanned = false;
+				std::uint64_t atMs    = 0;
+			};
+			std::unordered_map<std::uint32_t, FloraScanRec> floraScannedCache;
+			std::uint64_t floraScanQueries    = 0;  // 真正问过引擎几次（累计，诊断）
+			std::uint64_t floraScanHits       = 0;  // 其中「已扫描」（累计，诊断）
+			std::uint64_t floraScanShapeFails = 0;  // 链的形状校验没过几次（累计，诊断）
+			std::uint32_t floraScanProbes     = 0;  // 本会话已打的 `flora scan:` 探针数
+			std::uint32_t floraScanShapeWarns = 0;  // 形状校验失败的 WARN 已打几条（限流）
+			std::uint64_t floraScanShapeWarnAtMs = 0;
+			// 窗口内：本轮选中的星球目标里，分别有多少个走「已扫描（绿）」/「未扫描（青）」
+			std::uint64_t floraScannedSel   = 0;
+			std::uint64_t floraUnscannedSel = 0;
 
 			// --- ★ v4.7：Tick 间隔诊断（区分「Tick 没被调」和「被早退挡住」）---
 			std::uint64_t lastTickMs     = 0;
@@ -3211,6 +3276,10 @@ namespace SAS
 			g_cfg.resyncOnScannerClose = getInt("ResyncOnScannerClose", 1) != 0;
 			// ★★★ v4.23：举着原版扫描仪时「星球扫描目标」类别让位（理由见 Config）
 			g_cfg.yieldTargetsWhileScanning = getInt("YieldTargetsWhileScanning", 1) != 0;
+			// ★★★ v4.25：星球目标「已扫描 ⇒ 也用原版那个绿」（放下扫描仪之后）
+			g_cfg.floraScannedByResource = getInt("FloraScannedByResource", 1) != 0;
+			g_cfg.stateFloraScanned      = std::clamp(getInt("StateFloraScanned", 5), 0, 11);
+			g_cfg.floraScanProbeMax      = std::clamp(getInt("FloraScanProbeMax", 8), 0, 64);
 			g_cfg.unhighlightGraceMs = std::clamp(getInt("UnhighlightGraceMs", 1500), 0, 60000);
 			g_cfg.maxOutlineOpsPerScan = std::clamp(getInt("MaxOutlineOpsPerScan", 64), 0, 4096);
 
@@ -3454,6 +3523,22 @@ namespace SAS
 					  "「已扫描的星球目标」（近 = 5 / 远 = 4）⇒ 举着扫描仪时看到的是原版色",
 				g_cfg.stateByCategory[static_cast<std::size_t>(Category::kDevice)],
 				g_cfg.stateByCategory[static_cast<std::size_t>(Category::kLootAmmoAid)]);
+
+			// ★★★ v4.25：星球目标「已扫描」⇒ 也用原版那个绿（放下扫描仪之后）
+			{
+				const int floraState = g_cfg.stateByCategory[static_cast<std::size_t>(Category::kFlora)];
+				const std::string how = !g_cfg.floraScannedByResource
+					? "全部用 StateFlora（= v4.24 行为，扫没扫过看起来一样）"
+					: (g_cfg.stateFloraScanned == floraState
+							? "两种状态是同一个值 ⇒ 观感同 v4.24（等于把这项关掉）"
+							: "**已扫描过的**用 state " + std::to_string(g_cfg.stateFloraScanned) +
+								  "（原版「已扫描」绿 #27C684）、没扫描过的用 state " +
+								  std::to_string(floraState) +
+								  "（原版青色脉冲）；判据 = 引擎自己的 0x1597A50 —— 日志里搜 `flora scan:` 可核对");
+				REX::INFO("config: floraScannedByResource={} stateFloraScanned={} -> 「植物 / 矿脉 / 气泉 / 液池」"
+						  "放下扫描仪后：{}",
+					g_cfg.floraScannedByResource, g_cfg.stateFloraScanned, how);
+			}
 
 			REX::INFO("config: radius={:.1f}m targets={} hotkeyVK=0x{:X} startEnabled={}",
 				g_cfg.radiusMeters, g_cfg.maxTargets, g_cfg.hotkeyVk, g_cfg.startEnabled);
@@ -5596,6 +5681,11 @@ namespace SAS
 			//    但这里清掉才是干净的）。
 			g_state.dcWatchCount = 0;
 			g_state.dcUiProbeLastMs = 0;
+			// ★★★ v4.25：换场景 / 读档 ⇒ 「星球目标是否已扫描」的判据作废
+			//   （换了一个存档 = 勘测数据可能完全不同；缓存不能跨世界复用）。
+			//   ★ 直接用 clear()（而不是 InvalidateFloraScannedCache）—— 这里在
+			//     flora 判据的定义之前，用不着为了打一行日志去挪一大堆声明。
+			g_state.floraScannedCache.clear();
 			// ★ v4.13：事件队列里排队的记录也是「旧世界」的（FormID / 指针随时可能作废）
 			//   ⇒ 一起丢掉，免得换场景后按旧 FormID 去减账。
 			{
@@ -5897,9 +5987,72 @@ namespace SAS
 		std::uintptr_t        g_outlineRemoveVisorVt = 0;
 		bool                  g_outlineGraphRemoveReady = false;
 
+		// ================================================================
+		// ★★★ v4.25：星球目标「已经扫描过吗」—— **直接问引擎**（唯一权威来源）
+		// ----------------------------------------------------------------
+		// 起因（用户实测反馈，v4.24 修完之后剩下的那一半）：
+		//   「矿石、气体、液体、植物、动物现在扫描后，在扫描仪里的颜色是原版颜色了，
+		//     但是收起扫描以后，在 MOD 的高亮颜色里还是扫描前的原版蓝色」
+		// v4.24 把 state 4/5 归还引擎之后：**举着扫描仪**时原版绿已经回来了；但
+		// 放下扫描仪后 MOD 只用 StateFlora（= 7 = 原版青色脉冲）一个状态重挂 ⇒
+		// 「扫过的」和「没扫过的」看起来一模一样。
+		//
+		// 引擎自己的判据链（本机 1.16.244.0 复核反汇编 `0x159ED90` 的
+		// `0x159F4C2`~`0x159F569` 段，逐条对上）：
+		//
+		//   0159F4C7  mov rax,[rdi+0x98]       ; rdi = ref → base
+		//   0159F4D7  cmp byte [rax+0x2e],0x2e ; formType == kFLOR (0x2E) ?
+		//   0159F4E1  mov rax,[rax+0x260]      ; ★ FLOR+0x260 = produceItem（LVLI）
+		//   0159F4F1  cmp byte [rax+0x2e],0x3f ; formType == kLVLI (0x3F) ?
+		//   0159F4FB  cmp byte [rax+0x13a],0   ; 条目数 > 0 ?
+		//   0159F504  mov rax,[rax+0x120]      ; 首个条目的指针
+		//   0159F50B  mov rcx,[rax]            ; 条目的 form
+		//   0159F513  cmp byte [rcx+0x2e],0x28 ; formType == kMISC (0x28) ?
+		//   0159F519  mov rbx,[rcx+0x238]      ; ★ MISC+0x238 = BGSCraftingResourceOwner
+		//                                      ;   的 componentData（指针 → BSTArray）
+		//   0159F525  mov eax,[rbx]            ; size（BSTArray size@+0）
+		//   0159F52B  mov rbx,[rbx+8]          ; data（★ data@+8，与 v4.23 的订正一致）
+		//   0159F540  mov rcx,[rbx]            ; 每个元素（stride 0x18）的第一个字段
+		//   0159F548  cmp byte [rcx+0x2e],0x9f ; formType == kIRES (0x9F) = BGSResource ?
+		//   0159F54E  call 0x1597A50           ; ★「这个资源已经扫描过（进了勘测数据）？」
+		//   0159F557  state = 4 + (在范围内 ? 1 : 0) ; ⇒ 4（远）/ 5（近）= 原生绿 #27C684
+		//
+		// ⇒ MOD 照抄同一条链 + **同一个函数**，就能在不举扫描仪时给出与原版完全一致的
+		//   「已扫描」判定（而不是自己猜）。判定为「已扫描」⇒ 挂 StateFloraScanned
+		//   （默认 5 = 原版「已扫描」绿；远/近两个槽位原生色相同，所以不分远近），
+		//   否则保持 StateFlora（7 = 原版青色脉冲）。
+		//   ★ 全部只读：链上每一步都做形状校验（formType 断言 + 指针/可读性），
+		//     任何一步不通 ⇒ 按「未扫描」处理（失败方向永远是「保持原样」）。
+		constexpr std::uintptr_t kRvaIsResourceScanned = 0x1597A50;
+		// 函数首 16 字节签名（游戏版本一变 RVA 就不可靠，用之前硬核对）。
+		constexpr std::uint8_t kSigIsResourceScanned[16] = {
+			0x48, 0x89, 0x5C, 0x24, 0x10, 0x48, 0x89, 0x6C, 0x24, 0x18, 0x48, 0x89, 0x74, 0x24, 0x20, 0x57
+		};
+		// 链上的偏移（全部来自上面那段反汇编 —— commonlibsf 在这几个类上的声明比
+		// 实际少 8 字节，所以用引擎的值，并且每一步都做形状校验）。
+		constexpr std::size_t kOffFloraProduce   = 0x260;  // FLOR → produceItem（TESProduceForm）
+		constexpr std::size_t kOffLvliCount      = 0x13A;  // LVLI 条目数（byte）
+		constexpr std::size_t kOffLvliFirstEntry = 0x120;  // LVLI 首个条目（指针）
+		constexpr std::size_t kOffMiscResArray   = 0x238;  // MISC → 资源数组对象（指针）
+		constexpr std::size_t kOffResElemStride  = 0x18;   // 资源数组元素 stride
+		constexpr std::uint32_t kFloraResElemMax = 16;     // 元素数上限（防垃圾 size）
+		// 判据缓存的有效期（毫秒）：扫描状态只会在「举着扫描仪扫到」时变化，所以这个
+		// 值只影响「扫描完成 → 放下扫描仪」之后的刷新速度；放下扫描仪那一刻还有一次
+		// 强制作废（见 InvalidateFloraScannedCache 的调用点）。
+		constexpr std::uint64_t kFloraScanCacheTtlMs = 2000;
+		constexpr std::size_t   kFloraScanCacheMax   = 4096;  // 缓存条数上限（兜异常增长）
+
+		using IsResourceScanned_t = bool (*)(RE::TESForm*);
+		IsResourceScanned_t g_isResourceScanned      = nullptr;
+		bool                g_isResourceScannedReady = false;
+
 		// 前置声明（定义在 ResolveNativeOutline 之后）
 		std::uintptr_t OutlineManagerFor(std::uint32_t a_state);
 		std::uint32_t  PrimaryState();
+		// ★★★ v4.25：星球目标「已扫描」判据（定义见 SigMatches 之后）
+		std::uint32_t  FloraScannedState();
+		void           InvalidateFloraScannedCache(const char* a_reason);
+		bool           FloraTargetScanned(const RE::TESForm* a_base);
 		void           LogManagerDiagnostics(const char* a_tag);
 		void           LogManagerMapDiag(const char* a_tag, std::uint32_t a_state);
 		void           LogOutlineColors(const char* a_tag);
@@ -5929,6 +6082,201 @@ namespace SAS
 				}
 			}
 			return true;
+		}
+
+		// ================================================================
+		// ★★★ v4.25：星球目标（FLOR）「已扫描」判据
+		// ----------------------------------------------------------------
+		// 常量与完整证据链（反汇编原文）见文件上方「kRvaIsResourceScanned」那一段。
+		// 这里只有三件事：
+		//   ① FloraScannedState()      —— 配置里「已扫描」用哪个 outline 状态；
+		//   ② QueryFloraResourceScanned —— 照抄引擎那条链 + 调引擎自己的判据函数；
+		//   ③ FloraTargetScanned()     —— 带缓存的外层入口（热路径每轮都会问）。
+		// ================================================================
+
+		// ① 配置里「已扫描」用的状态（默认 5 = 原版「近处已扫描」= 绿 #27C684）
+		std::uint32_t FloraScannedState()
+		{
+			return static_cast<std::uint32_t>(std::clamp(g_cfg.stateFloraScanned, 0, 11));
+		}
+
+		// 链上各层的中间结果（诊断用；也是「形状校验过没过」的载体）
+		struct FloraChain
+		{
+			std::uint64_t produce = 0;  // FLOR → produceItem（LVLI）
+			std::uint64_t misc    = 0;  // LVLI 首条目 → MISC
+			std::uint32_t irES    = 0;  // 命中的 BGSResource FormID（未命中时给第一个 IRES）
+			bool          shapeOk = false;  // 每一层的 formType 断言都过了
+		};
+
+		// ② 照抄引擎那条链，问引擎「这个资源已经扫描过吗」。
+		//   ★ 全部只读；任何一层读不通就返回 false（= 按「未扫描」处理）。
+		//   ★ 只有末端的 g_isResourceScanned（= 引擎自己的 0x1597A50）是引擎调用。
+		bool QueryFloraResourceScanned(const RE::TESForm* a_base, FloraChain* a_out)
+		{
+			FloraChain out{};
+			if (a_out) {
+				*a_out = out;
+			}
+			if (!a_base) {
+				return false;
+			}
+			const auto* raw = reinterpret_cast<const std::uint8_t*>(a_base);
+			if (raw[kOffFormType] != static_cast<std::uint8_t>(RE::FormType::kFLOR)) {
+				return false;
+			}
+			// ---- ① FLOR → produceItem（必须是一个「有产出」的 LVLI）----
+			std::uint64_t producePtr = 0;
+			if (!SafeReadMem(raw + kOffFloraProduce, &producePtr, sizeof(producePtr)) ||
+				!IsPlausibleFormPtr(producePtr)) {
+				return false;
+			}
+			const auto* produce = reinterpret_cast<const std::uint8_t*>(producePtr);
+			if (produce[kOffFormType] != static_cast<std::uint8_t>(RE::FormType::kLVLI)) {
+				return false;
+			}
+			out.produce = producePtr;
+			if (produce[kOffLvliCount] == 0) {
+				out.shapeOk = true;  // 合法：这个记录不产出任何东西 ⇒ 谈不上「已扫描」
+				if (a_out) {
+					*a_out = out;
+				}
+				return false;
+			}
+			// ---- ② LVLI → 首个条目 → MISC ----
+			std::uint64_t entryPtr = 0;
+			std::uint64_t miscPtr  = 0;
+			if (!SafeReadMem(produce + kOffLvliFirstEntry, &entryPtr, sizeof(entryPtr)) ||
+				!IsPlausiblePointer(entryPtr) ||
+				!IsReadable(reinterpret_cast<const void*>(entryPtr), sizeof(std::uint64_t)) ||
+				!SafeReadMem(reinterpret_cast<const void*>(entryPtr), &miscPtr, sizeof(miscPtr)) ||
+				!IsPlausibleFormPtr(miscPtr)) {
+				return false;
+			}
+			const auto* misc = reinterpret_cast<const std::uint8_t*>(miscPtr);
+			if (misc[kOffFormType] != static_cast<std::uint8_t>(RE::FormType::kMISC)) {
+				return false;
+			}
+			out.misc = miscPtr;
+			// ---- ③ MISC → 资源数组（{size@+0, data@+8}，元素 stride 0x18）----
+			std::uint64_t arrPtr = 0;
+			if (!SafeReadMem(misc + kOffMiscResArray, &arrPtr, sizeof(arrPtr)) ||
+				!IsPlausiblePointer(arrPtr) ||
+				!IsReadable(reinterpret_cast<const void*>(arrPtr), 0x10)) {
+				return false;
+			}
+			std::uint32_t size = 0;
+			std::uint64_t data = 0;
+			if (!SafeReadMem(reinterpret_cast<const void*>(arrPtr), &size, sizeof(size)) ||
+				!SafeReadMem(reinterpret_cast<const void*>(arrPtr + 8), &data, sizeof(data))) {
+				return false;
+			}
+			if (size == 0) {
+				out.shapeOk = true;  // 合法空数组
+				if (a_out) {
+					*a_out = out;
+				}
+				return false;
+			}
+			if (size > kFloraResElemMax || !IsPlausiblePointer(data) ||
+				!IsReadable(reinterpret_cast<const void*>(data),
+					static_cast<std::size_t>(size) * kOffResElemStride)) {
+				return false;
+			}
+			bool anyResource = false;
+			bool hit         = false;
+			for (std::uint32_t i = 0; i < size; ++i) {
+				std::uint64_t elem = 0;
+				if (!SafeReadMem(reinterpret_cast<const void*>(data + i * kOffResElemStride), &elem,
+						sizeof(elem)) ||
+					!IsPlausibleFormPtr(elem)) {
+					return false;  // 数组里混进了垃圾 ⇒ 整个判据作废（按未扫描处理）
+				}
+				const auto* elemRaw = reinterpret_cast<const std::uint8_t*>(elem);
+				if (elemRaw[kOffFormType] != static_cast<std::uint8_t>(RE::FormType::kIRES)) {
+					continue;  // ★ 引擎也只认 IRES 的元素（0x159F548 的 formType 断言）
+				}
+				anyResource  = true;
+				const auto id = *reinterpret_cast<const std::uint32_t*>(elemRaw + kOffFormID);
+				if (out.irES == 0) {
+					out.irES = id;  // 诊断：没命中的时候至少能看到「问的是哪个资源」
+				}
+				// ★★ 这一步才是「问引擎」：0x1597A50 =「这个资源已扫描（进了勘测数据）？」
+				if (g_isResourceScannedReady &&
+					g_isResourceScanned(reinterpret_cast<RE::TESForm*>(elem))) {
+					out.irES = id;
+					hit      = true;
+					break;
+				}
+			}
+			out.shapeOk = anyResource;
+			if (a_out) {
+				*a_out = out;
+			}
+			return hit;
+		}
+
+		// ③ 热路径入口：每个 base 每 kFloraScanCacheTtlMs 最多问引擎一次。
+		//   返回「这个星球目标产出的资源已经扫描过」。
+		bool FloraTargetScanned(const RE::TESForm* a_base)
+		{
+			if (!g_cfg.floraScannedByResource || !g_isResourceScannedReady || !a_base) {
+				return false;
+			}
+			const std::uint32_t fid = a_base->GetFormID();
+			const auto          now = NowMs();
+			const auto          it  = g_state.floraScannedCache.find(fid);
+			if (it != g_state.floraScannedCache.end()) {
+				if (now - it->second.atMs < kFloraScanCacheTtlMs) {
+					return it->second.scanned;
+				}
+				g_state.floraScannedCache.erase(it);
+			}
+			if (g_state.floraScannedCache.size() >= kFloraScanCacheMax) {
+				g_state.floraScannedCache.clear();  // 兜异常增长（正常情况下几十条）
+			}
+
+			FloraChain chain{};
+			const bool scanned = QueryFloraResourceScanned(a_base, &chain);
+			++g_state.floraScanQueries;
+			if (scanned) {
+				++g_state.floraScanHits;
+			}
+			if (!chain.shapeOk) {
+				++g_state.floraScanShapeFails;
+				if (g_state.floraScanShapeWarns < 6 && now >= g_state.floraScanShapeWarnAtMs) {
+					++g_state.floraScanShapeWarns;
+					g_state.floraScanShapeWarnAtMs = now + 5000;
+					REX::WARN("flora scanned: base=0x{:X} 判据链形状校验没过（produce=0x{:X} misc=0x{:X}）"
+							  "-> 该目标按「未扫描」处理（青色）。若所有星球目标都这样，"
+							  "把这一行发出来（偏移要跟着游戏版本重新核对）",
+						fid, chain.produce, chain.misc);
+				}
+			}
+			g_state.floraScannedCache.emplace(fid, State::FloraScanRec{ scanned, now });
+
+			if (g_cfg.floraScanProbeMax > 0 &&
+				g_state.floraScanProbes < static_cast<std::uint32_t>(g_cfg.floraScanProbeMax)) {
+				++g_state.floraScanProbes;
+				REX::INFO("flora scan: base=0x{:X} produceItem=0x{:X}(LVLI) misc=0x{:X}(MISC) irES=0x{:X}(IRES)"
+						  " -> 已扫描={} ⇒ 用状态 {}（{}）",
+					fid, chain.produce, chain.misc, chain.irES, scanned ? 1 : 0,
+					scanned ? FloraScannedState() : g_cfg.stateByCategory[static_cast<std::size_t>(Category::kFlora)],
+					scanned ? "原版「已扫描」绿" : "原版「未扫描」青色脉冲");
+			}
+			return scanned;
+		}
+
+		// 判据缓存作废。调用点：放下扫描仪（那一局扫描的结果刚刚变了）、换场景 / 读档
+		// （换了一个存档 = 勘测数据可能完全不同）。
+		void InvalidateFloraScannedCache(const char* a_reason)
+		{
+			if (g_state.floraScannedCache.empty()) {
+				return;
+			}
+			const auto n = g_state.floraScannedCache.size();
+			g_state.floraScannedCache.clear();
+			REX::INFO("flora scanned: 判据缓存作废（{}，清了 {} 条）-> 下一轮重新问引擎", a_reason, n);
 		}
 
 		void ResolveNativeOutline()
@@ -6021,6 +6369,29 @@ namespace SAS
 					visorVtOk ? "ok" : "bad-vtbl",
 					g_outlineUnhighlightReady ? "ok" : "unavailable");
 			}
+			// ★★★ v4.25：星球目标「已扫描」判据用的那个引擎函数
+			//   （0x1597A50 =「这个 BGSResource 已经扫描过（进了勘测数据）？」）。
+			//   它被引擎自己的扫描求值函数 `0x159ED90` 调用（`0x159F54E`），因此语义
+			//   与原版**逐字节一致**——比我们自己猜「扫描状态存在哪」可靠得多。
+			//   ★ 拿不到只是「星球目标不再区分扫描前后」（退回 v4.24 行为），
+			//     不该影响高亮本身，所以单独校验、单独降级。
+			const auto addrScanned = base + kRvaIsResourceScanned;
+			if (SigMatches(addrScanned, kSigIsResourceScanned)) {
+				g_isResourceScanned      = reinterpret_cast<IsResourceScanned_t>(addrScanned);
+				g_isResourceScannedReady = true;
+				REX::INFO("flora scanned: 引擎判据就绪（RVA 0x{:X}，签名核对通过）-> 放下扫描仪后，"
+						  "**已扫描过**的矿石 / 气体 / 液体 / 植物用状态 {}（原版绿 #27C684），"
+						  "没扫描过的用状态 {}（原版青色脉冲）",
+					kRvaIsResourceScanned,
+					g_cfg.stateFloraScanned,
+					static_cast<int>(g_cfg.stateByCategory[static_cast<std::size_t>(Category::kFlora)]));
+			} else {
+				g_isResourceScannedReady = false;
+				REX::WARN("flora scanned: RVA 0x{:X} 签名不匹配（游戏版本变了？）-> "
+						  "「已扫描的星球目标」退回与未扫描同色（= v4.24 行为，不影响其它功能）",
+					kRvaIsResourceScanned);
+			}
+
 			LogManagerDiagnostics("install");
 			LogManagerMapDiag("install", PrimaryState());
 			// ★ v4.0.1：把 11 个状态的实际配色打出来（分类分色出问题时的第一手证据）
@@ -6678,6 +7049,14 @@ namespace SAS
 							done     = OutlineUnhighlightRef(a_ref, s);
 						}
 					}
+					// ★★★ v4.25：「植物」类别的**第二个状态**（已扫描，默认 5）也要试 ——
+					//   它可能不在任何类别的 StateXxx 里（用户把 StateFloraScanned 改成
+					//   别的值时就可能落单），但完全可能正是这条高亮挂着的槽位。
+					const auto floraScannedState = FloraScannedState();
+					if (!done && floraScannedState < kOutlineManagerUsed && !tried[floraScannedState]) {
+						tried[floraScannedState] = true;
+						done = OutlineUnhighlightRef(a_ref, floraScannedState);
+					}
 				}
 				if (done) {
 					++g_state.outlineRemoved;
@@ -6759,12 +7138,15 @@ namespace SAS
 			//    若照常走宽限期，~1.5 秒后 UnoutlineRef 会把管理器里那条 highlight
 			//    摘掉 —— 那可能正是引擎刚给这个目标挂上的）。
 			//   放下扫描仪那一刻 DetectEngineOutlineLoss → MarkAllForReassert 会把
-			//   dropAt 清零并按预算整批重申（状态仍是 7 = 原版青色），行为自洽。
-			const std::uint32_t floraState = static_cast<std::uint32_t>(
-				std::clamp(g_cfg.stateByCategory[static_cast<std::size_t>(Category::kFlora)], 0, 11));
+			//   dropAt 清零并按预算整批重申（★ v4.25：重申时会按「扫没扫过」重新选状态
+			//   —— 已扫描的用 StateFloraScanned，见 Rescan 里那一段），行为自洽。
 			const bool yieldTargets = g_cfg.yieldTargetsWhileScanning && g_state.monocleOpen;
 			for (auto& [ref, e] : g_state.outlined) {
-				if (yieldTargets && e.state == floraState) {
+				// ★★★ v4.25：让位改成**按类别**判断（v4.23 是按状态）—— 「植物」类别现在
+				//   有两个状态（未扫描 7 / 已扫描 5），按状态判断会漏掉「已扫描」那一半，
+				//   而它用的 state 5 正是引擎此刻在用的槽位（漏保护 ⇒ 宽限期一到，
+				//   MOD 会把引擎刚给这个目标挂的那条 highlight 摘掉）。见 OutlineEntry::cat。
+				if (yieldTargets && e.cat == static_cast<std::uint8_t>(Category::kFlora)) {
 					e.dropAt = 0;
 					continue;
 				}
@@ -6815,19 +7197,26 @@ namespace SAS
 						e.ref        = RE::NiPointer<RE::TESObjectREFR>{ c->ref };
 						e.reassertMs = nextMs;
 						e.state      = c->state;
+						e.cat        = c->cat;  // ★ v4.25：让位保护按类别判断
 						// ★ v4.7：记下挂的时候的 3D 根（之后只要它变了就说明 3D 被重建过 ⇒
 						//   引擎侧那条登记已经丢了 ⇒ 见「4) 3D 复检」）
 						e.last3D = RefGet3D(c->ref).get();
 						g_state.outlined[c->ref] = std::move(e);
 					}
-				} else if (a_nowMs >= it->second.reassertMs) {
+				} else if (a_nowMs >= it->second.reassertMs || it->second.state != c->state) {
+					// ★★★ v4.25：`it->second.state != c->state` 这一条是**必须的** ——
+					//   默认 `ReassertMs=0` 时 reassertMs 写成 UINT64_MAX（= 永不重申），
+					//   若只按时间判断，「星球目标刚被扫描完 ⇒ 该从青色换成绿色」这件事
+					//   就永远不会被应用（那条高亮会一直停在扫描前的状态）。
+					//   ⇒ 只要「想要的 state」与「挂着的 state」不一致就立刻走一次
+					//     摘 + 挂（走同一份每轮预算，不会突发）。
 					if (budget == 0) {
 						++g_state.opsDeferred;
 						continue;
 					}
 					--budget;
 					++g_state.opsThisScan;
-					// 状态变了（理论上只在 INI 改过之后才会发生）：先把旧的摘掉，
+					// 状态变了：先把旧的摘掉，
 					// 否则同一个引用会同时留在两个管理器里 ⇒ 两层描边。
 					if (it->second.state != c->state) {
 						UnoutlineRef(c->ref);
@@ -6835,6 +7224,7 @@ namespace SAS
 					if (OutlineRef(c->ref, c->state)) {
 						it->second.reassertMs = nextMs;
 						it->second.state      = c->state;
+						it->second.cat        = c->cat;  // ★ v4.25
 						it->second.last3D     = RefGet3D(c->ref).get();  // ★ v4.7
 					} else {
 						// 挂不上（管理器又没了）：本轮撤账，下轮重新试
@@ -7008,6 +7398,14 @@ namespace SAS
 			const bool justClosed  = g_state.monocleOpen && !monocleOpen;
 			const bool justOpened  = !g_state.monocleOpen && monocleOpen;
 			g_state.monocleOpen    = monocleOpen;
+
+			// ★★★ v4.25：**放下扫描仪的那一刻**把「星球目标是否已扫描」的判据缓存作废 ——
+			//   这一局很可能刚刚扫成了某个矿脉 / 植物（这正是用户要的「扫完就变绿」），
+			//   不请缓存的话最多要等 kFloraScanCacheTtlMs（2 秒）才换色。
+			//   放在所有早退之前：即使功能关着也照样跟踪（免得开局时留下陈旧判据）。
+			if (justClosed) {
+				InvalidateFloraScannedCache("放下扫描仪");
+			}
 
 			// ★★★ v4.24：刚举起扫描仪 ⇒ 1.5 秒后打一行「管理器占用」快照
 			//   （那一刻引擎的求值循环已经写过至少一轮，11 个槽位里谁有货一目了然；
@@ -7433,6 +7831,21 @@ namespace SAS
 				// ★ v4.0：分类分色 —— 类别 → 该用哪个 outline 状态
 				c.state = static_cast<std::uint32_t>(g_cfg.stateByCategory[static_cast<std::size_t>(cat)]);
 				c.cat   = static_cast<std::uint8_t>(cat);
+				// ★★★ v4.25：星球目标（「植物」= FLOR：矿石 / 气体 / 液体 / 植物）——
+				//   **已经扫描过的**换成「已扫描」状态（默认 5 = 原版那个绿），
+				//   没扫描过的保持 StateFlora（7 = 原版青色脉冲）。
+				//   判据 = 引擎自己的 0x1597A50（见常量区证据链），带缓存；
+				//   举着扫描仪时这一段根本走不到（上面已经 yield 掉了）。
+				//   ⇒ 放下扫描仪之后：扫过的 = 绿、没扫过的 = 青，与原版一致。
+				if (cat == static_cast<int>(Category::kFlora) && g_cfg.floraScannedByResource &&
+					g_isResourceScannedReady) {
+					if (FloraTargetScanned(base)) {
+						c.state = FloraScannedState();
+						++g_state.floraScannedSel;
+					} else {
+						++g_state.floraUnscannedSel;
+					}
+				}
 				// 已发光的按 0.5 折扣参与排序 = 黏性：站着不动目标不抖，
 				// 走动时近的新目标仍然能顶掉远的旧目标。
 				c.key = c.lit ? d2 * 0.5f : d2;
@@ -7812,6 +8225,23 @@ namespace SAS
 					REX::INFO("  category (本轮选中): {} | 类别开关跳过 disabled={}", cats, g_state.disabledSkips);
 					g_state.disabledSkips = 0;
 				}
+
+				// ★★★ v4.25：星球目标「扫没扫过」的分流（用户反馈「放下扫描仪后还是扫描前的
+				//   青色」就是要看这一行）：
+				//     `未扫描=` / `已扫描=` —— 窗口内**本轮选中**的星球目标各占多少
+				//       （已扫描 = 挂的是原版绿 state StateFloraScanned）；
+				//     `判据: 查询/命中/链失败/缓存=` —— 判据本身的工作情况：
+				//       查询在涨 = 真的在问引擎（带缓存，一个 base 最多每 2 秒一次）；
+				//       命中 > 0  = 引擎确认「这个资源已经扫描过」；
+				//       链失败在涨 = 我们那条 FLOR → LVLI → MISC → IRES 链又对不上了
+				//       （日志里有 `flora scan:` 细节行 + 一条 WARN）。
+				REX::INFO("  planet targets (窗口内): 未扫描={} 已扫描={} | 判据: 查询={} 命中={} 链失败={} 缓存={} ready={}",
+					g_state.floraUnscannedSel, g_state.floraScannedSel,
+					g_state.floraScanQueries, g_state.floraScanHits,
+					g_state.floraScanShapeFails, g_state.floraScannedCache.size(),
+					g_isResourceScannedReady ? 1 : 0);
+				g_state.floraUnscannedSel = 0;
+				g_state.floraScannedSel   = 0;
 
 				// ★ v4.2：尸体 / 搜空（诊断；计数**每轮扫描都累加**，
 				//   所以同一个尸体在半径内待 5 秒的计数会是它的 ~25 倍 —— 看趋势即可）。
