@@ -5,7 +5,7 @@
 
 Version  : 2.0  (plugin build 5.1.0)
            2.0 = the mod brings its own outline colour channels (described
-           below), plus seven fixes, all from player reports.
+           below), plus eight fixes, all from player reports.
            (1) "Ores and plants are green before *and* after scanning."
                The mod remembers a confirmed "surveyed" verdict so a target
                cannot fall back to cyan (added in 1.7.9 / 1.8.1), but that
@@ -176,6 +176,37 @@ Version  : 2.0  (plugin build 5.1.0)
                (0 = old global spread). The stats line gained a
                `记忆作用域(★v5.1.5): 读档= 事件= 跳过= 翻案= 重见证= 链复核: 丢=...` block
                and `按物种扩散 ... 星球外拒=`.
+           (8) "After travelling / changing maps, already-surveyed items turn
+               back to the pre-survey cyan; raising the scanner once turns
+               them green again." Fixed 2026-09-27. Fix (7) treats the game's
+               load-game event as the moment a save is loaded and wipes the
+               remembered verdicts there. It turns out the game also sends
+               that event for some travels / map changes (the log of the
+               reported session shows the travel being handled as "load #2"),
+               so a trip was mistaken for loading an older save and true
+               verdicts were thrown away - one look at the scanner afterwards
+               proved it: the game repainted the very same objects green,
+               meaning they really were surveyed in this save.
+               The load event is now only a *candidate*. The mod waits four
+               seconds after the loading screen closes (so the world is
+               settled), then asks the survey-data check about every resource
+               the memory mentions:
+                 - no resource at all can be disproved => this was a travel or
+                   a reload of the same save (the survey data did not go
+                   backwards) => the memory is kept as it is (nothing is
+                   dropped, the scope is not bumped, the species table is not
+                   cleared), and resources the check confirmed as surveyed are
+                   re-anchored to the current scope;
+                 - at least one resource is disproved => this really was an
+                   older save => the fix-(7) behaviour applies (scope bump,
+                   species table cleared, the disproved records dropped).
+               Resources whose records were only ever confirmed on another
+               planet / worldspace are skipped during that check - asking
+               about them from the current one can only produce a false
+               "not surveyed". One new ini key: FloraLoadBoundaryEvidence=1
+               (0 = old behaviour, every load event is treated as a real
+               load). The stats line gained a
+               `读档边界(★v5.1.6): 事件保留= 确认base= 推进=` block.
            Also in 2.0 (the headline feature) - the mod brings its own
            outline colour channels instead of borrowing the game's.
            The game has eleven outline "states"
@@ -663,20 +694,35 @@ Most useful options:
                         #27C684). Set it to 7 (= StateFlora) to make
                         scanned and unscanned look the same again.
   FloraMemoryScope=1    how far the mod's "this one is surveyed" memory is
-                        allowed to reach (see fix (7) at the top of this
-                        file). "Surveyed" is a fact of the save you loaded,
-                        so the mod treats the game's own load-game event as
-                        a save boundary: the first save you load in a
-                        session keeps the remembered file (continue-where-
-                        I-left-off), and every later load trusts only what
-                        that save itself confirmed - plus the survey-data
-                        check is asked once per load for every resource the
-                        memory mentions and deletes the ones it disproves.
+                        allowed to reach (see fixes (7) / (8) at the top of
+                        this file). "Surveyed" is a fact of the save you
+                        loaded, so the mod treats the game's own load-game
+                        event as a *candidate* save boundary: the first save
+                        you load in a session keeps the remembered file
+                        (continue-where-I-left-off), and for every later load
+                        the survey-data check is asked about every resource
+                        the memory mentions. If it disproves at least one,
+                        that was an older save and the records it disproved
+                        are deleted outright (see fix (8): a travel or a
+                        reload of the same save disproves nothing, and then
+                        nothing is touched at all).
                         1 = default. 0 = old behaviour (memory never
                         expires - the "green before I scanned it" reports
                         come back). 2 = strictest (never trust the
                         remembered file, so plants may read cyan after a
                         load until you raise the scanner once).
+  FloraLoadBoundaryEvidence=1
+                        decide a load-game event by evidence instead of
+                        trusting it blindly (fix (8)): the mod waits four
+                        seconds after the loading screen closes, then asks
+                        the survey-data check about the resources its memory
+                        mentions; only records it can actively disprove are
+                        deleted, so travels / map changes (which also send
+                        that event but do not make your survey data go
+                        backwards) no longer wipe true verdicts. Resources
+                        only ever confirmed on another planet are skipped
+                        during that check. 1 = default. 0 = old behaviour
+                        (every load event counts as a real load).
   FloraSpeciesPlanetScope=1
                         spread a confirmed "surveyed" verdict to the whole
                         species / resource only inside the same planet
