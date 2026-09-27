@@ -2397,6 +2397,11 @@ namespace SAS
 			std::uint64_t floraProgFails     = 0;  // 查询失败（回退到旧判据）
 			std::uint64_t floraProgCacheHits = 0;  // 缓存命中（省掉的引擎链调用）
 			std::uint64_t floraProgConflict  = 0;  // 与「引擎状态表 4/5」相矛盾的次数（上限内打 WARN）
+			// ★★★ 订正 R10：key 类型 word 是**现读**的 ⇒ 这两条是「现读到底读到了什么」
+			//   的直接证据（`keyZero=` 一直涨且 `满=` 不涨 = 类型 word 还没被引擎初始化 /
+			//   我们读错了地址）。
+			std::uint64_t floraProgKeyZero   = 0;  // 现读到 0 的次数（0 也可能是合法类型）
+			std::uint32_t floraProgProbes    = 0;  // 已打的 `flora progress probe:` 条数
 			std::uint32_t floraScanProbes     = 0;  // 本会话已打的 `flora scan:` 探针数
 			std::uint32_t floraScanDumps      = 0;  // ★ v4.26：已打的「指针窗口」取证条数
 			std::uint64_t floraScanShapeWarnAtMs = 0;
@@ -4608,7 +4613,9 @@ namespace SAS
 			REX::INFO("config: floraEngineProgress={} -> ★ 植物「已扫描」直读引擎扫描进度表"
 					  "（`PlayerKnowledge` 物种槽 percent == 100 = 引擎写 4/5 的同一依据）："
 					  "key1=[0x81组件+0x28]、key2=0x1307180(ref)、两级只读哈希 0x24105D0/0x23467B0、"
-					  "进度@[元素+0x20]；按 base 缓存（绿 = 10 分钟 / 未满 = 见 FloraUnscannedTtlMs）、"
+					  "进度@[元素+0x20]；★ **订正 R10：key 的类型 word 每次查询现读**"
+					  "（它在 .data 未初始化段，启动时必为 0 —— R9 因此把判据整个禁用了）；"
+					  "按 base 缓存（绿 = 10 分钟 / 未满 = 见 FloraUnscannedTtlMs）、"
 					  "读档时清缓存；签名 / 形状校验不过会自动回退（日志搜 `flora progress:`）",
 				g_cfg.floraEngineProgress);
 			REX::INFO("config: floraUseMemory={} -> 自建记忆层（按引用记忆 / 按物种扩散 / 落盘播种 / 「沿用旧结论」）：{}",
@@ -7452,8 +7459,14 @@ namespace SAS
 		constexpr std::uint8_t   kSigFloraSingleton[16] = {
 			0x48, 0x83, 0xEC, 0x28, 0xBA, 0xB8, 0x00, 0x00, 0x00, 0x65, 0x48, 0x8B, 0x04, 0x25, 0x58, 0x00
 		};
-		// 0x130A270 里 key「类型常量」的提取点（`44 0F B7 05 disp32` = movzx r8d, word [rip+disp]）：
-		//   启动时验证这 4 字节，再从 disp 算出常量地址读 word —— RVA 表一变也不会读错值。
+		// 0x130A270 里 key「类型 word」的提取点（`44 0F B7 05 disp32` = movzx r8d, word [rip+disp]）：
+		//   启动时验证这 4 字节，再从 disp 算出 **word 的地址** —— RVA 表一变也不会读错地址。
+		//   ★★★ 订正 R10（★ 关键）：这个 word 落在 `.data` 的**未初始化段**
+		//   （目标 RVA `0x61E1D94` 超出 `.data` 的 raw size ⇒ 文件里根本没有它，
+		//   是运行时才被写入的）—— **启动时读它必然是 0**，R9 就是因此把整条新判据
+		//   禁用了（实测启动日志 `key 类型常量异常（0）` + 统计行 `ready=0 问=0`）。
+		//   引擎自己也是**每次查询现读**这条指令 ⇒ 我们也改成现读（见
+		//   `QueryFloraScanProgressDirect`），这样构造出的 key 与引擎写入时用的完全一致。
 		constexpr std::uintptr_t kRvaFloraKeyTypePatch = 0x130A2BA;
 		constexpr std::uint8_t   kPatFloraKeyType[4] = { 0x44, 0x0F, 0xB7, 0x05 };
 		// 偏移与形状常量（全部来自上面那段反汇编）：
@@ -7475,6 +7488,9 @@ namespace SAS
 		constexpr std::uint64_t kFloraProgressFullTtlMs    = 600000;  // 「已扫描」缓存 10 分钟（读档会清）
 		constexpr std::uint64_t kFloraProgressFailTtlMs    = 10000;   // 查询失败缓存 10 秒（避免每轮重撞）
 		constexpr std::size_t   kFloraProgressCacheMax     = 4096;    // 缓存条数上限（兜异常增长）
+		// ★★★ 订正 R10：`flora progress probe:` 诊断条数上限（本会话）—— key 类型 word
+		//   改为现读后，前几条能看清「现读值 + 停在哪一层」，一次日志就能定位。
+		constexpr std::uint32_t kFloraProgProbeMax         = 8;
 
 		// 判据缓存的有效期（毫秒）：扫描状态只会在「举着扫描仪扫到」时变化，所以这个
 		// 值只影响「扫描完成 → 放下扫描仪」之后的刷新速度；放下扫描仪那一刻还有一次
@@ -7506,8 +7522,13 @@ namespace SAS
 		FloraHashFind_t     g_floraHashFind      = nullptr;
 		FloraSubFind_t      g_floraSubFind       = nullptr;
 		FloraSingleton_t    g_floraSingleton     = nullptr;
-		bool                g_floraProgressReady = false;  // 5 个签名 + key 类型常量全过才置 1
-		std::uint64_t       g_floraKeyType       = 0;      // key 高 16 位（启动时从指令提取）
+		bool                g_floraProgressReady = false;  // 5 个签名 + key 类型提取点签名全过才置 1
+		// ★★★ 订正 R10：key 高 16 位的「类型 word」—— 存**地址**、每次查询**现读**。
+		//   该 word 在 `.data` 未初始化段（运行时才被写）⇒ 启动时读必为 0；
+		//   引擎自己也是每次查询现读 ⇒ 现读才能和引擎写入时用的 key 完全一致。
+		const std::uint16_t* g_floraKeyTypeWord  = nullptr;  // 现读地址（0x61E1D94）
+		std::uint16_t        g_floraKeyTypeAtLoad = 0;       // 启动时读到什么（诊断：通常是 0）
+		std::uint16_t        g_floraKeyTypeLast   = 0;       // 最近一次现读到的值（诊断）
 
 		// 前置声明（定义在 ResolveNativeOutline 之后）
 		std::uintptr_t OutlineManagerFor(std::uint32_t a_state);
@@ -7964,62 +7985,108 @@ namespace SAS
 					kRvaFloraSubFind, kRvaFloraSingleton);
 				return;
 			}
-			// key 高 16 位的「类型常量」：从 0x130A270 的指令里现取（`44 0F B7 05 disp32`），
-			// 这样即使 RVA 表变了，只要指令模式没变就读到正确的常量。
+			// key 高 16 位的「类型 word」：从 0x130A270 的指令里现取（`44 0F B7 05 disp32`），
+			// 这样即使 RVA 表变了，只要指令模式没变就读到正确的**地址**。
+			// ★★★ 订正 R10：这里只**解析 + 记住地址**，**不读值、也不因值为 0 而禁用** ——
+			//   该 word 在 `.data` 未初始化段（运行时才被写），启动时读必为 0；
+			//   读值改到每次查询时现读（`QueryFloraScanProgressDirect`），与引擎口径一致。
 			const auto   patch = base + kRvaFloraKeyTypePatch;
 			std::uint8_t head[8]{};
 			if (!SafeReadMem(reinterpret_cast<const void*>(patch), head, sizeof(head)) ||
 				std::memcmp(head, kPatFloraKeyType, sizeof(kPatFloraKeyType)) != 0) {
-				REX::WARN("flora progress: key 类型常量提取点签名不符（+0x{:X}）-> 引擎扫描进度直读 DISABLED",
+				REX::WARN("flora progress: key 类型提取点签名不符（+0x{:X}）-> 引擎扫描进度直读 DISABLED",
 					kRvaFloraKeyTypePatch);
 				return;
 			}
-			std::uint64_t keyType = 0;
-			{
-				std::int32_t  disp = 0;
-				std::memcpy(&disp, head + 4, 4);
-				const auto    immAddr = patch + 8 + static_cast<std::intptr_t>(disp);
-				std::uint16_t word    = 0;
-				if (!SafeReadMem(reinterpret_cast<const void*>(immAddr), &word, sizeof(word))) {
-					REX::WARN("flora progress: 读 key 类型常量失败（+0x{:X}）-> 引擎扫描进度直读 DISABLED",
-						static_cast<std::uintptr_t>(immAddr - base));
-					return;
-				}
-				keyType = word;
-			}
-			if (keyType == 0) {
-				REX::WARN("flora progress: key 类型常量异常（0）-> 引擎扫描进度直读 DISABLED");
+			std::int32_t disp = 0;
+			std::memcpy(&disp, head + 4, 4);
+			const auto    immAddr = patch + 8 + static_cast<std::intptr_t>(disp);
+			std::uint16_t atLoad  = 0;
+			if (!SafeReadMem(reinterpret_cast<const void*>(immAddr), &atLoad, sizeof(atLoad))) {
+				REX::WARN("flora progress: key 类型 word 地址不可读（+0x{:X}）-> 引擎扫描进度直读 DISABLED",
+					static_cast<std::uintptr_t>(immAddr - base));
 				return;
 			}
-			g_floraKnowledgeId   = reinterpret_cast<FloraKnowledgeId_t>(addrKid);
-			g_floraGetComponent  = reinterpret_cast<FloraGetComponent_t>(addrComp);
-			g_floraHashFind      = reinterpret_cast<FloraHashFind_t>(addrFind);
-			g_floraSubFind       = reinterpret_cast<FloraSubFind_t>(addrSub);
-			g_floraSingleton     = reinterpret_cast<FloraSingleton_t>(addrSing);
-			g_floraKeyType       = keyType;
-			g_floraProgressReady = true;
+			g_floraKnowledgeId    = reinterpret_cast<FloraKnowledgeId_t>(addrKid);
+			g_floraGetComponent   = reinterpret_cast<FloraGetComponent_t>(addrComp);
+			g_floraHashFind       = reinterpret_cast<FloraHashFind_t>(addrFind);
+			g_floraSubFind        = reinterpret_cast<FloraSubFind_t>(addrSub);
+			g_floraSingleton      = reinterpret_cast<FloraSingleton_t>(addrSing);
+			g_floraKeyTypeWord    = reinterpret_cast<const std::uint16_t*>(immAddr);
+			g_floraKeyTypeAtLoad  = atLoad;
+			g_floraKeyTypeLast    = atLoad;
+			g_floraProgressReady  = true;
 			REX::INFO("flora progress ready: kid=+0x{:X} comp=+0x{:X} find=+0x{:X} sub=+0x{:X} "
-					  "sing=+0x{:X} keyType=0x{:X} (sig verified) -> 植物「已扫描」直读引擎扫描进度表",
+					  "sing=+0x{:X} keyTypeAddr=+0x{:X} keyType@load=0x{:X} (sig verified；"
+					  "★ 订正 R10：key 类型 word 改为**每次查询现读** —— 它在 .data 未初始化段、"
+					  "启动时必为 0，不再因此禁用判据) -> 植物「已扫描」直读引擎扫描进度表",
 				kRvaFloraKnowledgeId, kRvaFloraGetComponent, kRvaFloraHashFind, kRvaFloraSubFind,
-				kRvaFloraSingleton, g_floraKeyType);
+				kRvaFloraSingleton, static_cast<std::uintptr_t>(immAddr - base), atLoad);
 		}
 
 		// 单次查询的结果（ok=false = 任何一层没走通 ⇒ 上层回退到旧判据，绝不外抛）
+		// ★★★ 订正 R10：新增 `stage`（在哪一层停下的）与 `keyType`（本次现读到的类型 word）——
+		//   两者**只用于诊断**、不参与判定。`stage` 让「链路不通」一眼定位到具体那一层
+		//   （下一局若还有问题，看 `flora progress probe:` 行的 stage 就够了）。
+		enum FloraProgStage : std::uint8_t
+		{
+			kFloraProgOk = 0,         // 链路走通
+			kFloraProgNotReady,       // 判据没就绪 / 参数不合法
+			kFloraProgNoContainer,    // 组件容器（ref+0xC8）读不到 / 不像指针
+			kFloraProgNoComponent,    // 0x81 组件拿不到
+			kFloraProgNoKey1,         // key1 == 0（这个引用没有物种 / 资源 ID）
+			kFloraProgNoKeyType,      // key 类型 word 现读失败
+			kFloraProgNoSingleton,    // TLS 单例 / 知识库 DB 读不到
+			kFloraProgMainTableMiss,  // 主表里没有这个物种 / 资源（= 从来没扫过）
+			kFloraProgSubEntryOff,    // 桶内偏移 / 二级基址形状不对
+			kFloraProgSubTableMiss,   // 二级表里没有这个「知识 ID」的条目
+			kFloraProgProgressShape,  // 进度 byte 形状不对（>100）
+			kFloraProgException,      // SEH 捕获到异常
+		};
+
 		struct FloraProgressResult
 		{
 			bool          ok       = false;  // 链路走通（拿到 shape 合法的进度值）
 			std::uint8_t  progress = 0;      // 0..100；== 100 = 已扫描（引擎口径）
 			std::uint32_t key1     = 0;      // 物种 / 资源 ID（0x81 组件 +0x28）
 			std::uint32_t key2     = 0;      // 知识 ID（0x1307180(ref)）
+			std::uint16_t keyType  = 0;      // ★ 订正 R10：本次现读到的类型 word（诊断）
+			bool          keyTypeRead = false;             // 上面那个值是否真的读到了（诊断）
+			std::uint8_t  stage    = kFloraProgNotReady;  // ★ 订正 R10：停在哪一层（诊断）
 		};
+
+		// ★ 订正 R10：`stage` 的可读名字（只用于日志）
+		const char* FloraProgStageName(std::uint8_t a_stage)
+		{
+			switch (a_stage) {
+			case kFloraProgOk:            return "链路走通";
+			case kFloraProgNotReady:      return "判据没就绪 / 参数不合法";
+			case kFloraProgNoContainer:   return "组件容器（ref+0xC8）读不到";
+			case kFloraProgNoComponent:   return "0x81 组件拿不到";
+			case kFloraProgNoKey1:        return "key1 == 0（这个引用没有物种 / 资源 ID）";
+			case kFloraProgNoKeyType:     return "★ key 类型 word 现读失败";
+			case kFloraProgNoSingleton:   return "TLS 单例 / 知识库 DB 读不到";
+			case kFloraProgMainTableMiss: return "主表里没有这个物种 / 资源（= 从没扫过）";
+			case kFloraProgSubEntryOff:   return "桶内偏移 / 二级基址形状不对";
+			case kFloraProgSubTableMiss:  return "二级表里没有这个知识 ID 的条目";
+			case kFloraProgProgressShape: return "进度 byte 形状不对（>100）";
+			case kFloraProgException:     return "SEH 捕获到异常（指针失效 / 表结构变化）";
+			default:                      return "（未知 stage）";
+			}
+		}
 
 		// ② 单次查询（全 SEH + 逐层形状校验）。只调只读函数：
 		//   0x347170（组件，读锁）→ 读 [comp+0x28] → 0x1307180（ref→知识ID）
 		//   → 0x23FF640（TLS 单例）→ 0x24105D0（主表）→ 0x23467B0（二级）→ 读 [元素+0x20]。
+		//   ★★★ 订正 R10（★ 关键）：key 高 16 位的「类型 word」**每次查询现读** ——
+		//     它在 `.data` 未初始化段（运行时才被写入，启动时读必然是 0）；
+		//     R9 在启动时读到 0 就把整条判据禁用了（`ready=0 / 问=0`，用户看到
+		//     「已扫描的还是青、开关扫描仪也不自愈」）。引擎自己也是每次现读
+		//     （`movzx r8d, word [rip+disp]`）⇒ 现读才能和引擎构造的 key 完全一致。
 		FloraProgressResult QueryFloraScanProgressDirect(const RE::TESObjectREFR* a_ref)
 		{
 			FloraProgressResult r{};
-			if (!g_floraProgressReady || !a_ref) {
+			if (!g_floraProgressReady || !g_floraKeyTypeWord || !a_ref) {
 				return r;
 			}
 			__try {
@@ -8028,17 +8095,33 @@ namespace SAS
 				std::uint64_t container = 0;
 				if (!SafeReadMem(raw + kOffRefrComponentContainer, &container, sizeof(container)) ||
 					!IsPlausiblePointer(container)) {
+					r.stage = kFloraProgNoContainer;
 					return r;
 				}
 				void* comp = g_floraGetComponent(reinterpret_cast<void*>(container), kFloraScanCompId);
 				if (!comp || !IsReadable(comp, kOffFloraCompSpecie + 4)) {
+					r.stage = kFloraProgNoComponent;
 					return r;
 				}
 				std::uint32_t key1 = 0;
 				if (!SafeReadMem(reinterpret_cast<const std::uint8_t*>(comp) + kOffFloraCompSpecie,
 						&key1, sizeof(key1)) ||
 					key1 == 0) {
+					r.stage = kFloraProgNoKey1;
 					return r;  // 没有物种/资源 ID ⇒ 这条链不适用（引擎自己也会跳过）
+				}
+				// ①.5 ★★★ 订正 R10：**现读** key 类型 word（与引擎那条指令同一时刻取值）
+				std::uint16_t keyType = 0;
+				if (!SafeReadMem(reinterpret_cast<const void*>(g_floraKeyTypeWord),
+						&keyType, sizeof(keyType))) {
+					r.stage = kFloraProgNoKeyType;
+					return r;
+				}
+				r.keyType     = keyType;
+				r.keyTypeRead = true;
+				g_floraKeyTypeLast = keyType;  // 诊断：最近一次现读到什么
+				if (keyType == 0) {
+					++g_state.floraProgKeyZero;  // 诊断：现读到 0 的次数（0 本身也可能是合法类型）
 				}
 				// ② key2 = 0x1307180(ref)（纯查询：有 0x2A 组件 ⇒ FormID；否则查表映射）
 				const std::uint32_t key2 = g_floraKnowledgeId(const_cast<RE::TESObjectREFR*>(a_ref));
@@ -8048,28 +8131,34 @@ namespace SAS
 				if (!sing ||
 					!SafeReadMem(reinterpret_cast<const std::uint8_t*>(sing) + kOffFloraMgrDb, &mgr, sizeof(mgr)) ||
 					!IsPlausiblePointer(mgr)) {
+					r.stage = kFloraProgNoSingleton;
 					return r;
 				}
-				// ④ 主表查找（0x24105D0，只读）；key = (类型常量 << 48) | (key1 << 16)
+				// ④ 主表查找（0x24105D0，只读）；key = (类型 word << 48) | (key1 << 16)
 				std::uint64_t       out[4]{};
-				const std::uint64_t keyA = (g_floraKeyType << 48) | (static_cast<std::uint64_t>(key1) << 16);
+				const std::uint64_t keyA = (static_cast<std::uint64_t>(keyType) << 48) |
+										   (static_cast<std::uint64_t>(key1) << 16);
 				g_floraHashFind(reinterpret_cast<void*>(mgr + kOffFloraDbTable), out, &keyA);
 				const std::uint64_t bucket = out[kOffFloraLookupBucket / 8];
 				const std::uint64_t index  = out[kOffFloraLookupIndex / 8];
 				if (index == kFloraLookupSentinel && bucket == 0) {
-					return r;  // 表里没有这个物种 / 资源 ⇒ 无进度记录
+					r.stage = kFloraProgMainTableMiss;
+					return r;  // 表里没有这个物种 / 资源 ⇒ 无进度记录（= 从没扫过）
 				}
 				if (!IsPlausiblePointer(bucket)) {
+					r.stage = kFloraProgMainTableMiss;
 					return r;
 				}
 				// ⑤ 二级基址 = bucket + word[bucket + index*4 + 0x12]
 				std::uint16_t subOff = 0;
 				if (!SafeReadMem(reinterpret_cast<const std::uint8_t*>(bucket) + index * 4 + kOffFloraSubEntryOff,
 						&subOff, sizeof(subOff))) {
+					r.stage = kFloraProgSubEntryOff;
 					return r;
 				}
 				const auto* base2 = reinterpret_cast<const std::uint8_t*>(bucket + subOff);
 				if (!IsReadable(base2, kOffFloraSubCapacity + 8)) {
+					r.stage = kFloraProgSubEntryOff;
 					return r;
 				}
 				// ⑥ 二级查找（0x23467B0，只读）；返回迭代器（索引），== 容量 ⇒ 未找到
@@ -8080,23 +8169,28 @@ namespace SAS
 				if (!SafeReadMem(base2 + kOffFloraSubCapacity, &cap, sizeof(cap)) ||
 					!SafeReadMem(base2 + kOffFloraSubArray, &arr, sizeof(arr)) ||
 					!IsPlausiblePointer(arr) || cap == 0 || cap > (1u << 24)) {
+					r.stage = kFloraProgSubEntryOff;
 					return r;
 				}
 				if (iter >= cap) {
+					r.stage = kFloraProgSubTableMiss;
 					return r;  // 这个「知识 ID」在物种记录里没有条目
 				}
 				// ⑦ 进度 = byte[元素 + 0x20]（元素 stride 0x30）
 				const auto* elem = reinterpret_cast<const std::uint8_t*>(arr) + iter * kFloraSubElemStride;
 				std::uint8_t prog = 0;
 				if (!SafeReadMem(elem + kOffFloraElemProgress, &prog, sizeof(prog)) || prog > 100) {
+					r.stage = kFloraProgProgressShape;
 					return r;  // 形状不对 ⇒ 不采信
 				}
 				r.ok       = true;
+				r.stage    = kFloraProgOk;
 				r.progress = prog;
 				r.key1     = key1;
 				r.key2     = key2;
 			} __except (EXCEPTION_EXECUTE_HANDLER) {
-				r.ok = false;  // 指针失效 / 表结构变化等任何异常 ⇒ 当作「查不到」，绝不外抛
+				r.ok    = false;  // 指针失效 / 表结构变化等任何异常 ⇒ 当作「查不到」，绝不外抛
+				r.stage = kFloraProgException;
 			}
 			return r;
 		}
@@ -8140,6 +8234,27 @@ namespace SAS
 				}
 			} else {
 				++g_state.floraProgFails;
+			}
+			// ★★★ 订正 R10：诊断（只前几条）—— key 类型 word 是**现读**的，第一次拿到
+			//   非 0 值 / 首次失败都在这里可见：`stage` 说明停在哪一层、`keyType` 是现读值
+			//   （扫描到第几步就断在 `keyType=未读` 之前；见 `QueryFloraScanProgressDirect`）。
+			//   本会话最多 kFloraProgProbeMax 条（默认 8），不刷屏。
+			if (g_state.floraProgProbes < kFloraProgProbeMax) {
+				++g_state.floraProgProbes;
+				if (r.keyTypeRead) {
+					REX::INFO("flora progress probe: base=0x{:X} key1=0x{:X} key2=0x{:X} "
+							  "keyType=0x{:X}（现读） percent={} stage={} -> {}",
+						a_baseFid, r.key1, r.key2, r.keyType, r.progress,
+						static_cast<std::uint32_t>(r.stage),
+						r.ok ? (r.progress == kFloraProgressFull ? "★ 已扫描（引擎进度 100）"
+																 : "查到但**未满**（继续走旧判据）")
+							 : FloraProgStageName(r.stage));
+				} else {
+					REX::INFO("flora progress probe: base=0x{:X} key1=0x{:X} key2=0x{:X} "
+							  "keyType=（未读到） stage={} -> {}",
+						a_baseFid, r.key1, r.key2, static_cast<std::uint32_t>(r.stage),
+						FloraProgStageName(r.stage));
+				}
 			}
 			if (g_state.floraProgressByBase.size() >= kFloraProgressCacheMax) {
 				g_state.floraProgressByBase.clear();  // 兜异常增长（正常情况下只有几十条）
@@ -12326,7 +12441,8 @@ namespace SAS
 						  "| 读档边界(★v5.1.6): 事件保留={} 确认base={} 推进={} "
 						  "| 存档指纹(★v5.1.7): 锚={}天 处理={} 作废={}条 表剪={} 失败={} 存档={} "
 						  "| 引擎状态表: 条目={} 读={} 绿={} 青={} 无条目={} "
-						  "| 引擎进度直读(★v5.2): 问={} 满={} 未满={} 失败={} 缓存命中={} 冲突={} ready={} 记忆层={} "
+						  "| 引擎进度直读(★v5.2/订正R10): 问={} 满={} 未满={} 失败={} 缓存命中={} 冲突={} "
+						  "keyType=0x{:X}(现读) keyZero={} ready={} 记忆层={} "
 						  "| 学习表: 沿用={} 捡漏={} 落盘={} 写入={} 旧格式忽略={} 无时间={}"
 						  "（★ v5.1：按引用记忆 = 记忆粒度是引用；★ v5.1.2：按物种扩散 = 同 species / "
 						  "同资源被权威确认后，其**所有**实例一起变绿（引擎知识库本来就是这一级；"
@@ -12379,6 +12495,7 @@ namespace SAS
 					g_state.floraTableNoEntry,
 					g_state.floraProgQueries, g_state.floraProgFull, g_state.floraProgPartial,
 					g_state.floraProgFails, g_state.floraProgCacheHits, g_state.floraProgConflict,
+					static_cast<unsigned>(g_floraKeyTypeLast), g_state.floraProgKeyZero,
 					g_floraProgressReady ? 1 : 0,
 					(g_cfg.floraUseMemory ? "ON（v5.1.8 旧口径）" : "关（默认，抛弃记忆）"),
 					g_state.floraStickyKeeps, g_state.floraStatusTableHits,

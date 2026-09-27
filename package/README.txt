@@ -5,7 +5,7 @@
 
 Version  : 2.0  (plugin build 5.1.0)
            2.0 = the mod brings its own outline colour channels (described
-           below), plus eleven fixes, all from player reports.
+           below), plus twelve fixes, all from player reports.
            (1) "Ores and plants are green before *and* after scanning."
                The mod remembers a confirmed "surveyed" verdict so a target
                cannot fall back to cyan (added in 1.7.9 / 1.8.1), but that
@@ -323,6 +323,35 @@ Version  : 2.0  (plugin build 5.1.0)
                      FloraUseMemory=0 (1 = bring the old memory layers back, for
                      comparison only). The stats line gained an
                      `引擎进度直读(★v5.2): 问= 满= 未满= 失败= 缓存命中= 冲突= ready= 记忆层=` block.
+                     (12) "Surveyed things are cyan again, and this time opening
+                     and closing the scanner does not fix them either." Fixed
+                     2026-09-27, one build after (11). The direct survey read of
+                     (11) never actually ran: the game builds its lookup key
+                     from a 16-bit "type" word it reads from one of its own
+                     globals, and the mod read that word at load time - but the
+                     word lives in the uninitialised part of the exe's data
+                     (the file contains no bytes there; the value only appears
+                     once the game initialises it), so it was always 0 at load
+                     time and the mod treated "0" as an error and switched the
+                     whole check off. The startup log said so
+                     (`flora progress: key 类型常量异常（0）-> ... DISABLED`) and
+                     the stats line showed `ready=0 问=0` - zero queries. With
+                     the check off, plants were left with the checks that only
+                     hold *while the scanner is up* - so lowering the scanner
+                     turned them cyan again, and because the mod's own memory is
+                     off by design (fix (11)) there was nothing left to learn
+                     from, which is why raising the scanner no longer helped
+                     either. The mod now reads that word **fresh on every
+                     query**, exactly like the game does, so the key it builds
+                     always matches the key the game wrote; the startup message
+                     is now `keyTypeAddr=+0x61E1D94 keyType@load=0x0` (the load
+                     value is informational only - it is never used). The stats
+                     line block is now
+                     `引擎进度直读(★v5.2/订正R10): 问= 满= 未满= 失败= 缓存命中= 冲突= keyType=0x…(现读) keyZero= ready= 记忆层=`,
+                     and the first queries of a session log one detail line each
+                     (`flora progress probe: base=… key1=… key2=… keyType=…(现读) percent=… stage=… -> …`)
+                     so any remaining problem can be pinpointed to the exact
+                     step of the chain.
                      Also in 2.0 (the headline feature) - the mod brings its own
                      outline colour channels instead of borrowing the game's.
            The game has eleven outline "states"
@@ -868,14 +897,19 @@ Most useful options:
                         are off by default (FloraUseMemory=0), so this key only
                         matters when you set FloraUseMemory=1.
   FloraEngineProgress=1
-                        fix (11), default: plants read the game's own survey
-                        progress - the very byte the game's state-4/5 path
-                        reads (PlayerKnowledge species percent; 100 = surveyed)
-                        - through a fully read-only replay of the engine's own
-                        lookups, at any time and for any reference (including
-                        runtime-created surface plants). percent == 100 = green;
-                        a lower value never short-circuits. 0 = turn the direct
-                        read off (falls back to the older checks).
+                       fix (11) + (12), default: plants read the game's own
+                       survey progress - the very byte the game's state-4/5 path
+                       reads (PlayerKnowledge species percent; 100 = surveyed)
+                       - through a fully read-only replay of the engine's own
+                       lookups, at any time and for any reference (including
+                       runtime-created surface plants). Fix (12): the lookup
+                       key's "type" word is read **fresh on every query** (the
+                       game does the same; the value only exists once the game
+                       has initialised it, so the earlier load-time read of it
+                       was always 0 and had switched the whole check off).
+                       percent == 100 = green; a lower value never
+                       short-circuits. 0 = turn the direct read off (falls back
+                       to the older checks).
   FloraUseMemory=0
                         fix (11), default: the mod's own memory layers are OFF
                         (reference-level memory, species spread table, seeding

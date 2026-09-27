@@ -282,7 +282,24 @@ SFSE_PLUGIN_LOAD(const SFSE::LoadInterface* a_sfse)
 	//     `GetOutlineState` + 资源链（LVLI）；全程签名 / 形状 / SEH 三重保护，任一环
 	//     走不通自动回退（不影响高亮本身）。
 	//   回退：INI `FloraEngineProgress=0`（关新判据）/ `FloraUseMemory=1`（回 v5.1.8 记忆口径）。
-	REX::INFO("SAS_AlwaysScan v5.1.0 loading（订正 R9：植物「已扫描」直读引擎扫描进度表（PlayerKnowledge 物种槽 percent=100）+ 默认抛弃自建记忆（FloraUseMemory=0）—— 不再依赖「引擎画过 / 我们记下来」）(SFSE build {})",
+	// ★★★ 2026-09-27 订正 R10（公开版仍是 2.0、DLL build 仍是 5.1.0）：
+	//   **R9 的新判据实际上一次都没跑起来** —— 用户报告「已扫描物件还是扫描前青色，而且这次
+	//   开关扫描仪都没自我修复」。日志铁证（用户 2026-09-27 12:57~12:59 那一局）：
+	//   · 启动行 `flora progress: key 类型常量异常（0）-> 引擎扫描进度直读 DISABLED`
+	//     + 统计行 `引擎进度直读(★v5.2): 问=0 … ready=0` ⇒ ⓠ 判据全程零查询；
+	//   · 于是植物只剩「举着扫描仪时才成立的证据」（⓪.5 状态表探针 / ① GetOutlineState，
+	//     实测 `未扫描=489` 压倒性多数）⇒ 放下扫描仪就回到青色、`FloraUseMemory=0` 又
+	//     不记录引擎画过的绿 ⇒ 用户看到的「开关扫描仪也不自愈」。
+	//   **根因（★ 离线已证）**：那个「key 类型 word」（`0x130A270` 里 `movzx r8d, word [rip+disp]`）
+	//   位于 `.data` 的**未初始化段**（目标 RVA `0x61E1D94` 超出 `.data` 的 raw size ⇒
+	//   文件里没有它，运行时才被写入）⇒ **启动时读它必然是 0**；R9 把「读到 0」当异常把
+	//   整条判据禁用了。引擎自己也是**每次查询现读**那条指令。
+	//   修法（`AlwaysScan.cpp`）：① 解析阶段只**记住 word 的地址**（签名 / 可读性校验不变），
+	//   不再因值为 0 而禁用；② `QueryFloraScanProgressDirect` 里**每次查询现读**该 word
+	//   构造 key（与引擎同一时刻取值，最忠实）；③ 新增诊断 `stage`（停在哪一层）+
+	//   `keyType`（现读值）+ `flora progress probe:` 前 8 条 + 统计行
+	//   `keyType=0x…(现读) keyZero=` —— 下一局若有问题，一次日志就能定位到具体那一层。
+	REX::INFO("SAS_AlwaysScan v5.1.0 loading（订正 R10：植物「已扫描」直读引擎扫描进度表 —— key 类型 word 改为**每次查询现读**（它在 .data 未初始化段、启动时必为 0，R9 因此把判据整个禁用了）+ 默认抛弃自建记忆（FloraUseMemory=0））(SFSE build {})",
 		SFSE::GetSFSEVersion());
 
 	if (auto* messaging = SFSE::GetMessagingInterface()) {
