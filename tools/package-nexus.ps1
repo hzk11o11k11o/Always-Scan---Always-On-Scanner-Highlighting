@@ -104,6 +104,25 @@ foreach ($rel in $payload.Keys) {
     }
 }
 
+# ★ 2026-09-27：包内 INI 的**日志上限**以 resources 模板为准（= N 网公开版口径 1 MiB）——
+#   部署目录那份是**本机开发**口径（LogMaxMB=10，见 AGENTS.md「N 网公开版日志最大 1M、
+#   本机开发版本日志最大 10M」），不能直接进包。只改这一个键；其余内容照旧（含用户
+#   对部署 INI 的其它自定义）。模板值就是单一事实源（默认 1）。
+$tplIni    = Join-Path $root 'resources\SAS_AlwaysScan.ini'
+$stagedIni = Join-Path $staging 'SAS_AlwaysScan.ini'
+if ((Test-Path -LiteralPath $tplIni) -and (Test-Path -LiteralPath $stagedIni)) {
+    $pubMb = 1
+    $mm = Select-String -LiteralPath $tplIni -Pattern '^LogMaxMB=(\d+)'
+    if ($mm) { $pubMb = [int]$mm.Matches[0].Groups[1].Value }
+    $utf8    = New-Object System.Text.UTF8Encoding($false)   # 与模板一致：无 BOM
+    $iniText = [System.IO.File]::ReadAllText($stagedIni, $utf8)
+    $iniNew  = [regex]::Replace($iniText, '(?m)^LogMaxMB=\d+', "LogMaxMB=$pubMb")
+    if ($iniNew -ne $iniText) {
+        [System.IO.File]::WriteAllText($stagedIni, $iniNew, $utf8)
+        Write-Host ("      ini LogMaxMB set to {0} (public default; dev copy keeps its own value)" -f $pubMb) -ForegroundColor DarkGray
+    }
+}
+
 # ------------------------------------------------------------ 3. 打 zip（7z）
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 $zipPath = Join-Path $OutDir "StarfieldAlwaysScan-$Version.zip"

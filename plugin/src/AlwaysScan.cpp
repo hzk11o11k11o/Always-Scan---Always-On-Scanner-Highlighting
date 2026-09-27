@@ -2404,8 +2404,19 @@ namespace SAS
 			// ★★★ 订正 R11：key1 走兜底（0x910690）成功拿到的次数 —— 实测植物 ref 没有
 			//   0x81 组件 ⇒ 这个数**在涨**才说明兜底在干活（它不涨而失败不涨 = 没走到）。
 			std::uint64_t floraProgK1Fallback = 0;
-			std::uint32_t floraProgProbes    = 0;  // 已打的 `flora progress probe:` 条数
-			std::uint32_t floraScanProbes     = 0;  // 本会话已打的 `flora scan:` 探针数
+			//   ★★★ 订正 R12（诊断）：probe 不再只打「前 8 条」——额外保证
+			//     **每个 stage 的第一条**与**第一条成功**都能看到（见 QueryFloraScanProgressCached）。
+			//     R11 两局日志的实测教训：前 8 条 probe 恰好全是同一个 stage（=8），
+			//     而 `满=35` 的成功样例一条都没留下。
+			std::uint32_t floraProgProbes    = 0;  // 已打的 `flora progress probe:` 条数（前 N 条额度）
+			std::uint32_t floraProgStageSeen = 0;  // stage 位图：某个 stage 是否已经打过一条
+			bool          floraProgSawOk     = false;  // 是否已经打过「查询成功」的一行
+			bool          floraProgConflictWarned = false;  // 「直读=未满 vs 引擎表=绿」冲突的首条 WARN
+			std::uint32_t floraScanProbes     = 0;  // 本会话已打的 `flora scan:` 最终行数
+			//   ★★★ 订正 R12：**判绿行**用独立额度 —— R11 两局日志里 8 条额度全被
+			//     会话开头的「判青最终行」吃光 ⇒ 判绿行（含 R11 的核心验收点
+			//     `判据 = 引擎扫描进度直读`）结构上不可能出现在日志里（即使判据在干活）。
+			std::uint32_t floraScanGreenProbes = 0;  // 判绿行（直读/记忆/扩散/捡漏/GetOutlineState）额度
 			std::uint32_t floraScanDumps      = 0;  // ★ v4.26：已打的「指针窗口」取证条数
 			std::uint64_t floraScanShapeWarnAtMs = 0;
 			// ★★★ v4.28：`GetOutlineState(ref)` 主判据的计数（诊断 —— 一眼看它是不是在干活）
@@ -4621,6 +4632,11 @@ namespace SAS
 					  "★★ **订正 R11：key1 改为「先组件、后引擎兜底 0x910690」**"
 					  "（实测植物 ref 没有 0x81 组件 —— 引擎画绿走的也是这条兜底，R10 只复刻了"
 					  "组件主路径 ⇒ 判据从未成功；probe 行看 `k1来源=`、统计行看 `兜底K1=`）；"
+					  "★ **订正 R12（只改诊断）：R11 实测 `兜底K1=104 == 问(35)+失败(69)` ⇒ key1 获取"
+					  "已 100% 成功、失败全在表查找层；stage=8 细分成 12/13/14/15"
+					  "（14 = 空表 = 这个物种没扫过）；probe 失败行照实打印 key1/key2；"
+					  "每 stage 首条 + 首条成功必打；判绿行独立额度；`冲突=` 计数已实现"
+					  "（这两局 R11 的前 8 条 probe 全是 stage=8、判绿行一条都没留下 —— 本次修的就是可观测性）；"
 					  "按 base 缓存（绿 = 10 分钟 / 未满 = 见 FloraUnscannedTtlMs）、"
 					  "读档时清缓存；签名 / 形状校验不过会自动回退（日志搜 `flora progress:`）",
 				g_cfg.floraEngineProgress);
@@ -8088,10 +8104,18 @@ namespace SAS
 			kFloraProgNoKeyType,      // key 类型 word 现读失败
 			kFloraProgNoSingleton,    // TLS 单例 / 知识库 DB 读不到
 			kFloraProgMainTableMiss,  // 主表里没有这个物种 / 资源（= 从来没扫过）
-			kFloraProgSubEntryOff,    // 桶内偏移 / 二级基址形状不对
+			kFloraProgSubEntryOff,    // 桶内偏移 / 二级基址形状不对（★ R12 起不再产生；被 12~15 取代）
 			kFloraProgSubTableMiss,   // 二级表里没有这个「知识 ID」的条目
 			kFloraProgProgressShape,  // 进度 byte 形状不对（>100）
 			kFloraProgException,      // SEH 捕获到异常
+			// ★★★ 订正 R12（诊断细化）：R11 两局里 `stage=8` 占了全部 probe，
+			//   而 8 混合了三种情况（偏移读不到 / 基址不可读 / 表空或形状坏）——
+			//   无法判断「没扫过（空表，正常）」与「结构真的不对（异常）」。
+			//   这里拆成四档（**数字只增不改**：8 保留原义，12~15 是新细分）。
+			kFloraProgSubOffUnreadable  = 12,  // 桶内 subOff（bucket+index*4+0x12）读不到
+			kFloraProgSubBaseUnreadable = 13,  // 二级基址（bucket+subOff）不可读 / 其 cap/arr 字段读不到
+			kFloraProgSubEmptyTable     = 14,  // ★ 二级表 cap == 0（= 这个物种在本存档里**没有记录**，多半没扫过）
+			kFloraProgSubShapeBad       = 15,  // 二级表形状坏（arr 非指针 / cap 异常大）
 		};
 
 		struct FloraProgressResult
@@ -8104,6 +8128,13 @@ namespace SAS
 			bool          keyTypeRead = false;             // 上面那个值是否真的读到了（诊断）
 			bool          key1FromFallback = false;        // ★ 订正 R11：key1 来自兜底 0x910690（诊断）
 			std::uint8_t  stage    = kFloraProgNotReady;  // ★ 订正 R10：停在哪一层（诊断）
+			// ★★★ 订正 R12（诊断）：失败路径也把「已经走到的位置」带回去 ——
+			//   R11 的 probe 行在失败时 `key1=0x0 key2=0x0` 是**假的**（失败分支没赋值），
+			//   导致「key1 到底拿到没有」只能靠 `k1来源=` 反推。现在照实填。
+			std::uint64_t subBucket = 0;  // 主表查到的桶指针（stage>=8 时）
+			std::uint16_t subOff    = 0;  // 桶内偏移（stage 12~15 时）
+			std::uint64_t subCap    = 0;  // 二级表容量（stage 13~15 时）
+			std::uint64_t subArr    = 0;  // 二级表数组指针（stage 13~15 时）
 		};
 
 		// ★ 订正 R10：`stage` 的可读名字（只用于日志）
@@ -8118,10 +8149,14 @@ namespace SAS
 			case kFloraProgNoKeyType:     return "★ key 类型 word 现读失败";
 			case kFloraProgNoSingleton:   return "TLS 单例 / 知识库 DB 读不到";
 			case kFloraProgMainTableMiss: return "主表里没有这个物种 / 资源（= 从没扫过）";
-			case kFloraProgSubEntryOff:   return "桶内偏移 / 二级基址形状不对";
+			case kFloraProgSubEntryOff:   return "桶内偏移 / 二级基址形状不对（★ R12 起不再产生）";
 			case kFloraProgSubTableMiss:  return "二级表里没有这个知识 ID 的条目";
 			case kFloraProgProgressShape: return "进度 byte 形状不对（>100）";
 			case kFloraProgException:     return "SEH 捕获到异常（指针失效 / 表结构变化）";
+			case kFloraProgSubOffUnreadable:  return "桶内 subOff 读不到（+0x12）";
+			case kFloraProgSubBaseUnreadable: return "二级基址不可读 / cap·arr 字段读不到";
+			case kFloraProgSubEmptyTable:     return "★ 二级表空（cap==0 —— 这个物种在本存档里没有记录，多半没扫过）";
+			case kFloraProgSubShapeBad:       return "二级表形状坏（arr 非指针 / cap 异常大）";
 			default:                      return "（未知 stage）";
 			}
 		}
@@ -8197,8 +8232,12 @@ namespace SAS
 				if (keyType == 0) {
 					++g_state.floraProgKeyZero;  // 诊断：现读到 0 的次数（0 本身也可能是合法类型）
 				}
+				// ★★★ 订正 R12：从这里开始照实回填 —— 即使后面失败，probe 行也能看到
+				//   key1（已拿到）/ key2 的真实值（R11 的失败行里它们恒为 0x0，会误导排障）。
+				r.key1 = key1;
 				// ② key2 = 0x1307180(ref)（纯查询：有 0x2A 组件 ⇒ FormID；否则查表映射）
 				const std::uint32_t key2 = g_floraKnowledgeId(const_cast<RE::TESObjectREFR*>(a_ref));
+				r.key2 = key2;
 				// ③ mgr = [0x23FF640() + 0x8B0]（TLS 单例 + 知识库 DB）
 				void*         sing = g_floraSingleton();
 				std::uint64_t mgr  = 0;
@@ -8223,16 +8262,18 @@ namespace SAS
 					r.stage = kFloraProgMainTableMiss;
 					return r;
 				}
+				r.subBucket = bucket;  // ★ R12 诊断：主表查到的桶
 				// ⑤ 二级基址 = bucket + word[bucket + index*4 + 0x12]
 				std::uint16_t subOff = 0;
 				if (!SafeReadMem(reinterpret_cast<const std::uint8_t*>(bucket) + index * 4 + kOffFloraSubEntryOff,
 						&subOff, sizeof(subOff))) {
-					r.stage = kFloraProgSubEntryOff;
+					r.stage = kFloraProgSubOffUnreadable;  // ★ R12：8 拆成 12（偏移读不到）
 					return r;
 				}
+				r.subOff = subOff;
 				const auto* base2 = reinterpret_cast<const std::uint8_t*>(bucket + subOff);
 				if (!IsReadable(base2, kOffFloraSubCapacity + 8)) {
-					r.stage = kFloraProgSubEntryOff;
+					r.stage = kFloraProgSubBaseUnreadable;  // ★ R12：8 拆成 13（基址不可读）
 					return r;
 				}
 				// ⑥ 二级查找（0x23467B0，只读）；返回迭代器（索引），== 容量 ⇒ 未找到
@@ -8241,9 +8282,21 @@ namespace SAS
 				std::uint64_t cap = 0;
 				std::uint64_t arr = 0;
 				if (!SafeReadMem(base2 + kOffFloraSubCapacity, &cap, sizeof(cap)) ||
-					!SafeReadMem(base2 + kOffFloraSubArray, &arr, sizeof(arr)) ||
-					!IsPlausiblePointer(arr) || cap == 0 || cap > (1u << 24)) {
-					r.stage = kFloraProgSubEntryOff;
+					!SafeReadMem(base2 + kOffFloraSubArray, &arr, sizeof(arr))) {
+					r.stage = kFloraProgSubBaseUnreadable;  // ★ R12：13（字段读不到）
+					return r;
+				}
+				r.subCap = cap;
+				r.subArr = arr;
+				if (cap == 0) {
+					// ★★★ 订正 R12：**空表**单列一档 —— 这就是「这个物种在本存档里
+					//   没有记录（多半没扫过）」的正常表现，不该和「形状坏」混在一起
+					//   （R11 两局里全部 probe 都停在 stage=8，正是分不清这两种）。
+					r.stage = kFloraProgSubEmptyTable;
+					return r;
+				}
+				if (!IsPlausiblePointer(arr) || cap > (1u << 24)) {
+					r.stage = kFloraProgSubShapeBad;  // ★ R12：15（形状坏）
 					return r;
 				}
 				if (iter >= cap) {
@@ -8314,23 +8367,51 @@ namespace SAS
 			//   （扫描到第几步就断在 `keyType=未读` 之前；见 `QueryFloraScanProgressDirect`）。
 			//   ★ 订正 R11：加 `k1来源=`（组件 / 兜底 0x910690）—— 实测植物 ref 没有 0x81
 			//   组件，正常工作时这里应大量出现 `k1来源=兜底`。
-			//   本会话最多 kFloraProgProbeMax 条（默认 8），不刷屏。
-			if (g_state.floraProgProbes < kFloraProgProbeMax) {
-				++g_state.floraProgProbes;
-				const char* k1src = (r.key1FromFallback ? "兜底(0x910690)" : "组件(0x81)");
-				if (r.keyTypeRead) {
-					REX::INFO("flora progress probe: base=0x{:X} key1=0x{:X} k1来源={} key2=0x{:X} "
-							  "keyType=0x{:X}（现读） percent={} stage={} -> {}",
-						a_baseFid, r.key1, k1src, r.key2, r.keyType, r.progress,
-						static_cast<std::uint32_t>(r.stage),
-						r.ok ? (r.progress == kFloraProgressFull ? "★ 已扫描（引擎进度 100）"
-																 : "查到但**未满**（继续走旧判据）")
-							 : FloraProgStageName(r.stage));
-				} else {
-					REX::INFO("flora progress probe: base=0x{:X} key1=0x{:X} k1来源={} key2=0x{:X} "
-							  "keyType=（未读到） stage={} -> {}",
-						a_baseFid, r.key1, k1src, r.key2, static_cast<std::uint32_t>(r.stage),
-						FloraProgStageName(r.stage));
+			//   ★★★ 订正 R12：额度语义升级 —— 除「前 kFloraProgProbeMax 条（默认 8）」外，
+			//     **每个 stage 的第一条**与**第一条成功**都保证打出（R11 两局实测：
+			//     前 8 条全是同一个 stage=8，成功样例与其它 stage 一条都没留下）。
+			//     行数上限 ≈ 8 + 16（stage 位图）+ 1，仍不刷屏。
+			{
+				const std::uint32_t stage     = r.stage;
+				const bool          stageNew  = stage < 32 &&
+                                    (g_state.floraProgStageSeen & (1u << stage)) == 0;
+				const bool          okFirst   = r.ok && !g_state.floraProgSawOk;
+				const bool          baseQuota = g_state.floraProgProbes < kFloraProgProbeMax;
+				if (baseQuota || stageNew || okFirst) {
+					if (baseQuota) {
+						++g_state.floraProgProbes;
+					}
+					const char* k1src = (r.key1FromFallback ? "兜底(0x910690)" : "组件(0x81)");
+					// ★ R12：stage 12~15 时附「桶 / subOff / cap / arr」——直接区分
+					//   「空表（没扫过，正常）」与真正的形状异常（一次日志就能定性）。
+					char extra[128]{};
+					if (stage >= kFloraProgSubOffUnreadable && stage <= kFloraProgSubShapeBad) {
+						std::snprintf(extra, sizeof(extra),
+							" 桶=0x%zX subOff=0x%X cap=%zu arr=0x%zX",
+							static_cast<std::size_t>(r.subBucket), static_cast<unsigned>(r.subOff),
+							static_cast<std::size_t>(r.subCap), static_cast<std::size_t>(r.subArr));
+					}
+					if (r.keyTypeRead) {
+						REX::INFO("flora progress probe: base=0x{:X} key1=0x{:X} k1来源={} key2=0x{:X} "
+								  "keyType=0x{:X}（现读） percent={} stage={} -> {}{}",
+							a_baseFid, r.key1, k1src, r.key2, r.keyType, r.progress,
+							static_cast<std::uint32_t>(stage),
+							r.ok ? (r.progress == kFloraProgressFull ? "★ 已扫描（引擎进度 100）"
+																	 : "查到但**未满**（继续走旧判据）")
+								 : FloraProgStageName(r.stage),
+							extra);
+					} else {
+						REX::INFO("flora progress probe: base=0x{:X} key1=0x{:X} k1来源={} key2=0x{:X} "
+								  "keyType=（未读到） stage={} -> {}{}",
+							a_baseFid, r.key1, k1src, r.key2, static_cast<std::uint32_t>(stage),
+							FloraProgStageName(r.stage), extra);
+					}
+				}
+				if (stage < 32) {
+					g_state.floraProgStageSeen |= (1u << stage);
+				}
+				if (r.ok) {
+					g_state.floraProgSawOk = true;
 				}
 			}
 			if (g_state.floraProgressByBase.size() >= kFloraProgressCacheMax) {
@@ -9641,14 +9722,22 @@ namespace SAS
 			//   · 结果按 **base（物种）** 缓存 ⇒ 同 species 的实例共享一条结论
 			//     （引擎数据本来就是物种级的）——「扫一个实例 ⇒ 同 species 全绿」
 			//     由**引擎数据**保证，不再需要 v5.1.2 的物种扩散表。
+			//   ★★★ 订正 R12：`progSaidPartial` = 本轮直读**查到了但未满**（percent < 100）——
+			//     供 ⓪.5 / ① 的「冲突诊断」用（直读说未满、引擎却画了绿 4/5）。
+			bool progSaidPartial = false;
 			if (a_ref) {
 				const auto pr = QueryFloraScanProgressCached(a_ref, fid, now);
+				if (pr.ok && pr.progress < kFloraProgressFull) {
+					progSaidPartial = true;
+				}
 				if (pr.ok && pr.progress == kFloraProgressFull) {
 					++g_state.floraScanHits;
 					g_state.floraScannedCache.emplace(a_ref, State::FloraScanRec{ true, now, fid, 7 });
+					// ★★★ 订正 R12：判绿行走**独立额度**（R11 两局里 8 条额度全被会话
+					//   开头的判青最终行吃光 ⇒ 这一行在日志里结构上不可能出现）。
 					if (g_cfg.floraScanProbeMax > 0 &&
-						g_state.floraScanProbes < static_cast<std::uint32_t>(g_cfg.floraScanProbeMax)) {
-						++g_state.floraScanProbes;
+						g_state.floraScanGreenProbes < static_cast<std::uint32_t>(g_cfg.floraScanProbeMax)) {
+						++g_state.floraScanGreenProbes;
 						REX::INFO("flora scan: ref=0x{:X} base=0x{:X} 判据 = 引擎扫描进度直读（★ v5.2）"
 								  "：percent={}/100（key1=0x{:X} key2=0x{:X}）-> 已扫描 ⇒ 状态 {}（原版「已扫描」绿）",
 							a_ref->GetFormID(), fid, pr.progress, pr.key1, pr.key2, FloraScannedState());
@@ -9691,8 +9780,8 @@ namespace SAS
 					g_state.floraScannedCache.emplace(a_ref,
 						State::FloraScanRec{ true, now, fid, 4 });
 					if (g_cfg.floraScanProbeMax > 0 &&
-						g_state.floraScanProbes < static_cast<std::uint32_t>(g_cfg.floraScanProbeMax)) {
-						++g_state.floraScanProbes;
+						g_state.floraScanGreenProbes < static_cast<std::uint32_t>(g_cfg.floraScanProbeMax)) {
+						++g_state.floraScanGreenProbes;
 						REX::INFO("flora scan: ref=0x{:X} base=0x{:X} 判据 = 按引用记忆（★ v5.1）"
 								  "-> 已扫描 ⇒ 状态 {}（原版「已扫描」绿）",
 							a_ref->GetFormID(), fid, FloraScannedState());
@@ -9724,8 +9813,8 @@ namespace SAS
 				g_state.floraScannedCache.emplace(a_ref,
 					State::FloraScanRec{ true, now, fid, 6 });
 				if (g_cfg.floraScanProbeMax > 0 &&
-					g_state.floraScanProbes < static_cast<std::uint32_t>(g_cfg.floraScanProbeMax)) {
-					++g_state.floraScanProbes;
+					g_state.floraScanGreenProbes < static_cast<std::uint32_t>(g_cfg.floraScanProbeMax)) {
+					++g_state.floraScanGreenProbes;
 					REX::INFO("flora scan: ref=0x{:X} base=0x{:X} 判据 = 按物种扩散（★ v5.1.2："
 							  "同 species / 同资源已被权威确认；★ v5.1.5：同一颗星球）"
 							  "-> 已扫描 ⇒ 状态 {}（原版「已扫描」绿）",
@@ -9754,6 +9843,19 @@ namespace SAS
 					greenKnown = FloraRefKnown(a_ref, fid, &memGreen) && memGreen;
 				}
 				if (greenKnown) {
+					// ★★★ 订正 R12：**冲突计数**（`冲突=` 定义后第一次真正自增）——
+					//   「直读答『查到但未满』」而「引擎状态表说 4/5 绿」两者矛盾
+					//   （按引擎口径 percent 到 100 才会写 4/5）。只记诊断 + 首条 WARN，
+					//   **不影响行为**（绿仍然单向）。
+					if (progSaidPartial) {
+						++g_state.floraProgConflict;
+						if (!g_state.floraProgConflictWarned) {
+							g_state.floraProgConflictWarned = true;
+							REX::WARN("flora progress: ★ 冲突 —— 直读答「未满」而引擎状态表画的是绿"
+									  "（ref=0x{:X} base=0x{:X}）-> 诊断计数 `冲突=`；不影响行为",
+								a_ref->GetFormID(), fid);
+						}
+					}
 					++g_state.floraStatusTableHits;
 					++g_state.floraScanHits;
 					++g_state.floraLearnedHits;
@@ -9764,8 +9866,8 @@ namespace SAS
 						RememberFloraBase(fid, WorldspaceOfRef(a_ref), "状态表捡漏命中（动态激活）");
 					}
 					if (g_cfg.floraScanProbeMax > 0 &&
-						g_state.floraScanProbes < static_cast<std::uint32_t>(g_cfg.floraScanProbeMax)) {
-						++g_state.floraScanProbes;
+						g_state.floraScanGreenProbes < static_cast<std::uint32_t>(g_cfg.floraScanProbeMax)) {
+						++g_state.floraScanGreenProbes;
 						REX::INFO("flora scan: ref=0x{:X} base=0x{:X} 判据 = 引擎状态表捡漏"
 								  "（引擎亲手画过 state 4/5）-> 已扫描 ⇒ 状态 {}（原版「已扫描」绿）",
 							a_ref->GetFormID(), fid, FloraScannedState());
@@ -9795,6 +9897,16 @@ namespace SAS
 					++g_state.floraEngineStateUnknown;
 				}
 				if (engineState == kScannableStateScanned) {
+					// ★ R12：同 ⓪.5 的冲突诊断（直读说未满、引擎答 2）
+					if (progSaidPartial) {
+						++g_state.floraProgConflict;
+						if (!g_state.floraProgConflictWarned) {
+							g_state.floraProgConflictWarned = true;
+							REX::WARN("flora progress: ★ 冲突 —— 直读答「未满」而 GetOutlineState(ref)=2"
+									  "（ref=0x{:X} base=0x{:X}）-> 诊断计数 `冲突=`；不影响行为",
+								a_ref->GetFormID(), fid);
+						}
+					}
 					++g_state.floraScanHits;
 					// ★★★ v4.31 / v5.1：写进**按引用的单向记忆** —— 之后**这个引用**
 					//   都直接走 ⓪（不再重问引擎）。这是「低概率变青」的根治：
@@ -9803,8 +9915,8 @@ namespace SAS
 					RememberFloraRef(a_ref, a_base, true, "引擎状态 GetOutlineState(ref)=2（原生 IsScanned）");
 					g_state.floraScannedCache.emplace(a_ref, State::FloraScanRec{ true, now, fid, 1 });
 					if (g_cfg.floraScanProbeMax > 0 &&
-						g_state.floraScanProbes < static_cast<std::uint32_t>(g_cfg.floraScanProbeMax)) {
-						++g_state.floraScanProbes;
+						g_state.floraScanGreenProbes < static_cast<std::uint32_t>(g_cfg.floraScanProbeMax)) {
+						++g_state.floraScanGreenProbes;
 						REX::INFO("flora scan: ref=0x{:X} base=0x{:X} 判据 = 引擎自己的扫描状态 "
 								  "`GetOutlineState(ref)`=2（= 原生 IsScanned）-> 已扫描 ⇒ 状态 {}（原版「已扫描」绿）",
 							a_ref->GetFormID(), fid, FloraScannedState());
@@ -12518,7 +12630,7 @@ namespace SAS
 						  "| 读档边界(★v5.1.6): 事件保留={} 确认base={} 推进={} "
 						  "| 存档指纹(★v5.1.7): 锚={}天 处理={} 作废={}条 表剪={} 失败={} 存档={} "
 						  "| 引擎状态表: 条目={} 读={} 绿={} 青={} 无条目={} "
-						  "| 引擎进度直读(★v5.2/订正R11): 问={} 满={} 未满={} 失败={} 缓存命中={} 冲突={} "
+						  "| 引擎进度直读(★v5.2/订正R12): 问={} 满={} 未满={} 失败={} 缓存命中={} 冲突={} "
 						  "兜底K1={} keyType=0x{:X}(现读) keyZero={} ready={} 记忆层={} "
 						  "| 学习表: 沿用={} 捡漏={} 落盘={} 写入={} 旧格式忽略={} 无时间={}"
 						  "（★ v5.1：按引用记忆 = 记忆粒度是引用；★ v5.1.2：按物种扩散 = 同 species / "

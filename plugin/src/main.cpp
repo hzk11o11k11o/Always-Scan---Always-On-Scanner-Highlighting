@@ -11,6 +11,10 @@
 
 #include "REX/CONVERT.h"  // REX::UTF16_TO_UTF8（日志里打印真实路径）
 
+// ★ 2026-09-27：`GetPrivateProfileIntW`（读 INI 的 `LogMaxMB`）。PCH.h 里已定义
+//   NOMINMAX，不会有 min/max 宏冲突（AlwaysScan.cpp 也是这么拿的）。
+#include <Windows.h>
+
 #include <spdlog/details/file_helper.h>
 #include <spdlog/sinks/base_sink.h>
 #include <spdlog/sinks/msvc_sink.h>
@@ -29,9 +33,17 @@ namespace
 	// 避免两处写死不一致。
 	constexpr const char* kLogName = "SAS_AlwaysScan";
 
-	// 日志文件上限 10 MiB：写新一行时若会超过就把旧内容整体清空，
-	// 保证日志占用恒定 ~10 MiB（不是滚动保留旧文件）。
-	constexpr std::size_t kLogMaxBytes = 10 * 1024 * 1024;
+	// 日志文件上限（★ 2026-09-27 起 **INI 可配**，见下面 LogMaxBytesFromIni）：
+	//   写新一行时若会超过就把旧内容整体清空，保证日志占用恒定 ≈ 上限
+	//   （不是滚动保留旧文件）。
+	// ★ 需求（AGENTS.md，2026-09-27）：「N 网公开版日志最大 1M，本机开发版本日志最大
+	//   10M，把这个做成配置写进 ini 文件吧，免得还得改代码」。
+	//   ⇒ 键 = `[General] LogMaxMB`（整数 MiB，钳制 1~1024）。
+	//   内置默认 **1 MiB**（= 公开版口径：INI 缺失 / 手动安装也只占 1 MiB）；
+	//   本机部署的 `SAS_AlwaysScan.ini` 里显式写 `LogMaxMB=10`。
+	constexpr int kLogMaxMbDefault = 1;
+	constexpr int kLogMaxMbMin     = 1;
+	constexpr int kLogMaxMbMax     = 1024;
 
 	// 「单文件封顶」文件 sink。commonlibsf 默认建的是 basic_file_sink
 	// （纯追加、永不清理），长时间游玩日志会无限变大；本 sink 在写入前检查
@@ -117,6 +129,42 @@ namespace
 		return s;
 	}
 
+	// ★ 2026-09-27：日志上限 = INI `[General] LogMaxMB`（MiB）。
+	//   路径规则与 AlwaysScan.cpp 的配置解析**完全一致**（两处必须同规则，
+	//   否则会出现「INI 读到了、日志上限没读到」的鬼故事）：
+	//     ① 优先「和 esm 同级」（MO2 下 = mod 目录根）的 SAS_AlwaysScan.ini；
+	//     ② 不存在 ⇒ 回退 DLL 旁边的老位置（v4.16 及以前）。
+	//   值：读不到 / <1 ⇒ 1；>1024 ⇒ 1024。用宽字符 API（游戏可能在中文路径下）。
+	std::size_t LogMaxBytesFromIni()
+	{
+		std::filesystem::path ini;
+		if (const auto dir = EsmDir(); !dir.empty()) {
+			auto p = dir / "SAS_AlwaysScan.ini";
+			if (std::filesystem::exists(p)) {
+				ini = std::move(p);
+			}
+		}
+		if (ini.empty()) {
+			if (const auto dir = PluginDir(); !dir.empty()) {
+				auto p = dir / "SAS_AlwaysScan.ini";
+				if (std::filesystem::exists(p)) {
+					ini = std::move(p);
+				}
+			}
+		}
+		int mb = 0;
+		if (!ini.empty()) {
+			mb = static_cast<int>(::GetPrivateProfileIntW(L"General", L"LogMaxMB", 0, ini.wstring().c_str()));
+		}
+		if (mb < kLogMaxMbMin) {
+			mb = kLogMaxMbDefault;  // 键缺失（0）/ INI 不存在 ⇒ 公开版默认 1 MiB
+		}
+		if (mb > kLogMaxMbMax) {
+			mb = kLogMaxMbMax;
+		}
+		return static_cast<std::size_t>(mb) * 1024 * 1024;
+	}
+
 	// 接管日志：建「限长文件 sink」并把默认 logger 的 sink 全换成它。
 	// 必须在 SFSE::Init 之后调用。
 	//
@@ -134,6 +182,10 @@ namespace
 			return;
 		}
 
+		// ★ 2026-09-27：日志上限从 INI 读（`[General] LogMaxMB`，MiB）——
+		//   建 sink 前只解析一次（之后改 INI 要重启游戏才生效，与其它配置一致）。
+		const std::size_t maxBytes = LogMaxBytesFromIni();
+
 		std::filesystem::path fileName{ kLogName };
 		fileName += ".log";
 
@@ -141,7 +193,7 @@ namespace
 		std::shared_ptr<spdlog::sinks::sink> fileSink;
 		if (const auto dir = EsmDir(); !dir.empty()) {
 			try {
-				fileSink = std::make_shared<SizeLimitedFileSink>(dir / fileName, kLogMaxBytes);
+				fileSink = std::make_shared<SizeLimitedFileSink>(dir / fileName, maxBytes);
 				usedDir = dir;
 			} catch (const std::exception& e) {
 				REX::WARN("esm 同级目录里建日志失败（{}）—— 回退到 SFSE 默认日志目录", e.what());
@@ -150,7 +202,7 @@ namespace
 		if (!fileSink) {
 			if (const auto dir = SFSE::log::log_directory()) {
 				try {
-					fileSink = std::make_shared<SizeLimitedFileSink>(*dir / fileName, kLogMaxBytes);
+					fileSink = std::make_shared<SizeLimitedFileSink>(*dir / fileName, maxBytes);
 					usedDir = *dir;
 				} catch (const std::exception&) {
 				}
@@ -175,7 +227,9 @@ namespace
 		logger->flush_on(spdlog::level::debug);
 #endif
 		spdlog::set_pattern("[%T.%e] [%=5t] [%L] %v");
-		REX::INFO("日志文件：{}（上限 {} KiB，写满清空重来）", ToUtf8(usedDir / fileName), kLogMaxBytes / 1024);
+		REX::INFO("日志文件：{}（上限 {} MiB，写满清空重来；★ INI `[General] LogMaxMB` 可调"
+				  " —— N 网公开版 1 / 本机开发 10，改完重启游戏生效）",
+			ToUtf8(usedDir / fileName), maxBytes / (1024 * 1024));
 	}
 
 	// 插件加载时可能过早（SFSE 的任务系统还没起来），所以在
@@ -324,7 +378,31 @@ SFSE_PLUGIN_LOAD(const SFSE::LoadInterface* a_sfse)
 	//   「有 0x2A 组件」的引用**必然**调 `0x7BCBD0` → 组件失败时即本兜底；那些版本从未出现
 	//   崩溃 / 表增长 / 卡顿回归 ⇒ 直接调用不引入新副作用面。
 	//   回退：INI `FloraEngineProgress=0`（关新判据）。
-	REX::INFO("SAS_AlwaysScan v5.1.0 loading（订正 R11：植物「已扫描」直读引擎扫描进度表 —— ★ key1 获取改为「先组件、后引擎兜底 0x910690」（实测植物 ref 没有 0x81 组件，R10 只复刻了组件主路径 ⇒ 判据从未成功）+ R10 的 key 类型 word 每次查询现读 + 默认抛弃自建记忆（FloraUseMemory=0））(SFSE build {})",
+	// ★★★ 2026-09-27 订正 R12（公开版仍是 2.0、DLL build 仍是 5.1.0；**只改诊断、不改行为**）：
+	//   用户指令：「肉眼检测似乎没什么问题了，你再结合日志看看有没有遗漏的地方」。
+	//   本轮审查 R11 实测日志（2026-09-27 13:33~13:45 两局）的发现：
+	//   · ★ 好消息（R11 生效的硬证据）：`兜底K1=104` **恰好等于** `问(35) + 失败(69) = 104`
+	//     ⇒ 每一次真实查询都成功走兜底拿到 key1 —— key1 获取已 100% 工作；
+	//     另外 `满=35`（直读查出 percent=100）说明链路在**部分**目标上已经跑通。
+	//   · 问题 ①：两局共 16 条 `flora progress probe:` **全是 stage=8**
+	//     （「桶内偏移 / 二级基址形状不对」）—— 这一档混合了三种完全不同的情况：
+	//     subOff 读不到 / 二级基址不可读 / **cap==0（空表 = 这个物种没扫过，正常）**；
+	//     ⇒ 无法从日志区分「没扫过（行为正确）」与「结构真的不对（漏绿隐患）」。
+	//   · 问题 ②：probe 失败行 `key1=0x0 key2=0x0` 是**假的**（失败分支没回填诊断值）
+	//     —— 实际 key1 非零（否则 stage 会是 4），这行会把排障方向带偏。
+	//   · 问题 ③：判绿行（`flora scan: ref=… 判据 = …`）在两局日志里**一条都没有** ——
+	//     8 条额度被会话开头的「判青最终行」吃光 ⇒ R11 文档里的核心验收点
+	//     （`判据 = 引擎扫描进度直读：percent=100/100`）**结构上不可观测**（即使判据在干活）。
+	//   · 问题 ④：`冲突=`（直读与引擎状态表/GetOutlineState 相矛盾的计数）定义了但从不自增。
+	//   修法（全部在 `AlwaysScan.cpp`，纯诊断 / 可观测性；**行为一个字节都没动**）：
+	//   ① `stage` 8 细分成 12(桶内 subOff 读不到)/13(基址不可读)/14(**空表=没扫过**)/15(arr·cap 形状坏)，
+	//      probe 行随之附 `桶=/subOff=/cap=/arr=`（下一局一眼定性）；
+	//   ② 失败路径**照实回填** key1/key2（probe 行不再是假 0）；
+	//   ③ probe 除「前 8 条」外，**每个 stage 的首条**与**首条成功**都保证打出（样例必可见）；
+	//   ④ **判绿行独立额度**（`floraScanGreenProbes`，不再与判青最终行抢 8 条额度）；
+	//   ⑤ `冲突=` 实现：直读答「未满」而引擎状态表 4/5 或 `GetOutlineState==2` 时计数 + 首条 WARN。
+	//   ★ 版本号纪律：公开版仍 **2.0**、DLL 内部 build 仍 **5.1.0**（本轮未动版本号）。
+	REX::INFO("SAS_AlwaysScan v5.1.0 loading（订正 R12：植物「已扫描」直读**诊断细化** —— ★ R11 实测 `兜底K1=104 == 问(35)+失败(69)` = key1 获取 100% 成功、失败全在表查找层；本条：stage=8 拆成 12/13/14/15（空表 vs 形状坏）+ probe 失败行照实打印 key1/key2 + 每 stage 首条/首条成功必打 + 判绿行独立额度（R11 验收点此前不可观测）+ `冲突=` 计数；★ 只改诊断、不改行为）(SFSE build {})",
 		SFSE::GetSFSEVersion());
 
 	if (auto* messaging = SFSE::GetMessagingInterface()) {

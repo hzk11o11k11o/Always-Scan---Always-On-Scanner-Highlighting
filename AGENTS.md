@@ -34,6 +34,6 @@ D:\Mod Organizer 2
 - 所有工具的源代码允许你可以自己修改，添加自己想要的能力
 - 每次任务完成后，需要提交本地git，同时.gitignore也要添加必要忽略项
 - mod文件生成后要部署到Mod Organizer并配置启用
-- mod文件生成后帮我打包成nexus mods能接受的上传包文件，并帮我写一个介绍文案（只关注高亮mod）
+- mod文件生成后帮我打包成nexus mods能接受的上传包文件，N网公开版日志最大1M，本机开发版本日志最大10M，把这个做成配置写进ini文件吧，免得还得改代码，并帮我写一个介绍文案（只关注高亮mod）
 - https://www.nexusmods.com/starfield/mods/18268，这个是本mod的N网地址
 - 版本号你不要自己提升，等我通知再提升

@@ -5,7 +5,7 @@
 
 Version  : 2.0  (plugin build 5.1.0)
            2.0 = the mod brings its own outline colour channels (described
-           below), plus thirteen fixes, all from player reports.
+           below), plus fourteen fixes, all from player reports.
            (1) "Ores and plants are green before *and* after scanning."
                The mod remembers a confirmed "surveyed" verdict so a target
                cannot fall back to cyan (added in 1.7.9 / 1.8.1), but that
@@ -377,6 +377,23 @@ Version  : 2.0  (plugin build 5.1.0)
                      `k1来源=组件(0x81)` / `k1来源=兜底(0x910690)` and the stats
                      line gained a `兜底K1=` counter, so the answering path is
                      visible at a glance.
+                     (14) Log size is now a setting: `LogMaxMB` in the ini
+                     (in MiB, default 1; the developer copy of this ini uses
+                     10). The log is still self-limiting - once a new line
+                     would cross the cap, the file is emptied and starts over
+                     - but the cap no longer requires a new build to change.
+                     The startup line reports the effective cap. Also in this
+                     build, the internal "direct survey read" diagnostics got
+                     finer: a failed lookup now says *which* layer stopped it
+                     (empty table = this species has no record in this save,
+                     vs. a bad table shape) and prints the ids it had already
+                     resolved, every distinct failure layer and the first
+                     successful query are always logged, and the "judged
+                     green" lines have their own log budget (they used to be
+                     squeezed out by the "judged cyan" lines, so fix (13)'s
+                     effect could not even be seen in the log). Fix (13)'s
+                     read itself is unchanged - this build changes
+                     diagnostics only.
                      Also in 2.0 (the headline feature) - the mod brings its own
                      outline colour channels instead of borrowing the game's.
            The game has eleven outline "states"
@@ -1131,6 +1148,10 @@ Most useful options:
                         0 = disabled (walk everything every pass).
   NotifyOnToggle=1      show a HUD message on toggle
   LogStats=1            write a stats line to the log every 5 seconds
+  LogMaxMB=1            log size cap in MiB (1..1024). The log never grows
+                        past the cap: once a new line would cross it, the
+                        file is emptied and starts over (fix (14)). Raise
+                        it (e.g. 10) if you are collecting a long debug log.
 
 ------------------------------------------------------------------------
  TROUBLESHOOTING
@@ -1278,8 +1299,10 @@ categories).
 * With "Simple Immersive Looting" (Nexus 12677) installed, using its
   "Strip" option unequips a body's gear - the body starts glowing again
   because the gear is takeable now; loot it and the outline goes away.
-* The log is capped at 10 MiB: once it grows past that it is emptied and
-  starts over, so it can never fill up your disk.
+* The log size cap is the ini key `LogMaxMB` (in MiB, default 1): once the
+  log would grow past the cap, the file is emptied and starts over, so it
+  can never fill up your disk. Raise it (e.g. LogMaxMB=10) when collecting
+  a log for a bug report.
 * Since 4.3 the inventory calibration keeps retrying until it succeeds
   (it samples nearby containers or actors), so "looted means dark" also
   starts working when your first area had nothing to sample from.
