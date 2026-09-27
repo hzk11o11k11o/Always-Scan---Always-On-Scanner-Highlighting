@@ -220,7 +220,7 @@ SFSE_PLUGIN_LOAD(const SFSE::LoadInterface* a_sfse)
 	//      的**所有**实例一起变绿（引擎知识库本来就是这一级）—— 治用户实测的
 	//      「有些植物扫描后还是青，打开扫描仪再关闭才变绿」（R2）。
 	//   这三条一起治「扫描后没变色」—— 启动日志里认这个括号即可确认跑的是订正版。
-	REX::INFO("SAS_AlwaysScan v5.1.0 loading（订正 R2：状态表 0x5F39CE0 + 「青」不短路 + 按物种扩散）(SFSE build {})",
+	REX::INFO("SAS_AlwaysScan v5.1.0 loading（订正 R3：环内 cell 分片遍历 + loop/sync 细分计时）(SFSE build {})",
 		SFSE::GetSFSEVersion());
 
 	if (auto* messaging = SFSE::GetMessagingInterface()) {

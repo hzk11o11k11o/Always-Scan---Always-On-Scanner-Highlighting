@@ -5,7 +5,7 @@
 
 Version  : 2.0  (plugin build 5.1.0)
            2.0 = the mod brings its own outline colour channels (described
-           below), plus four fixes, all from player reports.
+           below), plus five fixes, all from player reports.
            (1) "Ores and plants are green before *and* after scanning."
                The mod remembers a confirmed "surveyed" verdict so a target
                cannot fall back to cyan (added in 1.7.9 / 1.8.1), but that
@@ -82,6 +82,32 @@ Version  : 2.0  (plugin build 5.1.0)
                game restart it is rebuilt from the per-object records as you
                walk past them. Nothing to configure; the stats line gained
                `按物种扩散(★v5.1.2)` counters.
+           (5) "The frame rate still drops." Fixed 2026-09-27. Fix (2) stopped
+               the mod from growing the game's own table; what remained was
+               the cost of the scan itself. Five times a second the mod
+               walks the object list of the cell you are in *and* of the
+               recently visited cells around it (that is what keeps objects
+               just across a border outlined). Together those lists may hold
+               up to 60,000 references, and walking that much took about
+               55 ms per pass in a busy scene - a fifth of a second's worth
+               of main-thread work, five times a second, which shows up as a
+               steady frame-rate drop outdoors and in dense areas. The log's
+               scan timings make it visible: `timing2: ... loop avg=55ms`.
+               Each surrounding cell's list is now walked **in slices** -
+               one slice per pass, rotating - so a pass touches about a
+               fifth of it. The cell you stand in is always walked in full,
+               so targets in view react immediately, and small lists (2000
+               references or fewer) are never sliced. The number of slices
+               is capped automatically so that one full rotation always
+               finishes well inside the existing "grace period" (how long a
+               highlight that left the selection is kept before it is
+               removed): 5 slices x 200 ms = 1 s against a 1500 ms grace, so
+               slicing can never make a highlight flicker. Nothing to
+               configure; RingSliceMaxRounds=5 (0 disables the slicing and
+               restores the old behaviour) tunes it, and the periodic log
+               line now breaks the scan time down: `timing2: ... (refs/scan:
+               cur=... ring=... | walk=...ms loot=...ms flora=...ms) |
+               sync ... (unh=... add=... 3D=...ms)`.
            Also in 2.0 (the headline feature) - the mod brings its own
            outline colour channels instead of borrowing the game's.
            The game has eleven outline "states"
@@ -716,6 +742,19 @@ Most useful options:
                         re-apply the outline if it was lost - this is what
                         cures the rare "it was glowing, then suddenly went
                         dark" case out in the open. 0 = off.
+  RingSliceMaxRounds=5  since build 5.1.0 (the "frame rate still drops"
+                        fix): the cells around the one you stand in (kept
+                        outlined across borders) are walked in rotating
+                        slices - one slice per pass - so a single pass never
+                        walks the whole neighbourhood (together those lists
+                        may hold up to 60,000 references, and walking all of
+                        them took ~55 ms per pass in a busy scene). The cell
+                        you stand in is always walked in full, and lists of
+                        2000 references or fewer are never sliced. The slice
+                        count is capped automatically so that one full
+                        rotation finishes inside UnhighlightGraceMs -
+                        slicing can therefore never make a highlight flicker.
+                        0 = disabled (walk everything every pass).
   NotifyOnToggle=1      show a HUD message on toggle
   LogStats=1            write a stats line to the log every 5 seconds
 

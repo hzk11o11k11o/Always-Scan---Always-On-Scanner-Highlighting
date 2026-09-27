@@ -696,6 +696,29 @@ namespace SAS
 		constexpr std::uint32_t kRingCellMissMax = 10;
 		constexpr std::uint32_t kRingRefsCap     = 60000;
 
+		// ================================================================
+		// ★★★ 2026-09-27（订正 R3）：环内 cell 的**分片遍历** —— 治「帧数下降」
+		// ================================================================
+		// 起因（用户报告 + 当轮日志）：
+		//   `timing: scan avg=79ms`（每 200ms 一轮 ⇒ 主线程占用 ~40%）；
+		//   拆开后 = `loop avg=55ms`（大头）+ `sync avg=14ms` + shape ~0ms。
+		//   而 loop 里只有「遍历引用 + 分类 + 距离」（纯内存读，单条 ~1µs，cache miss 主导）
+		//   ⇒ 唯一能解释 55ms 的就是**遍历量**：当前 cell + 环内 cell 合计可达
+		//   `kRingRefsCap = 60000` 个引用（外景大 cell 每个几万引用），6 万 × ~0.9µs ≈ 54ms。
+		// 治法：
+		//   每个环内 cell 的引用数组**均分成 ≤ N 片**（默认 N = 5），每轮只遍历**一片**、
+		//   游标轮转 ⇒ 每轮环内遍历量 ≈ 环总量 / N（默认 6 万/5 ≈ 1.2 万 ⇒ ~10ms）；
+		//   当前 cell（玩家所在）**不分片**，每轮全扫（视野里的目标必须即时响应）。
+		// 观感安全（两条都靠配置钳制，见 LoadConfig）：
+		//   ① **分片周期（N × ScanIntervalMs）必须 < UnhighlightGraceMs** ——
+		//      否则「本轮没被扫到」的目标会在宽限期到期时被 SyncNativeOutline 摘掉、
+		//      下一片再挂回来（闪烁）。默认 5 × 200ms = 1000ms < 1500ms ✓；
+		//      有效片数 eff = min(用户值, (grace - interval) / interval)，运行时钳死。
+		//   ② 小 cell（引用数 ≤ kRingSliceMinRefs）不分片 —— 单 cell / 小场景行为与旧版完全一致。
+		// 回退：INI `RingSliceMaxRounds=0`（= 1 = 每轮全扫，退回旧行为）。
+		constexpr std::uint32_t kRingSliceMaxRounds = 5;
+		constexpr std::uint32_t kRingSliceMinRefs   = 2000;
+
 		// ★★ v4.7：引用数「轻微变化」的容差（治「行走时不扫描」的第二个来源）
 		//   旧判据：`arr.size != lastRefsSize` ⇒ 立刻 `stableRounds = 0` 并 return，
 		//   而 `stableRounds` 要连续 2 轮才放行 ⇒ **每次长度变化要跳过约 3 轮（≈600ms）**。
@@ -1600,6 +1623,17 @@ namespace SAS
 			//   引擎侧描边是按 3D 图节点登记的，3D 被重建（外景流式加载 / LOD 切换）
 			//   就会丢，而账本还记着「挂着」⇒ 从此不亮。这一项让 MOD 发现后重挂。
 			int           verify3DPerScan = static_cast<int>(kVerify3DPerScan);
+			// ★★★ 2026-09-27（订正 R3，性能）：环内 cell 的**分片遍历**（治「帧数下降」）。
+			//   背景：环（kRingRefsCap = 60000）里各 cell 的引用原来是**每轮全量遍历**的
+			//   （纯内存读），6 万 × ~0.9µs ≈ 54ms/轮 ⇒ 用户当轮日志 `loop avg=55ms`。
+			//   分片 = 每个环内 cell 的数组均分成 ≤ N 片、每轮只遍历一片（游标轮转）
+			//   ⇒ 每轮环内遍历量 ≈ 环总量 / N（默认 6 万/5 ≈ 1.2 万，~10ms 量级）。
+			//   0 / 1 = 关（每轮全扫，退回旧行为，仅用于对照）；默认见 kRingSliceMaxRounds。
+			//   ★ 安全性：读取时按「N × ScanIntervalMs < UnhighlightGraceMs」钳出
+			//     `ringSliceRoundsEff`（防「本轮没扫到 ⇒ 宽限期摘掉 ⇒ 下片挂回」的闪烁），
+			//     Rescan 只认这个有效值 —— 见 LoadConfig 与启动日志那一行。
+			int           ringSliceMaxRounds = static_cast<int>(kRingSliceMaxRounds);
+			std::uint32_t ringSliceRoundsEff = kRingSliceMaxRounds;  // 钳制后的有效片数（≥1）
 			// ★★★ v4.29：放下扫描仪后的「恢复提速」窗口（治「植物 / 矿石比其它物品慢一拍」）。
 			//   resyncBoostMs = 提速窗口时长（0 = 关掉，退回旧行为）；
 			//   resyncBoostBudget = 窗口内每轮重挂预算（0 = 关掉，用 MaxOutlineOpsPerScan）。
@@ -1961,6 +1995,27 @@ namespace SAS
 			std::uint64_t tAddMs    = 0;
 			std::uint64_t vqCalls   = 0;
 
+			// --- ★★★ 2026-09-27（订正 R3）：把 loop / sync 再拆一层 —— 定位「帧数仍有下降」---
+			//   用户报告「帧数还是有下降现象」；当轮日志的形态是：
+			//     timing: scan avg=79ms（每 200ms 一轮 ⇒ 主线程占用 ~40%）
+			//     timing2: loop avg=55ms（大头）| sync avg=14ms | shape ~0ms
+			//   而 loop 里只有「遍历引用 + 分类 + 距离」（纯内存读）—— 唯一能解释 55ms 的
+			//   就是**遍历量**（`kRingRefsCap = 60000`：当前 cell + 环内 cell 合计可达 6 万引用，
+			//   按 ~0.9µs/引用 正好是 50ms 量级）。所以这一层拆出来回答两个问题：
+			//     ① refsWalkCur / refsWalkRing —— 每轮到底遍历了多少引用（分开统计）；
+			//     ② tWalk / tLoot / tFlora / t3D —— 时间分别花在哪一段。
+			//      · tWalkMs  = loop 内「遍历引用 + 分类 + 距离」整段时间（**含**下面两个子项）
+			//      · tLootMs  = 其中 RefLootState（容器 / 尸体判空；SafeReadMem 走库存清单）
+			//      · tFloraMs = 其中 FloraTargetScanned / ProbeFloraEngineState（植物 / 矿脉判据）
+			//      · t3DMs    = sync 内 3D 复检（RefGet3D × Verify3DPerScan）
+			std::uint64_t tWalkMs      = 0;
+			std::uint64_t tLootMs      = 0;
+			std::uint64_t tFloraMs     = 0;
+			std::uint64_t t3DMs        = 0;
+			std::uint64_t refsWalkCur  = 0;  // 窗口内遍历的「当前 cell」引用数（求和）
+			std::uint64_t refsWalkRing = 0;  // 窗口内遍历的「环内 cell」引用数（求和）
+			std::uint64_t ringSliceDeferred = 0;  // 窗口内因分片而推到下轮的引用数（诊断）
+
 			// --- 场景跟踪 ---
 			RE::TESObjectCELL* lastCell = nullptr;
 
@@ -1981,6 +2036,10 @@ namespace SAS
 				std::uint64_t      seenMs = 0;  // 最近一次校验通过 / 玩家在其中的时刻
 				std::uint32_t      miss   = 0;  // 连续校验失败次数（到 kRingCellMissMax 就踢）
 				std::uint32_t      refs   = 0;  // 最近一次读到的引用数（诊断）
+				// ★★★ 订正 R3：分片游标 —— 环内 cell 每轮只遍历「一片」（见
+				//   Config::ringSliceMaxRounds 与 Rescan 里的分片逻辑）。
+				//   0 = 下一片从数组头开始；推进到 >= refs 时归 0。
+				std::uint32_t      sliceCursor = 0;
 			};
 			RingCell      ring[kRingCellMax]{};
 			// --- 诊断（窗口内，打完成绩清零）---
@@ -3537,6 +3596,29 @@ namespace SAS
 			g_cfg.settleOnCellCrossMs = std::clamp(getInt("SettleOnCellCrossMs", static_cast<int>(kSettleOnCellCrossMs)), 0, 2000);
 			g_cfg.streamJumpTolerance = std::clamp(getInt("StreamJumpTolerance", static_cast<int>(kRefsStreamJumpMax)), 0, 65536);
 			g_cfg.verify3DPerScan     = std::clamp(getInt("Verify3DPerScan", static_cast<int>(kVerify3DPerScan)), 0, 1024);
+			// ★★★ 2026-09-27（订正 R3，性能）：环内 cell 分片遍历（定义见 Config 注释）。
+			//   读取后立刻按「分片周期必须 < 宽限期」钳出**有效片数**（防目标闪烁）：
+			//   周期 = eff × ScanIntervalMs，宽限期 = UnhighlightGraceMs，留一整轮余量。
+			//   例：默认 1500 / 200 ⇒ 上限 6 ⇒ eff = min(5, 6) = 5（周期 1.0s < 1.5s ✓）；
+			//       若用户把 UnhighlightGraceMs 调小到 500 ⇒ eff 自动落到 1（不分片）。
+			g_cfg.ringSliceMaxRounds =
+				std::clamp(getInt("RingSliceMaxRounds", static_cast<int>(kRingSliceMaxRounds)), 0, 64);
+			{
+				const auto iv    = static_cast<std::uint32_t>(std::max(1, g_cfg.scanIntervalMs));
+				const auto grace = static_cast<std::uint32_t>(std::max(0, g_cfg.unhighlightGraceMs));
+				std::uint32_t maxByGrace = grace > iv ? (grace - iv) / iv : 0;
+				if (maxByGrace < 1) {
+					maxByGrace = 1;  // 极窄宽限期 / 分片关闭：1 = 每轮全扫（旧行为）
+				}
+				std::uint32_t eff = static_cast<std::uint32_t>(std::max(0, g_cfg.ringSliceMaxRounds));
+				if (eff == 0) {
+					eff = 1;  // 0 = 关（与 1 同义）
+				}
+				if (eff > maxByGrace) {
+					eff = maxByGrace;
+				}
+				g_cfg.ringSliceRoundsEff = eff;
+			}
 			// ★★★ v4.29：放下扫描仪后的「恢复提速」（见常量区 kResyncBoostMs）
 			g_cfg.resyncBoostMs     = static_cast<std::uint64_t>(
 				std::clamp(getInt("ResyncBoostMs", static_cast<int>(kResyncBoostMs)), 0, 30000));
@@ -3882,6 +3964,22 @@ namespace SAS
 			REX::INFO("config: exteriorContinuous={} settleOnCellCross={}ms streamJumpTolerance={} verify3DPerScan={}",
 				g_cfg.exteriorContinuous, g_cfg.settleOnCellCrossMs,
 				g_cfg.streamJumpTolerance, g_cfg.verify3DPerScan);
+			// ★★★ 2026-09-27（订正 R3，性能）：环内 cell 分片遍历 —— 治用户报告的
+			//   「帧数仍有下降」（当轮日志 scan avg=79ms：loop 55ms 几乎全是「每轮全量
+			//   遍历环内 cell 的引用」，环总量可达 kRingRefsCap=60000）。
+			{
+				const std::uint32_t eff = std::max<std::uint32_t>(1, g_cfg.ringSliceRoundsEff);
+				const std::uint64_t periodMs =
+					static_cast<std::uint64_t>(eff) * static_cast<std::uint64_t>(std::max(1, g_cfg.scanIntervalMs));
+				const bool sliceOn = eff > 1 && g_cfg.ringSliceMaxRounds > 1;
+				REX::INFO("config: ringSliceMaxRounds={} -> 环内 cell 分片{}：有效片数={}（每轮只遍历每 cell 的 1/{} 片，"
+						  "小 cell（≤{} 个引用）不分片；分片周期 ≈ {}ms 必须 < UnhighlightGraceMs={}ms，"
+						  "否则目标会「摘掉再挂回」闪烁 —— 有效片数已按这两项钳死）；"
+						  "想回退设 RingSliceMaxRounds=0（每轮全扫）",
+					g_cfg.ringSliceMaxRounds,
+					sliceOn ? "" : "（关：每轮全扫）",
+					eff, eff, kRingSliceMinRefs, periodMs, g_cfg.unhighlightGraceMs);
+			}
 			// ★★★ v4.29：放下扫描仪后的「恢复提速」—— 治「植物 / 矿石比其它物品慢一拍」。
 			REX::INFO("config: resyncBoost={}ms budget={} -> 放下扫描仪（引擎拆 Monocle HUD 清表）之后的头 {}ms 内，"
 					  "把「全量重挂」的每轮预算从 {} 提到 {} 条，并让「青→绿」这类状态变化**优先**换色"
@@ -9070,6 +9168,10 @@ namespace SAS
 			//   诊断：统计行里的 `3D复检: probes=… reassert=…`（后者持续增长 = 这条
 			//   自愈在真的干活；用户下次报告里这两个数就是证据）。
 			if (g_state.nativeReady && g_cfg.verify3DPerScan > 0 && !a_chosen.empty()) {
+				// ★ 订正 R3：3D 复检（RefGet3D × Verify3DPerScan）耗时单列 ——
+				//   它原来是混在 tAdd 里的，而 RefGet3D 是**引擎虚调用**（不是纯内存读），
+				//   是 add 段 14ms 的主要候选来源（见 timing2 输出）。
+				PhaseTimer t3D{ &g_state.t3DMs };
 				const std::size_t total = a_chosen.size();
 				const std::size_t step  = std::min<std::size_t>(total, static_cast<std::size_t>(g_cfg.verify3DPerScan));
 				std::uint32_t     probed = 0;
@@ -9301,6 +9403,11 @@ namespace SAS
 			{
 				RE::TESObjectCELL*        cell  = nullptr;
 				RE::TESObjectREFR* const* list  = nullptr;
+				// ★★★ 订正 R3（分片）：本片段在引用数组里的起点与长度。
+				//   当前 cell 恒为 begin=0 / count=全量（玩家所在处必须每轮即时响应）；
+				//   环内 cell 每轮只取「一片」（begin=sliceCursor、count=片大小），
+				//   遍历总量从 kRingRefsCap(60000) 降到 ≈ 总量 / RingSliceMaxRounds。
+				std::uint32_t             begin = 0;
 				std::uint32_t             count = 0;
 			};
 			static std::array<ScanCell, 1 + kRingCellMax> scanCells;
@@ -9378,13 +9485,29 @@ namespace SAS
 
 				scanCells[cellCount++] = ScanCell{ cell,
 					reinterpret_cast<RE::TESObjectREFR* const*>(arr.data),
+					0,  // ★ 订正 R3：当前 cell 不分片（玩家所在处每轮全扫）
 					std::min<std::uint32_t>(arr.size, kMaxRefsSanity) };
 				// 当前 cell 进环（= 玩家真的在这里；「连续过渡」判据与「边界对面也扫」都靠它）
 				RingTouch(cell, a_nowMs, arr.size);
 			}
 
 			// ---- ★ v4.7：环里其它 cell（形状 + 自洽性都过才一起扫）----
+			//   ★★★ 2026-09-27（订正 R3，性能）：环内 cell **分片遍历** ——
+			//     背景：kRingRefsCap = 60000（环里各 cell 引用数合计上限），而 loop 段
+			//     是**每轮全量遍历**（+ 分类 + 距离，纯内存读）⇒ 用户当轮日志里
+			//     `loop avg=55ms`（200ms 一轮 = 主线程占用 ~28%）几乎全在这里 ——
+			//     6 万引用 × ~0.9µs（cache miss 主导）≈ 54ms，数字完全对上。
+			//     治法：每个环内 cell 的引用数组**均分成 ≤ RingSliceMaxRounds 片**，
+			//     每轮只遍历**一片**（游标轮转）⇒ 每轮环内遍历量 ≈ 环总量 / N
+			//     （默认 6 万/5 ≈ 1.2 万，开销降到 ~10ms 量级）。
+			//   ★ 观感安全性的两条硬约束（都在 LoadConfig 里钳死）：
+			//     ① 分片周期（= N × ScanIntervalMs）**必须 < UnhighlightGraceMs** ——
+			//        否则「本轮没扫到」的目标会在宽限期到期时被 SyncNativeOutline 摘掉、
+			//        下一片再挂回来（闪烁）。默认 5 × 200ms = 1000ms < 1500ms ✓；
+			//     ② 小 cell（≤ kRingSliceMinRefs）不分片 —— 单 cell 场景行为与旧版一致。
+			//   ★ 不变量：环内 cell 的「当前 cell」永远不在这里（上面已 scanCells[0]）。
 			{
+				const std::uint32_t sliceRounds = g_cfg.ringSliceRoundsEff;
 				for (auto& rc : g_state.ring) {
 					if (cellCount >= scanCells.size()) {
 						break;
@@ -9416,9 +9539,27 @@ namespace SAS
 					rc.miss   = 0;
 					rc.seenMs = a_nowMs;
 					rc.refs   = ringArr.size;
+
+					// ---- 分片（见上方长注释）----
+					const std::uint32_t total = std::min<std::uint32_t>(ringArr.size, kMaxRefsSanity);
+					std::uint32_t       begin = 0;
+					std::uint32_t       take  = total;
+					if (sliceRounds > 1 && total > kRingSliceMinRefs) {
+						const std::uint32_t slice = (total + sliceRounds - 1) / sliceRounds;  // 向上取整
+						if (rc.sliceCursor >= total) {
+							rc.sliceCursor = 0;  // 数组缩过 / 防御：游标越界就从头来
+						}
+						begin = rc.sliceCursor;
+						take  = std::min(slice, total - begin);
+						// 下一片起点（扫到尾巴就回到数组头 —— 分片是环形的）
+						rc.sliceCursor = (begin + take >= total) ? 0 : (begin + take);
+						g_state.ringSliceDeferred += total - take;
+					} else {
+						rc.sliceCursor = 0;  // 小 cell / 分片关：每轮全扫
+					}
 					scanCells[cellCount++] = ScanCell{ rc.cell,
 						reinterpret_cast<RE::TESObjectREFR* const*>(ringArr.data),
-						std::min<std::uint32_t>(ringArr.size, kMaxRefsSanity) };
+						begin, take };
 				}
 				RingTrimByRefs();
 			}
@@ -9448,6 +9589,9 @@ namespace SAS
 			//   实测却是 30ms 上下，所以必须单独计时把它和形状校验分开看）。
 			{
 				PhaseTimer tLoop{ &g_state.tLoopMs, &g_state.tLoopMax };
+				// ★ 订正 R3：loop 内「遍历引用 + 分类 + 距离」整段（**含**下面
+				//   tLoot / tFlora 两个子项；配合 refsWalkCur/Ring 判断是否遍历量问题）。
+				PhaseTimer tWalk{ &g_state.tWalkMs };
 
 			// ★ v4.7：对「当前 cell + 环内 cell」逐个遍历（见上面 scanCells 的说明）。
 			//   每个 cell 只认**它自己**的引用（`ref->parentCell == sc.cell`）：
@@ -9455,13 +9599,21 @@ namespace SAS
 			for (std::size_t ci = 0; ci < cellCount; ++ci) {
 			const auto& sc = scanCells[ci];
 			auto* const*        list  = sc.list;
+			const std::uint32_t begin = sc.begin;  // ★ 订正 R3：环内 cell 的分片起点
 			const std::uint32_t count = sc.count;
+			// ★ 订正 R3：窗口内「实际遍历的引用数」分两桶（当前 cell / 环内分片）——
+			//   它就是 loop 耗时的分母；用户再报「帧数下降」时先看这两个数。
+			if (ci == 0) {
+				g_state.refsWalkCur += count;
+			} else {
+				g_state.refsWalkRing += count;
+			}
 
 			// ★ v4.2：库存列表偏移标定（**每会话一次**，只拿容器当样本）。
 			//   放在这里是因为它要顺序扫引用找样本；标定完成后这一段不再执行，
 			//   热路径里一次 VirtualQuery 都不会有。
 			if (!g_state.invCalibDone && g_cfg.skipEmptyLoot) {
-				CalibrateInventory(list, count);
+				CalibrateInventory(list + begin, count);
 			}
 
 			// ★★ v4.17：「资源」关键词判据的启动自检（只做一次；通过/失败后都不再执行）。
@@ -9470,8 +9622,8 @@ namespace SAS
 				ResourceKeywordSelfTest();
 			}
 
-			for (std::uint32_t i = 0; i < count; ++i) {
-				auto* ref = list[i];
+			for (std::uint32_t j = 0; j < count; ++j) {
+				auto* ref = list[begin + j];
 				// 全部是纯内存读，零引擎调用
 				if (!ref || !IsPlausiblePointer(reinterpret_cast<std::uint64_t>(ref))) {
 					continue;
@@ -9523,7 +9675,9 @@ namespace SAS
 					//   引擎此刻正在给这一类目标写 state 4/5（已扫描，绿）或 7/8（未扫描，青）；
 					//   读一眼它写的是什么，就能知道「**这个引用**扫没扫过」
 					//   （见 ProbeFloraEngineState；★ v5.1：只读走树，零副作用）。
+					const auto tf0 = NowMs();  // ★ 订正 R3：计入 tFlora
 					ProbeFloraEngineState(ref, base);
+					g_state.tFloraMs += NowMs() - tf0;
 					continue;
 				}
 				// ★ v4.2：容器 / 尸体「搜空即熄灭」——库存为空就不进候选集合。
@@ -9553,8 +9707,10 @@ namespace SAS
 						//   ★ v4.13：展示柜还要**内容快照**（记账判据的基准，见常量区「v4.13」）。
 						bool      sawTemporary = false;
 						DcSnapOut snap{};
+						const auto tl0 = NowMs();  // ★ 订正 R3：判空耗时单列（SafeReadMem 走清单）
 						const int loot =
 							RefLootState(ref, displayCase ? &sawTemporary : nullptr, displayCase ? &snap : nullptr);
+						g_state.tLootMs += NowMs() - tl0;
 						// ★ v4.8：容器「判空链路快照」探针（首次 + 判决变化时各一条）。
 						//   用户报「武器箱关着不亮、一打开就亮」—— 这两条记录就是答案：
 						//   见 ContProbe 顶部的长注释（关着时的 size/sum/skipNp/skipEq
@@ -9674,7 +9830,10 @@ namespace SAS
 					(g_cfg.floraScannedByEngineState && g_scannableOutlineStateReady) ||
 					(g_cfg.floraScannedByResource && g_isResourceScannedReady);
 				if (cat == static_cast<int>(Category::kFlora) && floraJudgeOn) {
-					if (FloraTargetScanned(ref, base)) {
+					const auto tf0 = NowMs();  // ★ 订正 R3：植物 / 矿脉判据耗时单列
+					const bool floraScanned = FloraTargetScanned(ref, base);
+					g_state.tFloraMs += NowMs() - tf0;
+					if (floraScanned) {
 						c.state = FloraScannedState();
 						// ★★★ v5.0：通道模式下「已扫描」走专属通道（绿），
 						//   与「未扫描」（kFlora = 青）分开 —— 与 state 7/5 的分法同构。
@@ -10244,12 +10403,18 @@ namespace SAS
 					const auto avg = [&](std::uint64_t a_sum) -> std::uint64_t {
 						return g_state.scanMsSamples ? a_sum / g_state.scanMsSamples : 0;
 					};
-					REX::INFO("  timing2: shape avg={}ms max={}ms vq={}/scan | loop avg={}ms max={}ms | sync avg={}ms max={}ms (unh avg={}ms add avg={}ms)",
+					// ★ 订正 R3：把 loop / sync 再拆一层（定义见 State 里那一段注释）。
+					//   refs/scan cur / ring = 每轮实际遍历的引用数（当前 cell / 环内分片）——
+					//   loop 的耗时基本就是它 × ~1µs（cache miss 主导）；ring 分片生效时
+					//   `分片推迟` 会同步增长（= 本轮没扫、留给下几片的那部分）。
+					REX::INFO("  timing2: shape avg={}ms max={}ms vq={}/scan | loop avg={}ms max={}ms (refs/scan: cur={} ring={} 分片推迟={} | walk={}ms loot={}ms flora={}ms) | sync avg={}ms max={}ms (unh avg={}ms add avg={}ms 3D={}ms)",
 						avg(g_state.tShapeMs), g_state.tShapeMax,
 						g_state.scanMsSamples ? (g_vqCalls - g_state.vqCalls) / g_state.scanMsSamples : 0,
 						avg(g_state.tLoopMs), g_state.tLoopMax,
+						avg(g_state.refsWalkCur), avg(g_state.refsWalkRing), avg(g_state.ringSliceDeferred),
+						avg(g_state.tWalkMs), avg(g_state.tLootMs), avg(g_state.tFloraMs),
 						avg(g_state.tSyncMs), g_state.tSyncMax,
-						avg(g_state.tUnhMs), avg(g_state.tAddMs));
+						avg(g_state.tUnhMs), avg(g_state.tAddMs), avg(g_state.t3DMs));
 				}
 				g_state.vqCalls       = g_vqCalls;
 				g_state.scanMsTotal   = 0;
@@ -10263,6 +10428,14 @@ namespace SAS
 				g_state.tSyncMax      = 0;
 				g_state.tUnhMs        = 0;
 				g_state.tAddMs        = 0;
+				// ★ 订正 R3：新拆出来的几段（loop/sync 细分）同步清零
+				g_state.tWalkMs           = 0;
+				g_state.tLootMs           = 0;
+				g_state.tFloraMs          = 0;
+				g_state.t3DMs             = 0;
+				g_state.refsWalkCur       = 0;
+				g_state.refsWalkRing      = 0;
+				g_state.ringSliceDeferred = 0;
 
 				// ★ v3.1：原来这里打的是 Papyrus 侧自报的引导线状态
 				//   （guideHb / guideState / guideMarkers），引导线功能已整体移除，
