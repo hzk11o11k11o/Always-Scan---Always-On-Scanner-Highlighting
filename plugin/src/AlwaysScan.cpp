@@ -465,6 +465,8 @@ namespace SAS
 		constexpr std::size_t   kMenuEvtRecentMax     = 4;    // 「最近几条事件」环形（取证行用）
 		constexpr std::size_t   kMenuEvtSrcScanMax    = 0x200; // UI+0x20 对不上时往后扫多远找源
 		constexpr std::uint64_t kMenuSinkCheckMs      = 60000; // 每 60 秒核对一次「sink 还在不在」
+		// ★★★ v5.1.5（订正 R5）：读档事件 sink 的「还在不在」核对周期（同 menu / loot 通道）
+		constexpr std::uint64_t kLoadSinkCheckMs      = 60000;
 		constexpr std::size_t kDcWatchMax            = 12;    // 逐帧观察的展示柜引用上限
 		// ★ 逐帧观察表的淘汰阈值：连续这么多帧读不到该引用就踢出去。
 		//   取值偏小（≈0.13 秒 @60fps）—— 因为 `IsReadable` 失败那一路会走
@@ -1082,6 +1084,52 @@ namespace SAS
 			//   **判成未扫描的**按这个键重问 ⇒ 引擎状态一旦恢复立刻（≤5 秒）变绿。
 			//   0 = 退回 30 秒（= v4.32 行为）。
 			int           floraUnscannedTtlMs = 5000;
+
+			// ================================================================
+			// ★★★ v5.1.5（订正 R5）：**「已扫描」记忆按存档隔离**（热键 = 引擎读档事件）
+			// ================================================================
+			// 用户报告（原文）：
+			//   「未扫描星球资源直接显示绿色问题还存在，特别是重新读档后（未扫描时的存档）
+			//    问题非常严重」
+			//
+			// 根因：按引用的「已扫描」记忆（含落盘文件 `SAS_AlwaysScan.flora-learn.txt`）
+			//   **不区分存档**，而「已扫描」这件事**是存档里的勘测数据**决定的：
+			//   · 在「后玩的存档」里学到的一批绿（引擎亲手画过 4/5 / 状态 == 2 / 链命中）
+			//     会**跨存档**保留 ⇒ 读回「更早的存档」（勘测数据更少）时，
+			//     那些引用在**这个存档里根本没扫过**，却仍然被判「已扫描」= 假绿；
+			//   · 更要命的是「按物种（base）扩散表」（v5.1.2）：一个假绿的引用会把它的
+			//     species 记进表 ⇒ **同 species / 同资源的所有实例**一起变绿 ——
+			//     用户看到的「问题非常严重」就是这个放大器。
+			//
+			// 修法：把**引擎自己的读档事件**（`TESLoadGameEvent`）当**存档边界**
+			//   （换场景 / 快速旅行 / 进门都不算 —— 那些不会让勘测数据倒退）：
+			//     · 每次读档：`floraSaveEpoch + 1`，并把**按物种扩散表**清空
+			//       （它只该由「本存档内当场见证」的结论重建）；
+			//     · 记忆条目自带 `epoch`（见证于第几次读档之后）——
+			//       **不在本存档作用域内**的条目不再产生「已扫描」（见 FloraEntryInScope）；
+			//     · 每次读档顺手做一次**资源链复核**：对记忆里出现过的 base 逐个问引擎
+			//       `0x1597A50`（这个资源在不在**本存档**的勘测数据里）——
+			//       链走通且答「没有」⇒ 该 base 的全部条目当场丢掉（矿脉 / 气泉 / 液池；
+			//       植物产出 MISC ⇒ 链不适用、不丢，交给「本存档内见证」规则）。
+			//
+			// 取值：
+			//   1 = ★ 默认（本次修复）：**本会话第一次读档**仍信任落盘记忆
+			//       （= 重开游戏继续玩同一个存档时，扫过的目标不用再开一遍扫描仪 ——
+			//         docs/33 验收 ⑤ 的体验保留），**之后**每次读档只认「该存档内见证过」
+			//       的绿（+ 资源链当场复核）。
+			//   2 = 最严格：落盘记忆一律只当提示（连第一次读档也不认），全部要求
+			//       「本存档内见证」—— 假绿投诉仍存在时的对照开关。
+			//   0 = 旧行为（v5.1.4：记忆永远有效、物种表不清）—— 只为对照 / 回退。
+			int           floraMemoryScope = 1;
+
+			// ★★★ v5.1.5（订正 R5）：**按物种（base）扩散只在同一颗星球内生效**。
+			//   为什么（用户报告的另一半）：「未扫描星球资源直接显示绿色」—— v5.1.2 的
+			//   扩散表只按 base 记（全局），在星球 A 学到的物种会让星球 B 上**同种但没扫过**
+			//   的资源也变绿（v5.1 之前的 base 级引用记忆踩的正是同一个坑，docs/33）。
+			//   修法：见证时记下当时的 worldspace（`TESObjectREFR::GetParentWorldSpace()`），
+			//   命中时要求**同一颗星球**（读不到 worldspace ⇒ 不收紧，保持旧行为）。
+			//   1 = 开启（默认）；0 = 旧行为（全局扩散，只为对照）。
+			bool          floraSpeciesPlanetScope = true;
 
 			// 「已扫描」的星球目标用哪个 outline 状态（0..11）。默认 **5**：
 			//   引擎把「已经在勘测数据里的星球目标」写进 state 4（远）/ 5（近），
@@ -1730,6 +1778,36 @@ namespace SAS
 			std::uint32_t                    channel    = 0xFFFFFFFFu;
 		};
 
+		// ================================================================
+		// ★★★ v5.1.5（订正 R5）：「按物种（base）扩散表」的**作用域** —— 见证时所在的
+		//   **世界空间（星球 / 内景）**（定义在 State 之前，因为 State 里有它的容器）。
+		// ----------------------------------------------------------------
+		// 为什么必须有这一层：v5.1.2 的扩散表只按 base 记（**全局**），而用户实测的假绿
+		//   正是**跨星球**那种 ——「未扫描星球资源直接显示绿色问题还存在」（v5.1 之前的
+		//   base 级引用记忆也踩过同一个坑，docs/33 的结论）。
+		//   ⇒ 扩散限制在**同一颗星球**：
+		//     · 见证时记下当时的 worldspace（`TESObjectREFR::GetParentWorldSpace()`，
+		//       指针只在会话内有意义 —— 表本来就不落盘）；
+		//     · 命中时要求当前引用的 worldspace ∈ 列表；
+		//     · `count == 0`（见证时读不到）/ `a_ws == 0`（当前引用读不到）⇒ **不收紧**
+		//       （宁可保留旧行为，也不因为读不到就误判成假绿）。
+		// ================================================================
+		struct FloraBaseScope
+		{
+			std::array<std::uintptr_t, 4> worldspaces{};  // 见证时的 worldspace（最多 4 个）
+			std::uint32_t                 count = 0;
+
+			[[nodiscard]] bool Seen(std::uintptr_t a_ws) const
+			{
+				for (std::uint32_t i = 0; i < count && i < worldspaces.size(); ++i) {
+					if (worldspaces[i] == a_ws) {
+						return true;
+					}
+				}
+				return false;
+			}
+		};
+
 		struct State
 		{
 			// --- 表单绑定（★ v4.0：只剩「游戏内提示」用的一个 GLOB）---
@@ -2219,6 +2297,12 @@ namespace SAS
 			{
 				std::uint32_t baseFid = 0;      // 校验：记下时的 base（FormID 被回收 / 跨存档 ⇒ 失效）
 				bool          green   = false;  // true = 已扫描（绿）
+				// ★★★ v5.1.5（订正 R5）：这条结论**见证于第几次读档之后**。
+				//   0 = 本会话启动时从落盘文件读回（只在本会话的第一次读档前/后有效）；
+				//   N = 第 N 次读档之后当场见证（只在那一次读档之后有效）。
+				//   「已扫描」是**存档里的勘测数据**决定的 ⇒ 读档 = 存档边界，
+				//   越过边界的老结论一律不再产生绿（见 FloraEntryInScope）。
+				std::uint32_t epoch   = 0;
 			};
 			std::unordered_map<std::uint32_t, FloraRefKnow> floraRefKnow;  // 引用 FormID -> 结论
 			std::uint64_t floraRefHits      = 0;  // 被「按引用记忆」直接命中几次（诊断）
@@ -2239,7 +2323,13 @@ namespace SAS
 			//     重启游戏后靠「引用级落盘记忆」在遍历到旧引用时**动态激活**（见
 			//     FloraTargetScanned ⓪）—— 影响面与「引用级记忆」本身完全相同，
 			//     不会额外外溢到别的存档。
-			std::unordered_set<std::uint32_t> floraBaseKnow;  // base FormID（物种 / 资源）
+			//   ★★★ v5.1.5（订正 R5）：值从「空」升级成 **FloraBaseScope**（见证时所在的
+			//     worldspace 列表）—— 同 species 只在**同一颗星球**扩散（用户报的假绿有一半
+			//     是跨星球来的）。表本身仍然不落盘（会话级，读档时清空）。
+			std::unordered_map<std::uint32_t, FloraBaseScope> floraBaseKnow;  // base FormID -> 作用域
+			//   `cell 指针 → worldspace 指针` 缓存（WorldspaceOfRef；换场景 / 读档时清空）
+			std::unordered_map<std::uintptr_t, std::uintptr_t> floraCellWsCache;
+			std::uint64_t floraBasePlanetDenied = 0;  // 因「不在同一颗星球」被拒绝的扩散次数
 			std::uint64_t floraBaseHits = 0;  // 被「按物种扩散」直接命中几次（诊断）
 			std::uint64_t floraBaseNew  = 0;  // 本会话记下几个 base（诊断）
 			// ★★★ v5.1：只读探针（引擎状态表）的计数 —— 这一路**零副作用**
@@ -2255,6 +2345,29 @@ namespace SAS
 			std::uint64_t floraPersistWrites   = 0;  // 追加写盘的条数
 			bool          floraPersistReady    = false;
 			std::string   floraPersistPath;          // 懒设置（首次用到时算一次）
+
+			// ★★★ v5.1.5（订正 R5）：**读档 = 存档边界**（「已扫描」记忆按存档隔离）
+			//   `saveLoadPending`：读档事件 sink 只置这个原子标志（事件不保证在主线程），
+			//     真正的处理在主线程（载入画面关闭时 / Tick 兜底，见 ProcessFloraSaveLoad）。
+			//   `floraSaveEpoch`：每处理一次读档 +1；记忆条目自带 epoch（见 FloraRefKnow）。
+			std::atomic_bool   saveLoadPending{ false };
+			std::atomic_uint64_t saveLoadPendingAtMs{ 0 };  // 事件时刻（Tick 兜底的延迟守卫）
+			std::atomic_uint64_t loadEvtTotal{ 0 };      // 收到几次读档事件（诊断）
+			std::uint32_t    floraSaveEpoch        = 0;  // 已处理几次读档
+			std::uint64_t    floraSaveLoads        = 0;
+			std::uint64_t    floraScopeSkipped     = 0;  // 因「不在本存档作用域」而被跳过的记忆命中
+			std::uint64_t    floraScopeDemoted     = 0;  // 被引擎当场画的「青」翻案掉的过期绿
+			std::uint64_t    floraScopeRescoped    = 0;  // 过期条目在本存档内被重新见证（回到作用域）
+			std::uint64_t    floraScopeDropped     = 0;  // 读档复核时被资源链证伪而丢掉的**条目**数
+			std::uint64_t    floraScopeDroppedBase = 0;  // 同上，被证伪的 **base** 数
+			std::uint64_t    floraScopeChainDisproved = 0;  // 复核里被链**证伪**（本存档没扫描）的 base 数
+			std::uint64_t    floraScopeChainSkip   = 0;  // 复核里「链不适用 / 超预算」而没结论的 base 数
+			std::uint64_t    floraScopeClearedBase = 0;  // 读档时清掉的物种表条目数
+			bool             loadSinkRegistered    = false;
+			std::uint64_t    loadSinkRetryAtMs     = 0;
+			std::uint64_t    loadSinkCheckMs       = 0;
+			std::uint64_t    loadSinkFailures      = 0;
+			std::uint8_t*    loadSinkSource        = nullptr;  // 已注册的读档事件源（用于「还在不在」核对）
 
 			// --- ★ v4.7：Tick 间隔诊断（区分「Tick 没被调」和「被早退挡住」）---
 			std::uint64_t lastTickMs     = 0;
@@ -3876,6 +3989,10 @@ namespace SAS
 			g_cfg.floraLearnPersist     = getInt("FloraLearnPersist", 1) != 0;
 			g_cfg.floraLearnClearOnLoad = getInt("FloraLearnClearOnLoad", 0) != 0;
 			g_cfg.floraUnscannedTtlMs   = std::clamp(getInt("FloraUnscannedTtlMs", 5000), 0, 30000);
+			// ★★★ v5.1.5（订正 R5）：「已扫描」记忆按**存档**隔离（详见 Config 里 v5.1.5 段）
+			g_cfg.floraMemoryScope      = std::clamp(getInt("FloraMemoryScope", 1), 0, 2);
+			// ★★★ v5.1.5（订正 R5）：按物种扩散只在**同一颗星球**内（同上）
+			g_cfg.floraSpeciesPlanetScope = getInt("FloraSpeciesPlanetScope", 1) != 0;
 			g_cfg.unhighlightGraceMs = std::clamp(getInt("UnhighlightGraceMs", 1500), 0, 60000);
 			g_cfg.maxOutlineOpsPerScan = std::clamp(getInt("MaxOutlineOpsPerScan", 64), 0, 4096);
 
@@ -4255,6 +4372,25 @@ namespace SAS
 					  "引擎状态表探针 = **只读走树（RVA 0x5F39CE0 + 节点 +0x20/+0x28）**，"
 					  "不再调 LookupOrAdd（那会插入条目 + 对 REFR 加引用计数 ⇒ 玩得越久越卡）；"
 					  "「青」记忆只当提示（不再短路主判据 / 资源链，任何一条给出「已扫描」都会升级成绿）");
+			// ★★★ v5.1.5（订正 R5）：记忆按**存档**隔离（详见 Config 里 v5.1.5 段）
+			REX::INFO("config: floraSpeciesPlanetScope={} -> 按物种（base）扩散**只在同一颗星球**内"
+					  "（见证时记下 `TESObjectREFR::GetParentWorldSpace()` 的 worldspace，命中时要求相同；"
+					  "读不到 ⇒ 不收紧）；{}",
+				g_cfg.floraSpeciesPlanetScope,
+				g_cfg.floraSpeciesPlanetScope
+					? "跨星球不再外溢（v5.1.2 的全局扩散会让「别的星球上没扫过的同种资源」也变绿）"
+					: "**旧行为**（全局扩散）—— 只为对照");
+			REX::INFO("config: floraMemoryScope={} -> 「已扫描」记忆按存档隔离（读档 = 存档边界，"
+					  "用引擎 `TESLoadGameEvent` 判定；快速旅行 / 进门不算）：{}",
+				g_cfg.floraMemoryScope,
+				g_cfg.floraMemoryScope == 0
+					? "**旧行为**（记忆永远有效、物种表不清）—— 假绿会回来，只为对照"
+					: (g_cfg.floraMemoryScope == 1
+								? "本会话**第一次**读档仍信任落盘记忆（重开游戏继续玩同一存档 = "
+								  "扫过的目标不用再开一遍扫描仪）；**之后**每次读档只认「该存档内当场见证」"
+								  "的绿，并把落盘记忆里「资源链证明还没扫描」的条目当场丢掉"
+								: "**最严格**：落盘记忆只当提示（连第一次读档也不认），一律要求"
+								  "「本存档内当场见证」（假绿投诉仍存在时的对照开关）"));
 			LoadFloraLearnTable();
 
 			REX::INFO("config: radius={:.1f}m targets={} hotkeyVK=0x{:X} startEnabled={}",
@@ -6453,6 +6589,9 @@ namespace SAS
 			//   ★ 直接用 clear()（而不是 InvalidateFloraScannedCache）—— 这里在
 			//     flora 判据的定义之前，用不着为了打一行日志去挪一大堆声明。
 			g_state.floraScannedCache.clear();
+			// ★★★ v5.1.5（订正 R5）：worldspace 缓存也是「旧世界的 cell 指针 → worldspace」
+			//   ⇒ 一起作废（cell 指针可能被释放 / 重排）。
+			g_state.floraCellWsCache.clear();
 			// ★ v4.26：「从引擎状态里学到的绿」也要一起作废 —— 换了存档，
 			//   上一个世界的勘测数据与新存档无关。
 			// ★★★ v4.33：改成**默认不清**（INI `FloraLearnClearOnLoad=1` 才清）——
@@ -7565,6 +7704,38 @@ namespace SAS
 		//   记忆还在，下轮遇到时会**动态激活**重建）。
 		constexpr std::size_t kFloraBaseKnowMax = 4096;
 
+		// （`FloraBaseScope` 定义在 State 之前 —— State 里有它的容器：见文件上方。）
+
+		// `cell 指针 → worldspace 指针` 的缓存（同一 cell 的成千上万次询问 = 一次引擎调用）。
+		//   换场景 / 读档时清空（cell 可能被释放 / 重排）。
+		constexpr std::size_t kFloraCellWsCacheMax = 256;
+
+		// ★ v5.1.5：这个引用所在的 worldspace（星球 / 内景；读不到 ⇒ 0 = 未知）。
+		//   用引擎自己的 `TESObjectREFR::GetParentWorldSpace()`；按 cell 指针缓存。
+		std::uintptr_t WorldspaceOfRef(const RE::TESObjectREFR* a_ref)
+		{
+			if (!a_ref) {
+				return 0;
+			}
+			const auto* cell = a_ref->parentCell;
+			if (!cell) {
+				return 0;
+			}
+			const auto cellKey = reinterpret_cast<std::uintptr_t>(cell);
+			if (const auto it = g_state.floraCellWsCache.find(cellKey); it != g_state.floraCellWsCache.end()) {
+				return it->second;
+			}
+			std::uintptr_t ws = 0;
+			if (auto* w = const_cast<RE::TESObjectREFR*>(a_ref)->GetParentWorldSpace()) {
+				ws = reinterpret_cast<std::uintptr_t>(w);
+			}
+			if (g_state.floraCellWsCache.size() >= kFloraCellWsCacheMax) {
+				g_state.floraCellWsCache.clear();
+			}
+			g_state.floraCellWsCache.emplace(cellKey, ws);
+			return ws;
+		}
+
 		// ★★★ v5.1.2（订正 R2）：把「这个 **base（物种 / 资源）** 已扫描」记进会话表。
 		//   权威来源（调用点）：`RememberFloraRef(绿)` 成功时、⓪/⓪.5 的引用级绿记忆
 		//   命中时（= 跨会话**动态激活**）。返回 true = 本次首次记下。
@@ -7572,7 +7743,9 @@ namespace SAS
 		//     实例 ⇒ 同 species 的全部实例画绿」（v5.1 日志实证：举一下扫描仪，
 		//     同 base 的一串引用被逐个画成 4/5）。所以「权威确认过任一个体」⇒
 		//     「同 base 全绿」不是外推，而是**把引擎的行为补全**。
-		bool RememberFloraBase(std::uint32_t a_baseFid, const char* a_reason)
+		//   ★★★ v5.1.5（订正 R5）：扩散**限制在同一颗星球**（见 FloraBaseScope）——
+		//     跨星球外溢正是用户这一轮报的「未扫描星球资源直接显示绿色」。
+		bool RememberFloraBase(std::uint32_t a_baseFid, std::uintptr_t a_ws, const char* a_reason)
 		{
 			if (!a_baseFid || a_baseFid == 0xFFFFFF) {
 				return false;
@@ -7582,25 +7755,80 @@ namespace SAS
 					kFloraBaseKnowMax);
 				g_state.floraBaseKnow.clear();
 			}
-			if (!g_state.floraBaseKnow.insert(a_baseFid).second) {
-				return false;  // 已在表里
+			const auto it = g_state.floraBaseKnow.find(a_baseFid);
+			if (it == g_state.floraBaseKnow.end()) {
+				FloraBaseScope s{};
+				if (a_ws) {
+					s.worldspaces[0] = a_ws;
+					s.count          = 1;
+				}
+				g_state.floraBaseKnow.emplace(a_baseFid, s);
+				++g_state.floraBaseNew;
+				const auto n = g_state.floraBaseNew;
+				if (n <= 24 || n % 64 == 0) {
+					REX::INFO("flora scan: 按物种记下「已扫描」—— base=0x{:X}（{}）；"
+							  "★ v5.1.2：同 species / 同资源的**所有**实例一起变绿；"
+							  "★ v5.1.5：**限制在同一颗星球**（记录 worldspace=0x{:X}；"
+							  "0 = 读不到 ⇒ 不收紧；不落盘 ⇒ 不会外溢到别的存档）",
+						a_baseFid, a_reason, a_ws);
+				}
+				return true;
 			}
-			++g_state.floraBaseNew;
-			const auto n = g_state.floraBaseNew;
-			if (n <= 24 || n % 64 == 0) {
-				REX::INFO("flora scan: 按物种记下「已扫描」—— base=0x{:X}（{}）；"
-						  "★ v5.1.2：同 species / 同资源的**所有**实例一起变绿"
-						  "（引擎知识库就是这个粒度，与原版一致；不落盘 ⇒ 不会外溢到别的存档）",
-					a_baseFid, a_reason);
+			// 已在表里：只补作用域（同一物种在别的星球也被见证 ⇒ 那颗星球也放行）
+			auto& e = it->second;
+			if (a_ws && !e.Seen(a_ws) && e.count < e.worldspaces.size()) {
+				e.worldspaces[e.count++] = a_ws;
 			}
-			return true;
+			return false;
 		}
 
 		// 查「这个物种 / 资源」是不是已被权威确认过（会话级；见上面长注释）。
-		bool FloraBaseKnown(std::uint32_t a_baseFid)
+		//   ★★★ v5.1.5（订正 R5）：还要**在同一个世界空间（星球）**里 ——
+		//     见 FloraBaseScope（跨星球外溢 = 用户报的假绿）。
+		//     `a_ws == 0`（当前引用读不到 worldspace / 见证时也没读到）⇒ 不收紧（保守）。
+		bool FloraBaseKnown(std::uint32_t a_baseFid, std::uintptr_t a_ws)
 		{
-			return a_baseFid != 0 &&
-			       g_state.floraBaseKnow.find(a_baseFid) != g_state.floraBaseKnow.end();
+			if (!a_baseFid) {
+				return false;
+			}
+			const auto it = g_state.floraBaseKnow.find(a_baseFid);
+			if (it == g_state.floraBaseKnow.end()) {
+				return false;
+			}
+			if (!g_cfg.floraSpeciesPlanetScope) {
+				return true;  // 旧行为（全局 species 表，对照用）
+			}
+			const auto& e = it->second;
+			if (e.count == 0 || a_ws == 0) {
+				return true;  // 拿不到作用域 / 当前世界空间不知道 ⇒ 不收紧
+			}
+			if (e.Seen(a_ws)) {
+				return true;
+			}
+			++g_state.floraBasePlanetDenied;
+			return false;
+		}
+
+		// ★★★ v5.1.5（订正 R5）：这条记忆**还在「本存档的作用域」里**吗？
+		//   为什么需要它：用户实测「未扫描星球资源直接显示绿色，重新读档（未扫描时的存档）
+		//   后问题非常严重」—— 「已扫描」是**存档里勘测数据**的事实，而记忆（含落盘文件）
+		//   不区分存档 ⇒ 在「后玩的存档」里学到的绿会漏到「更早的存档」里。
+		//   判据（epoch = 见证于第几次读档之后，见 State::FloraRefKnow）：
+		//     · `FloraMemoryScope=0`（旧行为，对照用）⇒ 永远算数；
+		//     · 条目 epoch != 0 ⇒ **只有当前读档编号相同**才算数（= 本存档内当场见证）；
+		//     · 条目 epoch == 0（本会话启动时从落盘文件读回，属于**上一个游戏会话**）⇒
+		//       `FloraMemoryScope=1`（默认）只在本会话**第一次读档**时算数
+		//       （= 重开游戏继续玩同一个存档：扫过的目标不用再开一遍扫描仪）；
+		//       之后的每次读档都不算数（那时玩家可能读了更早的存档）。
+		bool FloraEntryInScope(const State::FloraRefKnow& a_e)
+		{
+			if (g_cfg.floraMemoryScope == 0) {
+				return true;
+			}
+			if (a_e.epoch != 0) {
+				return a_e.epoch == g_state.floraSaveEpoch;
+			}
+			return g_cfg.floraMemoryScope == 1 && g_state.floraSaveEpoch <= 1;
 		}
 
 		// ★★★ v5.1：把「这个**引用**是否已扫描」写进按引用的单向记忆。
@@ -7608,6 +7836,10 @@ namespace SAS
 		//   返回 true = 本次**首次**写入（调用方可据此打一条日志 / 落盘）。
 		//   规则（与 v4.31 的「单向」一致，只是粒度收窄到引用）：
 		//     · 「绿」不会被「青」翻案（这就是「低概率变青」的根治）；
+		//     · ★★★ v5.1.5：「单向」与「作用域」绑定 —— 引擎在**本存档里**当场画出
+		//       「青」（7/8）时，可以把一条**过期**（不在作用域内）的绿翻案掉
+		//       （那正是「读档后假绿」：引擎已经明确说这个存档里它没被扫描）；
+		//       作用域内的绿仍然单向（「低概率变青」不回归）。
 		//     · 同一个 FormID 换了 base（运行时引用的 FormID 会被回收）⇒ 当新条目；
 		//     · 「绿」条目落盘（`SAS_AlwaysScan.flora-learn.txt`，跨会话保留）。
 		bool RememberFloraRef(const RE::TESObjectREFR* a_ref, const RE::TESForm* a_base,
@@ -7626,35 +7858,52 @@ namespace SAS
 				e = State::FloraRefKnow{};  // FormID 被回收去装别的东西 ⇒ 当新条目
 			}
 			if (e.baseFid == baseFid) {
+				const bool inScope = FloraEntryInScope(e);
 				if (e.green == a_green) {
+					// ★ v5.1.5：结论相同但**已经过期** ⇒ 只把作用域盖成当前这一档
+					//   （= 本存档内重新见证；不重复落盘、不重复计数）。
+					if (!inScope) {
+						e.epoch = g_state.floraSaveEpoch;
+						++g_state.floraScopeRescoped;
+					}
 					return false;  // 已有同样的结论
 				}
 				if (e.green && !a_green) {
-					return false;  // ★ 单向：已确认「已扫描」的不被「未扫描」翻案
+					if (inScope) {
+						return false;  // ★ 单向：**本存档内**确认过「已扫描」的不被「未扫描」翻案
+					}
+					// ★ v5.1.5：过期的绿 ⇒ 允许被引擎**当场**画的青翻案（见上面长注释）
+					++g_state.floraScopeDemoted;
 				}
 			}
 			e.baseFid = baseFid;
 			e.green   = a_green;
+			e.epoch   = g_state.floraSaveEpoch;  // ★ v5.1.5：盖「见证于第几次读档之后」
 			EnsureFloraRefKnowRoom();
 			if (a_green) {
 				++g_state.floraRefGreenNew;
 				AppendFloraLearnRecord(refFid, baseFid);  // ★ 落盘（跨会话保留）
 				// ★★★ v5.1.2（订正 R2）：顺手把 base 记进会话级「物种表」——
 				//   同 base 的其它实例（本轮引擎没画到的那些）靠它一起变绿。
-				RememberFloraBase(baseFid, a_reason);
+				//   ★ v5.1.5：物种表每次读档都被清空（只由「本存档内见证」重建），
+				//     而且**带见证时的 worldspace**（同 species 只在**同一颗星球**上扩散）。
+				RememberFloraBase(baseFid, WorldspaceOfRef(a_ref), a_reason);
 			} else {
 				++g_state.floraRefCyanNew;
 			}
 			const auto n = g_state.floraRefGreenNew + g_state.floraRefCyanNew;
 			if (n <= 24 || n % 64 == 0) {
 				REX::INFO("flora scan: 按引用记下 {} —— ref=0x{:X} base=0x{:X}（{}）"
-						  "（★ v5.1：记忆粒度 = 引用，不再外溢到同 base 的其它实例）",
-					a_green ? "「已扫描」（绿）" : "「未扫描」（青）", refFid, baseFid, a_reason);
+						  "（★ v5.1：记忆粒度 = 引用；★ v5.1.5：结论带读档作用域 epoch={}）",
+					a_green ? "「已扫描」（绿）" : "「未扫描」（青）", refFid, baseFid, a_reason,
+					g_state.floraSaveEpoch);
 			}
 			return true;
 		}
 
 		// 查「这个引用」的记忆（base 必须对得上）。命中 ⇒ 调用方不必再问引擎。
+		//   ★★★ v5.1.5：**不在本存档作用域内的条目一律不算命中**（否则旧存档的绿会
+		//     漏到刚读进来的档里 —— 用户实测的假绿就是这么来的）。
 		bool FloraRefKnown(const RE::TESObjectREFR* a_ref, std::uint32_t a_baseFid, bool* a_outGreen)
 		{
 			if (!a_ref || !a_baseFid) {
@@ -7666,6 +7915,10 @@ namespace SAS
 			}
 			const auto it = g_state.floraRefKnow.find(refFid);
 			if (it == g_state.floraRefKnow.end() || it->second.baseFid != a_baseFid) {
+				return false;
+			}
+			if (!FloraEntryInScope(it->second)) {
+				++g_state.floraScopeSkipped;
 				return false;
 			}
 			if (a_outGreen) {
@@ -7807,15 +8060,19 @@ namespace SAS
 				if (e.baseFid != base || !e.green) {
 					e.baseFid = base;
 					e.green   = true;
+					// ★★★ v5.1.5（订正 R5）：落盘条目 =「**上一个游戏会话**见证的结论」，
+					//   盖 epoch = 0 ⇒ 只有在本会话**第一次读档**时才算数
+					//   （见 FloraEntryInScope；之后每次读档只认本存档内见证过的绿）。
+					e.epoch = 0;
 					++g_state.floraPersistLoaded;
 				}
 			}
 			std::fclose(f);
 			g_state.floraPersistReady = true;
-			REX::INFO("flora learn: 按引用记忆已从落盘文件载入 {} 条（{}）-> 这些**引用**本会话直接判"
-					  "「已扫描」，不需要再开一遍扫描仪（FloraLearnPersist=1）；"
-					  "★ v5.1.2：物种表**不落盘**，遇到这些引用时会**动态激活**其 base ⇒ "
-					  "同 species / 同资源的其它实例**立刻**一起变绿（不会外溢到别的存档）{}",
+			REX::INFO("flora learn: 按引用记忆已从落盘文件载入 {} 条（{}）-> 本会话**第一次读档**时这些"
+					  "**引用**直接判「已扫描」（不需要再开一遍扫描仪，FloraLearnPersist=1）；"
+					  "★ v5.1.5：之后每次读档都会把它们降级为「待重新见证」，并清空物种表、"
+					  "按资源链复核（防止「读到更早的存档时，那个存档里没扫过的也显示绿色」）{}",
 				g_state.floraPersistLoaded, path,
 				g_state.floraPersistIgnored
 					? "；★ 旧格式（base 级）行被忽略 " + std::to_string(g_state.floraPersistIgnored) +
@@ -7846,6 +8103,209 @@ namespace SAS
 						  "（行格式：`引用 FormID base FormID`），重开游戏直接读回（想重置就删掉这个文件）",
 					path);
 			}
+		}
+
+		// ================================================================
+		// ★★★ v5.1.5（订正 R5）：**读档 = 存档边界**（「已扫描」记忆按存档隔离）
+		// ----------------------------------------------------------------
+		// 用户报告：「未扫描星球资源直接显示绿色问题还存在，特别是重新读档后
+		//   （未扫描时的存档）问题非常严重」。
+		// 为什么必须用**引擎自己的读档事件**（`RE::TESLoadGameEvent`）：本项目
+		//   v4.0 起用的「载入画面由开变关」这条信号**读档与换场景都会发**
+		//   （快速旅行 / 进门都会经过载入画面），而「记忆还能不能用」只取决于
+		//   **换没换存档** —— 换场景不会让勘测数据倒退，读档会。
+		//
+		// 事件类型：commonlibsf 里 `TESLoadGameEvent` 定义在 `RE/E/Events.h`
+		//   （单独 include 会因缺类型编译不过 —— v4.0 / v4.11 都踩过）⇒ 按既有做法
+		//   **本地定义一个同布局（空负载）的类型**；事件源走 commonlibsf 给的
+		//   REL::ID（`TESLoadGameEvent::GetEventSource` = 64149，versionlib 里对得上）。
+		//   sink 只做一件事：置一个**原子标志**（事件不保证在主线程），
+		//   真正的处理放在主线程（载入画面关闭时，见 ProcessFloraSaveLoad）。
+		// ================================================================
+		struct SasLoadGameEvent
+		{
+		};
+
+		class SasLoadGameSink final : public RE::BSTEventSink<SasLoadGameEvent>
+		{
+		public:
+			RE::BSEventNotifyControl ProcessEvent(const SasLoadGameEvent&,
+				RE::BSTEventSource<SasLoadGameEvent>*) override
+			{
+				g_state.saveLoadPendingAtMs.store(NowMs(), std::memory_order_relaxed);
+				g_state.saveLoadPending.store(true, std::memory_order_relaxed);
+				g_state.loadEvtTotal.fetch_add(1, std::memory_order_relaxed);
+				return RE::BSEventNotifyControl::kContinue;
+			}
+		};
+		SasLoadGameSink g_loadGameSink;
+
+		// 主线程：确保读档事件 sink 挂着（失败每 4 秒重试；挂上后每 60 秒核对一次）。
+		//   形状校验与既有的事件通道同一套（★ v4.11/v4.12/v4.13 的教训：vtable / 形状
+		//   对不上就**绝不注册**，最坏结果只是少一条信号）。
+		void EnsureLoadGameSink(std::uint64_t a_nowMs)
+		{
+			if (g_cfg.floraMemoryScope == 0) {
+				return;  // 旧行为（对照）：不需要存档边界
+			}
+			if (g_state.loadSinkRegistered) {
+				if (a_nowMs - g_state.loadSinkCheckMs < kLoadSinkCheckMs) {
+					return;
+				}
+				g_state.loadSinkCheckMs = a_nowMs;
+				if (!SinkStillInArray(g_state.loadSinkSource, &g_loadGameSink)) {
+					g_state.loadSinkRegistered = false;
+					g_state.loadSinkRetryAtMs  = 0;
+					REX::WARN("load event: 读档事件的 sink 从事件源数组里掉出去了 -> 重挂它");
+				} else {
+					return;
+				}
+			}
+			if (g_state.loadSinkRetryAtMs > a_nowMs) {
+				return;
+			}
+			g_state.loadSinkRetryAtMs = a_nowMs + 4000;
+
+			// 事件源：`TESLoadGameEvent::GetEventSource()`（返回 BSTEventSource 的地址）
+			using func_t = void* (*)();
+			static ::REL::Relocation<func_t> getSource{ RE::ID::TESLoadGameEvent::GetEventSource };
+			auto* src = static_cast<std::uint8_t*>(getSource());
+			if (!src || !IsReadable(src, 0x20)) {
+				++g_state.loadSinkFailures;
+				if (g_state.loadSinkFailures <= 3) {
+					REX::WARN("load event: 读档事件源拿不到（{}）-> 这次不注册"
+							  "（FloraMemoryScope=1 的「按存档隔离」会退化：读档不会作废过期记忆）",
+						src ? "返回的地址不可读" : "GetEventSource() 返回空");
+				}
+				return;
+			}
+			const auto sz = *reinterpret_cast<const std::uint32_t*>(src + 0x08);
+			const auto cp = *reinterpret_cast<const std::uint32_t*>(src + 0x0C);
+			const auto dp = *reinterpret_cast<const std::uint64_t*>(src + 0x10);
+			if (sz > cp || cp > 4096 || (sz != 0 && !IsReadable(reinterpret_cast<const void*>(dp), 8))) {
+				++g_state.loadSinkFailures;
+				if (g_state.loadSinkFailures <= 3) {
+					REX::WARN("load event: 读档事件源的形状不像 BSTEventSource（size={} cap={} data=0x{:X}）-> 不注册",
+						sz, cp, dp);
+				}
+				return;
+			}
+			reinterpret_cast<RE::BSTEventSource<SasLoadGameEvent>*>(src)->RegisterSink(&g_loadGameSink);
+			g_state.loadSinkRegistered = true;
+			g_state.loadSinkSource     = src;
+			g_state.loadSinkCheckMs    = a_nowMs;
+			REX::INFO("load event: 读档事件 sink 已注册（源 0x{:X}，sinks size={} cap={}）-> 每次读档都会把"
+					  "「已扫描」记忆的**存档作用域** +1，并清空按物种扩散表（★ v5.1.5）",
+				reinterpret_cast<std::uintptr_t>(src), sz, cp);
+		}
+
+		// ★ v5.1.5：这个 base（物种 / 资源）在本**存档**里能**证明**「还没被扫描」吗？
+		//   只有「资源链走通（shapeOk）∧ 不是植物（产出 LVLI）∧ 引擎答『不在勘测数据里』」
+		//   才算证明 —— 那是引擎自己的判据函数（`0x1597A50`），live、跟随存档。
+		//   链不适用（植物产出 MISC、无产出字段、形状校验没过）⇒ 返回 false
+		//   （不能证伪 ⇒ 不丢，交给「本存档内见证」规则）。
+		bool FloraBaseProvablyUnscannedInThisSave(std::uint32_t a_baseFid)
+		{
+			if (!g_isResourceScannedReady || !g_cfg.floraScannedByResource || !a_baseFid) {
+				return false;
+			}
+			auto* base = RE::TESForm::LookupByID(a_baseFid);
+			if (!base) {
+				return false;
+			}
+			FloraChain chain{};
+			const bool scanned = QueryFloraResourceScanned(base, &chain);
+			if (!chain.shapeOk || chain.produceIsMisc) {
+				return false;  // 链不适用 / 走不通 ⇒ 拿不到「必然未扫描」的证明
+			}
+			return !scanned;
+		}
+
+		// ================================================================
+		// ★★★ v5.1.5（订正 R5）：处理一次**读档**（存档边界）
+		//   顺序即优先级（证据链 / 用户报告见 Config 里 v5.1.5 段）：
+		//     ① `floraSaveEpoch + 1` —— 之后只有「本存档内见证过」的结论才算数
+		//        （见 FloraEntryInScope；落盘条目的 epoch = 0）；
+		//     ② **清空按物种（base）扩散表** —— 它是「同 species 全绿」的放大器，
+		//        必须跟随存档（本存档内的见证会重新把它填起来）；
+		//     ③ **资源链复核**：对记忆里出现过的 base 逐个问引擎 `0x1597A50`
+		//        （这个资源在不在**本存档**的勘测数据里）—— 链走通且答「没有」
+		//        ⇒ 该 base 的**全部条目当场丢掉**（矿脉 / 气泉 / 液池；
+		//        植物链不适用 ⇒ 不丢，交给②+作用域规则）。
+		//   ★ 这条复核是**可证伪的硬证据**（引擎自己的函数、live、跟随存档），
+		//     所以它对「本会话第一次读档」也生效 —— 哪怕玩家是重开游戏后直接读了一个
+		//     更早的存档（此时落盘记忆本来被信任）。
+		// ================================================================
+		constexpr std::size_t kFloraScopeValidateMaxBase = 64;  // 每次读档最多复核多少个 base
+
+		void ProcessFloraSaveLoad(const char* a_when)
+		{
+			if (!g_state.saveLoadPending.exchange(false)) {
+				return;  // 这次「载入画面关闭」不是读档（= 快速旅行 / 进门）⇒ 什么都不做
+			}
+			++g_state.floraSaveEpoch;
+			++g_state.floraSaveLoads;
+
+			if (g_cfg.floraMemoryScope == 0) {
+				REX::INFO("flora memory: 读档 #{}（{}）—— FloraMemoryScope=0 ⇒ 旧行为"
+						  "（记忆不按存档隔离、物种表不清）",
+					g_state.floraSaveEpoch, a_when);
+				return;
+			}
+
+			// ② 物种表：任何读档都作废（只由「本存档内见证」重建）
+			const auto clearedBases    = g_state.floraBaseKnow.size();
+			g_state.floraScopeClearedBase += clearedBases;
+			g_state.floraBaseKnow.clear();
+
+			// ③ 资源链复核：把「本存档里必然未扫描」的 base 及其条目丢掉
+			std::size_t                     checked = 0;
+			std::size_t                     skipped = 0;
+			std::unordered_set<std::uint32_t> dropBases;
+			{
+				std::unordered_set<std::uint32_t> bases;
+				for (const auto& kv : g_state.floraRefKnow) {
+					if (kv.second.baseFid) {
+						bases.insert(kv.second.baseFid);
+					}
+				}
+				for (const auto base : bases) {
+					if (checked >= kFloraScopeValidateMaxBase) {
+						++skipped;
+						continue;
+					}
+					++checked;
+					if (FloraBaseProvablyUnscannedInThisSave(base)) {
+						dropBases.insert(base);
+					}
+				}
+			}
+			std::size_t droppedRefs = 0;
+			if (!dropBases.empty()) {
+				for (auto it = g_state.floraRefKnow.begin(); it != g_state.floraRefKnow.end();) {
+					if (dropBases.count(it->second.baseFid)) {
+						it = g_state.floraRefKnow.erase(it);
+						++droppedRefs;
+					} else {
+						++it;
+					}
+				}
+			}
+			g_state.floraScopeDropped += droppedRefs;
+			g_state.floraScopeDroppedBase += dropBases.size();
+			g_state.floraScopeChainDisproved += dropBases.size();
+			g_state.floraScopeChainSkip += skipped;
+
+			REX::INFO("flora memory: 读档 #{} 处理完（{}）-> 「已扫描」记忆的存档作用域 = 第 {} 次读档；"
+					  "按物种扩散表已清空 {} 个 base；资源链复核 {} 个 base → **证伪（本存档里没扫描）** {} 个 base / "
+					  "丢掉 {} 条引用记忆{}；之后这些目标只会由「本存档内当场见证」（引擎画 4/5 / 状态==2 / "
+					  "链命中）重新变绿 —— ★ 落盘记忆仍在（重开游戏继续玩同一个存档时有效，FloraMemoryScope={}）",
+				g_state.floraSaveEpoch, a_when, g_state.floraSaveEpoch, clearedBases, checked,
+				dropBases.size(), droppedRefs,
+				skipped ? ("（另有 " + std::to_string(skipped) + " 个 base 超出单次复核预算，下一轮不再补 —— "
+														"预算见 kFloraScopeValidateMaxBase）")
+						: std::string{},
+				g_cfg.floraMemoryScope);
 		}
 
 		// ③ 热路径入口：**每个引用**按 TTL（已扫描 30 秒 / 未扫描见
@@ -7935,7 +8395,8 @@ namespace SAS
 					//   其它实例**立刻**一起变绿，不必等玩家再举一次扫描仪。
 					//   ★ 影响面与「引用级记忆」本身完全相同（记忆是绿的 ⇒ 才激活），
 					//     不会额外外溢到别的存档。
-					RememberFloraBase(fid, "引用级记忆命中（跨会话动态激活）");
+					//   ★ v5.1.5：带上这个引用所在的 worldspace ⇒ 只放行**同一颗星球**。
+					RememberFloraBase(fid, WorldspaceOfRef(a_ref), "引用级记忆命中（跨会话动态激活）");
 					g_state.floraScannedCache.emplace(a_ref,
 						State::FloraScanRec{ true, now, fid, 4 });
 					if (g_cfg.floraScanProbeMax > 0 &&
@@ -7950,12 +8411,18 @@ namespace SAS
 			}
 
 			// ⓪.2 ★★★ v5.1.2（订正 R2）：**按物种（base）扩散** —— 纯内存查表，零引擎调用。
+			//   ★★★ v5.1.5（订正 R5）：**扩散只在同一颗星球内**（FloraBaseKnown 第二参
+			//     = 该引用的 worldspace）—— 用户报的「未扫描星球资源直接显示绿色」
+			//     有一半来自 v5.1.2 的**全局**扩散（在星球 A 学到的物种会让星球 B 上
+			//     同种但没扫过的资源也变绿，正是 v5.1 之前那类假绿，docs/33）。
 			//   引擎知识库是 species（资源）级的：只要这个物种被权威确认过（任一实例
 			//   被引擎画成 4/5、或引擎状态 == 2、或资源链命中），**同 base 的所有实例**
 			//   都该是原版绿 —— 这正是「打开扫描仪再关闭就变绿」的那批目标
 			//   （它们在引擎的画里本来就是绿的，只是之前没被我们学到）。
 			//   判定放在 ⓪ 之后、⓪.5（探针）之前：省掉一次状态表读取。
-			if (FloraBaseKnown(fid)) {
+			//   ★★★ v5.1.5（订正 R5）：**限制在同一颗星球**（worldspace）—— 用户报的
+			//     「未扫描星球资源直接显示绿色」有一半就是这么来的（跨星球外溢）。
+			if (FloraBaseKnown(fid, WorldspaceOfRef(a_ref))) {
 				++g_state.floraBaseHits;
 				++g_state.floraScanHits;
 				++g_state.floraLearnedHits;
@@ -7965,7 +8432,8 @@ namespace SAS
 					g_state.floraScanProbes < static_cast<std::uint32_t>(g_cfg.floraScanProbeMax)) {
 					++g_state.floraScanProbes;
 					REX::INFO("flora scan: ref=0x{:X} base=0x{:X} 判据 = 按物种扩散（★ v5.1.2："
-							  "同 species / 同资源已被权威确认）-> 已扫描 ⇒ 状态 {}（原版「已扫描」绿）",
+							  "同 species / 同资源已被权威确认；★ v5.1.5：同一颗星球）"
+							  "-> 已扫描 ⇒ 状态 {}（原版「已扫描」绿）",
 						a_ref->GetFormID(), fid, FloraScannedState());
 				}
 				return true;
@@ -7988,7 +8456,8 @@ namespace SAS
 					++g_state.floraScanHits;
 					++g_state.floraLearnedHits;
 					// ★★★ v5.1.2：同 ⓪ —— 命中即动态激活物种表（见那里的长注释）
-					RememberFloraBase(fid, "状态表捡漏命中（动态激活）");
+					//   ★ v5.1.5：带上 worldspace（只在同一颗星球扩散）
+					RememberFloraBase(fid, WorldspaceOfRef(a_ref), "状态表捡漏命中（动态激活）");
 					if (g_cfg.floraScanProbeMax > 0 &&
 						g_state.floraScanProbes < static_cast<std::uint32_t>(g_cfg.floraScanProbeMax)) {
 						++g_state.floraScanProbes;
@@ -10419,6 +10888,12 @@ namespace SAS
 					//    把一个全新的内景误判成「连续过渡」）。
 					RingClear();
 					ResetForNewScene(now, "载入画面关闭（读档 / 换场景）");
+					// ★★★ v5.1.5（订正 R5）：如果这次载入是**读档**（引擎的
+					//   `TESLoadGameEvent` 已经发过），那么世界状态可能比记忆**更旧**
+					//   ⇒ 立刻按存档重新划定「已扫描」记忆的作用域
+					//   （清理 + 资源链复核，见 ProcessFloraSaveLoad）。
+					//   ★ 快速旅行 / 进门**不会**有这条事件 ⇒ 记忆照旧（同存档内有效）。
+					ProcessFloraSaveLoad("载入画面关闭");
 				}
 				g_state.loadingSeen = loading;
 			}
@@ -10430,6 +10905,19 @@ namespace SAS
 			//     真正干活的换成下面那两个**游戏事件**（见常量区「v4.13」）。
 			EnsureMenuEventSink(now);
 			EnsureLootEventSinks(now);
+			// ★★★ v5.1.5（订正 R5）：读档事件通道（「按存档隔离记忆」的唯一可靠信号）。
+			EnsureLoadGameSink(now);
+			//   兜底：读档事件在「我们还没看到载入画面」时就发出来了
+			//   （典型：从主菜单直接读档 —— 游戏的 LoadingMenu 在我们的 Tick 跑起来
+			//    之前就关了）⇒ 立刻处理，别把它错留到下一次「快速旅行」的载入画面
+			//    关闭时才处理（那会让「存档边界」晚一步生效 = 那一小段窗口仍然假绿）。
+			//   ★ 延迟守卫 1.5s：如果这次读档其实还会弹载入画面，正常路径会在它关闭时
+			//     处理（那时标志已被消费）⇒ 这条兜底只覆盖「压根没看到载入画面」的情形，
+			//     也避免在「旧世界还开着、载入画面还没弹出来」的那一瞬间就去做资源链复核。
+			if (!IsLoadingScreenUp() && g_state.saveLoadPending.load(std::memory_order_relaxed) &&
+				now - g_state.saveLoadPendingAtMs.load(std::memory_order_relaxed) >= 1500) {
+				ProcessFloraSaveLoad("读档事件（Tick 兜底：没看到载入画面）");
+			}
 			//   事件是引擎在别的调用点发的 ⇒ 每帧把队列里的记录消化成判决
 			//   （记账减账 / 快速面板会话；判据见常量区「v4.13」）。
 			ProcessLootEvents(now);
@@ -10708,12 +11196,19 @@ namespace SAS
 				//       （日志里有 `flora scan:` 细节行 + 一条 WARN）。
 				REX::INFO("  planet targets (窗口内): 未扫描={} 已扫描={} | 判据: 查询={} 命中={} 链失败={} 缓存={} 偏移=0x{:X}/0x{:X} "
 						  "| 引擎状态: 问={} 已扫描={} 未扫描={} 未知={} | 按引用记忆(★v5.1): 命中={} 绿={} 青={} 总量={} "
-						  "| 按物种扩散(★v5.1.2): 命中={} 物种表={} 新增={} "
+						  "| 按物种扩散(★v5.1.2): 命中={} 物种表={} 新增={} 星球外拒={} ★v5.1.5 "
+						  "| 记忆作用域(★v5.1.5): 读档={} 事件={} 跳过={} 翻案={} 重见证={} 链复核: 丢={}条/{}base 清物种表={} "
 						  "| 引擎状态表: 条目={} 读={} 绿={} 青={} 无条目={} "
 						  "| 学习表: 沿用={} 捡漏={} 落盘={} 写入={} 旧格式忽略={}"
 						  "（★ v5.1：按引用记忆 = 记忆粒度是引用；★ v5.1.2：按物种扩散 = 同 species / "
 						  "同资源被权威确认后，其**所有**实例一起变绿（引擎知识库本来就是这一级；"
 						  "物种表**不落盘**，重启后靠引用级记忆动态激活）；"
+						  "★ v5.1.5 记忆作用域 = 每次**读档**（引擎 TESLoadGameEvent）把作用域 +1 并清空物种表 ⇒ "
+						  "只有「该存档内当场见证」的绿才算数（`跳过` = 过期记忆被忽略的次数、`翻案` = "
+						  "引擎当场画「青」把过期绿降级的次数、`重见证` = 过期条目在本存档内被重新确认的次数、"
+						  "`链复核 丢` = 资源链证明「这个存档里没扫描」而丢掉的条目/base 数、"
+						  "`星球外拒` = 按物种扩散被「不在同一颗星球」挡下的次数）——"
+						  "如果读档在涨而丢/跳过不动，说明那些绿在本存档里**确实**是已扫描的；"
 						  "引擎状态表 = 引擎那棵「引用→状态」红黑树的条目数 —— **玩多久都应该基本稳定**，"
 						  "持续单调增长 = 有代码在往里插条目；命中/捡漏 = 判定在干活、沿用 = 保住的绿；"
 						  "落盘 = 启动读回条数 / 写入 = 本会话新增）"
@@ -10727,6 +11222,10 @@ namespace SAS
 					g_state.floraRefHits, g_state.floraRefGreenNew, g_state.floraRefCyanNew,
 					g_state.floraRefKnow.size(),
 					g_state.floraBaseHits, g_state.floraBaseKnow.size(), g_state.floraBaseNew,
+					g_state.floraBasePlanetDenied,
+					g_state.floraSaveLoads, g_state.loadEvtTotal.load(std::memory_order_relaxed),
+					g_state.floraScopeSkipped, g_state.floraScopeDemoted, g_state.floraScopeRescoped,
+					g_state.floraScopeDropped, g_state.floraScopeDroppedBase, g_state.floraScopeClearedBase,
 					OutlineStateTableCount(),
 					g_state.floraTableProbes, g_state.floraTableGreen, g_state.floraTableCyan,
 					g_state.floraTableNoEntry,

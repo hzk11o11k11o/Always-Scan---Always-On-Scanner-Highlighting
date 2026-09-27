@@ -5,7 +5,7 @@
 
 Version  : 2.0  (plugin build 5.1.0)
            2.0 = the mod brings its own outline colour channels (described
-           below), plus six fixes, all from player reports.
+           below), plus seven fixes, all from player reports.
            (1) "Ores and plants are green before *and* after scanning."
                The mod remembers a confirmed "surveyed" verdict so a target
                cannot fall back to cyan (added in 1.7.9 / 1.8.1), but that
@@ -136,6 +136,46 @@ Version  : 2.0  (plugin build 5.1.0)
                pass). The stats line gained a `timing3:` row that breaks the
                scan down in microseconds and reports how much of the time was
                spent stalled rather than working.
+           (7) "Planet resources I have not surveyed show up green right away -
+               especially after loading an older save." Fixed 2026-09-27.
+               "Surveyed" is a fact of *the save you have loaded*: the game's
+               own check reads the survey data of that save, and that data
+               goes backwards when you load an earlier save. The mod's memory
+               was not tied to a save at all, so what one playing session had
+               learned stayed valid after loading a different (older) save and
+               those objects were still treated as surveyed there. A second
+               layer made it worse - fix (4)'s species-wide table was global,
+               so a species confirmed on one planet also turned the same
+               species green on every other planet, before you had surveyed
+               anything there.
+               Two scopes are now built in.
+               (a) Save scope: the mod subscribes to the game's load-game
+                   event. Every time you load a save the memory's scope is
+                   bumped, so only what *this* save confirmed still counts;
+                   the species table is cleared with it and is rebuilt only
+                   from what this save confirms. In addition, the survey-data
+                   check is asked once per load for every resource the memory
+                   mentions - when it shows a resource is not in this save's
+                   survey data, that species' records are deleted outright
+                   (the game's own check reads the current save, so this is a
+                   proof, not a guess).
+               (b) Planet scope: the species table now records the worldspace
+                   the species was confirmed in and only spreads inside that
+                   same planet.
+               Long-lived memory still works the way it used to across game
+               restarts: the first save you load in a session is trusted (the
+               "continue where I left off" case); every later load in the same
+               session trusts only what that save confirmed.
+               Trade-off, stated honestly: after loading a save, surveyed
+               *plants* read as not-surveyed cyan until you raise the scanner
+               once (the game paints them green at that point and the mod
+               learns it again). Ores / gas / liquid are unaffected, because
+               the survey-data check answers for them right away. Two new ini
+               keys: FloraMemoryScope=1 (0 = old behaviour, 2 = strictest:
+               never trust the remembered file), FloraSpeciesPlanetScope=1
+               (0 = old global spread). The stats line gained a
+               `记忆作用域(★v5.1.5): 读档= 事件= 跳过= 翻案= 重见证= 链复核: 丢=...` block
+               and `按物种扩散 ... 星球外拒=`.
            Also in 2.0 (the headline feature) - the mod brings its own
            outline colour channels instead of borrowing the game's.
            The game has eleven outline "states"
@@ -622,6 +662,28 @@ Most useful options:
                         (default 5 = the game's own "scanned" green,
                         #27C684). Set it to 7 (= StateFlora) to make
                         scanned and unscanned look the same again.
+  FloraMemoryScope=1    how far the mod's "this one is surveyed" memory is
+                        allowed to reach (see fix (7) at the top of this
+                        file). "Surveyed" is a fact of the save you loaded,
+                        so the mod treats the game's own load-game event as
+                        a save boundary: the first save you load in a
+                        session keeps the remembered file (continue-where-
+                        I-left-off), and every later load trusts only what
+                        that save itself confirmed - plus the survey-data
+                        check is asked once per load for every resource the
+                        memory mentions and deletes the ones it disproves.
+                        1 = default. 0 = old behaviour (memory never
+                        expires - the "green before I scanned it" reports
+                        come back). 2 = strictest (never trust the
+                        remembered file, so plants may read cyan after a
+                        load until you raise the scanner once).
+  FloraSpeciesPlanetScope=1
+                        spread a confirmed "surveyed" verdict to the whole
+                        species / resource only inside the same planet
+                        (worldspace). Before this, a species confirmed on
+                        one planet also turned the same species green on
+                        every other planet before you surveyed anything
+                        there. 0 = old global spread (comparison only).
   ColorWeapon=FF2E2E    exact RGB per category (written by default):
   ColorApparel=FF2E2E     equipment (weapons / suits / clothing) red,
   ColorNote=B36BFF        notes & resources purple, misc blue - plus
