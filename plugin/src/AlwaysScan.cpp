@@ -8780,32 +8780,28 @@ namespace SAS
 
 			// ③ 真·存档边界：勘测数据确实倒退（有 base 被证伪）⇒ 走 v5.1.5 的作废路径。
 			//   `FloraMemoryScope=2`（最严格）也走这里（不依赖证据，每次事件都推进）。
+			//   ★★★ v5.1.7（订正 R7）：这里**不再删条目**（和主线的新口径一致）——
+			//     「没扫描」这个否定答案在载入刚结束时不可靠（见上面 TryProcessFloraLoadSaveByTime
+			//     的长注释），所以只用**作用域**表达作废（epoch 推到 >= 2 ⇒ 落盘条目一律
+			//     不在作用域，需要重新见证）；条目本身留着，换个更新的存档就会回来。
 			++g_state.floraSaveEpoch;
+			if (g_state.floraSaveEpoch < 2) {
+				g_state.floraSaveEpoch = 2;  // 第一次读档也能作废落盘条目（v5.1.5 是靠上面的删除达到同样效果）
+			}
 			const auto clearedBases    = g_state.floraBaseKnow.size();
 			g_state.floraScopeClearedBase += clearedBases;
 			g_state.floraBaseKnow.clear();
 
-			std::size_t droppedRefs = 0;
-			if (!dropBases.empty()) {
-				for (auto it = g_state.floraRefKnow.begin(); it != g_state.floraRefKnow.end();) {
-					if (dropBases.count(it->second.baseFid)) {
-						it = g_state.floraRefKnow.erase(it);
-						++droppedRefs;
-					} else {
-						++it;
-					}
-				}
-			}
-			g_state.floraScopeDropped += droppedRefs;
-			g_state.floraScopeDroppedBase += dropBases.size();
+			g_state.floraScopeDroppedBase += dropBases.size();  // 诊断：被证伪的 base 数（不再真删）
 
-			REX::INFO("flora memory: 读档 #{} 处理完（{}）-> 资源链**证伪 {} 个 base**（证实「本存档里没扫描」）"
+			REX::INFO("flora memory: 读档 #{} 处理完（{}）-> 资源链**证伪 {} 个 base**"
 					  "⇒ 判定为**读回了更早的存档** ⇒ 「已扫描」记忆的存档作用域 = 第 {} 次读档；"
-					  "按物种扩散表已清空 {} 个 base / 丢掉 {} 条引用记忆{}（复核 {} 个：确认已扫描 {} / "
-					  "无结论 {} / 跳过 {}；当前世界空间 0x{:X}）；之后这些目标只会由「本存档内当场见证」"
+					  "按物种扩散表已清空 {} 个 base{}（复核 {} 个：确认已扫描 {} / 无结论 {} / 跳过 {}；"
+					  "当前世界空间 0x{:X}）；★ v5.1.7：被证伪的条目**不再删除**（只按作用域失效，"
+					  "换更新的存档就会回来）；之后这些目标只会由「本存档内当场见证」"
 					  "（引擎画 4/5 / 状态==2 / 链命中）重新变绿 —— ★ 落盘记忆仍在"
 					  "（重开游戏继续玩同一个存档时有效，FloraMemoryScope={}）",
-				loadNo, a_when, dropBases.size(), g_state.floraSaveEpoch, clearedBases, droppedRefs,
+				loadNo, a_when, dropBases.size(), g_state.floraSaveEpoch, clearedBases,
 				skipped ? ("（另有 " + std::to_string(skipped) + " 个 base 被跳过：超预算 / 只见证于别的世界空间）")
 						: std::string{},
 				checked, confirmedBases.size(), noVerdict, skipped, curWs,
@@ -11747,7 +11743,8 @@ namespace SAS
 						  "★ v5.1.5 记忆作用域 = 每次**读档**（引擎 TESLoadGameEvent）把作用域 +1 并清空物种表 ⇒ "
 						  "只有「该存档内当场见证」的绿才算数（`跳过` = 过期记忆被忽略的次数、`翻案` = "
 						  "引擎当场画「青」把过期绿降级的次数、`重见证` = 过期条目在本存档内被重新确认的次数、"
-						  "`链复核 丢` = 资源链证明「这个存档里没扫描」而丢掉的条目/base 数、"
+						  "`链复核 丢` = 资源链证明「这个存档里没扫描」而丢掉的条目/base 数"
+						  "（★ v5.1.7 起**恒为 0**：不再删条目，只按作用域失效）、"
 						  "`星球外拒` = 按物种扩散被「不在同一颗星球」挡下的次数）——"
 						  "如果读档在涨而丢/跳过不动，说明那些绿在本存档里**确实**是已扫描的；"
 						  "★ v5.1.6 起这条被用来判定「传送 / 读同一存档」——链复核一个 base 都证伪不了 ⇒ "

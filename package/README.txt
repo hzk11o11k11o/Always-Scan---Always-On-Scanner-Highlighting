@@ -200,6 +200,8 @@ Version  : 2.0  (plugin build 5.1.0)
                  - at least one resource is disproved => this really was an
                    older save => the fix-(7) behaviour applies (scope bump,
                    species table cleared, the disproved records dropped).
+                   (Corrected in fix (9): nothing is deleted any more - the
+                   records are only taken out of scope.)
                Resources whose records were only ever confirmed on another
                planet / worldspace are skipped during that check - asking
                about them from the current one can only produce a false
@@ -247,7 +249,10 @@ Version  : 2.0  (plugin build 5.1.0)
                same save" behaviour. One new ini key:
                FloraSaveFingerprint=1 (0 = fall back to the fix-(8) path; the
                mod also falls back automatically, with a warning in the log, if
-               the game clock cannot be read). The stats line gained a
+               the game clock cannot be read - and that fallback path no longer
+               deletes records either, it only takes them out of scope, so no
+               unreliably answered check can erase anything any more). The
+               stats line gained a
                `存档指纹(★v5.1.7): 锚=…天 处理= 作废=条 表剪= 失败= 存档=` block.
            Also in 2.0 (the headline feature) - the mod brings its own
            outline colour channels instead of borrowing the game's.
