@@ -5,7 +5,7 @@
 
 Version  : 2.0  (plugin build 5.1.0)
            2.0 = the mod brings its own outline colour channels (described
-           below), plus twelve fixes, all from player reports.
+           below), plus thirteen fixes, all from player reports.
            (1) "Ores and plants are green before *and* after scanning."
                The mod remembers a confirmed "surveyed" verdict so a target
                cannot fall back to cyan (added in 1.7.9 / 1.8.1), but that
@@ -352,6 +352,31 @@ Version  : 2.0  (plugin build 5.1.0)
                      (`flora progress probe: base=… key1=… key2=… keyType=…(现读) percent=… stage=… -> …`)
                      so any remaining problem can be pinpointed to the exact
                      step of the chain.
+                     (13) "Surveyed things are cyan again, and this time even
+                     opening and closing the scanner does not fix them - newly
+                     highlighted objects seem to be affected most." Fixed
+                     2026-09-27, one build after (12). The direct survey read of
+                     (11) was still never succeeding - every query stopped at
+                     the very first step, "0x81 component not found". That
+                     component (the first thing the game itself reads) simply
+                     does not exist on these surface plants, and the game does
+                     not stop there either: when the component is missing it
+                     falls back to a lookup that finds the species id from the
+                     surrounding world data - and *that fallback* is what the
+                     game's own green-painting path actually uses. The mod had
+                     only reimplemented the component step, so the whole check
+                     kept failing silently (log: `flora progress probe: …
+                     stage=3 -> 0x81 component not found`; stats:
+                     `问=0 失败=…`). The mod now follows the game's own order:
+                     try the component first, and if it is missing (or empty)
+                     call the game's own fallback lookup for the species id -
+                     read-only, and the very same call the game's own outline
+                     update was already running through the mod's engine-state
+                     check for many versions (so no new side effects are
+                     introduced). The first few queries of a session now log
+                     `k1来源=组件(0x81)` / `k1来源=兜底(0x910690)` and the stats
+                     line gained a `兜底K1=` counter, so the answering path is
+                     visible at a glance.
                      Also in 2.0 (the headline feature) - the mod brings its own
                      outline colour channels instead of borrowing the game's.
            The game has eleven outline "states"
@@ -897,19 +922,23 @@ Most useful options:
                         are off by default (FloraUseMemory=0), so this key only
                         matters when you set FloraUseMemory=1.
   FloraEngineProgress=1
-                       fix (11) + (12), default: plants read the game's own
-                       survey progress - the very byte the game's state-4/5 path
-                       reads (PlayerKnowledge species percent; 100 = surveyed)
-                       - through a fully read-only replay of the engine's own
-                       lookups, at any time and for any reference (including
-                       runtime-created surface plants). Fix (12): the lookup
-                       key's "type" word is read **fresh on every query** (the
-                       game does the same; the value only exists once the game
-                       has initialised it, so the earlier load-time read of it
-                       was always 0 and had switched the whole check off).
-                       percent == 100 = green; a lower value never
-                       short-circuits. 0 = turn the direct read off (falls back
-                       to the older checks).
+                      fix (11) + (12) + (13), default: plants read the game's
+                      own survey progress - the very byte the game's state-4/5
+                      path reads (PlayerKnowledge species percent; 100 =
+                      surveyed) - through a fully read-only replay of the
+                      engine's own lookups, at any time and for any reference
+                      (including runtime-created surface plants). Fix (12): the
+                      lookup key's "type" word is read **fresh on every query**
+                      (the game does the same; the value only exists once the
+                      game has initialised it, so the earlier load-time read of
+                      it was always 0 and had switched the whole check off).
+                      Fix (13): the species id is obtained the way the game
+                      itself obtains it - the "0x81 component" first, and when
+                      that component is missing (the normal case for surface
+                      plants) the game's own fallback lookup is called. percent
+                      == 100 = green; a lower value never short-circuits.
+                      0 = turn the direct read off (falls back to the older
+                      checks).
   FloraUseMemory=0
                         fix (11), default: the mod's own memory layers are OFF
                         (reference-level memory, species spread table, seeding
