@@ -5,7 +5,7 @@
 
 Version  : 2.0  (plugin build 5.1.0)
            2.0 = the mod brings its own outline colour channels (described
-           below), plus fifteen fixes, all from player reports.
+           below), plus sixteen fixes, all from player reports.
            (1) "Ores and plants are green before *and* after scanning."
                The mod remembers a confirmed "surveyed" verdict so a target
                cannot fall back to cyan (added in 1.7.9 / 1.8.1), but that
@@ -378,8 +378,10 @@ Version  : 2.0  (plugin build 5.1.0)
                      line gained a `兜底K1=` counter, so the answering path is
                      visible at a glance.
                      (14) Log size is now a setting: `LogMaxMB` in the ini
-                     (in MiB, default 1; the developer copy of this ini uses
-                     10). The log is still self-limiting - once a new line
+                     (in MiB; the built-in default was 1 back then - see (16):
+                     this release ships 0, i.e. logging off; the developer
+                     copy of this ini uses 10). The log is still self-limiting
+                     - once a new line
                      would cross the cap, the file is emptied and starts over
                      - but the cap no longer requires a new build to change.
                      The startup line reports the effective cap. Also in this
@@ -408,6 +410,18 @@ Version  : 2.0  (plugin build 5.1.0)
                      simply did not store them - the same "only part of the
                      data comes back" trap as in (13) and (14)). Fix (13)'s
                      read itself, and every verdict, is unchanged.
+                     (16) Public builds now ship with logging fully OFF.
+                     The `LogMaxMB` key (fix (14)) is a switch as well as a
+                     cap: **0 = no log at all** (no file is created, not one
+                     byte is written; this release ships `0`), 1..1024 = on,
+                     capped at that many MiB - once a new line would cross
+                     the cap the file is emptied and starts over, exactly as
+                     before. The developer copy of the ini uses `10`. Nothing
+                     else changes: every verdict, colour and highlight works
+                     as in the previous 2.0 build. If you report an issue and
+                     are asked for a log: set `LogMaxMB=10` in the ini,
+                     restart the game, and the log file appears next to the
+                     mod's esm (see TROUBLESHOOTING below).
                      Also in 2.0 (the headline feature) - the mod brings its own
                      outline colour channels instead of borrowing the game's.
            The game has eleven outline "states"
@@ -1162,10 +1176,13 @@ Most useful options:
                         0 = disabled (walk everything every pass).
   NotifyOnToggle=1      show a HUD message on toggle
   LogStats=1            write a stats line to the log every 5 seconds
-  LogMaxMB=1            log size cap in MiB (1..1024). The log never grows
-                        past the cap: once a new line would cross it, the
-                        file is emptied and starts over (fix (14)). Raise
-                        it (e.g. 10) if you are collecting a long debug log.
+  LogMaxMB=0            log switch + size cap, in MiB (fix (14) and (16)):
+                        0 = logging fully OFF - no file is created, nothing
+                        is written (this is what the public release ships).
+                        1..1024 = on; the log never grows past the cap, once
+                        a new line would cross it the file is emptied and
+                        starts over. Set it to 10 while collecting a long
+                        debug log, then restart the game.
 
 ------------------------------------------------------------------------
  TROUBLESHOOTING
@@ -1176,6 +1193,12 @@ Log file (since 1.5 it lives right next to the mod):
       ...\mods\Starfield Always Scan (SFSE)\SAS_AlwaysScan.log
     * manual install  : ...\Starfield\Data\SAS_AlwaysScan.log
   (In 1.4 and older it was Documents\My Games\Starfield\SFSE\Logs\.)
+
+  NOTE (fix (16)): this release ships with logging fully OFF, so there
+  simply is no log file until you switch it on. To get one: open the
+  ini next to the esm (SAS_AlwaysScan.ini), set LogMaxMB=10, restart
+  the game. The log then appears in the folder above and is capped at
+  10 MiB (it empties itself and starts over when full).
 
 At startup the log prints the active configuration and whether the
 native outline functions were found ("native outline ready"). While
@@ -1313,10 +1336,12 @@ categories).
 * With "Simple Immersive Looting" (Nexus 12677) installed, using its
   "Strip" option unequips a body's gear - the body starts glowing again
   because the gear is takeable now; loot it and the outline goes away.
-* The log size cap is the ini key `LogMaxMB` (in MiB, default 1): once the
-  log would grow past the cap, the file is emptied and starts over, so it
-  can never fill up your disk. Raise it (e.g. LogMaxMB=10) when collecting
-  a log for a bug report.
+* The log is controlled by the ini key `LogMaxMB` (fix (16)): 0 = logging
+  fully off (this release ships 0 - no file is created), 1..1024 = on with
+  that size cap in MiB (once the log would grow past the cap, the file is
+  emptied and starts over, so it can never fill up your disk). Set it to
+  10, restart the game, and the log appears next to the mod's esm - do
+  that when collecting a log for a bug report.
 * Since 4.3 the inventory calibration keeps retrying until it succeeds
   (it samples nearby containers or actors), so "looted means dark" also
   starts working when your first area had nothing to sample from.

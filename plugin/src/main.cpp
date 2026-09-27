@@ -33,16 +33,16 @@ namespace
 	// 避免两处写死不一致。
 	constexpr const char* kLogName = "SAS_AlwaysScan";
 
-	// 日志文件上限（★ 2026-09-27 起 **INI 可配**，见下面 LogMaxBytesFromIni）：
-	//   写新一行时若会超过就把旧内容整体清空，保证日志占用恒定 ≈ 上限
+	// 日志文件上限 / 开关（★ 2026-09-27 起 **INI 可配**，见下面 LogMaxBytesFromIni）：
+	//   开启时：写新一行若会超过上限就把旧内容整体清空，保证日志占用恒定 ≈ 上限
 	//   （不是滚动保留旧文件）。
-	// ★ 需求（AGENTS.md，2026-09-27）：「N 网公开版日志最大 1M，本机开发版本日志最大
-	//   10M，把这个做成配置写进 ini 文件吧，免得还得改代码」。
-	//   ⇒ 键 = `[General] LogMaxMB`（整数 MiB，钳制 1~1024）。
-	//   内置默认 **1 MiB**（= 公开版口径：INI 缺失 / 手动安装也只占 1 MiB）；
+	// ★ 需求（AGENTS.md，2026-09-27 订正 R14）：「N 网公开版日志**完全关闭**，本机开发
+	//   版本日志最大 10M，把这个做成配置写进 ini 文件吧（**配置项 0 关闭，大于 0 开启**），
+	//   免得还得改代码」。
+	//   ⇒ 键 = `[General] LogMaxMB`：**0 = 完全关闭**（不建文件、不写一个字节）；
+	//      **1 ~ 1024 = 开启**，上限 N MiB。
+	//   内置默认 **0（关闭）**（= 公开版口径：INI 缺失 / 手动安装也不产生日志）；
 	//   本机部署的 `SAS_AlwaysScan.ini` 里显式写 `LogMaxMB=10`。
-	constexpr int kLogMaxMbDefault = 1;
-	constexpr int kLogMaxMbMin     = 1;
 	constexpr int kLogMaxMbMax     = 1024;
 
 	// 「单文件封顶」文件 sink。commonlibsf 默认建的是 basic_file_sink
@@ -129,12 +129,14 @@ namespace
 		return s;
 	}
 
-	// ★ 2026-09-27：日志上限 = INI `[General] LogMaxMB`（MiB）。
+	// ★ 2026-09-27（订正 R14）：日志上限 / 开关 = INI `[General] LogMaxMB`（MiB）。
 	//   路径规则与 AlwaysScan.cpp 的配置解析**完全一致**（两处必须同规则，
 	//   否则会出现「INI 读到了、日志上限没读到」的鬼故事）：
 	//     ① 优先「和 esm 同级」（MO2 下 = mod 目录根）的 SAS_AlwaysScan.ini；
 	//     ② 不存在 ⇒ 回退 DLL 旁边的老位置（v4.16 及以前）。
-	//   值：读不到 / <1 ⇒ 1；>1024 ⇒ 1024。用宽字符 API（游戏可能在中文路径下）。
+	//   值：缺键 / 读不到 / 0 ⇒ **0 = 完全关闭**；负数按 0；>1024 ⇒ 1024。
+	//   返回 0 表示关闭（调用方不建文件 sink）；否则 = 字节上限。
+	//   用宽字符 API（游戏可能在中文路径下）。
 	std::size_t LogMaxBytesFromIni()
 	{
 		std::filesystem::path ini;
@@ -156,8 +158,8 @@ namespace
 		if (!ini.empty()) {
 			mb = static_cast<int>(::GetPrivateProfileIntW(L"General", L"LogMaxMB", 0, ini.wstring().c_str()));
 		}
-		if (mb < kLogMaxMbMin) {
-			mb = kLogMaxMbDefault;  // 键缺失（0）/ INI 不存在 ⇒ 公开版默认 1 MiB
+		if (mb < 0) {
+			mb = 0;  // 负数按「关闭」处理（有效域 = 0 ~ 1024）
 		}
 		if (mb > kLogMaxMbMax) {
 			mb = kLogMaxMbMax;
@@ -182,9 +184,18 @@ namespace
 			return;
 		}
 
-		// ★ 2026-09-27：日志上限从 INI 读（`[General] LogMaxMB`，MiB）——
+		// ★ 2026-09-27（订正 R14）：日志上限 / 开关从 INI 读（`[General] LogMaxMB`，MiB）——
 		//   建 sink 前只解析一次（之后改 INI 要重启游戏才生效，与其它配置一致）。
 		const std::size_t maxBytes = LogMaxBytesFromIni();
+		if (maxBytes == 0) {
+			// `LogMaxMB=0` ⇒ **完全关闭日志**（公开版默认口径）：不建任何文件、清掉
+			// 全部 sink 并把 level 置 off —— 之后所有日志调用零输出（连 MSVC 调试
+			// 输出也不留）、开销降到一个 level 比较。这也是「完全关闭」的兑现方式：
+			// 不产生日志文件 = 玩家侧零痕迹。
+			logger->sinks().clear();
+			logger->set_level(spdlog::level::off);
+			return;
+		}
 
 		std::filesystem::path fileName{ kLogName };
 		fileName += ".log";
@@ -228,7 +239,7 @@ namespace
 #endif
 		spdlog::set_pattern("[%T.%e] [%=5t] [%L] %v");
 		REX::INFO("日志文件：{}（上限 {} MiB，写满清空重来；★ INI `[General] LogMaxMB` 可调"
-				  " —— N 网公开版 1 / 本机开发 10，改完重启游戏生效）",
+				  " —— 0 = 完全关闭（N 网公开版默认），本机开发 10，改完重启游戏生效）",
 			ToUtf8(usedDir / fileName), maxBytes / (1024 * 1024));
 	}
 
@@ -421,7 +432,15 @@ SFSE_PLUGIN_LOAD(const SFSE::LoadInterface* a_sfse)
 	//   ② `FloraProgressRec` 加 key1/key2（缓存命中时回填）⇒ 判绿行的 key1/key2 不再假 0；
 	//   ③ 链判决行（「为什么青」的第一现场）同样按 base 首条 —— 对症用户主诉的「已扫描却青」。
 	//   ★ 版本号纪律：公开版仍 **2.0**、DLL 内部 build 仍 **5.1.0**（本轮未动版本号）。
-	REX::INFO("SAS_AlwaysScan v5.1.0 loading（订正 R13：植物「已扫描」诊断可观测性补完 —— ★ R12 实测验收点全达成（probe 可判读 / stage=14=没扫过 / 判绿行出现 / 冲突=0 / 兜底K1==问+失败）；本条：判绿行与链判决行额度升级为「前 N 条 ∨ **每个 base 首条**」（会话硬上限 64，R12 实测 8 条被 3 个 base 用光 ⇒ 之后 8 次扫描零日志）+ 直读缓存命中**回填 key1/key2**（此前打印 0x0 假值 = 「只带回部分字段」第三次）+ 链判决行按 base 首条（对症「已扫描却青」）；★ 只改诊断、不改行为）(SFSE build {})",
+	// ★★★ 2026-09-27 订正 R14（公开版仍是 2.0、DLL build 仍是 5.1.0）：
+	//   用户新需求（AGENTS.md）：「N 网公开版日志**完全关闭**、本机开发版本日志最大 10M，
+	//   做成配置写进 ini（**配置项 0 关闭，大于 0 开启**），免得还得改代码」。
+	//   改动（`main.cpp`，一处语义升级）：`[General] LogMaxMB` 从「钳制 1~1024 的上限」
+	//   升级为「**开关 + 上限**」—— **0 = 完全关闭**（不建文件、清空全部 sink + level
+	//   置 off，日志调用零输出零文件）；**>0 = 开启**，上限 N MiB（钳制到 1024）。
+	//   内置默认 1 → **0（关闭）** = 公开版口径（INI 缺失 / 手动安装也不产生日志）；
+	//   本机部署 INI 显式写 `LogMaxMB=10`（开发排障口径，行为不变）。
+	REX::INFO("SAS_AlwaysScan v5.1.0 loading（订正 R14：日志**完全关闭**开关（N 网公开版口径）—— `[General] LogMaxMB` 升级为「开关 + 上限」：**0 = 完全关闭**（不建文件、清空全部 sink + level off，零输出零文件；★ 内置默认也是 0）、**>0 = 开启**（上限 N MiB，钳制 1024）；本机部署 INI 显式写 10；R13 的诊断可观测性（判绿行/链判决行「每 base 首条」+ 缓存回填 key1/key2）原样保留；★ 除日志开关外行为零改动）(SFSE build {})",
 		SFSE::GetSFSEVersion());
 
 	if (auto* messaging = SFSE::GetMessagingInterface()) {
