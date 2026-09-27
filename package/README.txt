@@ -5,7 +5,7 @@
 
 Version  : 2.0  (plugin build 5.1.0)
            2.0 = the mod brings its own outline colour channels (described
-           below), plus eight fixes, all from player reports.
+           below), plus nine fixes, all from player reports.
            (1) "Ores and plants are green before *and* after scanning."
                The mod remembers a confirmed "surveyed" verdict so a target
                cannot fall back to cyan (added in 1.7.9 / 1.8.1), but that
@@ -207,6 +207,48 @@ Version  : 2.0  (plugin build 5.1.0)
                (0 = old behaviour, every load event is treated as a real
                load). The stats line gained a
                `读档边界(★v5.1.6): 事件保留= 确认base= 推进=` block.
+           (9) The same report as (8), sent again after fix (8): "after
+               travelling / changing maps, already-surveyed items turn back
+               to cyan; raising the scanner once turns them green again."
+               Fixed 2026-09-27. The evidence this time was complete: in the
+               reported session a *plain* save load was reviewed, the survey
+               check answered "not surveyed" for nine resources and 132
+               remembered references were deleted right there - while the
+               game itself, ten seconds later, painted those very resources
+               green (they *are* surveyed in that save), and eighty seconds
+               later the same survey check answered "surveyed" for one of
+               them. In other words: right after a load screen, the "not
+               surveyed" answer of that check has no contrast at all (a
+               not-yet-ready lookup answers the same way), so fix (8) was
+               building an irreversible decision on it.
+               The load boundary now uses the *game clock* instead
+               (`Calendar::gameDaysPassed`, which is stored inside the save
+               and restored when it is loaded). Every remembered reference is
+               stamped with the game time it was learned at (third field of
+               the flora-learn file), and every load candidate records the
+               game time of the save that was just loaded as an anchor:
+                 - learned at / before the anchor => that scan happened in
+                   the past of this save => the memory stays valid;
+                 - learned after the anchor => it belongs to a newer timeline
+                   => it is simply *out of scope* for this save - and,
+                   unlike before, nothing is deleted, so loading a newer save
+                   brings those records back automatically (the verdicts are
+                   reversible now);
+                 - a travel or a reload of the same save barely moves the
+                   anchor => nothing at all is invalidated (this is the core
+                   of the fix);
+                 - loading a genuinely older save invalidates only the
+                   "future" records - the ones you had surveyed in that older
+                   save stay green (the old behaviour wiped everything and
+                   asked you to raise the scanner once to rebuild it).
+               Records written by earlier versions have no timestamp; they
+               are anchored at the game time of the first load of the session,
+               which reproduces the previous "trusted while you continue the
+               same save" behaviour. One new ini key:
+               FloraSaveFingerprint=1 (0 = fall back to the fix-(8) path; the
+               mod also falls back automatically, with a warning in the log, if
+               the game clock cannot be read). The stats line gained a
+               `存档指纹(★v5.1.7): 锚=…天 处理= 作废=条 表剪= 失败= 存档=` block.
            Also in 2.0 (the headline feature) - the mod brings its own
            outline colour channels instead of borrowing the game's.
            The game has eleven outline "states"
@@ -694,35 +736,47 @@ Most useful options:
                         #27C684). Set it to 7 (= StateFlora) to make
                         scanned and unscanned look the same again.
   FloraMemoryScope=1    how far the mod's "this one is surveyed" memory is
-                        allowed to reach (see fixes (7) / (8) at the top of
-                        this file). "Surveyed" is a fact of the save you
-                        loaded, so the mod treats the game's own load-game
-                        event as a *candidate* save boundary: the first save
-                        you load in a session keeps the remembered file
-                        (continue-where-I-left-off), and for every later load
-                        the survey-data check is asked about every resource
-                        the memory mentions. If it disproves at least one,
-                        that was an older save and the records it disproved
-                        are deleted outright (see fix (8): a travel or a
-                        reload of the same save disproves nothing, and then
-                        nothing is touched at all).
+                        allowed to reach (see fixes (7) / (8) / (9) at the
+                        top of this file). "Surveyed" is a fact of the save
+                        you loaded, so every remembered reference is stamped
+                        with the game time it was learned at, and every
+                        load-game event only records the game time of the save
+                        that was just loaded as an anchor: records learned at
+                        or before it stay valid, records learned later belong
+                        to a newer timeline and are out of scope for this save
+                        (they are *not* deleted - loading a newer save brings
+                        them back). A travel moves that anchor by seconds, so
+                        nothing is invalidated; loading an older save
+                        invalidates only the "future" records.
                         1 = default. 0 = old behaviour (memory never
                         expires - the "green before I scanned it" reports
                         come back). 2 = strictest (never trust the
                         remembered file, so plants may read cyan after a
                         load until you raise the scanner once).
+  FloraSaveFingerprint=1
+                        decide the load boundary by the game clock (fix (9),
+                        default). 0 = fall back to the fix-(8) path (survey
+                        check right after the loading screen closes - its
+                        "not surveyed" answer has no contrast at that moment).
+                        The mod also falls back automatically - with a warning
+                        in the log - if the game clock cannot be read, so a
+                        broken Calendar can never make the mod delete
+                        anything.
   FloraLoadBoundaryEvidence=1
-                        decide a load-game event by evidence instead of
-                        trusting it blindly (fix (8)): the mod waits four
-                        seconds after the loading screen closes, then asks
-                        the survey-data check about the resources its memory
-                        mentions; only records it can actively disprove are
-                        deleted, so travels / map changes (which also send
-                        that event but do not make your survey data go
-                        backwards) no longer wipe true verdicts. Resources
-                        only ever confirmed on another planet are skipped
-                        during that check. 1 = default. 0 = old behaviour
-                        (every load event counts as a real load).
+                        only used by the fallback path (fix (8); with
+                        FloraSaveFingerprint=1 this key does nothing unless
+                        the game clock cannot be read): decide a load-game
+                        event by evidence instead of trusting it blindly: the
+                        mod waits four seconds after the loading screen
+                        closes, then asks the survey-data check about the
+                        resources its memory mentions; only records it can
+                        actively disprove are deleted, so travels / map
+                        changes (which also send that event but do not make
+                        your survey data go backwards) no longer wipe true
+                        verdicts. Resources only ever confirmed on another
+                        planet are skipped during that check. 1 = default.
+                        0 = old behaviour (every load event counts as a real
+                        load).
   FloraSpeciesPlanetScope=1
                         spread a confirmed "surveyed" verdict to the whole
                         species / resource only inside the same planet

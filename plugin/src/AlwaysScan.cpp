@@ -37,6 +37,7 @@
 
 #include "RE/B/BSFixedString.h"
 #include "RE/B/BSTEvent.h"
+#include "RE/C/Calendar.h"  // ★ v5.1.7（订正 R7）：游戏时间（读档边界的时间指纹）
 #include "RE/F/FormTypes.h"
 #include "RE/N/NiAVObject.h"
 #include "RE/N/NiPoint.h"
@@ -1173,6 +1174,34 @@ namespace SAS
 			//   ★ `FloraMemoryScope=2`（最严格）不受本开关影响：仍按「每次事件都推进」。
 			bool          floraLoadBoundaryEvidence = true;
 
+			// ★★★ v5.1.7（订正 R7）：**读档边界改用「游戏时间指纹」**（默认开，1）。
+			// ----------------------------------------------------------------
+			// 为什么换口径（完整证据链见 docs/40）：v5.1.6 把「资源链复核有证伪」当作
+			//   「读回了更早的存档」的证据，但**载入刚结束时资源链的否定答案是错的** ——
+			//   用户 2026-09-27 10:15 那一局实证：
+			//     · 10:15:38（载入画面关闭 + 4s）复核 15 个 base ⇒ 9 个「证伪」⇒
+			//       删掉 132 条记忆（用户看到的就是「已扫描物品变青」）；
+			//     · 10:15:48 用户一举扫描仪，引擎自己把**同一批** base 画成绿（state 4/5）；
+			//     · 10:16:56 资源链对同一批里的 base=0x270033 答「已扫描」（命中）——
+			//       **同一个函数、同一个资源，80 秒后答案相反**。
+			//   ⇒ 「没扫描」这个否定答案在载入刚结束的那段时间**没有区分度**
+			//     （链路上下文没就绪时也答「没扫描」），不能拿它做不可逆的作废。
+			//
+			// 新口径 = **游戏时间**（`Calendar::gameDaysPassed`；随存档一起被保存 / 读回）：
+			//   · 每条记忆自带**学习时刻**（落盘行第 3 个字段；旧格式行 = 0 = 未知）；
+			//   · 读档时把「本存档的游戏时间」记成**锚点**：
+			//       学习时刻 ≤ 锚点 + eps ⇒ 这个扫描发生在本存档的过去 ⇒ 记忆有效；
+			//       学习时刻 >  锚点 + eps ⇒ 属于更新的时间线 ⇒ **不在作用域**（不产生绿）；
+			//   · ★ **作废是可逆的、且不删条目**：再读一个更新的存档，条目就自动回来
+			//     （v5.1.5/v5.1.6 是「删掉 + 举扫描仪重学」）；
+			//   · 传送 / 继续同一存档 ⇒ 锚点几乎不动 ⇒ 什么都不作废（本次修复的核心，
+			//     不再依赖「资源链自己证明自己」这种脆弱证据）；
+			//   · 读回更早的存档 ⇒ 只有「未来」的条目失效，其余照常有效 —— 比 R5 的
+			//     「一律作废、植物要靠举扫描仪重学」精准得多。
+			//   `FloraMemoryScope=2`（最严格）仍然走旧口径（对照开关）。
+			//   0 = 回退到 v5.1.6 的链证据路径（万一 Calendar 读不到也会自动回退）。
+			bool          floraSaveFingerprint = true;
+
 			// 「已扫描」的星球目标用哪个 outline 状态（0..11）。默认 **5**：
 			//   引擎把「已经在勘测数据里的星球目标」写进 state 4（远）/ 5（近），
 			//   两者原生色都是**绿色 #27C684**（`outline colors` 日志里的
@@ -1838,6 +1867,10 @@ namespace SAS
 		{
 			std::array<std::uintptr_t, 4> worldspaces{};  // 见证时的 worldspace（最多 4 个）
 			std::uint32_t                 count = 0;
+			// ★★★ v5.1.7（订正 R7）：**最早**一次见证的游戏时间（天；0 = 未知）。
+			//   读档时用它剪枝：「见证时刻 > 本存档的游戏时间」⇒ 这个物种的绿属于更新的
+			//   时间线 ⇒ 不在本存档作用域（见 TryProcessFloraSaveLoadByTime）。
+			float                         days  = 0.0f;
 
 			[[nodiscard]] bool Seen(std::uintptr_t a_ws) const
 			{
@@ -2345,6 +2378,10 @@ namespace SAS
 				//   「已扫描」是**存档里的勘测数据**决定的 ⇒ 读档 = 存档边界，
 				//   越过边界的老结论一律不再产生绿（见 FloraEntryInScope）。
 				std::uint32_t epoch   = 0;
+				// ★★★ v5.1.7（订正 R7）：这条结论**见证时的游戏时间**（天；0 = 未知 / 旧格式）。
+				//   读档时用它判定作用域：`days ≤ 本存档的游戏时间` ⇒ 这个扫描发生在
+				//   本存档的过去 ⇒ 记忆有效（见 FloraEntryInScope / docs/40）。
+				float         days    = 0.0f;
 			};
 			std::unordered_map<std::uint32_t, FloraRefKnow> floraRefKnow;  // 引用 FormID -> 结论
 			std::uint64_t floraRefHits      = 0;  // 被「按引用记忆」直接命中几次（诊断）
@@ -2417,6 +2454,24 @@ namespace SAS
 			std::uint64_t    floraScopeConfirmedBase = 0;
 			std::uint64_t    floraScopeEvalAtMs    = 0;
 			const char*      floraScopeEvalWhen    = nullptr;  // 本次待复核的来源（日志用）
+			// ★★★ v5.1.7（订正 R7）：**存档时间指纹**（读档边界的新口径，见 Config / docs/40）
+			//   `floraSaveDaysFloor`：本存档的「游戏时间锚点」（天）—— 最近一次读档处理时
+			//     读到的 `Calendar::gameDaysPassed`。<0 = 还没有可信锚点（一律不收紧）。
+			//   `floraLegacyStampDays`：旧格式（无时间字段）条目的锚 —— 第一次可信读档时定，
+			//     等价于 R5 的「落盘记忆在本会话第一次读档时仍然有效」。
+			//   注：新口径下 `floraSaveEpoch` 只当**本时间线标记**（读一次档 +1；之后
+			//     当场见证的条目不再受锚点限制，见 FloraEntryInScope）。
+			float            floraSaveDaysFloor   = -1.0f;
+			float            floraLegacyStampDays = -1.0f;
+			std::uint64_t    floraFpLoads         = 0;      // 用指纹处理过几次读档（诊断）
+			std::uint64_t    floraFpVoided        = 0;      // 累计「不在本存档作用域」的条目数（非破坏）
+			std::uint64_t    floraFpClearedBase   = 0;      // 累计被剪枝的物种表条目数
+			std::uint64_t    floraFpFailures      = 0;      // 游戏时间读不到的次数（回退链证据路径）
+			std::uint64_t    floraPersistNoTime   = 0;      // 落盘行里没有时间字段的条数（旧格式，诊断）
+			float            floraDaysCache       = 0.0f;   // `CurrentGameDays` 的 1 秒缓存
+			std::uint64_t    floraDaysCacheAtMs   = 0;
+			char             floraFpSaveName[40]{};         // 诊断：最近一次读档的存档名（读不到 = 空）
+			std::uint32_t    floraFpSaveNo        = 0;      // 诊断：currentSaveGameNumber
 			bool             loadSinkRegistered    = false;
 			std::uint64_t    loadSinkRetryAtMs     = 0;
 			std::uint64_t    loadSinkCheckMs       = 0;
@@ -3969,6 +4024,10 @@ namespace SAS
 		// ★★★ v4.33 / v5.1：按引用记忆的落盘（定义见 ProbeFloraEngineState 之前）。
 		//   前置声明必须在这里：LoadConfig 里会调用它（载入 = 配置文件读完之后）。
 		void LoadFloraLearnTable();
+		// ★★★ v5.1.7（订正 R7）：游戏时间（读档的时间指纹；定义见 FloraEntryInScope 之前）。
+		//   前置声明必须在这里：LoadConfig 的启动日志会**当场探一次**（「现在读到的时间 = …」）。
+		bool  ReadGameDays(float* a_out);
+		float CurrentGameDays();  // 同上（1 秒缓存版；`RememberFloraBase` 等更早的定义要用）
 
 		void LoadConfig()
 		{
@@ -4049,6 +4108,8 @@ namespace SAS
 			g_cfg.floraSpeciesPlanetScope = getInt("FloraSpeciesPlanetScope", 1) != 0;
 			// ★★★ v5.1.6（订正 R6）：「读档边界」证据驱动（详见 Config 里 v5.1.6 段）
 			g_cfg.floraLoadBoundaryEvidence = getInt("FloraLoadBoundaryEvidence", 1) != 0;
+			// ★★★ v5.1.7（订正 R7）：读档边界 = 游戏时间指纹（详见 Config 里 v5.1.7 段）
+			g_cfg.floraSaveFingerprint   = getInt("FloraSaveFingerprint", 1) != 0;
 			g_cfg.unhighlightGraceMs = std::clamp(getInt("UnhighlightGraceMs", 1500), 0, 60000);
 			g_cfg.maxOutlineOpsPerScan = std::clamp(getInt("MaxOutlineOpsPerScan", 64), 0, 4096);
 
@@ -4458,6 +4519,21 @@ namespace SAS
 					  "⇒ 记忆保持有效（治用户实测的「传送后已扫描物品变青」）；有证伪才是真读档"
 					: "**v5.1.5 旧行为**（事件即边界：无条件推进作用域 / 清物种表 / 丢条目）—— 只为对照",
 				kFloraScopeEvalDelayMs);
+			// ★★★ v5.1.7（订正 R7）：读档边界 = **游戏时间指纹**（详见 Config 里 v5.1.7 段 / docs/40）
+			{
+				float probeDays = 0.0f;
+				const bool timeOk = ReadGameDays(&probeDays);
+				REX::INFO("config: floraSaveFingerprint={} -> ★ 读档边界 = **游戏时间指纹**"
+						  "（`Calendar::gameDaysPassed`）：条目自带「学习时刻」（落盘行第 3 字段），"
+						  "读档时把本存档的游戏时间当**锚点** —— 学习时刻 ≤ 锚点 ⇒ 记忆有效；"
+						  "> 锚点 ⇒ 不在本存档作用域（**不删条目**，换更新的存档就回来）；"
+						  "传送 / 继续同一存档 ⇒ 锚点几乎不动 ⇒ 什么都不作废（本次修复的核心）；"
+						  "0 = 回退到 v5.1.6 的链证据路径。"
+						  "★ 现在读到的时间 = {}（Calendar 反汇编证据见常量区 / docs/40）",
+					g_cfg.floraSaveFingerprint,
+					timeOk ? std::to_string(probeDays) + " 天"
+						   : std::string("此刻读不到（启动时还没进世界 —— 正常；读档时仍读不到才会回退）"));
+			}
 			LoadFloraLearnTable();
 
 			REX::INFO("config: radius={:.1f}m targets={} hotkeyVK=0x{:X} startEnabled={}",
@@ -7669,9 +7745,10 @@ namespace SAS
 				s.empty() ? "（一个都没有）" : s, pcA, pcB);
 		}
 
-		// ★★★ v4.33 / v5.1：学习表落盘（定义在下面；这里先声明，因为
-		//   `RememberFloraRef` 的「绿」分支也要落盘）。★ v5.1 起一行 = 两个 FormID。
-		void AppendFloraLearnRecord(std::uint32_t a_refFid, std::uint32_t a_baseFid);
+		// ★★★ v4.33 / v5.1 / v5.1.7：学习表落盘（定义在下面；这里先声明，因为
+		//   `RememberFloraRef` 的「绿」分支也要落盘）。★ v5.1 起一行 = 两个 FormID；
+		//   ★ v5.1.7 起追加第 3 个字段 = 见证时刻（游戏时间，天）。
+		void AppendFloraLearnRecord(std::uint32_t a_refFid, std::uint32_t a_baseFid, float a_days);
 
 		// ================================================================
 		// ★★★ v5.1：**只读**读一眼「引擎给这个引用写的 outline 状态」
@@ -7833,6 +7910,7 @@ namespace SAS
 			const auto it = g_state.floraBaseKnow.find(a_baseFid);
 			if (it == g_state.floraBaseKnow.end()) {
 				FloraBaseScope s{};
+				s.days = CurrentGameDays();  // ★ v5.1.7：见证时刻（读档剪枝用）
 				if (a_ws) {
 					s.worldspaces[0] = a_ws;
 					s.count          = 1;
@@ -7851,6 +7929,11 @@ namespace SAS
 			}
 			// 已在表里：只补作用域（同一物种在别的星球也被见证 ⇒ 那颗星球也放行）
 			auto& e = it->second;
+			// ★ v5.1.7：保留**最早**一次见证的游戏时间（最能证明「这个绿在本存档的过去」）
+			const float d = CurrentGameDays();
+			if (d > 0.0f && (e.days <= 0.0f || d < e.days)) {
+				e.days = d;
+			}
 			if (a_ws && !e.Seen(a_ws) && e.count < e.worldspaces.size()) {
 				e.worldspaces[e.count++] = a_ws;
 			}
@@ -7884,12 +7967,132 @@ namespace SAS
 			return false;
 		}
 
-		// ★★★ v5.1.5（订正 R5）：这条记忆**还在「本存档的作用域」里**吗？
+		// ================================================================
+		// ★★★ v5.1.7（订正 R7）：**存档时间指纹** —— 「这个存档是哪个时间线」的硬证据
+		// ----------------------------------------------------------------
+		// 为什么需要（完整证据链见 docs/40）：v5.1.6 把「资源链复核有证伪」当作
+		//   「读回了更早的存档」的证据 —— 但**载入刚结束时资源链的否定答案是错的**：
+		//   用户 2026-09-27 10:15 那一局，载入画面关闭 + 4s 的复核把 9 个 base 全判成
+		//   「本存档没扫描」并删掉 132 条记忆（= 用户看到的「已扫描物品变青」）；
+		//   而 10s 后引擎自己（拿着扫描仪）把**同一批** base 画成绿（state 4/5）、
+		//   80s 后资源链对其中一个（base=0x270033）也答「已扫描」——
+		//   **同一个函数、同一个资源，80 秒后答案相反**。
+		//   ⇒ 「没扫描」这个否定答案在载入刚结束的那段时间**没有区分度**
+		//     （链路上下文没就绪时同样答「没扫描」），不能拿它做不可逆的作废。
+		//
+		// 新口径 = **游戏时间**（`Calendar::gameDaysPassed`；随存档一起保存 / 读回）：
+		//   · 每条记忆自带「学习时刻」（落盘行第 3 字段；旧格式行 = 0 = 未知）；
+		//   · 读档时把「本存档的游戏时间」记成**锚点**（`floraSaveDaysFloor`）：
+		//       学习时刻 ≤ 锚点 + eps ⇒ 这个扫描发生在本存档的过去 ⇒ 记忆有效；
+		//       学习时刻 >  锚点 + eps ⇒ 属于更新的时间线 ⇒ 不在作用域（**不删**）；
+		//   · 传送 / 继续同一存档 ⇒ 锚点几乎不动 ⇒ 什么都不作废（本次修复的核心）。
+		//
+		// 离线核对（本机 1.16.244.0，docs/40 §三）：
+		//   Calendar 单例 = REL::ID 937673 -> RVA 0x5FDCDF8（`Calendar**`）；
+		//   字段 gameDaysPassed @ Calendar+0x30、TESGlobal::value @ +0x48 —— 两处交叉验证：
+		//     · 0x5A73EC: mov rcx,[单例] / mov rax,[rcx+0x30] / vmovss xmm0,[rax+0x48]
+		//     · 0x9519FC: mov rax,[单例] / mov rcx,[rax+0x10]（gameYear）/ vcvttss2si r8,[rcx+0x48]
+		//       （且 year 读不到时的兜底常量 0x4D = 77 与 commonlibsf `Calendar::GetYear()`
+		//        的默认值完全一致 —— 布局对上了）
+		//   运行时再叠一层形状校验：单例非空 → 全局非空可读 → formType == kGLOB → 值有限且 > 0。
+		// ================================================================
+		constexpr float kFloraSaveTimeEpsDays = 0.005f;  // ≈ 7.2 游戏分钟（时钟量化 + 处理延迟余量）
+
+		bool ReadGameDays(float* a_out)
+		{
+			*a_out = 0.0f;
+			auto* cal = RE::Calendar::GetSingleton();
+			if (!cal || !IsReadable(cal, 0x40)) {
+				return false;
+			}
+			auto* glob = cal->gameDaysPassed;
+			if (!glob || !IsReadable(glob, 0x50)) {
+				return false;
+			}
+			if (reinterpret_cast<const std::uint8_t*>(glob)[kOffFormType] !=
+				static_cast<std::uint8_t>(RE::FormType::kGLOB)) {
+				return false;
+			}
+			const float v = *reinterpret_cast<const float*>(
+				reinterpret_cast<const std::uint8_t*>(glob) + 0x48);
+			if (!(v > 0.0f) || !std::isfinite(v)) {
+				return false;
+			}
+			*a_out = v;
+			return true;
+		}
+
+		// 见证时刻（游戏时间，天；读不到 ⇒ 0 = 未知）。调用点只在「写新结论」时（很少），
+		//   再叠一层 1 秒缓存兜住同一帧里的多次写。
+		float CurrentGameDays()
+		{
+			const auto now = NowMs();
+			if (g_state.floraDaysCacheAtMs && now - g_state.floraDaysCacheAtMs < 1000) {
+				return g_state.floraDaysCache;
+			}
+			float d = 0.0f;
+			if (!ReadGameDays(&d)) {
+				d = 0.0f;
+			}
+			g_state.floraDaysCacheAtMs = now ? now : 1;
+			g_state.floraDaysCache     = d;
+			return d;
+		}
+
+		// 诊断（**只用于日志**）：最近一次排队载入的存档名 + 当前存档编号。
+		//   偏移取自 commonlibsf `RE/B/BGSSaveLoad.h`（BGSSaveLoadManager：Singleton = REL::ID 883588、
+		//   currentSaveGameNumber @ +0x38、queuedEntryToLoad @ +0x58；BGSSaveLoadFileEntry::fileName @ +0x00）。
+		//   ★ 全部走 SafeReadMem（SEH 直读）+ 可打印字符校验 ⇒ 偏移万一不对，最坏也只是
+		//     日志里少一段信息，绝不参与任何判定、绝不崩。
+		void ReadSaveNameDiag()
+		{
+			g_state.floraFpSaveName[0] = '\0';
+			g_state.floraFpSaveNo      = 0;
+			static ::REL::Relocation<void**> mgrVar{ RE::ID::BGSSaveLoadManager::Singleton };
+			std::uintptr_t                   mgr = 0;
+			if (!mgrVar.address() ||
+				!SafeReadMem(reinterpret_cast<const void*>(mgrVar.address()), &mgr, sizeof(mgr)) || !mgr) {
+				return;
+			}
+			std::uint32_t no = 0;
+			if (SafeReadMem(reinterpret_cast<const void*>(mgr + 0x38), &no, sizeof(no)) && no < 10000000u) {
+				g_state.floraFpSaveNo = no;
+			}
+			std::uintptr_t entry = 0;
+			if (!SafeReadMem(reinterpret_cast<const void*>(mgr + 0x58), &entry, sizeof(entry)) || !entry) {
+				return;
+			}
+			std::uintptr_t namePtr = 0;
+			if (!SafeReadMem(reinterpret_cast<const void*>(entry), &namePtr, sizeof(namePtr)) || !namePtr) {
+				return;
+			}
+			char buf[40]{};
+			if (!SafeReadMem(reinterpret_cast<const void*>(namePtr), buf, sizeof(buf) - 1)) {
+				return;
+			}
+			buf[sizeof(buf) - 1] = '\0';
+			std::size_t n = 0;
+			for (; n + 1 < sizeof(g_state.floraFpSaveName) && buf[n]; ++n) {
+				const auto c = static_cast<unsigned char>(buf[n]);
+				if (c < 0x20 || c > 0x7E) {
+					break;  // 非可打印 ⇒ 不像文件名，丢弃
+				}
+				g_state.floraFpSaveName[n] = static_cast<char>(c);
+			}
+			g_state.floraFpSaveName[n] = '\0';
+		}
+
+		// ★★★ v5.1.5（订正 R5）/ v5.1.7（订正 R7）：这条记忆**还在「本存档的作用域」里**吗？
 		//   为什么需要它：用户实测「未扫描星球资源直接显示绿色，重新读档（未扫描时的存档）
 		//   后问题非常严重」—— 「已扫描」是**存档里勘测数据**的事实，而记忆（含落盘文件）
 		//   不区分存档 ⇒ 在「后玩的存档」里学到的绿会漏到「更早的存档」里。
-		//   判据（epoch = 见证于第几次读档之后，见 State::FloraRefKnow）：
+		//   ★★★ v5.1.7（订正 R7）**新口径 = 存档时间指纹**（默认；见上面长注释 / docs/40）：
 		//     · `FloraMemoryScope=0`（旧行为，对照用）⇒ 永远算数；
+		//     · 本时间线内当场见证（epoch == 当前）⇒ 永远算数（不受锚点限制）；
+		//     · 其余条目按**学习时刻**判定：`days ≤ 锚点 + eps` ⇒ 算数；
+		//       没有时间信息（旧格式行）⇒ 用 `floraLegacyStampDays`（首次读档的锚）；
+		//       连锚都没有（还没处理过读档）⇒ 不收紧（保守）。
+		//   ★ 旧口径（v5.1.5 的 epoch；`FloraSaveFingerprint=0` 或读不到时间时回退）：
 		//     · 条目 epoch != 0 ⇒ **只有当前读档编号相同**才算数（= 本存档内当场见证）；
 		//     · 条目 epoch == 0（本会话启动时从落盘文件读回，属于**上一个游戏会话**）⇒
 		//       `FloraMemoryScope=1`（默认）只在本会话**第一次读档**时算数
@@ -7899,6 +8102,20 @@ namespace SAS
 		{
 			if (g_cfg.floraMemoryScope == 0) {
 				return true;
+			}
+			if (g_cfg.floraSaveFingerprint && g_cfg.floraMemoryScope == 1 &&
+				g_state.floraSaveDaysFloor >= 0.0f) {
+				if (a_e.epoch != 0 && a_e.epoch == g_state.floraSaveEpoch) {
+					return true;  // ★ 本时间线内当场见证 ⇒ 永远有效
+				}
+				float d = a_e.days;
+				if (!(d > 0.0f)) {
+					d = g_state.floraLegacyStampDays;  // 旧格式行 / 读不到时间 ⇒ 用首次读档的锚
+				}
+				if (!(d > 0.0f)) {
+					return true;  // 实在没有时间信息 ⇒ 不收紧（保守）
+				}
+				return d <= g_state.floraSaveDaysFloor + kFloraSaveTimeEpsDays;
 			}
 			if (a_e.epoch != 0) {
 				return a_e.epoch == g_state.floraSaveEpoch;
@@ -7954,10 +8171,12 @@ namespace SAS
 			e.baseFid = baseFid;
 			e.green   = a_green;
 			e.epoch   = g_state.floraSaveEpoch;  // ★ v5.1.5：盖「见证于第几次读档之后」
+			const float seenDays = CurrentGameDays();  // ★ v5.1.7：见证时刻（游戏时间，天）
+			e.days = seenDays;
 			EnsureFloraRefKnowRoom();
 			if (a_green) {
 				++g_state.floraRefGreenNew;
-				AppendFloraLearnRecord(refFid, baseFid);  // ★ 落盘（跨会话保留）
+				AppendFloraLearnRecord(refFid, baseFid, seenDays);  // ★ 落盘（跨会话保留）
 				// ★★★ v5.1.2（订正 R2）：顺手把 base 记进会话级「物种表」——
 				//   同 base 的其它实例（本轮引擎没画到的那些）靠它一起变绿。
 				//   ★ v5.1.5：物种表每次读档都被清空（只由「本存档内见证」重建），
@@ -7969,9 +8188,10 @@ namespace SAS
 			const auto n = g_state.floraRefGreenNew + g_state.floraRefCyanNew;
 			if (n <= 24 || n % 64 == 0) {
 				REX::INFO("flora scan: 按引用记下 {} —— ref=0x{:X} base=0x{:X}（{}）"
-						  "（★ v5.1：记忆粒度 = 引用；★ v5.1.5：结论带读档作用域 epoch={}）",
+						  "（★ v5.1：记忆粒度 = 引用；★ v5.1.5：结论带读档作用域 epoch={}；"
+						  "★ v5.1.7：带见证时刻 = {} 天）",
 					a_green ? "「已扫描」（绿）" : "「未扫描」（青）", refFid, baseFid, a_reason,
-					g_state.floraSaveEpoch);
+					g_state.floraSaveEpoch, seenDays);
 			}
 			return true;
 		}
@@ -8091,7 +8311,8 @@ namespace SAS
 				g_state.floraPersistReady = true;
 				return;
 			}
-			// 读一行 = 两个十六进制 FormID（★ v5.1 起）。只认「两个 token」的行；
+			// 读一行 = 两个十六进制 FormID（★ v5.1 起）+ 可选第 3 个字段（★ v5.1.7 起 =
+			//   **见证时刻**（游戏时间，天））。只认「两个 token」的行；
 			//   v4.33~v5.0 的「一个 base」旧格式会被数出来并忽略（成因见上面那段注释）。
 			const auto readHex = [](const char* a_in, const char** a_outEnd) -> std::uint32_t {
 				const char* h   = (a_in[0] == '0' && (a_in[1] == 'x' || a_in[1] == 'X')) ? a_in + 2 : a_in;
@@ -8131,6 +8352,23 @@ namespace SAS
 					++g_state.floraPersistIgnored;
 					continue;
 				}
+				// ★★★ v5.1.7（订正 R7）：可选第 3 个字段 = 见证时刻（游戏时间，天）。
+				//   v5.1.6 及更早写的行没有它 ⇒ days = 0 = 未知（读档时用
+				//   `floraLegacyStampDays` 兜 —— 等价于 R5 的「第一次读档仍然有效」）。
+				float days = 0.0f;
+				{
+					const char* r = e2;
+					while (*r == ' ' || *r == '\t') {
+						++r;
+					}
+					if (*r != '\r' && *r != '\n' && *r != '\0') {
+						char*        de = nullptr;
+						const double dv = std::strtod(r, &de);
+						if (de && de != r && dv > 0.0 && dv < 1.0e7) {
+							days = static_cast<float>(dv);
+						}
+					}
+				}
 				auto& e = g_state.floraRefKnow[ref];
 				if (e.baseFid != base || !e.green) {
 					e.baseFid = base;
@@ -8139,16 +8377,20 @@ namespace SAS
 					//   盖 epoch = 0 ⇒ 只有在本会话**第一次读档**时才算数
 					//   （见 FloraEntryInScope；之后每次读档只认本存档内见证过的绿）。
 					e.epoch = 0;
+					e.days  = days;  // ★ v5.1.7
 					++g_state.floraPersistLoaded;
+					if (days <= 0.0f) {
+						++g_state.floraPersistNoTime;
+					}
 				}
 			}
 			std::fclose(f);
 			g_state.floraPersistReady = true;
-			REX::INFO("flora learn: 按引用记忆已从落盘文件载入 {} 条（{}）-> 本会话**第一次读档**时这些"
-					  "**引用**直接判「已扫描」（不需要再开一遍扫描仪，FloraLearnPersist=1）；"
-					  "★ v5.1.5：之后每次读档都会把它们降级为「待重新见证」，并清空物种表、"
-					  "按资源链复核（防止「读到更早的存档时，那个存档里没扫过的也显示绿色」）{}",
-				g_state.floraPersistLoaded, path,
+			REX::INFO("flora learn: 按引用记忆已从落盘文件载入 {} 条（{}）-> 读档时按**见证时刻**"
+					  "（★ v5.1.7：行第 3 字段 = 游戏时间）判定是否还在本存档作用域内"
+					  "（时间 ≤ 本存档的游戏时间 ⇒ 直接判「已扫描」，不需要再开一遍扫描仪）；"
+					  "★ 没有时间字段的旧行（{} 条）用「首次读档的锚」兜底 = 本会话第一次读档时仍然有效{}",
+				g_state.floraPersistLoaded, path, g_state.floraPersistNoTime,
 				g_state.floraPersistIgnored
 					? "；★ 旧格式（base 级）行被忽略 " + std::to_string(g_state.floraPersistIgnored) +
 						  " 条 —— 那种粒度会把同 species / 同资源的**所有**实例一起涂绿、"
@@ -8156,8 +8398,10 @@ namespace SAS
 					: std::string{});
 		}
 
-		// 新学到一条「这个引用已扫描」就追加写一行（文件不存在时创建；去重靠内存记忆）
-		void AppendFloraLearnRecord(std::uint32_t a_refFid, std::uint32_t a_baseFid)
+		// 新学到一条「这个引用已扫描」就追加写一行（文件不存在时创建；去重靠内存记忆）。
+		//   ★ v5.1.7：第 3 个字段 = 见证时刻（游戏时间，天）—— 读档时用它判定
+		//     「这个扫描发生在哪个存档的过去」（见 FloraEntryInScope / docs/40）。
+		void AppendFloraLearnRecord(std::uint32_t a_refFid, std::uint32_t a_baseFid, float a_days)
 		{
 			if (!g_cfg.floraLearnPersist) {
 				return;
@@ -8170,12 +8414,14 @@ namespace SAS
 				}
 				return;
 			}
-			std::fprintf(f, "0x%08X 0x%08X\n", a_refFid, a_baseFid);
+			std::fprintf(f, "0x%08X 0x%08X %.5f\n", a_refFid, a_baseFid,
+				a_days > 0.0f ? a_days : 0.0f);
 			std::fclose(f);
 			++g_state.floraPersistWrites;
 			if (g_state.floraPersistWrites == 1) {
 				REX::INFO("flora learn: 开始落盘（{}）—— 以后学到的「这个引用已扫描」都追加到这里"
-						  "（行格式：`引用 FormID base FormID`），重开游戏直接读回（想重置就删掉这个文件）",
+						  "（行格式：`引用 FormID base FormID 游戏时间(天)`），重开游戏直接读回"
+						  "（想重置就删掉这个文件）",
 					path);
 			}
 		}
@@ -8355,6 +8601,93 @@ namespace SAS
 		constexpr std::size_t    kFloraScopeValidateMaxBase = 64;  // 每次读档最多复核多少个 base
 		// （复核延后时长 `kFloraScopeEvalDelayMs` 定义在文件上方常量区 —— 启动日志也要引用它。）
 
+		// ================================================================
+		// ★★★ v5.1.7（订正 R7）：用**游戏时间指纹**处理一次读档候选（默认口径）
+		// ----------------------------------------------------------------
+		// 返回 true = 已按新口径处理完（调用方直接 return）；false = 读不到时间 / 开关关掉
+		//   / `FloraMemoryScope` 不是 1 ⇒ 交给 v5.1.6 的链证据路径（fallback，原样保留）。
+		//
+		// 与 v5.1.6 的三点区别（全部来自用户 2026-09-27 10:15 那一局的实证，见 docs/40）：
+		//   ① **不做资源链复核** —— 那个时刻的否定答案没有区分度（同一资源 80 秒后答相反）；
+		//   ② **不删任何条目** —— 作废 = 「不在本存档作用域」（可逆：换更新的存档就自动回来）；
+		//   ③ 传送 / 继续同一存档 ⇒ 锚点几乎不动 ⇒ 什么都不作废（不再依赖链的自证）。
+		//
+		// 「作废」的语义 = `FloraEntryInScope` 用锚点把「属于更新时间线」的条目挡在作用域外
+		//   （它们不再产生绿）；同一次读档里，**本时间线内当场见证**的条目（epoch == 当前）
+		//   不受锚点限制。物种表则按每个 base 的**最早见证时刻**剪枝。
+		// ================================================================
+		bool TryProcessFloraSaveLoadByTime(const char* a_when, std::uint64_t a_loadNo)
+		{
+			if (g_cfg.floraMemoryScope != 1 || !g_cfg.floraSaveFingerprint) {
+				return false;
+			}
+			float days = 0.0f;
+			if (!ReadGameDays(&days)) {
+				++g_state.floraFpFailures;
+				if (g_state.floraFpFailures <= 3) {
+					REX::WARN("flora memory: 读档候选 #{}：**游戏时间读不到**"
+							  "（Calendar / GameDaysPassed 形状校验没过）⇒ 本次回退 v5.1.6 的链证据路径"
+							  "（那一套的否定答案在载入刚结束时可能不准，FloraSaveFingerprint 想关就设 0）",
+						a_loadNo);
+				}
+				return false;
+			}
+			const float floorOld = g_state.floraSaveDaysFloor;
+			if (g_state.floraLegacyStampDays < 0.0f) {
+				g_state.floraLegacyStampDays = days;  // 旧格式行的锚（= R5 的「第一次读档仍有效」）
+			}
+			g_state.floraSaveDaysFloor = days;  // ★ 锚点 = 本存档的游戏时间
+			++g_state.floraSaveEpoch;           // 「本时间线」标记（读档后当场见证的条目不受锚点限制）
+			++g_state.floraFpLoads;
+			ReadSaveNameDiag();
+
+			const float limit = days + kFloraSaveTimeEpsDays;
+			std::size_t voided = 0;
+			std::size_t kept   = 0;
+			for (const auto& kv : g_state.floraRefKnow) {
+				const auto& e = kv.second;
+				if (e.epoch == g_state.floraSaveEpoch) {
+					++kept;  // 刚 bump，正常不会有；留着兜异常
+					continue;
+				}
+				float d = e.days;
+				if (!(d > 0.0f)) {
+					d = g_state.floraLegacyStampDays;
+				}
+				if (d > 0.0f && d > limit) {
+					++voided;
+				} else {
+					++kept;
+				}
+			}
+			std::size_t pruned = 0;
+			for (auto it = g_state.floraBaseKnow.begin(); it != g_state.floraBaseKnow.end();) {
+				float d = it->second.days;
+				if (!(d > 0.0f)) {
+					d = g_state.floraLegacyStampDays;
+				}
+				if (d > 0.0f && d > limit) {
+					it = g_state.floraBaseKnow.erase(it);  // 这个物种的绿属于更新的时间线 ⇒ 剪掉
+					++pruned;
+				} else {
+					++it;
+				}
+			}
+			g_state.floraFpVoided += voided;
+			g_state.floraFpClearedBase += pruned;
+
+			REX::INFO("flora memory: 读档候选 #{}（{}）-> ★ **存档时间指纹**：本存档的游戏时间 = {:.5f} 天"
+					  "（上次锚点 = {}；存档 = {} / #{}）⇒ **不在本存档作用域**的条目 {} 条 / 仍有效 {} 条"
+					  "（物种表剪掉 {} 个 base）—— ★ **不删任何条目**（作用域可逆：换一个更新的存档就会自动回来）"
+					  "；★ v5.1.7（订正 R7：读档边界改用游戏时间指纹 —— 传送 / 继续同一存档不再误作废）",
+				a_loadNo, a_when, days,
+				floorOld >= 0.0f ? std::to_string(floorOld) : std::string("无"),
+				g_state.floraFpSaveName[0] ? g_state.floraFpSaveName : "?",
+				g_state.floraFpSaveNo,
+				voided, kept, pruned);
+			return true;
+		}
+
 		void ProcessFloraSaveLoad(const char* a_when)
 		{
 			++g_state.floraSaveLoads;
@@ -8367,7 +8700,15 @@ namespace SAS
 				return;
 			}
 
+			// ★★★ v5.1.7（订正 R7）：**优先按「游戏时间指纹」处理**（见上面的长注释 / docs/40）。
+			//   读不到时间 / 开关关掉 / scope != 1 ⇒ 落到下面 v5.1.6 的链证据路径（回退）。
+			if (TryProcessFloraSaveLoadByTime(a_when, loadNo)) {
+				return;
+			}
+
 			// ① 资源链复核（★ v5.1.6：**先复核、后决策** —— v5.1.5 是先作废再复核）
+			//   ★ 注意（v5.1.7）：这条路只在「读不到游戏时间」时才会走到 —— 那时链的
+			//     否定答案依旧不可靠（见上方长注释），所以它只是**兜底**，不是默认口径。
 			const auto                        curWs = CurrentWorldspace();
 			std::size_t                       checked = 0;
 			std::size_t                       skipped = 0;
@@ -11390,8 +11731,9 @@ namespace SAS
 						  "| 按物种扩散(★v5.1.2): 命中={} 物种表={} 新增={} 星球外拒={} ★v5.1.5 "
 						  "| 记忆作用域(★v5.1.5): 读档={} 事件={} 跳过={} 翻案={} 重见证={} 链复核: 丢={}条/{}base 清物种表={} "
 						  "| 读档边界(★v5.1.6): 事件保留={} 确认base={} 推进={} "
+						  "| 存档指纹(★v5.1.7): 锚={}天 处理={} 作废={}条 表剪={} 失败={} 存档={} "
 						  "| 引擎状态表: 条目={} 读={} 绿={} 青={} 无条目={} "
-						  "| 学习表: 沿用={} 捡漏={} 落盘={} 写入={} 旧格式忽略={}"
+						  "| 学习表: 沿用={} 捡漏={} 落盘={} 写入={} 旧格式忽略={} 无时间={}"
 						  "（★ v5.1：按引用记忆 = 记忆粒度是引用；★ v5.1.2：按物种扩散 = 同 species / "
 						  "同资源被权威确认后，其**所有**实例一起变绿（引擎知识库本来就是这一级；"
 						  "物种表**不落盘**，重启后靠引用级记忆动态激活）；"
@@ -11404,9 +11746,15 @@ namespace SAS
 						  "★ v5.1.6 起这条被用来判定「传送 / 读同一存档」——链复核一个 base 都证伪不了 ⇒ "
 						  "**不推进作用域、不清物种表、不丢条目**（`事件保留` 记的就是这种「传送被误报成读档」的次数；"
 						  "`确认base` = 复核里被链确认「本存档里已扫描」的 base 数；`推进` = 真正推进过几次存档边界）；"
+						  "★★ v5.1.7（订正 R7）**默认口径已换成「存档时间指纹」**（上面那一段；`读档边界` "
+						  "那段只剩回退路径的计数）：`锚` = 本存档的游戏时间（天，`Calendar::gameDaysPassed`）；"
+						  "`处理` = 用指纹处理过几次读档；`作废` = 累计有多少条记忆「不在本存档作用域」"
+						  "（= 学习时刻晚于本存档 —— **不删条目**，换更新的存档就自动回来）；"
+						  "`表剪` = 物种表被剪掉的 base 数；`失败` = 游戏时间读不到的次数（那几次回退到 "
+						  "v5.1.6 的链证据路径）；`存档` = 从 `BGSSaveLoadManager` 读到的存档名（诊断）；"
 						  "引擎状态表 = 引擎那棵「引用→状态」红黑树的条目数 —— **玩多久都应该基本稳定**，"
 						  "持续单调增长 = 有代码在往里插条目；命中/捡漏 = 判定在干活、沿用 = 保住的绿；"
-						  "落盘 = 启动读回条数 / 写入 = 本会话新增）"
+						  "落盘 = 启动读回条数 / 写入 = 本会话新增 / 无时间 = 落盘行里没有时间字段的条数）"
 						  " | 窗口取证={} ready={}/{}",
 					g_state.floraUnscannedSel, g_state.floraScannedSel,
 					g_state.floraScanQueries, g_state.floraScanHits,
@@ -11422,12 +11770,17 @@ namespace SAS
 					g_state.floraScopeSkipped, g_state.floraScopeDemoted, g_state.floraScopeRescoped,
 					g_state.floraScopeDropped, g_state.floraScopeDroppedBase, g_state.floraScopeClearedBase,
 					g_state.floraScopeKept, g_state.floraScopeConfirmedBase, g_state.floraSaveEpoch,
+					(g_state.floraSaveDaysFloor >= 0.0f ? std::to_string(g_state.floraSaveDaysFloor)
+														: std::string("无")),
+					g_state.floraFpLoads, g_state.floraFpVoided, g_state.floraFpClearedBase,
+					g_state.floraFpFailures,
+					(g_state.floraFpSaveName[0] ? std::string(g_state.floraFpSaveName) : std::string("-")),
 					OutlineStateTableCount(),
 					g_state.floraTableProbes, g_state.floraTableGreen, g_state.floraTableCyan,
 					g_state.floraTableNoEntry,
 					g_state.floraStickyKeeps, g_state.floraStatusTableHits,
 					g_state.floraPersistLoaded, g_state.floraPersistWrites,
-					g_state.floraPersistIgnored,
+					g_state.floraPersistIgnored, g_state.floraPersistNoTime,
 					g_state.floraScanDumps,
 					g_isResourceScannedReady ? 1 : 0,
 					g_scannableOutlineStateReady ? 1 : 0);
