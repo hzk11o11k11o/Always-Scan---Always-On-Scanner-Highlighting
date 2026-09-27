@@ -253,7 +253,21 @@ SFSE_PLUGIN_LOAD(const SFSE::LoadInterface* a_sfse)
 	//   · 读回更早的存档 ⇒ 只有「未来」的条目失效，其余照常有效（比 R5 的
 	//     「一律作废、植物靠举扫描仪重学」精准得多）。
 	//   回退：INI `FloraSaveFingerprint=0`（回到 R6 链证据路径）；读不到游戏时间时也会自动回退。
-	REX::INFO("SAS_AlwaysScan v5.1.0 loading（订正 R7：读档边界改用游戏时间指纹 —— 传送 / 继续同一存档不再误作废；作废不删条目、可逆）(SFSE build {})",
+	// ★★★ 2026-09-27 订正 R8（公开版仍是 2.0、DLL build 仍是 5.1.0）：
+	//   **治「传送后已扫描物品变青」的剩余那一半**（R7 之后用户第三次报同一现象）——
+	//   R7 的读档边界已经不再误作废（那一局 `作废=0 条`），但**按物种扩散被星球口径挡住** +
+	//   **引用级记忆命中不了**（外景临时引用每次会话换 FormID），于是：
+	//   · 在星球 A 本会话亲手扫过的物种，星图快速旅行到 B 后**引擎自己**（一举扫描仪）
+	//     把同 species 实例画成绿 4/5 ⇒ 引擎的物种知识**跨星球生效**，我们却涂成青色；
+	//   · 载入 / 传送后同一个物种的实例换了 FormID ⇒ 落盘记忆（按引用）命中不到。
+	//   R8 两处改动（都在 `AlwaysScan.cpp`）：
+	//     ① `FloraBaseKnown()` **默认不再按星球硬拒绝**（`FloraSpeciesPlanetScope` 默认 0 =
+	//        引擎口径）；作用域仍由**存档边界**管（物种表会话级不落盘 + 读档按游戏时间锚点剪枝）；
+	//     ② 新增 `SeedFloraBaseFromRefMemory()`：把**作用域内**的落盘绿条目按 base **播种**进
+	//        物种表（启动载入后 + 每次读档剪枝后各一次）⇒ 同 species 的实例**不必等举扫描仪**
+	//        直接是绿的。
+	//   回退：INI `FloraSpeciesPlanetScope=1`（回到 R5 的严格口径，只为对照）。
+	REX::INFO("SAS_AlwaysScan v5.1.0 loading（订正 R8：物种表用落盘记忆播种 + 扩散不再按星球硬拒绝 —— 传送 / 换星球后已扫描的 species 直接是绿的）(SFSE build {})",
 		SFSE::GetSFSEVersion());
 
 	if (auto* messaging = SFSE::GetMessagingInterface()) {

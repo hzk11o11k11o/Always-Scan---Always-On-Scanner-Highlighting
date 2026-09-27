@@ -5,7 +5,7 @@
 
 Version  : 2.0  (plugin build 5.1.0)
            2.0 = the mod brings its own outline colour channels (described
-           below), plus nine fixes, all from player reports.
+           below), plus ten fixes, all from player reports.
            (1) "Ores and plants are green before *and* after scanning."
                The mod remembers a confirmed "surveyed" verdict so a target
                cannot fall back to cyan (added in 1.7.9 / 1.8.1), but that
@@ -173,7 +173,8 @@ Version  : 2.0  (plugin build 5.1.0)
                the survey-data check answers for them right away. Two new ini
                keys: FloraMemoryScope=1 (0 = old behaviour, 2 = strictest:
                never trust the remembered file), FloraSpeciesPlanetScope=1
-               (0 = old global spread). The stats line gained a
+               (0 = global spread; note: fix (10) made 0 the default again).
+               The stats line gained a
                `记忆作用域(★v5.1.5): 读档= 事件= 跳过= 翻案= 重见证= 链复核: 丢=...` block
                and `按物种扩散 ... 星球外拒=`.
            (8) "After travelling / changing maps, already-surveyed items turn
@@ -254,6 +255,44 @@ Version  : 2.0  (plugin build 5.1.0)
                unreliably answered check can erase anything any more). The
                stats line gained a
                `存档指纹(★v5.1.7): 锚=…天 处理= 作废=条 表剪= 失败= 存档=` block.
+           (10) The same report as (8) / (9), sent a third time after fix (9):
+               "after travelling / changing maps, already-surveyed items turn
+               back to cyan; raising the scanner once turns them green again."
+               Fixed 2026-09-27. Fix (9) had already made the load boundary
+               harmless (in that session the stats read `作废=0条` - nothing was
+               invalidated any more), so the cyan had a different cause, and
+               the same log holds it:
+                 - the reported session used the star map at 10:50:24 and
+                   finished a fast travel at 10:50:45; from then on the mod's
+                   `按物种扩散 ... 星球外拒=` counter climbed to 37 and the whole
+                   batch of plants was painted cyan;
+                 - ten seconds later the player raised the scanner and *the
+                   game itself* painted those very plants green (state 4 / 5) -
+                   and those were the species the player had scanned by hand
+                   three minutes earlier, on the planet the trip started from.
+               In other words: the game's "this species is surveyed" knowledge
+               works *across planets*, while fix (7) had taught the mod to hard
+               -reject any spread that crosses a worldspace - so targets that
+               really are surveyed in this save came out cyan. Two changes:
+                 (a) the species spread is global again by default
+                     (FloraSpeciesPlanetScope=0 = the game's own behaviour; 1
+                     keeps the strict per-planet rule for comparison only).
+                     Out-of-save leakage is still prevented, by the *save*
+                     scope alone: the species table is session-only (never
+                     written to disk) and every load prunes it by the game-time
+                     anchor of fix (9);
+                 (b) the species table is now *seeded* from the remembered
+                     file: planet targets on a surface are runtime-created
+                     references whose FormIDs are handed out again after a new
+                     session / map change, so reference-level memory simply
+                     cannot match them (that session: `记忆: 命中=2` with 271
+                     already-surveyed plants sitting cyan). After the file is
+                     loaded - and again after every load's pruning - every
+                     green record that is *in scope* is added to the species
+                     table by species, so those instances are green right away
+                     instead of after raising the scanner once. The stats line
+                     gained `播种=` and `跨星球放行=` inside the
+                     `按物种扩散(★v5.1.8)` block.
            Also in 2.0 (the headline feature) - the mod brings its own
            outline colour channels instead of borrowing the game's.
            The game has eleven outline "states"
@@ -783,12 +822,19 @@ Most useful options:
                         0 = old behaviour (every load event counts as a real
                         load).
   FloraSpeciesPlanetScope=1
-                        spread a confirmed "surveyed" verdict to the whole
-                        species / resource only inside the same planet
-                        (worldspace). Before this, a species confirmed on
-                        one planet also turned the same species green on
-                        every other planet before you surveyed anything
-                        there. 0 = old global spread (comparison only).
+                       FloraSpeciesPlanetScope=0
+                        how far a confirmed "surveyed" verdict spreads to the
+                        rest of its species / resource. 0 = default (fix (10)):
+                        spread everywhere, which is what the game itself does -
+                        raise the scanner after surveying a species and the game
+                        paints that species green on any planet you meet it on.
+                        The mod still keeps this inside the save: the species
+                        table is session-only and pruned by the game-time anchor
+                        of fix (9), and only in-scope records seed it. 1 = strict
+                        per-planet spread (fix (7)'s rule); it paints targets
+                        that are surveyed in this save cyan whenever you
+                        witnessed the species on another planet - comparison /
+                        fallback only.
   ColorWeapon=FF2E2E    exact RGB per category (written by default):
   ColorApparel=FF2E2E     equipment (weapons / suits / clothing) red,
   ColorNote=B36BFF        notes & resources purple, misc blue - plus

@@ -1130,14 +1130,19 @@ namespace SAS
 			//   0 = 旧行为（v5.1.4：记忆永远有效、物种表不清）—— 只为对照 / 回退。
 			int           floraMemoryScope = 1;
 
-			// ★★★ v5.1.5（订正 R5）：**按物种（base）扩散只在同一颗星球内生效**。
-			//   为什么（用户报告的另一半）：「未扫描星球资源直接显示绿色」—— v5.1.2 的
-			//   扩散表只按 base 记（全局），在星球 A 学到的物种会让星球 B 上**同种但没扫过**
-			//   的资源也变绿（v5.1 之前的 base 级引用记忆踩的正是同一个坑，docs/33）。
-			//   修法：见证时记下当时的 worldspace（`TESObjectREFR::GetParentWorldSpace()`），
-			//   命中时要求**同一颗星球**（读不到 worldspace ⇒ 不收紧，保持旧行为）。
-			//   1 = 开启（默认）；0 = 旧行为（全局扩散，只为对照）。
-			bool          floraSpeciesPlanetScope = true;
+			// ★★★ v5.1.5（订正 R5）→ ★★★ v5.1.8（订正 R8）：**按物种（base）扩散是否按星球收紧**。
+			//   R5 的初衷：v5.1.2 的扩散表只按 base 记（全局），怕「在星球 A 学到的物种
+			//   让星球 B 上没扫过的同种资源也变绿」⇒ 加了「必须同一颗 worldspace」的硬拒绝。
+			//   R8 的依据（用户 2026-09-27 10:50 那一局日志实证）：在星球 A 本会话亲手扫过的
+			//   物种，星图快速旅行到 B 之后**引擎自己**（一举扫描仪）就把同 species 的实例
+			//   画成绿 4/5 ⇒ **引擎的物种知识本来就是跨星球生效的**；按星球硬拒绝只会把
+			//   「本存档里明确已扫描」的目标涂成青色（= 用户第三次报的「传送后变青」）。
+			//   ⇒ 默认 **0 = 引擎口径（全局物种表，作用域仍由「存档」管）**：
+			//     · 物种表是**会话级**、不落盘；读档时按**游戏时间锚点**剪枝（R7）；
+			//     · 落盘记忆只在**作用域内**才播种（R8，见 SeedFloraBaseFromRefMemory）；
+			//     ⇒ 跨星球扩散不会再外溢到别的存档（R5 真正要防的是这个）。
+			//   `1` = 保留 R5 的严格口径（只在同一颗星球内扩散）—— 只为对照 / 回退。
+			bool          floraSpeciesPlanetScope = false;
 
 			// ================================================================
 			// ★★★ v5.1.6（订正 R6）：**「读档边界」改为证据驱动**（治「传送后变青」）
@@ -2408,7 +2413,9 @@ namespace SAS
 			std::unordered_map<std::uint32_t, FloraBaseScope> floraBaseKnow;  // base FormID -> 作用域
 			//   `cell 指针 → worldspace 指针` 缓存（WorldspaceOfRef；换场景 / 读档时清空）
 			std::unordered_map<std::uintptr_t, std::uintptr_t> floraCellWsCache;
-			std::uint64_t floraBasePlanetDenied = 0;  // 因「不在同一颗星球」被拒绝的扩散次数
+			std::uint64_t floraBasePlanetDenied = 0;  // 因「不在同一颗星球」被拒绝的扩散次数（★ v5.1.8 起只在 FloraSpeciesPlanetScope=1 时才会涨）
+			std::uint64_t floraBaseCrossPlanet = 0;   // ★ v5.1.8：跨星球**放行**的扩散次数（默认口径下发生 = 修复在干活）
+			std::uint64_t floraBaseSeeded     = 0;    // ★ v5.1.8：用落盘记忆播种出来的物种表条目数
 			std::uint64_t floraBaseHits = 0;  // 被「按物种扩散」直接命中几次（诊断）
 			std::uint64_t floraBaseNew  = 0;  // 本会话记下几个 base（诊断）
 			// ★★★ v5.1：只读探针（引擎状态表）的计数 —— 这一路**零副作用**
@@ -4105,7 +4112,8 @@ namespace SAS
 			// ★★★ v5.1.5（订正 R5）：「已扫描」记忆按**存档**隔离（详见 Config 里 v5.1.5 段）
 			g_cfg.floraMemoryScope      = std::clamp(getInt("FloraMemoryScope", 1), 0, 2);
 			// ★★★ v5.1.5（订正 R5）：按物种扩散只在**同一颗星球**内（同上）
-			g_cfg.floraSpeciesPlanetScope = getInt("FloraSpeciesPlanetScope", 1) != 0;
+			//   ★ v5.1.8（订正 R8）：默认改成 **0**（引擎口径 = 全局物种表；见 Config 里那段证据）
+			g_cfg.floraSpeciesPlanetScope = getInt("FloraSpeciesPlanetScope", 0) != 0;
 			// ★★★ v5.1.6（订正 R6）：「读档边界」证据驱动（详见 Config 里 v5.1.6 段）
 			g_cfg.floraLoadBoundaryEvidence = getInt("FloraLoadBoundaryEvidence", 1) != 0;
 			// ★★★ v5.1.7（订正 R7）：读档边界 = 游戏时间指纹（详见 Config 里 v5.1.7 段）
@@ -4489,14 +4497,17 @@ namespace SAS
 					  "引擎状态表探针 = **只读走树（RVA 0x5F39CE0 + 节点 +0x20/+0x28）**，"
 					  "不再调 LookupOrAdd（那会插入条目 + 对 REFR 加引用计数 ⇒ 玩得越久越卡）；"
 					  "「青」记忆只当提示（不再短路主判据 / 资源链，任何一条给出「已扫描」都会升级成绿）");
-			// ★★★ v5.1.5（订正 R5）：记忆按**存档**隔离（详见 Config 里 v5.1.5 段）
-			REX::INFO("config: floraSpeciesPlanetScope={} -> 按物种（base）扩散**只在同一颗星球**内"
-					  "（见证时记下 `TESObjectREFR::GetParentWorldSpace()` 的 worldspace，命中时要求相同；"
-					  "读不到 ⇒ 不收紧）；{}",
+			// ★★★ v5.1.5（订正 R5）→ ★★★ v5.1.8（订正 R8）：扩散的星球口径
+			REX::INFO("config: floraSpeciesPlanetScope={} -> 按物种（base）扩散的星球口径：{}"
+					  "（作用域由「存档边界」管：物种表会话级不落盘、读档按**游戏时间锚点**剪枝、"
+					  "落盘记忆只在作用域内才播种 —— 见 docs/41）",
 				g_cfg.floraSpeciesPlanetScope,
 				g_cfg.floraSpeciesPlanetScope
-					? "跨星球不再外溢（v5.1.2 的全局扩散会让「别的星球上没扫过的同种资源」也变绿）"
-					: "**旧行为**（全局扩散）—— 只为对照");
+					? "**R5 严格口径**：只在同一颗 worldspace 内扩散（跨星球一律拒绝 —— 会把"
+					  "「本存档里已扫描、但见证发生在别的星球」的目标误判成青色；只为对照 / 回退）"
+					: "★ **引擎口径（默认，v5.1.8）**：物种知识**跨星球**生效 —— 引擎自己"
+					  "（一举扫描仪）会给「本存档里扫过的 species」在**任何**星球画绿 4/5；"
+					  "我们只要在作用域内见证过该物种就整片变绿（`跨星球放行=` 计数可见）");
 			REX::INFO("config: floraMemoryScope={} -> 「已扫描」记忆按存档隔离（读档 = 存档边界，"
 					  "用引擎 `TESLoadGameEvent` 当**候选信号**；★ v5.1.6 起还要**资源链证据**成立才作废"
 					  "——部分传送 / 换世界空间也会发这个事件）：{}",
@@ -7941,9 +7952,15 @@ namespace SAS
 		}
 
 		// 查「这个物种 / 资源」是不是已被权威确认过（会话级；见上面长注释）。
-		//   ★★★ v5.1.5（订正 R5）：还要**在同一个世界空间（星球）**里 ——
-		//     见 FloraBaseScope（跨星球外溢 = 用户报的假绿）。
-		//     `a_ws == 0`（当前引用读不到 worldspace / 见证时也没读到）⇒ 不收紧（保守）。
+		//   ★★★ v5.1.8（订正 R8）：**默认不再按星球硬拒绝**（回引擎口径）——
+		//     用户 2026-09-27 10:50 那一局实证：在星球 A 扫过的物种（本会话当场见证），
+		//     星图快速旅行到 B 之后，**引擎自己**（一举扫描仪）把同 species 的实例
+		//     画成绿 4/5 ⇒ 引擎的物种知识**跨星球生效**；而我们按「不在同一颗星球」
+		//     把它们挡成青色 = 用户第三次报的「传送后已扫描物品变青」。
+		//     ⇒ 物种表本来就有**存档作用域**（会话级、不落盘、读档时按锚点剪枝 +
+		//     落盘条目按见证时刻播种），跨星球扩散不会外溢到别的存档；
+		//     `FloraSpeciesPlanetScope=1` 仍保留 R5 的严格口径（只为对照 / 回退）。
+		//     `a_ws == 0`（当前引用读不到 worldspace）⇒ 不收紧（保守）。
 		bool FloraBaseKnown(std::uint32_t a_baseFid, std::uintptr_t a_ws)
 		{
 			if (!a_baseFid) {
@@ -7953,10 +7970,13 @@ namespace SAS
 			if (it == g_state.floraBaseKnow.end()) {
 				return false;
 			}
-			if (!g_cfg.floraSpeciesPlanetScope) {
-				return true;  // 旧行为（全局 species 表，对照用）
-			}
 			const auto& e = it->second;
+			if (!g_cfg.floraSpeciesPlanetScope) {
+				if (e.count != 0 && a_ws != 0 && !e.Seen(a_ws)) {
+					++g_state.floraBaseCrossPlanet;  // ★ v5.1.8：这次扩散跨了星球（旧口径会拒绝）
+				}
+				return true;  // ★ 默认口径 = 引擎口径（物种知识跨星球；作用域由存档边界管）
+			}
 			if (e.count == 0 || a_ws == 0) {
 				return true;  // 拿不到作用域 / 当前世界空间不知道 ⇒ 不收紧
 			}
@@ -8128,6 +8148,65 @@ namespace SAS
 				return a_e.epoch == g_state.floraSaveEpoch;
 			}
 			return g_cfg.floraMemoryScope == 1 && g_state.floraSaveEpoch <= 1;
+		}
+
+		// ================================================================
+		// ★★★ v5.1.8（订正 R8）：用落盘记忆**播种**按物种扩散表
+		// ----------------------------------------------------------------
+		// 为什么需要（用户 2026-09-27 10:48 那一局日志实证）：
+		//   外景里的星球目标引用是**运行时临时引用**（FormID `0xFF……`），
+		//   同一个物种的实例在**新会话 / 换场景后换了 FormID**（不是「同一个引用」）⇒
+		//   按引用的落盘记忆**命中不了**（那一局载入后 `记忆: 命中=2`，
+		//   271 个本已扫描过的植物全在青色）——而引擎自己一举扫描仪就把它们画成绿
+		//   ⇒ 那些绿是**本存档的事实**，我们只是「忘了」。
+		//   ⇒ 只靠引用级记忆，「继续同一存档 / 传送」必然先青后绿（用户三次报的现象）。
+		// 做法：把落盘记忆里**仍在作用域内**的绿条目按 **base（物种）**播种进物种表 ——
+		//   之后同 species 的实例（无论 FormID 是否变过）直接走 ⓪.2 ⇒ 一开始就是绿的，
+		//   不必等玩家举一次扫描仪。
+		//   ③ 播种只**新建**条目（不覆盖已有见证；已有条目只把 `days` 往早收）；
+		//   ④ `days` 沿用条目自己的值（0 = 旧格式 ⇒ 读档剪枝时用 legacy 锚，与条目同口径）；
+		//   ⑤ 不落盘（物种表本来就是会话级表；落盘记忆才是它的来源）。
+		// 安全性：只播种 `FloraEntryInScope()` 判为**本存档作用域内**的条目 ——
+		//   读回更早的存档时，属于「更新的时间线」的条目不算数（R5/R7 的规则不变）。
+		std::size_t SeedFloraBaseFromRefMemory(const char* a_reason)
+		{
+			if (!g_cfg.floraLearnPersist || g_cfg.floraMemoryScope != 1) {
+				return 0;  // 最严格口径（2）/ 旧行为（0）不播种
+			}
+			std::size_t seeded = 0;
+			std::size_t early  = 0;  // 已有条目被「往早收」的个数（诊断）
+			for (const auto& kv : g_state.floraRefKnow) {
+				const auto& e = kv.second;
+				if (!e.green || !e.baseFid || e.baseFid == 0xFFFFFF) {
+					continue;
+				}
+				if (!FloraEntryInScope(e)) {
+					continue;
+				}
+				const auto it = g_state.floraBaseKnow.find(e.baseFid);
+				if (it == g_state.floraBaseKnow.end()) {
+					if (g_state.floraBaseKnow.size() >= kFloraBaseKnowMax) {
+						REX::WARN("flora learn: 播种物种表时达上限 {}（异常）—— 停止播种", kFloraBaseKnowMax);
+						break;
+					}
+					FloraBaseScope s{};
+					s.days = e.days;  // 0 = 旧格式（剪枝时用 legacy 锚）
+					g_state.floraBaseKnow.emplace(e.baseFid, s);
+					++seeded;
+					++g_state.floraBaseSeeded;
+				} else if (e.days > 0.0f &&
+						   (it->second.days <= 0.0f || e.days < it->second.days)) {
+					it->second.days = e.days;  // 保留**最早**见证时刻（与 RememberFloraBase 一致）
+					++early;
+				}
+			}
+			if (seeded > 0 || early > 0) {
+				REX::INFO("flora learn: 按物种扩散表**播种** {} 个 base（{}；落盘记忆里共 {} 条，"
+						  "作用域内才会播种）⇒ 同 species 的实例**不必等举扫描仪**就是绿的"
+						  "（★ v5.1.8：引用会换 FormID，物种级才稳）",
+					seeded, a_reason, g_state.floraRefKnow.size());
+			}
+			return seeded;
 		}
 
 		// ★★★ v5.1：把「这个**引用**是否已扫描」写进按引用的单向记忆。
@@ -8403,6 +8482,9 @@ namespace SAS
 						  " 条 —— 那种粒度会把同 species / 同资源的**所有**实例一起涂绿、"
 						  "且跨存档生效，正是 v5.1 修掉的问题（想清空直接删这个文件）"
 					: std::string{});
+			// ★★★ v5.1.8（订正 R8）：载入完就用**作用域内**的绿条目播种物种表 ——
+			//   「继续同一存档 / 传送」时同 species 的实例（FormID 变了也算）直接是绿的。
+			SeedFloraBaseFromRefMemory("启动时载入落盘记忆");
 		}
 
 		// 新学到一条「这个引用已扫描」就追加写一行（文件不存在时创建；去重靠内存记忆）。
@@ -8683,15 +8765,23 @@ namespace SAS
 			g_state.floraFpVoided += voided;
 			g_state.floraFpClearedBase += pruned;
 
+			// ★★★ v5.1.8（订正 R8）：剪枝之后再播种一次 —— 属于「更新的时间线」的物种
+			//   已经被剪掉，剩下的（含落盘条目）都在本存档作用域内 ⇒ 用它们播种，
+			//   同 species 的实例（含 FormID 换过的）**不必等举扫描仪**就是绿的。
+			const auto seeded = SeedFloraBaseFromRefMemory(a_when);
+
 			REX::INFO("flora memory: 读档候选 #{}（{}）-> ★ **存档时间指纹**：本存档的游戏时间 = {:.5f} 天"
 					  "（上次锚点 = {}；存档 = {} / #{}）⇒ **不在本存档作用域**的条目 {} 条 / 仍有效 {} 条"
-					  "（物种表剪掉 {} 个 base）—— ★ **不删任何条目**（作用域可逆：换一个更新的存档就会自动回来）"
-					  "；★ v5.1.7（订正 R7：读档边界改用游戏时间指纹 —— 传送 / 继续同一存档不再误作废）",
+					  "（物种表剪掉 {} 个 base；播种后物种表 {} 个 base，本次新增 {} 个）"
+					  "—— ★ **不删任何条目**（作用域可逆：换一个更新的存档就会自动回来）"
+					  "；★ v5.1.8（订正 R8：物种表用落盘记忆播种 + 扩散不再按星球硬拒绝 —— "
+					  "传送 / 换星球后已扫描的 species 直接是绿的）",
 				a_loadNo, a_when, days,
 				floorOld >= 0.0f ? std::to_string(floorOld) : std::string("无"),
 				g_state.floraFpSaveName[0] ? g_state.floraFpSaveName : "?",
 				g_state.floraFpSaveNo,
-				voided, kept, pruned);
+				voided, kept, pruned,
+				g_state.floraBaseKnow.size(), seeded);
 			return true;
 		}
 
@@ -8775,6 +8865,9 @@ namespace SAS
 						  "重见证 {} 条）—— ★ v5.1.6（订正 R6：不再把传送误当作读档）",
 					loadNo, a_when, checked, confirmedBases.size(), noVerdict, skipped, curWs,
 					g_state.floraScopeRescoped);
+				// ★★★ v5.1.8（订正 R8）：这条路径也是「记忆保持有效」⇒ 顺手播种一次
+				//   （作用域内的落盘条目 ⇒ 物种表；FormID 换过的实例也能直接是绿的）。
+				SeedFloraBaseFromRefMemory(a_when);
 				return;
 			}
 
@@ -11731,7 +11824,7 @@ namespace SAS
 				//       （日志里有 `flora scan:` 细节行 + 一条 WARN）。
 				REX::INFO("  planet targets (窗口内): 未扫描={} 已扫描={} | 判据: 查询={} 命中={} 链失败={} 缓存={} 偏移=0x{:X}/0x{:X} "
 						  "| 引擎状态: 问={} 已扫描={} 未扫描={} 未知={} | 按引用记忆(★v5.1): 命中={} 绿={} 青={} 总量={} "
-						  "| 按物种扩散(★v5.1.2): 命中={} 物种表={} 新增={} 星球外拒={} ★v5.1.5 "
+						  "| 按物种扩散(★v5.1.8): 命中={} 物种表={} 新增={} 播种={} 跨星球放行={} 星球外拒={} "
 						  "| 记忆作用域(★v5.1.5): 读档={} 事件={} 跳过={} 翻案={} 重见证={} 链复核: 丢={}条/{}base 清物种表={} "
 						  "| 读档边界(★v5.1.6): 事件保留={} 确认base={} 推进={} "
 						  "| 存档指纹(★v5.1.7): 锚={}天 处理={} 作废={}条 表剪={} 失败={} 存档={} "
@@ -11745,7 +11838,10 @@ namespace SAS
 						  "引擎当场画「青」把过期绿降级的次数、`重见证` = 过期条目在本存档内被重新确认的次数、"
 						  "`链复核 丢` = 资源链证明「这个存档里没扫描」而丢掉的条目/base 数"
 						  "（★ v5.1.7 起**恒为 0**：不再删条目，只按作用域失效）、"
-						  "`星球外拒` = 按物种扩散被「不在同一颗星球」挡下的次数）——"
+						  "`星球外拒` = 按物种扩散被「不在同一颗星球」挡下的次数"
+						  "（★ v5.1.8 起**默认口径不再拒绝**：物种知识按引擎口径跨星球生效，"
+						  "`跨星球放行` 记的就是这种放行的次数；`播种` = 用落盘记忆填进物种表的 base 数，"
+						  "它让「传送 / 继续同一存档」时同 species 的实例**不必等举扫描仪**就是绿的））——"
 						  "如果读档在涨而丢/跳过不动，说明那些绿在本存档里**确实**是已扫描的；"
 						  "★ v5.1.6 起这条被用来判定「传送 / 读同一存档」——链复核一个 base 都证伪不了 ⇒ "
 						  "**不推进作用域、不清物种表、不丢条目**（`事件保留` 记的就是这种「传送被误报成读档」的次数；"
@@ -11769,6 +11865,7 @@ namespace SAS
 					g_state.floraRefHits, g_state.floraRefGreenNew, g_state.floraRefCyanNew,
 					g_state.floraRefKnow.size(),
 					g_state.floraBaseHits, g_state.floraBaseKnow.size(), g_state.floraBaseNew,
+					g_state.floraBaseSeeded, g_state.floraBaseCrossPlanet,
 					g_state.floraBasePlanetDenied,
 					g_state.floraSaveLoads, g_state.loadEvtTotal.load(std::memory_order_relaxed),
 					g_state.floraScopeSkipped, g_state.floraScopeDemoted, g_state.floraScopeRescoped,
