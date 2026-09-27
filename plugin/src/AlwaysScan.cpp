@@ -2389,6 +2389,12 @@ namespace SAS
 				std::uint8_t  progress = 0;      // 引擎给的进度（0..100）
 				std::uint64_t atMs     = 0;      // 查询时刻（TTL 用）
 				bool          ok       = false;  // 链路走通（false = 查询失败，TTL 较短）
+				// ★★★ 订正 R13：把 key1/key2 也存进缓存 —— 缓存命中时回填给调用方，
+				//   判绿行不再打印 0x0 假值（这是「失败路径不赋值」同源的**第三次**：
+				//   R10 的 `keyType=0x0`、R11 的 `key1=0x0`（失败分支）、
+				//   R13 的 `key1=0x0`（缓存分支）—— 都只带回了部分字段）。
+				std::uint32_t key1     = 0;
+				std::uint32_t key2     = 0;
 			};
 			std::unordered_map<std::uint32_t, FloraProgressRec> floraProgressByBase;
 			std::uint64_t floraProgQueries   = 0;  // 真正调用引擎链几次（诊断）
@@ -2417,6 +2423,13 @@ namespace SAS
 			//     会话开头的「判青最终行」吃光 ⇒ 判绿行（含 R11 的核心验收点
 			//     `判据 = 引擎扫描进度直读`）结构上不可能出现在日志里（即使判据在干活）。
 			std::uint32_t floraScanGreenProbes = 0;  // 判绿行（直读/记忆/扩散/捡漏/GetOutlineState）额度
+			//   ★★★ 订正 R13：判绿行 / 链判决行的额度再升级为「前 N 条 ∨ **每个 base 首条**」
+			//     （会话硬上限 64）—— R12 只加了「判绿行独立 8 条」，实测那 8 条被
+			//     14:03:16 / 14:03:27 两批目标（3 个 base）用光 ⇒ 之后 8 次「扫描→放下」
+			//     （到 14:07:22）**全程没有任何判绿日志**。下一次「某物种扫描后不绿」的
+			//     第一现场仍然会不可观测 —— 按 base 去重后每个新物种的首条必留痕。
+			std::unordered_set<std::uint32_t> floraScanGreenBases;  // 判绿行：已打过的 base
+			std::unordered_set<std::uint32_t> floraScanChainBases;  // 链判决行：已打过的 base
 			std::uint32_t floraScanDumps      = 0;  // ★ v4.26：已打的「指针窗口」取证条数
 			std::uint64_t floraScanShapeWarnAtMs = 0;
 			// ★★★ v4.28：`GetOutlineState(ref)` 主判据的计数（诊断 —— 一眼看它是不是在干活）
@@ -4637,6 +4650,9 @@ namespace SAS
 					  "（14 = 空表 = 这个物种没扫过）；probe 失败行照实打印 key1/key2；"
 					  "每 stage 首条 + 首条成功必打；判绿行独立额度；`冲突=` 计数已实现"
 					  "（这两局 R11 的前 8 条 probe 全是 stage=8、判绿行一条都没留下 —— 本次修的就是可观测性）；"
+					  "★★ **订正 R13（只改诊断）：判绿行 / 链判决行额度升级为「前 N 条 ∨ 每个 base 首条」**"
+					  "（R12 实测 8 条判绿额度被 3 个 base 用光 ⇒ 之后 8 次「扫描→放下」零日志）；"
+					  "**直读缓存命中回填 key1/key2**（此前打印 0x0 假值 —— 「只带回部分字段」第三次）；"
 					  "按 base 缓存（绿 = 10 分钟 / 未满 = 见 FloraUnscannedTtlMs）、"
 					  "读档时清缓存；签名 / 形状校验不过会自动回退（日志搜 `flora progress:`）",
 				g_cfg.floraEngineProgress);
@@ -8347,6 +8363,10 @@ namespace SAS
 					++g_state.floraProgCacheHits;
 					r.ok       = rec.ok;
 					r.progress = rec.progress;
+					// ★★★ 订正 R13：回填 key1/key2（缓存里现在有它们）——
+					//   缓存命中的判绿行不再打印 0x0 假值。
+					r.key1     = rec.key1;
+					r.key2     = rec.key2;
 					return r;
 				}
 				g_state.floraProgressByBase.erase(it);
@@ -8417,7 +8437,8 @@ namespace SAS
 			if (g_state.floraProgressByBase.size() >= kFloraProgressCacheMax) {
 				g_state.floraProgressByBase.clear();  // 兜异常增长（正常情况下只有几十条）
 			}
-			g_state.floraProgressByBase.emplace(a_baseFid, State::FloraProgressRec{ r.progress, a_now, r.ok });
+			g_state.floraProgressByBase.emplace(a_baseFid,
+				State::FloraProgressRec{ r.progress, a_now, r.ok, r.key1, r.key2 });
 			return r;
 		}
 
@@ -8430,6 +8451,34 @@ namespace SAS
 			const auto n = g_state.floraProgressByBase.size();
 			g_state.floraProgressByBase.clear();
 			REX::INFO("flora progress: 进度缓存作废（{}，清了 {} 条 base）-> 下一轮重新问引擎", a_reason, n);
+		}
+
+		// ★★★ 订正 R13：诊断行的**每 base 首条**额度（判绿行 / 链判决行各一组）——
+		//   条件 = 「前 FloraScanProbeMax 条（默认 8）」∨「该 base 的首条」，
+		//   并受会话硬上限 `kFloraScanProbeHardMax` 约束；FloraScanProbeMax=0 ⇒ 全关。
+		//   ★ 教训（R12 实测，2026-09-27 13:59~14:08 那一局）：判绿行独立 8 条额度
+		//     被 14:03:16 / 14:03:27 两批目标（base=0x25232B / 0x185479 / 0x185489）
+		//     用光 ⇒ 之后 8 次「扫描 → 放下」全程没有任何判绿日志 —— 下一次
+		//     「某物种扫描后不绿」的第一现场仍然会不可观测。按 base 去重后，
+		//     每个新物种的首条必留痕（日志量 = 前 8 条 + 一局遇到的 base 数）。
+		constexpr std::uint32_t kFloraScanProbeHardMax = 64;
+		bool FloraScanDetailProbeAllowed(std::unordered_set<std::uint32_t>& a_seen,
+			std::uint32_t& a_count, std::uint32_t a_baseFid)
+		{
+			if (g_cfg.floraScanProbeMax <= 0 || a_count >= kFloraScanProbeHardMax) {
+				return false;
+			}
+			const bool quotaFirst = a_count < static_cast<std::uint32_t>(g_cfg.floraScanProbeMax);
+			const bool baseFirst  = a_seen.find(a_baseFid) == a_seen.end();
+			if (!quotaFirst && !baseFirst) {
+				return false;
+			}
+			++a_count;
+			a_seen.insert(a_baseFid);
+			if (a_seen.size() > 1024) {
+				a_seen.clear();  // 兜异常增长（正常一局几十个 base）
+			}
+			return true;
 		}
 
 		// ★★★ v4.33 / v5.1 / v5.1.7：学习表落盘（定义在下面；这里先声明，因为
@@ -9735,9 +9784,10 @@ namespace SAS
 					g_state.floraScannedCache.emplace(a_ref, State::FloraScanRec{ true, now, fid, 7 });
 					// ★★★ 订正 R12：判绿行走**独立额度**（R11 两局里 8 条额度全被会话
 					//   开头的判青最终行吃光 ⇒ 这一行在日志里结构上不可能出现）。
-					if (g_cfg.floraScanProbeMax > 0 &&
-						g_state.floraScanGreenProbes < static_cast<std::uint32_t>(g_cfg.floraScanProbeMax)) {
-						++g_state.floraScanGreenProbes;
+					//   ★★★ 订正 R13：额度再升级为「前 N 条 ∨ **每个 base 首条**」
+					//   （R12 实测那 8 条被 3 个 base 用光 ⇒ 之后 8 次「扫描→放下」零日志）。
+					if (FloraScanDetailProbeAllowed(g_state.floraScanGreenBases,
+							g_state.floraScanGreenProbes, fid)) {
 						REX::INFO("flora scan: ref=0x{:X} base=0x{:X} 判据 = 引擎扫描进度直读（★ v5.2）"
 								  "：percent={}/100（key1=0x{:X} key2=0x{:X}）-> 已扫描 ⇒ 状态 {}（原版「已扫描」绿）",
 							a_ref->GetFormID(), fid, pr.progress, pr.key1, pr.key2, FloraScannedState());
@@ -9779,9 +9829,8 @@ namespace SAS
 					RememberFloraBase(fid, WorldspaceOfRef(a_ref), "引用级记忆命中（跨会话动态激活）");
 					g_state.floraScannedCache.emplace(a_ref,
 						State::FloraScanRec{ true, now, fid, 4 });
-					if (g_cfg.floraScanProbeMax > 0 &&
-						g_state.floraScanGreenProbes < static_cast<std::uint32_t>(g_cfg.floraScanProbeMax)) {
-						++g_state.floraScanGreenProbes;
+					if (FloraScanDetailProbeAllowed(g_state.floraScanGreenBases,
+							g_state.floraScanGreenProbes, fid)) {
 						REX::INFO("flora scan: ref=0x{:X} base=0x{:X} 判据 = 按引用记忆（★ v5.1）"
 								  "-> 已扫描 ⇒ 状态 {}（原版「已扫描」绿）",
 							a_ref->GetFormID(), fid, FloraScannedState());
@@ -9812,9 +9861,8 @@ namespace SAS
 				++g_state.floraLearnedHits;
 				g_state.floraScannedCache.emplace(a_ref,
 					State::FloraScanRec{ true, now, fid, 6 });
-				if (g_cfg.floraScanProbeMax > 0 &&
-					g_state.floraScanGreenProbes < static_cast<std::uint32_t>(g_cfg.floraScanProbeMax)) {
-					++g_state.floraScanGreenProbes;
+				if (FloraScanDetailProbeAllowed(g_state.floraScanGreenBases,
+						g_state.floraScanGreenProbes, fid)) {
 					REX::INFO("flora scan: ref=0x{:X} base=0x{:X} 判据 = 按物种扩散（★ v5.1.2："
 							  "同 species / 同资源已被权威确认；★ v5.1.5：同一颗星球）"
 							  "-> 已扫描 ⇒ 状态 {}（原版「已扫描」绿）",
@@ -9865,9 +9913,8 @@ namespace SAS
 					if (g_cfg.floraUseMemory) {
 						RememberFloraBase(fid, WorldspaceOfRef(a_ref), "状态表捡漏命中（动态激活）");
 					}
-					if (g_cfg.floraScanProbeMax > 0 &&
-						g_state.floraScanGreenProbes < static_cast<std::uint32_t>(g_cfg.floraScanProbeMax)) {
-						++g_state.floraScanGreenProbes;
+					if (FloraScanDetailProbeAllowed(g_state.floraScanGreenBases,
+							g_state.floraScanGreenProbes, fid)) {
 						REX::INFO("flora scan: ref=0x{:X} base=0x{:X} 判据 = 引擎状态表捡漏"
 								  "（引擎亲手画过 state 4/5）-> 已扫描 ⇒ 状态 {}（原版「已扫描」绿）",
 							a_ref->GetFormID(), fid, FloraScannedState());
@@ -9914,9 +9961,8 @@ namespace SAS
 					//   ★ v5.1：只记这个引用，同 base 的其它实例照常按各自的判据走。
 					RememberFloraRef(a_ref, a_base, true, "引擎状态 GetOutlineState(ref)=2（原生 IsScanned）");
 					g_state.floraScannedCache.emplace(a_ref, State::FloraScanRec{ true, now, fid, 1 });
-					if (g_cfg.floraScanProbeMax > 0 &&
-						g_state.floraScanGreenProbes < static_cast<std::uint32_t>(g_cfg.floraScanProbeMax)) {
-						++g_state.floraScanGreenProbes;
+					if (FloraScanDetailProbeAllowed(g_state.floraScanGreenBases,
+							g_state.floraScanGreenProbes, fid)) {
 						REX::INFO("flora scan: ref=0x{:X} base=0x{:X} 判据 = 引擎自己的扫描状态 "
 								  "`GetOutlineState(ref)`=2（= 原生 IsScanned）-> 已扫描 ⇒ 状态 {}（原版「已扫描」绿）",
 							a_ref->GetFormID(), fid, FloraScannedState());
@@ -9966,9 +10012,10 @@ namespace SAS
 			}
 			g_state.floraScannedCache.emplace(a_ref, State::FloraScanRec{ result, now, fid, 0 });
 
-			if (g_cfg.floraScanProbeMax > 0 &&
-				g_state.floraScanProbes < static_cast<std::uint32_t>(g_cfg.floraScanProbeMax)) {
-				++g_state.floraScanProbes;
+			// ★★★ 订正 R13：链判决行（判青 / 判绿最终行）同样升级为「前 N 条 ∨ 每 base 首条」——
+			//   用户报的主症状是「已扫描却显示青」，这条行正是「为什么青」的第一现场；
+			//   R12 实测 8 条额度全在会话开头（同一批 base）用光，之后新物种一条都留不下。
+			if (FloraScanDetailProbeAllowed(g_state.floraScanChainBases, g_state.floraScanProbes, fid)) {
 				char res[96];
 				std::size_t p = 0;
 				for (std::uint32_t i = 0; i < chain.irESCount && p + 16 < sizeof(res); ++i) {
@@ -12630,7 +12677,7 @@ namespace SAS
 						  "| 读档边界(★v5.1.6): 事件保留={} 确认base={} 推进={} "
 						  "| 存档指纹(★v5.1.7): 锚={}天 处理={} 作废={}条 表剪={} 失败={} 存档={} "
 						  "| 引擎状态表: 条目={} 读={} 绿={} 青={} 无条目={} "
-						  "| 引擎进度直读(★v5.2/订正R12): 问={} 满={} 未满={} 失败={} 缓存命中={} 冲突={} "
+						  "| 引擎进度直读(★v5.2/订正R13): 问={} 满={} 未满={} 失败={} 缓存命中={} 冲突={} "
 						  "兜底K1={} keyType=0x{:X}(现读) keyZero={} ready={} 记忆层={} "
 						  "| 学习表: 沿用={} 捡漏={} 落盘={} 写入={} 旧格式忽略={} 无时间={}"
 						  "（★ v5.1：按引用记忆 = 记忆粒度是引用；★ v5.1.2：按物种扩散 = 同 species / "

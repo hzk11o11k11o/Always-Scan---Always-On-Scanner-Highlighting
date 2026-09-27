@@ -5,7 +5,7 @@
 
 Version  : 2.0  (plugin build 5.1.0)
            2.0 = the mod brings its own outline colour channels (described
-           below), plus fourteen fixes, all from player reports.
+           below), plus fifteen fixes, all from player reports.
            (1) "Ores and plants are green before *and* after scanning."
                The mod remembers a confirmed "surveyed" verdict so a target
                cannot fall back to cyan (added in 1.7.9 / 1.8.1), but that
@@ -394,6 +394,20 @@ Version  : 2.0  (plugin build 5.1.0)
                      effect could not even be seen in the log). Fix (13)'s
                      read itself is unchanged - this build changes
                      diagnostics only.
+                     (15) Diagnostics only - no behaviour change. Reviewing a
+                     long session showed the "judged green" log lines (fix
+                     (14) gave them a budget of eight) being spent on three
+                     species within the first two minutes, so the rest of the
+                     session logged nothing - exactly the evidence you would
+                     want if you ever have to report "this one stays cyan".
+                     Two changes: every species now gets its first "judged
+                     green" line logged (plus the original first eight; hard
+                     cap 64 per session), the "why is this one cyan" lines get
+                     the same per-species treatment, and cached answers print
+                     the real key ids instead of 0x0 placeholders (the cache
+                     simply did not store them - the same "only part of the
+                     data comes back" trap as in (13) and (14)). Fix (13)'s
+                     read itself, and every verdict, is unchanged.
                      Also in 2.0 (the headline feature) - the mod brings its own
                      outline colour channels instead of borrowing the game's.
            The game has eleven outline "states"
