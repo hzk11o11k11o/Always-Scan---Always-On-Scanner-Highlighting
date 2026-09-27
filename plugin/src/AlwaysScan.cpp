@@ -8001,7 +8001,14 @@ namespace SAS
 		bool ReadGameDays(float* a_out)
 		{
 			*a_out = 0.0f;
-			auto* cal = RE::Calendar::GetSingleton();
+			// 直接走 `REL::Relocation` 而不是 `Calendar::GetSingleton()`：先核对
+			//   「地址库解析出来的地址非空」再去取单例指针（万一 ID 解析失败，
+			//   commonlibsf 的写法会直接解引用一个空地址）。
+			static ::REL::Relocation<RE::Calendar**> calVar{ RE::ID::Calendar::Singleton };
+			if (!calVar.address()) {
+				return false;
+			}
+			auto* cal = *calVar;
 			if (!cal || !IsReadable(cal, 0x40)) {
 				return false;
 			}
