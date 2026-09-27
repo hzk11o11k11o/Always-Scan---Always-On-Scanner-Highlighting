@@ -5,7 +5,7 @@
 
 Version  : 2.0  (plugin build 5.1.0)
            2.0 = the mod brings its own outline colour channels (described
-           below), plus five fixes, all from player reports.
+           below), plus six fixes, all from player reports.
            (1) "Ores and plants are green before *and* after scanning."
                The mod remembers a confirmed "surveyed" verdict so a target
                cannot fall back to cyan (added in 1.7.9 / 1.8.1), but that
@@ -108,6 +108,34 @@ Version  : 2.0  (plugin build 5.1.0)
                line now breaks the scan time down: `timing2: ... (refs/scan:
                cur=... ring=... | walk=...ms loot=...ms flora=...ms) |
                sync ... (unh=... add=... 3D=...ms)`.
+           (6) "The frame rate looks fine when I stand still, but stutters in
+               busy scenes - combat, or while moving when new items get
+               outlined." Fixed 2026-09-27. Fix (5) assumed the scan cost was
+               proportional to the number of objects it walks, but the log
+               disproved that: the same ~1540 objects cost 10 ms while
+               standing still and 63 ms while moving. What actually changes is
+               the price of a single operation: the mod reads game memory and
+               checks it is readable through ReadProcessMemory and
+               VirtualQuery, and both of those have to take the process
+               address-space lock. While the game streams the world (walking,
+               combat) that lock is busy, so a single call goes from ~10 us to
+               a few hundred microseconds - and a scan makes hundreds of them.
+               Both paths are now lock-free: memory is read directly with a
+               hardware-exception guard, and the readability check probes one
+               byte per page. On top of that, the inventory check that decides
+               whether a container or corpse is empty (which ran for every one
+               of them, five times a second) is now cached per object and
+               invalidated by the actual events - taking or putting an item,
+               opening or closing the loot UI - so "loot it empty and the
+               highlight goes out" still reacts exactly as before. A startup
+               self-test verifies the direct reads (including that an
+               unreadable address is caught safely) and prints the cost of
+               both methods in the log; if it ever fails, the mod falls back
+               to the old behaviour automatically. Two new ini keys: FastReadMem=1
+               (0 = old behaviour) and LootCacheTtlMs=1500 (0 = check every
+               pass). The stats line gained a `timing3:` row that breaks the
+               scan down in microseconds and reports how much of the time was
+               spent stalled rather than working.
            Also in 2.0 (the headline feature) - the mod brings its own
            outline colour channels instead of borrowing the game's.
            The game has eleven outline "states"
@@ -638,6 +666,25 @@ Most useful options:
   ResourceByKeyword=1   recognise "resources" from the item record's own
                         ResourceType keywords (default on).  0 = every MISC
                         item counts as misc (the 1.5 behaviour).
+  FastReadMem=1         read game memory directly, guarded by a
+                        hardware-exception handler, instead of calling
+                        ReadProcessMemory; and check whether memory is
+                        readable by probing one byte per page instead of
+                        calling VirtualQuery.  Both of those APIs take the
+                        process address-space lock, which the game holds while
+                        it streams the world - that is what made moving /
+                        combat scenes stutter (see fix (6) at the top of this
+                        file).  A startup self-test verifies the direct reads
+                        and prints both methods' cost in the log.
+                        0 = the old behaviour (useful for comparison only).
+  LootCacheTtlMs=1500   how long an "is this container / corpse empty" verdict
+                        is reused (milliseconds).  The cache is dropped
+                        immediately when an item is taken or put, or when the
+                        loot UI opens / closes, so looting a container empty
+                        still puts the highlight out exactly as quickly as
+                        before.  It only cuts the number of memory reads per
+                        pass (30+ down to a handful).  0 = check every
+                        container / corpse on every pass.
   EnableWeapon=1 ...    per-category on/off switches (weapon / apparel /
   EnableResource=1      ammoaid / note / resource / loot(misc) / container /
                         device / door / flora / corpse).

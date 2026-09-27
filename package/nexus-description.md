@@ -19,7 +19,7 @@
 | --- | --- |
 | **Mod name** | `Always Scan - Always-On Scanner Highlighting (SFSE)` |
 | **Summary**（约 250 字符以内） | `Keep the scanner highlight on at all times. No need to hold the handheld scanner: everything inside a configurable radius gets the vanilla outline, color-coded by category. Full-radius highlighting, one toggle hotkey, fully configurable via INI. SFSE plugin.` |
-| **Version** | `2.0`（引擎 build 5.1.0；Nexus 上的 1.0 → … → 1.8.1 → 2.0。★ 2026-09-27 又修了三个坑：「扫描后不变色」×2 + 「帧数仍有下降」，**公开版号仍按用户要求保持 2.0**） |
+| **Version** | `2.0`（引擎 build 5.1.0；Nexus 上的 1.0 → … → 1.8.1 → 2.0。★ 2026-09-27 又修了四个坑：「扫描后不变色」×2 + 「帧数仍有下降」+「**动态场景（走动 / 战斗）卡顿**」，**公开版号仍按用户要求保持 2.0**） |
 | **Category** | `Gameplay`（Alternate suggestion: `Items and Objects - Gameplay`） |
 | **Requirements（依赖）** | `Starfield Script Extender (SFSE) 0.2.21+`、`(1.16.244.0) SFSE Address Library`、游戏版本 `1.16.244.0` |
 | **主文件（Main file）** | `StarfieldAlwaysScan-2.0.zip` |
@@ -246,6 +246,17 @@ Built with **SFSE** and **CommonLibSF**. Huge thanks to their authors and to eve
   ④ 修「帧数仍有下降」—— **环内 cell 分片遍历**（每轮只扫一片、玩家所在 cell 永远全扫、
   小 cell 不分片，`RingSliceMaxRounds=5`）：单轮环内遍历量降到约 1/5，
   分片周期被自动钳在「离开宽限期」之内 ⇒ 永不闪烁；
+  ⑤ 修「**静态场景帧数正常、动态场景（战斗 / 走动时扫到新的高亮物品）卡顿**」——
+  ④ 的假设（耗时 ∝ 遍历量）**被日志证伪**：同样 ~1540 个引用，站着不动 10ms、
+  走动 63ms，而同窗口的引擎调用耗时两边都是 7ms。真正变贵的是**单次内存操作**：
+  MOD 读游戏内存 / 判断可读性用的 `ReadProcessMemory` 与 `VirtualQuery` 都要拿
+  **进程地址空间锁**，而游戏流式加载（走动 / 战斗）时那把锁被抢 ⇒ 单次从 ~10µs
+  涨到几百 µs，一轮几百次就是几十毫秒。两条路现在都**不进内核**：直接读 + 硬件异常
+  兜底（`FastReadMem=1`，启动自检会验证并打印两种读法的耗时对照，失败自动回退）；
+  另外「容器 / 尸体是否搜空」的库存检查**按对象缓存**（`LootCacheTtlMs=1500`），
+  失效靠**事件**（拿 / 放物品、搜刮界面开闭）⇒ 「拿空即灭」的延迟与旧版完全一致。
+  统计行新增 `timing3:`（µs 级细分 + 调用次数 + **卡顿检测** + 最慢一轮的墙钟 / CPU），
+  下次若还卡，一行日志就能判定「是我们的指令慢，还是线程被抢 / 等内存」；
 - **★★★ 1.8.1：修「已扫描植物低概率变回青色」的根** —— 1.7.9 已经加了「单向记忆」，
   但实测日志发现它有三个洞：① 每次**载入 / 换场景**都被清空（游戏「载入画面关闭」事件）；
   ② 只活在内存里 ⇒ **每次重开游戏都要再开一遍扫描仪重新学**；③「重问失败时沿用旧结论」

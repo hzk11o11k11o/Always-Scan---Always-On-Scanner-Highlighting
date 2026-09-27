@@ -9,6 +9,7 @@
 #include "SFSE/SFSE.h"
 
 #include <cstdint>
+#include <cstring>
 #include <functional>
 #include <string>
 #include <string_view>

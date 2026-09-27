@@ -719,6 +719,38 @@ namespace SAS
 		constexpr std::uint32_t kRingSliceMaxRounds = 5;
 		constexpr std::uint32_t kRingSliceMinRefs   = 2000;
 
+		// ================================================================
+		// ★★★ 2026-09-27 深夜（订正 R4）：把热路径上的**内核调用**全部拿掉 ——
+		//   治用户报告的「**静态场景帧数正常，动态场景（战斗 / 走动时扫到新的高亮
+		//   物品）卡顿**」。
+		// ================================================================
+		// 起因（同一局日志，2026-09-27 08:32~08:48）：
+		//   · 08:37 静止：cur+ring = 1538 个引用 ⇒ `loop avg=10ms`、`walk=10ms`；
+		//   · 08:47 走动：cur+ring = 1545 个引用 ⇒ `loop avg=63ms`、`walk=63ms`。
+		//   遍历量 / 候选数 / 判空次数**几乎一模一样**，墙钟差 6 倍 ⇒ R3 的假设
+		//   （「耗时 = 遍历量 × 常数」）**被自己的日志证伪**：差的不是「做了多少事」，
+		//   而是「每件事多贵」。
+		//   进一步看：同一窗口里 `sync`（引擎调用）两边都是 7ms、`3D复检` 都是
+		//   700~800 次 —— 说明**引擎调用没变慢**，变慢的只有 loop 里那一段。
+		//   loop 里唯一会「进制内核」的东西是：
+		//     · `SafeReadMem` → `ReadProcessMemory`（容器 / 尸体判空的库存链，
+		//        一轮几百次）；`IsReadable` → `VirtualQuery`（形状校验 / 探针）。
+		//   两者都要拿**进程地址空间锁**；游戏流式加载（走动 / 战斗 = 大量
+		//   commit / decommit / remap）时那把锁被抢，单次调用从 ~10µs 涨到几百 µs
+		//   （按日志反推 64ms ÷ ~170 次）⇒ 每轮多出几十毫秒 = 可见卡顿。
+		// 治法（两条都默认开、都能一行 INI 回退）：
+		//   ① `FastReadMem=1`：安全读改成 **SEH 兜底 + 直接读**（正常内存零内核调用）；
+		//      可读性校验改成**逐页 1 字节直读探针**（页粒度 = 保护的粒度）。
+		//   ② `LootCacheTtlMs=1500`：容器 / 尸体判空**按引用缓存**，失效靠事件
+		//      （拿 / 放物品、容器界面开关）⇒ 一轮的库存链调用从 30+ 次降到个位数。
+		// 另外把计时精度从 ms 换成 µs（`NowUs`）：原来每次 `NowMs() - t0` 取整，
+		//   单次几百 µs 的判空 / 分类全被抹成 0 —— R3 的 `loot=0ms flora=2ms`
+		//   就是这么来的（**假象**：真实开销躲在 walk 里看不见）。
+		constexpr std::size_t kLootMemoMax = 512;  // 判空缓存的条目上限（超了整体清空）
+		// 「遍历内部空档」的阈值（µs）：把「我们的指令慢」与「线程被抢 / 等内存」
+		//   分开。每 64 个引用取一次时刻，间隔 ≥ 这个值就记一次 `卡顿`。
+		constexpr std::uint64_t kStallThresholdUs = 3000;
+
 		// ★★ v4.7：引用数「轻微变化」的容差（治「行走时不扫描」的第二个来源）
 		//   旧判据：`arr.size != lastRefsSize` ⇒ 立刻 `stableRounds = 0` 并 return，
 		//   而 `stableRounds` 要连续 2 轮才放行 ⇒ **每次长度变化要跳过约 3 轮（≈600ms）**。
@@ -1634,6 +1666,24 @@ namespace SAS
 			//     Rescan 只认这个有效值 —— 见 LoadConfig 与启动日志那一行。
 			int           ringSliceMaxRounds = static_cast<int>(kRingSliceMaxRounds);
 			std::uint32_t ringSliceRoundsEff = kRingSliceMaxRounds;  // 钳制后的有效片数（≥1）
+
+			// ★★★ 订正 R4（性能）：两把削减「每轮扫描里最贵那一块」的开关。
+			//   背景（用户 2026-09-27：「静态场景帧数正常，动态场景（战斗 / 走动时扫到
+			//   新的高亮物品）卡顿」）：同一局日志里 loop 的耗时**与遍历量无关**
+			//   （08:37 静止：1538 引用 → 7ms；08:47 走动：1545 引用 → 63ms），
+			//   也与判空次数无关（两边都在 30 次/轮 量级）⇒ 差的是**单次操作的墙钟成本**。
+			//   这条路径上唯一会「进制内核」的操作就是 SafeReadMem（ReadProcessMemory）
+			//   与 IsReadable（VirtualQuery）—— 两者都要拿**进程地址空间锁**；
+			//   游戏流式加载（走动 / 战斗 = 大量 commit / decommit）时那把锁被抢，
+			//   单次调用可以从 ~10µs 涨到 ~300µs（按日志反推），每轮几百次 ⇒ 几十毫秒。
+			//   ⇒ ① `fastReadMem`：改成 SEH 兜底 + 直接读（正常内存零内核调用）；
+			//      ② `lootCacheTtlMs`：容器 / 尸体判空结果按引用缓存（见下）。
+			bool          fastReadMem    = true;
+			// 判空缓存 TTL（毫秒）。**权威的失效信号是事件**（拿 / 放物品的
+			// TESContainerChangedEvent、容器界面开关）—— 它们一发生就整体作废缓存；
+			// TTL 只是兜住「没有事件的变化」（比如别的角色 / 脚本动了容器内容）。
+			// 0 = 关（每轮实时判空，退回 v5.1-R3 行为）。
+			int           lootCacheTtlMs = 1500;
 			// ★★★ v4.29：放下扫描仪后的「恢复提速」窗口（治「植物 / 矿石比其它物品慢一拍」）。
 			//   resyncBoostMs = 提速窗口时长（0 = 关掉，退回旧行为）；
 			//   resyncBoostBudget = 窗口内每轮重挂预算（0 = 关掉，用 MaxOutlineOpsPerScan）。
@@ -1972,9 +2022,15 @@ namespace SAS
 			std::uint32_t invRounds    = 0;  // 已经尝试过多少轮（到 kInvCalibMaxRounds 才放弃）
 
 			// --- v2.2：耗时统计（每次统计日志之间重置，用来定位卡顿）---
-			std::uint64_t scanMsTotal     = 0;  // 窗口内 Sum(每轮 Rescan 耗时)
-			std::uint64_t scanMsMax       = 0;  // 窗口内最大单轮耗时（这才是卡顿的感觉来源）
-			std::uint32_t scanMsSamples   = 0;
+			//   ★★★ 订正 R4：**单位从 ms 改成 µs**（见下面的长注释）。
+			std::uint64_t scanMsTotal     = 0;  // 窗口内 Sum(每轮 Rescan 耗时，µs)
+			std::uint64_t scanMsMax       = 0;  // 窗口内最大单轮耗时（这才是卡顿的感觉来源，µs）
+			std::uint32_t scanMsSamples   = 0;  // 窗口内 Rescan 调用次数（**含**早退的那些）
+			// ★★★ 订正 R4：真正跑完遍历的轮数 —— 所有分段平均都必须除以它。
+			//   原来一律除以 scanMsSamples（含「形状没过 / 还在等稳定 / 静置期」等早退轮），
+			//   早退轮的分段耗时是 0 ⇒ 把平均值**稀释**了（诊断时会低估真实开销）。
+			std::uint32_t scanFullSamples = 0;
+			std::uint32_t scanRefsLast    = 0;  // 最近一轮实际遍历的引用数（诊断）
 			std::uint64_t opsThisScan     = 0;  // 最近一轮实际发出的引擎调用数
 			std::uint64_t opsDeferred     = 0;  // 因为预算不够而推迟到下一轮的调用数
 			bool          loadingNow      = false;
@@ -1985,14 +2041,14 @@ namespace SAS
 			//   · loop  = 遍历全部引用挑目标（纯内存读）
 			//   · sync  = 挂/摘（SyncNativeOutline，引擎调用集中在这一段）
 			//   · unh / add = 其中 UnoutlineRef / OutlineRef 各占多少
-			std::uint64_t tShapeMs  = 0;
-			std::uint64_t tShapeMax = 0;
-			std::uint64_t tLoopMs   = 0;
-			std::uint64_t tLoopMax  = 0;
-			std::uint64_t tSyncMs   = 0;
-			std::uint64_t tSyncMax  = 0;
-			std::uint64_t tUnhMs    = 0;
-			std::uint64_t tAddMs    = 0;
+			std::uint64_t tShapeUs  = 0;
+			std::uint64_t tShapeMaxUs = 0;
+			std::uint64_t tLoopUs   = 0;
+			std::uint64_t tLoopMaxUs = 0;
+			std::uint64_t tSyncUs   = 0;
+			std::uint64_t tSyncMaxUs = 0;
+			std::uint64_t tUnhUs    = 0;
+			std::uint64_t tAddUs    = 0;
 			std::uint64_t vqCalls   = 0;
 
 			// --- ★★★ 2026-09-27（订正 R3）：把 loop / sync 再拆一层 —— 定位「帧数仍有下降」---
@@ -2004,17 +2060,64 @@ namespace SAS
 			//   按 ~0.9µs/引用 正好是 50ms 量级）。所以这一层拆出来回答两个问题：
 			//     ① refsWalkCur / refsWalkRing —— 每轮到底遍历了多少引用（分开统计）；
 			//     ② tWalk / tLoot / tFlora / t3D —— 时间分别花在哪一段。
-			//      · tWalkMs  = loop 内「遍历引用 + 分类 + 距离」整段时间（**含**下面两个子项）
-			//      · tLootMs  = 其中 RefLootState（容器 / 尸体判空；SafeReadMem 走库存清单）
-			//      · tFloraMs = 其中 FloraTargetScanned / ProbeFloraEngineState（植物 / 矿脉判据）
-			//      · t3DMs    = sync 内 3D 复检（RefGet3D × Verify3DPerScan）
-			std::uint64_t tWalkMs      = 0;
-			std::uint64_t tLootMs      = 0;
-			std::uint64_t tFloraMs     = 0;
-			std::uint64_t t3DMs        = 0;
+			//      · tWalk    = loop 内「遍历引用 + 分类 + 距离」整段时间（**含**下面几个子项）
+			//      · tLoot    = 其中 RefLootState（容器 / 尸体判空）
+			//      · tFlora   = 其中 FloraTargetScanned / ProbeFloraEngineState（植物 / 矿脉判据）
+			//      · t3D      = sync 内 3D 复检（RefGet3D × Verify3DPerScan）
+			//   ★★★ 订正 R4：单位 = **µs**，并新增 tClassify / tProbe / 卡顿检测 ——
+			//     因为 R3 的 ms 计时**按次取整**（`NowMs() - t0` 每次 < 1ms 就记 0），
+			//     而判空 / 植物 / 分类都是「一次几百 µs × 几十次」的形态 ⇒ 原来的
+			//     `loot=0ms flora=2ms` 是**假象**（真实开销全被抹平到 walk 里）。
+			//     R4 起全部用 QueryPerformanceCounter 的 µs 计时。
+			std::uint64_t tWalkUs      = 0;
+			std::uint64_t tLootUs      = 0;
+			std::uint64_t tFloraUs     = 0;
+			std::uint64_t tClassifyUs  = 0;  // ClassifyRef（含 ACHR 判决探针 / 分类链）
+			std::uint64_t tProbeUs     = 0;  // ContProbe / DcWatchAdd / LootProbe（诊断探针）
+			std::uint64_t t3DUs        = 0;
 			std::uint64_t refsWalkCur  = 0;  // 窗口内遍历的「当前 cell」引用数（求和）
 			std::uint64_t refsWalkRing = 0;  // 窗口内遍历的「环内 cell」引用数（求和）
 			std::uint64_t ringSliceDeferred = 0;  // 窗口内因分片而推到下轮的引用数（诊断）
+
+			// --- ★★★ 订正 R4：卡顿检测（遍历内部的「空档」）---
+			//   每 64 个引用取一次时刻；相邻两次之间的间隔 ≥ kStallThresholdUs 记一次卡顿。
+			//   用途：把「遍历本身慢」与「主线程被抢 / 内存卡住」分开 ——
+			//   若 `卡顿合计` 占了 walk 的大头，就不是我们的指令慢，而是调度 / 内存。
+			std::uint64_t stallCheckUs = 0;
+			std::uint32_t stallCount   = 0;
+			std::uint64_t stallUs      = 0;
+			std::uint64_t stallMaxUs   = 0;
+			// 调用计数（窗口内求和；每次统计日志清零）—— 「耗时」必须配「分母」
+			std::uint32_t cntLoot      = 0;  // RefLootState 真实执行次数（不含缓存命中）
+			std::uint32_t cntLootMemo  = 0;  // 判空结果来自缓存（省掉）
+			std::uint32_t cntFlora     = 0;  // FloraTargetScanned 次数
+			std::uint32_t cntClassify  = 0;  // ClassifyRef 次数
+			std::uint32_t cntProbe     = 0;  // 诊断探针次数
+			// 直读撞异常 / 走内核读的**上一次快照**（与全局计数相减得到窗口内增量）
+			std::uint64_t sehFaults    = 0;
+			std::uint64_t kernelReads  = 0;
+			// 最慢一轮的快照（µs；供 timing3 行打印 —— 卡顿是「最慢那几轮」造成的）
+			std::uint64_t worstScanUs   = 0;
+			std::uint64_t worstScanRefsSum = 0;  // 完成轮遍历量的和（算「每轮平均引用数」用）
+			std::uint32_t worstRefs     = 0;
+			std::uint64_t worstWalkUs   = 0;
+			std::uint64_t worstLootUs   = 0;
+			std::uint64_t worstFloraUs  = 0;
+			std::uint64_t worstClassifyUs = 0;
+			std::uint64_t worstStallUs  = 0;
+			std::uint32_t worstStalls   = 0;
+			std::uint64_t worstCpuUs    = 0;  // 该轮的**线程 CPU 时间**（与墙钟对比 ⇒ 被抢了多少）
+
+			// --- ★★★ 订正 R4：容器 / 尸体「判空结果」按引用缓存 ---
+			//   见 Config::lootCacheTtlMs 的长注释（来源 = 事件失效 + TTL 兜底）。
+			struct LootMemoRec
+			{
+				std::uint64_t atMs   = 0;
+				std::uint32_t serial = 0;  // 与 lootMemoSerial 不一致 = 已被事件作废
+				int           loot   = -3;
+			};
+			std::unordered_map<const RE::TESObjectREFR*, LootMemoRec> lootMemo;
+			std::uint32_t lootMemoSerial = 0;
 
 			// --- 场景跟踪 ---
 			RE::TESObjectCELL* lastCell = nullptr;
@@ -2238,8 +2341,81 @@ namespace SAS
 				duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count());
 		}
 
+		// ★★★ 订正 R4：**微秒级**时钟（QueryPerformanceCounter，约 20ns/次）。
+		//   为什么必须换成 µs：原来所有分段计时都是 `NowMs() - t0`，单次操作 < 1ms
+		//   就被取整成 0 —— 而热路径里的判空 / 分类 / 植物判据恰好全是「单次几百 µs、
+		//   一轮几十次」的形态 ⇒ 日志里 `loot=0ms flora=2ms`，真实开销被抹平到
+		//   walk 那一段里看不见了（R3 的结论就是这么被误导的）。
+		std::uint64_t NowUs()
+		{
+			static const double kTicksPerUs = [] {
+				LARGE_INTEGER f{};
+				::QueryPerformanceFrequency(&f);
+				return f.QuadPart > 0 ? static_cast<double>(f.QuadPart) / 1e6 : 1.0;
+			}();
+			LARGE_INTEGER c{};
+			::QueryPerformanceCounter(&c);
+			return static_cast<std::uint64_t>(static_cast<double>(c.QuadPart) / kTicksPerUs);
+		}
+
+		// 当前线程**真正占用 CPU** 的时间（µs）—— 与墙钟对比：
+		//   墙钟远大于 CPU = 这段时间里线程被抢占 / 在等内存 / 在内核里（页错误）。
+		//   ★ 这是区分「我们的指令慢」与「被别人抢了」的唯一硬判据。
+		std::uint64_t ThreadCpuUs()
+		{
+			FILETIME creation{}, exit{}, kernel{}, user{};
+			if (!::GetThreadTimes(::GetCurrentThread(), &creation, &exit, &kernel, &user)) {
+				return 0;
+			}
+			const auto toUs = [](const FILETIME& a_ft) -> std::uint64_t {
+				ULARGE_INTEGER u{};
+				u.LowPart  = a_ft.dwLowDateTime;
+				u.HighPart = a_ft.dwHighDateTime;
+				return u.QuadPart / 10;  // 100ns → µs
+			};
+			return toUs(kernel) + toUs(user);
+		}
+
+		// ★★★ 订正 R4：**不进制内核**的安全读（SEH 兜底 + 直接 memcpy）。
+		//   动机见 Config::fastReadMem 的长注释：ReadProcessMemory 要拿进程地址空间锁，
+		//   游戏流式加载时单次调用可慢 10~30 倍，而本项目一轮扫描要读几百次。
+		//   语义完全等价（读不出来 ⇒ false）：
+		//     · 正常内存：一条 memcpy（~ns 级，零内核调用）；
+		//     · 不可读地址：触发硬件异常 → `__except` 吃掉 → 返回 false（罕见）。
+		//   分两次拷贝（先到栈上暂存再给调用方）是为了「失败时**不污染**目标缓冲区」——
+		//   有调用方不看返回值就按旧值用（例如 `SafeReadMem(raw + x, &v, 4)` 之后
+		//   拿 v 当 0 用），半途失败的 memcpy 可能留下垃圾。
+		//   ★ `noinline` 是必需的：含 `__try` 的函数一旦被内联进「有析构对象」的调用点，
+		//     MSVC 会报 C2712（cannot use __try in functions that require object unwinding）。
+		constexpr std::size_t kSehStageBytes = 256;
+		__declspec(noinline) bool SehReadMem(const void* a_src, void* a_dst, std::size_t a_len)
+		{
+			if (a_len == 0) {
+				return true;
+			}
+			std::uint8_t stage[kSehStageBytes];
+			std::size_t  done = 0;
+			while (done < a_len) {
+				const std::size_t chunk =
+					std::min<std::size_t>(a_len - done, kSehStageBytes);
+				__try {
+					std::memcpy(stage, static_cast<const std::uint8_t*>(a_src) + done, chunk);
+				} __except (EXCEPTION_EXECUTE_HANDLER) {
+					return false;
+				}
+				std::memcpy(static_cast<std::uint8_t*>(a_dst) + done, stage, chunk);
+				done += chunk;
+			}
+			return true;
+		}
+
+		// 诊断计数（窗口内）：直读撞异常 / 走内核兜底
+		std::uint64_t g_sehFaults  = 0;
+		std::uint64_t g_kernelReads = 0;
+
 		// ★ v2.3：把 Rescan 拆段计时用的小工具（作用域结束自动累加）。
 		//   用它以后，即使代码里中途 return，耗时也照样被记上。
+		//   ★★★ 订正 R4：计时改成 **µs**（原来 ms 会把「单次几百 µs」抹成 0）。
 		struct PhaseTimer
 		{
 			std::uint64_t* sum;
@@ -2247,12 +2423,12 @@ namespace SAS
 			std::uint64_t  t0;
 
 			explicit PhaseTimer(std::uint64_t* a_sum, std::uint64_t* a_max = nullptr) :
-				sum(a_sum), max(a_max), t0(NowMs())
+				sum(a_sum), max(a_max), t0(NowUs())
 			{}
 
 			~PhaseTimer()
 			{
-				const auto dt = NowMs() - t0;
+				const auto dt = NowUs() - t0;
 				if (sum) {
 					*sum += dt;
 				}
@@ -2294,8 +2470,14 @@ namespace SAS
 			std::uintptr_t end       = 0;
 			std::uint64_t  expiresMs = 0;
 		};
-		constexpr std::size_t kReadRegionCount = 8;
-		constexpr std::uint64_t kReadRegionTtlMs = 3000;
+		// ★★★ 订正 R4：槽位 8 → **64**、TTL 3s → **10s**。
+		//   理由：8 个槽在「当前 cell + 环内 cell + 库存对象 + 表单对象」这种
+		//   十几个区间的场景里*几乎每轮都在互相淘汰* ⇒ 每轮都要重新问内核，
+		//   而 VirtualQuery 正是本轮要消灭的那类调用（见 Config::fastReadMem）。
+		constexpr std::size_t kReadRegionCount = 64;
+		constexpr std::uint64_t kReadRegionTtlMs = 10000;
+		constexpr std::uintptr_t kPageSize  = 0x1000;
+		constexpr std::uintptr_t kPageMask  = kPageSize - 1;
 		ReadRegion            g_readRegions[kReadRegionCount];
 		std::size_t           g_readRegionNext = 0;
 		std::uint64_t         g_vqCalls        = 0;  // 诊断：窗口内真的问了内核多少次
@@ -2305,6 +2487,19 @@ namespace SAS
 			for (auto& r : g_readRegions) {
 				r = ReadRegion{};
 			}
+		}
+
+		// 把「[start,end) 已验证可读」记进缓存（页对齐窗口，理由是保护是**页粒度**的：
+		// 页内任意字节可读 ⇒ 整页可读，所以按页扩边是安全的）。
+		void NoteReadRegion(std::uintptr_t a_start, std::uintptr_t a_end, std::uint64_t a_nowMs)
+		{
+			const auto b = a_start & ~kPageMask;
+			const auto e = (a_end + kPageMask) & ~kPageMask;
+			auto&      slot = g_readRegions[g_readRegionNext];
+			g_readRegionNext = (g_readRegionNext + 1) % kReadRegionCount;
+			slot.base        = b;
+			slot.end         = e;
+			slot.expiresMs   = a_nowMs + kReadRegionTtlMs;
 		}
 
 		bool IsReadable(const void* a_ptr, std::size_t a_len)
@@ -2327,6 +2522,27 @@ namespace SAS
 				}
 			}
 
+			// ★★★ 订正 R4：缓存未命中时**先试不进制内核的那条路** ——
+			//   逐页 1 字节直读（页头能读 ⇒ 整页能读；页头不可读 ⇒ 直接判不可读）。
+			//   原本这里直接走 VirtualQuery（要拿地址空间锁），实测动态场景里
+			//   单次可达几百 µs；现在正常内存零内核调用。
+			if (g_cfg.fastReadMem) {
+				bool ok = true;
+				for (auto p = start; p < end; p = (p & ~kPageMask) + kPageSize) {
+					std::uint8_t probe = 0;
+					if (!SehReadMem(reinterpret_cast<const void*>(p), &probe, 1)) {
+						ok = false;
+						break;
+					}
+				}
+				if (ok) {
+					NoteReadRegion(start, end, now);
+					return true;
+				}
+				++g_sehFaults;  // 诊断：直读真的撞到不可读页（正常应极少）
+				return false;   // 页不可读：VirtualQuery 也只会答「不可读」，不必再花一次内核调用
+			}
+
 			MEMORY_BASIC_INFORMATION mbi{};
 			++g_vqCalls;
 			if (::VirtualQuery(a_ptr, &mbi, sizeof(mbi)) == 0) {
@@ -2343,11 +2559,7 @@ namespace SAS
 			if (end > rend || rend <= base) {
 				return false;
 			}
-			auto& slot = g_readRegions[g_readRegionNext];
-			g_readRegionNext = (g_readRegionNext + 1) % kReadRegionCount;
-			slot.base        = base;
-			slot.end         = rend;
-			slot.expiresMs   = now + kReadRegionTtlMs;
+			NoteReadRegion(base, rend, now);
 			return true;
 		}
 
@@ -2859,13 +3071,89 @@ namespace SAS
 		//      垃圾数据几乎不可能满足。
 		//   ③ 实在读不出来 ⇒ 只记一次 `menu event (bad)`，累计到阈值就**注销 sink**
 		//      （彻底断掉这条通道，退回轮询，绝不带着风险继续跑）。
+		// ★★★ 订正 R4（性能）：默认走「SEH 直读」（见 SehReadMem 的说明），
+		//   只有直读真的撞上不可读地址（罕见）才退回内核读一次。
+		//   为什么这条是动态场景卡顿的主因候选：本插件一轮扫描里 SafeReadMem
+		//   要被调几百次（容器 / 尸体判空的库存链），而 ReadProcessMemory 每次都要
+		//   拿**进程地址空间锁** —— 游戏流式加载（走动 / 战斗）时那把锁被抢，
+		//   单次从 ~10µs 涨到几百 µs ⇒ 一轮就多出几十毫秒。
 		bool SafeReadMem(const void* a_src, void* a_dst, std::size_t a_len)
 		{
 			if (!a_src || !a_dst || a_len == 0) {
 				return false;
 			}
+			if (g_cfg.fastReadMem) {
+				if (SehReadMem(a_src, a_dst, a_len)) {
+					return true;
+				}
+				++g_sehFaults;
+				++g_kernelReads;  // 诊断：真的走了内核兜底
+			} else {
+				++g_kernelReads;
+			}
 			SIZE_T read = 0;
 			return ::ReadProcessMemory(::GetCurrentProcess(), a_src, a_dst, a_len, &read) != 0 && read == a_len;
+		}
+
+		// ★★★ 订正 R4：直读（SEH）**启动自检** —— 决定 `FastReadMem` 敢不敢用。
+		//   三条判据（全部在启动时跑，把「有问题」暴露在日志里而不是游戏崩/卡里）：
+		//     ① 可读内存读得出来且内容一致；
+		//     ② 不可读内存（现 reserve 一页、不 commit）**安全返回 false**、不崩、不卡死
+		//        —— 这一条同时验证「没有别的模块把我们的访问违例吞掉」；
+		//     ③ 顺带把「直读 vs 内核读」的单次耗时打出来（用户日志里就能看到差距）。
+		bool SelfTestFastRead(std::uint64_t* a_outSehUs, std::uint64_t* a_outRpmUs)
+		{
+			// ① 可读
+			std::uint64_t v   = 0x1122334455667788ULL;
+			std::uint64_t got = 0;
+			if (!SehReadMem(&v, &got, sizeof(got)) || got != v) {
+				return false;
+			}
+			// ② 不可读：RESERVE（不 COMMIT）+ PAGE_NOACCESS ⇒ 读它必然触发访问违例
+			auto* reserved = static_cast<std::uint8_t*>(
+				::VirtualAlloc(nullptr, 0x1000, MEM_RESERVE, PAGE_NOACCESS));
+			if (reserved) {
+				std::uint8_t b    = 0;
+				const bool   safe = !SehReadMem(reserved, &b, 1);
+				::VirtualFree(reserved, 0, MEM_RELEASE);
+				if (!safe) {
+					return false;  // 真的读了却不报失败 ⇒ 不能用（可能是保护页语义异常）
+				}
+			}
+			// ③ 耗时对照（200 次足够看出量级）
+			constexpr int kLoop = 200;
+			{
+				std::uint64_t tmp = 0, sink = 0;
+				const auto    t0 = NowUs();
+				for (int i = 0; i < kLoop; ++i) {
+					if (SehReadMem(&v, &tmp, sizeof(tmp))) {
+						sink += tmp;
+					}
+				}
+				if (a_outSehUs) {
+					*a_outSehUs = NowUs() - t0;
+				}
+				if (sink == 0xDEADBEEFULL) {
+					return false;  // 防优化（不可能命中）
+				}
+			}
+			{
+				std::uint64_t tmp = 0, sink = 0;
+				SIZE_T        read = 0;
+				const auto    t0 = NowUs();
+				for (int i = 0; i < kLoop; ++i) {
+					if (::ReadProcessMemory(::GetCurrentProcess(), &v, &tmp, sizeof(tmp), &read)) {
+						sink += tmp;
+					}
+				}
+				if (a_outRpmUs) {
+					*a_outRpmUs = NowUs() - t0;
+				}
+				if (sink == 0xDEADBEEFULL) {
+					return false;
+				}
+			}
+			return true;
 		}
 
 		// ----------------------------------------------------------------
@@ -3603,6 +3891,24 @@ namespace SAS
 			//       若用户把 UnhighlightGraceMs 调小到 500 ⇒ eff 自动落到 1（不分片）。
 			g_cfg.ringSliceMaxRounds =
 				std::clamp(getInt("RingSliceMaxRounds", static_cast<int>(kRingSliceMaxRounds)), 0, 64);
+			// ★★★ 订正 R4（性能）：热路径去内核化 + 判空缓存（定义与完整推导见 Config）。
+			g_cfg.fastReadMem = getInt("FastReadMem", 1) != 0;
+			g_cfg.lootCacheTtlMs = std::clamp(getInt("LootCacheTtlMs", 1500), 0, 60000);
+			// 直读自检（一次性）：不可读内存必须能被安全捕获 ⇒ 否则自动退回内核读。
+			//   把「有问题」留在启动日志里，而不是留到游戏里崩 / 卡。
+			if (g_cfg.fastReadMem) {
+				std::uint64_t sehUs = 0, rpmUs = 0;
+				if (!SelfTestFastRead(&sehUs, &rpmUs)) {
+					g_cfg.fastReadMem = false;
+					REX::WARN("saferead selftest: 直读（SEH）**不可用**"
+							  "（读到不可读内存时没能安全返回 false）-> 自动退回内核读"
+							  "（等价的旧行为；性能会差一些）。把这一行发出来即可定位。");
+				} else {
+					REX::INFO("saferead selftest: 直读可用（可读 ✓ / 不可读安全捕获 ✓）；"
+							  "200 次耗时 直读={}µs vs 内核读={}µs（{}倍）-> FastReadMem 生效",
+						sehUs, rpmUs, sehUs ? std::max<std::uint64_t>(1, rpmUs / std::max<std::uint64_t>(1, sehUs)) : 0);
+				}
+			}
 			{
 				const auto iv    = static_cast<std::uint32_t>(std::max(1, g_cfg.scanIntervalMs));
 				const auto grace = static_cast<std::uint32_t>(std::max(0, g_cfg.unhighlightGraceMs));
@@ -3979,6 +4285,22 @@ namespace SAS
 					g_cfg.ringSliceMaxRounds,
 					sliceOn ? "" : "（关：每轮全扫）",
 					eff, eff, kRingSliceMinRefs, periodMs, g_cfg.unhighlightGraceMs);
+			}
+			// ★★★ 订正 R4（性能）：消灭热路径上的内核调用 —— 治用户报告的
+			//   「静态场景帧数正常、动态场景（战斗 / 走动）卡顿」（见 Config 长注释）。
+			{
+				REX::INFO("config: fastReadMem={} -> 安全读{}；可读性校验{}"
+						  "（★ 直读 = SEH 兜底 + memcpy，正常内存**零内核调用**；"
+						  "旧行为 = ReadProcessMemory / VirtualQuery，游戏流式加载时"
+						  "单次可慢 10~30 倍 —— 这是动态场景卡顿的主因候选）",
+					g_cfg.fastReadMem,
+					g_cfg.fastReadMem ? "= 直读（SEH 兜底）" : "= 内核读（旧行为，仅用于对照）",
+					g_cfg.fastReadMem ? "= 直读探针（逐页 1 字节）" : "= VirtualQuery");
+				REX::INFO("config: lootCacheTtlMs={} -> 容器 / 尸体判空结果按引用缓存 {}ms"
+						  "（拿 / 放物品事件、容器界面开关会**立刻**作废缓存 ⇒ 判空延迟不受 TTL 影响；"
+						  "0 = 关，退回每轮实时判空）",
+					g_cfg.lootCacheTtlMs,
+					g_cfg.lootCacheTtlMs > 0 ? std::to_string(g_cfg.lootCacheTtlMs) : std::string("（关）"));
 			}
 			// ★★★ v4.29：放下扫描仪后的「恢复提速」—— 治「植物 / 矿石比其它物品慢一拍」。
 			REX::INFO("config: resyncBoost={}ms budget={} -> 放下扫描仪（引擎拆 Monocle HUD 清表）之后的头 {}ms 内，"
@@ -5488,6 +5810,13 @@ namespace SAS
 				}
 				g_lootEvtQueueCount = 0;
 			}
+			// ★★★ 订正 R4：**任何物品进出事件都作废判空缓存** —— 拿 / 放都会改变
+			//   某个容器 / 尸体的内容，而「内容变化」正是判空结果唯一的权威信号。
+			//   代价：下一次扫描（≤ ScanIntervalMs）把附近容器重读一遍；
+			//   换来：「拿空即灭」的延迟**不受缓存 TTL 影响**（与旧行为逐帧一致）。
+			if (n > 0) {
+				++g_state.lootMemoSerial;
+			}
 			if (!g_cfg.containerLootEvents) {
 				return;  // 功能关着：**照旧把队列排空**（否则它会一直涨），只是不判决
 			}
@@ -6110,6 +6439,10 @@ namespace SAS
 			g_state.lootProbed.clear();
 			g_state.contProbed.clear();       // ★ v4.8
 			g_state.displayCaseVerdict.clear();  // ★ v4.10（旧世界的引用随时可能被销毁）
+			// ★★★ 订正 R4：判空缓存同样是「旧世界的引用 → 结论」⇒ 一起作废
+			//   （不清的话：指针被回收后，新的容器会读到别的容器的旧结论）。
+			g_state.lootMemo.clear();
+			++g_state.lootMemoSerial;
 			// ★ v4.11：逐帧观察表里存的也是「旧世界」的引用 ⇒ 一起作废
 			//   （不清的话，指针被回收后再读就是野指针；虽然每帧都有 IsReadable 兜底，
 			//    但这里清掉才是干净的）。
@@ -9022,7 +9355,7 @@ namespace SAS
 
 			// ---- 2) 到期的摘除（受预算限制）----
 			{
-				PhaseTimer tUnh{ &g_state.tUnhMs };
+				PhaseTimer tUnh{ &g_state.tUnhUs };
 				for (auto it = g_state.outlined.begin(); it != g_state.outlined.end();) {
 					if (it->second.dropAt == 0 || a_nowMs < it->second.dropAt) {
 						++it;
@@ -9090,7 +9423,7 @@ namespace SAS
 			}
 
 			// ---- 3) 新目标 / 到重申时刻的（同样受预算限制）----
-			PhaseTimer tAdd{ &g_state.tAddMs };
+			PhaseTimer tAdd{ &g_state.tAddUs };
 			for (auto* c : a_chosen) {
 				auto it = g_state.outlined.find(c->ref);
 				if (it == g_state.outlined.end()) {
@@ -9171,7 +9504,7 @@ namespace SAS
 				// ★ 订正 R3：3D 复检（RefGet3D × Verify3DPerScan）耗时单列 ——
 				//   它原来是混在 tAdd 里的，而 RefGet3D 是**引擎虚调用**（不是纯内存读），
 				//   是 add 段 14ms 的主要候选来源（见 timing2 输出）。
-				PhaseTimer t3D{ &g_state.t3DMs };
+				PhaseTimer t3D{ &g_state.t3DUs };
 				const std::size_t total = a_chosen.size();
 				const std::size_t step  = std::min<std::size_t>(total, static_cast<std::size_t>(g_cfg.verify3DPerScan));
 				std::uint32_t     probed = 0;
@@ -9381,8 +9714,83 @@ namespace SAS
 		// ====================================================================
 		// 扫描
 		// ====================================================================
+		// ★★★ 订正 R4：单轮扫描的「墙钟 vs 线程 CPU」计量 + 最慢一轮快照。
+		//   为什么需要它（本轮排查的核心）：
+		//     · 静态场景（站着不动）：1538 个引用 → loop ≈ 7ms；
+		//     · 动态场景（走动 / 战斗）：1545 个引用 → loop ≈ 63ms。
+		//   遍历量、判空次数都一样 ⇒ 只能说明**单次操作的墙钟成本**变了。
+		//   于是必须能把「这几十毫秒」拆成两类：
+		//     ① 我们的指令 / 内核调用真的在烧 CPU（CPU ≈ 墙钟）；
+		//     ② 线程被抢占 / 等内存（页错误）/ 卡在内核（CPU ≪ 墙钟）。
+		//   判据 = `GetThreadTimes` 的线程 CPU 时间（`scan … cpu=…`；`卡顿` 见 State）。
+		//   ★ 作用域结束（含所有 early return）自动结算；只有真的走过遍历的轮
+		//     （refs > 0）才进「分段平均 / 最慢一轮」——早退轮会把平均稀释掉。
+		struct ScanProfile
+		{
+			std::uint64_t wall0Us  = 0;
+			std::uint64_t cpu0Us   = 0;
+			std::uint64_t walk0Us  = 0;
+			std::uint64_t loot0Us  = 0;
+			std::uint64_t cls0Us   = 0;
+			std::uint64_t flora0Us = 0;
+			std::uint64_t stallUs0 = 0;
+			std::uint32_t stall0   = 0;
+			std::uint32_t refs0    = 0;
+
+			ScanProfile()
+			{
+				wall0Us  = NowUs();
+				cpu0Us   = ThreadCpuUs();
+				walk0Us  = g_state.tWalkUs;
+				loot0Us  = g_state.tLootUs;
+				cls0Us   = g_state.tClassifyUs;
+				flora0Us = g_state.tFloraUs;
+				stallUs0 = g_state.stallUs;
+				stall0   = g_state.stallCount;
+				refs0    = static_cast<std::uint32_t>(g_state.refsWalkCur + g_state.refsWalkRing);
+			}
+
+			~ScanProfile()
+			{
+				if (wall0Us == 0) {
+					return;  // 已结算过
+				}
+				const auto wall = NowUs() - wall0Us;
+				wall0Us         = 0;
+				const auto cpu  = ThreadCpuUs() - cpu0Us;
+				const auto refs = static_cast<std::uint32_t>(
+					(g_state.refsWalkCur + g_state.refsWalkRing) - refs0);
+				++g_state.scanMsSamples;
+				g_state.scanMsTotal += wall;
+				if (wall > g_state.scanMsMax) {
+					g_state.scanMsMax = wall;
+				}
+				if (refs == 0) {
+					return;  // 早退轮（形状没过 / 还没稳定 / 静置期…）：单列，不污染平均
+				}
+				++g_state.scanFullSamples;
+				g_state.scanRefsLast = refs;
+				g_state.worstScanRefsSum += refs;  // 诊断：完成轮的平均遍历量
+				if (wall > g_state.worstScanUs) {
+					g_state.worstScanUs       = wall;
+					g_state.worstCpuUs        = cpu;
+					g_state.worstRefs         = refs;
+					g_state.worstWalkUs       = g_state.tWalkUs - walk0Us;
+					g_state.worstLootUs       = g_state.tLootUs - loot0Us;
+					g_state.worstClassifyUs   = g_state.tClassifyUs - cls0Us;
+					g_state.worstFloraUs      = g_state.tFloraUs - flora0Us;
+					g_state.worstStallUs      = g_state.stallUs - stallUs0;
+					g_state.worstStalls       = g_state.stallCount - stall0;
+				}
+			}
+
+			ScanProfile(const ScanProfile&) = delete;
+			ScanProfile& operator=(const ScanProfile&) = delete;
+		};
+
 		void Rescan(std::uint64_t a_nowMs, RE::PlayerCharacter* a_player)
 		{
+			ScanProfile profile;  // ★ 订正 R4：本轮计量（作用域结束自动结算）
 			// ★★★ v4.23：「让位原版」只针对**星球扫描目标**（见 Config::yieldTargets-
 			//   WhileScanning 的长注释）—— 判断放在类别循环里（下面 `cat` 处），
 			//   因为其它类别必须在举着扫描仪时照常重申（否则引擎建 HUD 时清掉管理器，
@@ -9418,7 +9826,7 @@ namespace SAS
 			{
 				// ★ v2.3：这一段就是实测里那个「什么都没干却花 31ms」的元凶，
 				//   单独计时 + 配合 g_vqCalls（真的问了几次内核）一起看。
-				PhaseTimer tShape{ &g_state.tShapeMs, &g_state.tShapeMax };
+				PhaseTimer tShape{ &g_state.tShapeUs, &g_state.tShapeMaxUs };
 
 				// cell 指针本身也必须可读：下面的 ReadRawArray 会直接解引用 cell+off，
 				// 这一条几乎零成本，专门挡「parentCell 偏移万一也不对」的极端情况。
@@ -9588,10 +9996,10 @@ namespace SAS
 			// ★ v2.3：遍历 + 排序 + 挑选这一整段（纯内存读，理论上应该在 1ms 量级；
 			//   实测却是 30ms 上下，所以必须单独计时把它和形状校验分开看）。
 			{
-				PhaseTimer tLoop{ &g_state.tLoopMs, &g_state.tLoopMax };
+				PhaseTimer tLoop{ &g_state.tLoopUs, &g_state.tLoopMaxUs };
 				// ★ 订正 R3：loop 内「遍历引用 + 分类 + 距离」整段（**含**下面
 				//   tLoot / tFlora 两个子项；配合 refsWalkCur/Ring 判断是否遍历量问题）。
-				PhaseTimer tWalk{ &g_state.tWalkMs };
+				PhaseTimer tWalk{ &g_state.tWalkUs };
 
 			// ★ v4.7：对「当前 cell + 环内 cell」逐个遍历（见上面 scanCells 的说明）。
 			//   每个 cell 只认**它自己**的引用（`ref->parentCell == sc.cell`）：
@@ -9622,7 +10030,24 @@ namespace SAS
 				ResourceKeywordSelfTest();
 			}
 
+			g_state.stallCheckUs = NowUs();  // ★ 订正 R4：卡顿检测的起点
 			for (std::uint32_t j = 0; j < count; ++j) {
+				// ★★★ 订正 R4：**卡顿检测** —— 每 64 个引用取一次时刻；相邻两次的间隔
+				//   ≥ kStallThresholdUs(3ms) 就记一次。用途：把「我们的指令慢」与
+				//   「主线程被抢占 / 等内存（页错误）／卡在内核」分开 ——
+				//   若「卡顿合计」占了 walk 的大头，就不再是优化代码能解决的事。
+				if ((j & 63u) == 0u) {
+					const auto ts  = NowUs();
+					const auto gap = ts - g_state.stallCheckUs;
+					if (gap >= kStallThresholdUs) {
+						++g_state.stallCount;
+						g_state.stallUs += gap;
+						if (gap > g_state.stallMaxUs) {
+							g_state.stallMaxUs = gap;
+						}
+					}
+					g_state.stallCheckUs = ts;
+				}
 				auto* ref = list[begin + j];
 				// 全部是纯内存读，零引擎调用
 				if (!ref || !IsPlausiblePointer(reinterpret_cast<std::uint64_t>(ref))) {
@@ -9647,8 +10072,11 @@ namespace SAS
 				// ★ v4.2：分类改成「按引用自己」（ClassifyRef）——
 				//   ACHR 引用要看死活（活人不亮 = 红线；尸体要亮），
 				//   「base = NPC_/LVLN 的普通 REFR」= 尸体道具。
-				bool      isCorpse = false;
-				const int cat      = ClassifyRef(ref, base, d2, isCorpse);
+				bool       isCorpse = false;
+				const auto tc0      = NowUs();  // ★ 订正 R4：分类耗时单列（含 ACHR 判决探针）
+				const int  cat      = ClassifyRef(ref, base, d2, isCorpse);
+				g_state.tClassifyUs += NowUs() - tc0;
+				++g_state.cntClassify;
 				if (cat < 0) {
 					// 诊断：半径内、类型不在白名单 → 记一笔类型直方图（见统计日志 rejTypes=）
 					if (base) {
@@ -9675,9 +10103,10 @@ namespace SAS
 					//   引擎此刻正在给这一类目标写 state 4/5（已扫描，绿）或 7/8（未扫描，青）；
 					//   读一眼它写的是什么，就能知道「**这个引用**扫没扫过」
 					//   （见 ProbeFloraEngineState；★ v5.1：只读走树，零副作用）。
-					const auto tf0 = NowMs();  // ★ 订正 R3：计入 tFlora
+					const auto tf0 = NowUs();  // ★ 订正 R4：计入 tFlora（µs）
 					ProbeFloraEngineState(ref, base);
-					g_state.tFloraMs += NowMs() - tf0;
+					g_state.tFloraUs += NowUs() - tf0;
+					++g_state.cntFlora;
 					continue;
 				}
 				// ★ v4.2：容器 / 尸体「搜空即熄灭」——库存为空就不进候选集合。
@@ -9707,16 +10136,47 @@ namespace SAS
 						//   ★ v4.13：展示柜还要**内容快照**（记账判据的基准，见常量区「v4.13」）。
 						bool      sawTemporary = false;
 						DcSnapOut snap{};
-						const auto tl0 = NowMs();  // ★ 订正 R3：判空耗时单列（SafeReadMem 走清单）
-						const int loot =
-							RefLootState(ref, displayCase ? &sawTemporary : nullptr, displayCase ? &snap : nullptr);
-						g_state.tLootMs += NowMs() - tl0;
+						// ★★★ 订正 R4（性能）：判空结果按引用缓存（见 Config::lootCacheTtlMs）。
+						//   原来每个容器 / 尸体**每轮**都要走一遍库存链（SafeReadMem 好几个
+						//   字段 + 逐条目），实测 30+ 次/轮；而它的权威变化信号是**事件**
+						//   （拿 / 放物品、容器界面开关）—— 那些一发生就整体作废缓存。
+						//   缓存命中 ⇒ 一次哈希查找，零内存读、零内核调用。
+						//   ★ 展示柜不进缓存：它的「投影条目 / 段号」状态机本来就要每轮看。
+						int  loot     = -3;  // -3 = 还没有结论（要走判空）
+						bool fromMemo = false;
+						if (!displayCase && g_cfg.lootCacheTtlMs > 0) {
+							const auto it = g_state.lootMemo.find(ref);
+							if (it != g_state.lootMemo.end() &&
+								it->second.serial == g_state.lootMemoSerial &&
+								a_nowMs - it->second.atMs < static_cast<std::uint64_t>(g_cfg.lootCacheTtlMs)) {
+								loot     = it->second.loot;
+								fromMemo = true;
+								++g_state.cntLootMemo;
+							}
+						}
+						if (!fromMemo) {
+							const auto tl0 = NowUs();  // ★ 订正 R4：判空耗时单列（µs）
+							loot = RefLootState(ref, displayCase ? &sawTemporary : nullptr,
+								displayCase ? &snap : nullptr);
+							g_state.tLootUs += NowUs() - tl0;
+							++g_state.cntLoot;
+							if (!displayCase) {
+								if (g_state.lootMemo.size() >= kLootMemoMax) {
+									g_state.lootMemo.clear();  // 兜异常增长（正常几十条）
+								}
+								g_state.lootMemo[ref] =
+									State::LootMemoRec{ a_nowMs, g_state.lootMemoSerial, loot };
+							}
+						}
 						// ★ v4.8：容器「判空链路快照」探针（首次 + 判决变化时各一条）。
 						//   用户报「武器箱关着不亮、一打开就亮」—— 这两条记录就是答案：
 						//   见 ContProbe 顶部的长注释（关着时的 size/sum/skipNp/skipEq
 						//   与打开后一对比即可定位）。
 						if (cat == static_cast<int>(Category::kContainer) && !isCorpse) {
+							const auto tp0 = NowUs();  // ★ 订正 R4：诊断探针耗时单列
 							ContProbe(ref, base, d2, loot, displayCase);
+							g_state.tProbeUs += NowUs() - tp0;
+							++g_state.cntProbe;
 						}
 						// ★★ v4.11：展示柜**逐帧观察**登记 + 「看到投影却没有界面标志」的取证/自愈。
 						//   ① 逐帧观察把「拿空 ⇒ 立刻关掉」的观测窗口从 200ms 缩到 1 帧；
@@ -9773,7 +10233,10 @@ namespace SAS
 							//   （只对近距离的、每个 ref 只打一次；上限 LootProbeMax）。
 							//   这是「拿空还亮」的取证主力：残留条目会被逐条列出。
 							if (isCorpse) {
+								const auto tp0 = NowUs();  // ★ 订正 R4：探针耗时单列
 								LootProbe(ref, d2);
+								g_state.tProbeUs += NowUs() - tp0;
+								++g_state.cntProbe;
 							}
 						} else if (loot == -2) {
 							// ★ v4.3：细分「有 / 未知 / 库存指针为 null / 未标定」——
@@ -9830,9 +10293,10 @@ namespace SAS
 					(g_cfg.floraScannedByEngineState && g_scannableOutlineStateReady) ||
 					(g_cfg.floraScannedByResource && g_isResourceScannedReady);
 				if (cat == static_cast<int>(Category::kFlora) && floraJudgeOn) {
-					const auto tf0 = NowMs();  // ★ 订正 R3：植物 / 矿脉判据耗时单列
+					const auto tf0 = NowUs();  // ★ 订正 R4：植物 / 矿脉判据耗时单列（µs）
 					const bool floraScanned = FloraTargetScanned(ref, base);
-					g_state.tFloraMs += NowMs() - tf0;
+					g_state.tFloraUs += NowUs() - tf0;
+					++g_state.cntFlora;
 					if (floraScanned) {
 						c.state = FloraScannedState();
 						// ★★★ v5.0：通道模式下「已扫描」走专属通道（绿），
@@ -9881,7 +10345,7 @@ namespace SAS
 			//    不需要 EFSH、也不需要令牌桶）
 			// ------------------------------------------------------------------
 			{
-				PhaseTimer tSync{ &g_state.tSyncMs, &g_state.tSyncMax };
+				PhaseTimer tSync{ &g_state.tSyncUs, &g_state.tSyncMaxUs };
 				SyncNativeOutline(chosen, a_nowMs);
 			}
 		}
@@ -9993,6 +10457,9 @@ namespace SAS
 				if (uiOpen != g_state.containerUiOpen) {
 					g_state.containerUiOpen = uiOpen;
 					++g_state.containerUiSerial;
+					// ★★★ 订正 R4：界面开 / 关 = 内容可能已经变过（投影收起 / 展开）
+					//   ⇒ 判空缓存整体作废（判空延迟与旧行为一致）。
+					++g_state.lootMemoSerial;
 					if (uiOpen) {
 						++g_state.containerUiOpens;
 					}
@@ -10129,14 +10596,10 @@ namespace SAS
 			//   （引擎设置此时肯定已加载完；详见 RefreshOutlineParamsOnce 的说明）
 			RefreshOutlineParamsOnce();
 
-			const auto scanT0 = NowMs();
+			// ★★★ 订正 R4：本轮扫描的「墙钟 / 线程 CPU / 各分段」计量现在全部在
+			//   `Rescan` 内部的 `ScanProfile`（作用域结束结算）—— 这样早退轮也能被
+			//   正确归类（早退轮不进「分段平均」，见 ScanProfile 的说明）。
 			Rescan(now, player);
-			const auto scanDt = NowMs() - scanT0;
-			g_state.scanMsTotal += scanDt;
-			if (scanDt > g_state.scanMsMax) {
-				g_state.scanMsMax = scanDt;
-			}
-			++g_state.scanMsSamples;
 			++g_state.scanCount;
 
 			if (g_cfg.logStats && now - g_state.lastStatsMs > kStatsLogIntervalMs) {
@@ -10388,9 +10851,11 @@ namespace SAS
 				LogRendererParams("stats");
 
 				// 性能窗口：每轮扫描耗时（max 才是「卡顿」的感觉来源）与单轮引擎调用数。
-				REX::INFO("  timing: scan avg={}ms max={}ms ops={} deferred={} loading={}",
-					g_state.scanMsSamples ? g_state.scanMsTotal / g_state.scanMsSamples : 0,
-					g_state.scanMsMax,
+				//   ★ 订正 R4：这里是**墙钟**（µs 计时 / 1000）；`完成` = 真的跑完遍历的轮数。
+				REX::INFO("  timing: scan avg={}ms max={}ms 完成={}/{} 轮 ops={} deferred={} loading={}",
+					g_state.scanMsSamples ? g_state.scanMsTotal / g_state.scanMsSamples / 1000 : 0,
+					g_state.scanMsMax / 1000,
+					g_state.scanFullSamples, g_state.scanMsSamples,
 					g_state.opsThisScan,
 					g_state.opsDeferred,
 					g_state.loadingNow ? 1 : 0);
@@ -10399,43 +10864,108 @@ namespace SAS
 				//   shape = 读 cell + 引用数组形状校验（vq = 真的问内核几次 VirtualQuery）
 				//   loop  = 遍历全部引用 + 排序 + 挑选
 				//   sync  = SyncNativeOutline（其中 unh=摘、add=挂）
+				//   ★★★ 订正 R4：① 全部分段平均**除以「完成轮」**（早退轮会把平均稀释）；
+				//     ② 单位 µs / 1000 = ms（**真 ms**，原来 ms 取整会把几百 µs 抹成 0，
+				//        于是 `loot=0ms` 是假象）；③ 新增 timing3 行 = 卡顿的正面证据。
 				{
 					const auto avg = [&](std::uint64_t a_sum) -> std::uint64_t {
-						return g_state.scanMsSamples ? a_sum / g_state.scanMsSamples : 0;
+						return g_state.scanFullSamples ? a_sum / g_state.scanFullSamples / 1000 : 0;
 					};
 					// ★ 订正 R3：把 loop / sync 再拆一层（定义见 State 里那一段注释）。
 					//   refs/scan cur / ring = 每轮实际遍历的引用数（当前 cell / 环内分片）——
-					//   loop 的耗时基本就是它 × ~1µs（cache miss 主导）；ring 分片生效时
-					//   `分片推迟` 会同步增长（= 本轮没扫、留给下几片的那部分）。
+					//   ring 分片生效时 `分片推迟` 会同步增长（= 本轮没扫、留给下几片的那部分）。
 					REX::INFO("  timing2: shape avg={}ms max={}ms vq={}/scan | loop avg={}ms max={}ms (refs/scan: cur={} ring={} 分片推迟={} | walk={}ms loot={}ms flora={}ms) | sync avg={}ms max={}ms (unh avg={}ms add avg={}ms 3D={}ms)",
-						avg(g_state.tShapeMs), g_state.tShapeMax,
-						g_state.scanMsSamples ? (g_vqCalls - g_state.vqCalls) / g_state.scanMsSamples : 0,
-						avg(g_state.tLoopMs), g_state.tLoopMax,
+						avg(g_state.tShapeUs), g_state.tShapeMaxUs / 1000,
+						g_state.scanFullSamples ? (g_vqCalls - g_state.vqCalls) / g_state.scanFullSamples : 0,
+						avg(g_state.tLoopUs), g_state.tLoopMaxUs / 1000,
 						avg(g_state.refsWalkCur), avg(g_state.refsWalkRing), avg(g_state.ringSliceDeferred),
-						avg(g_state.tWalkMs), avg(g_state.tLootMs), avg(g_state.tFloraMs),
-						avg(g_state.tSyncMs), g_state.tSyncMax,
-						avg(g_state.tUnhMs), avg(g_state.tAddMs), avg(g_state.t3DMs));
+						avg(g_state.tWalkUs), avg(g_state.tLootUs), avg(g_state.tFloraUs),
+						avg(g_state.tSyncUs), g_state.tSyncMaxUs / 1000,
+						avg(g_state.tUnhUs), avg(g_state.tAddUs), avg(g_state.t3DUs));
+
+					// ★★★ 订正 R4：`timing3` —— 回答「动态场景为什么卡」的那一行。
+					//   ① `最慢一轮` = 本轮窗口里最慢的一轮（卡顿是**最慢那几轮**造成的，
+					//      不是平均值）：总墙钟 / 其中线程 CPU（`cpu=`）—— 两者差得越远，
+					//      越说明那几十毫秒不是我们的指令，而是**被抢 / 等内存 / 内核里**；
+					//   ② `卡顿` = 遍历内部的空档（每 64 个引用取一次时刻，间隔 ≥ 3ms）：
+					//      次数 / 合计 / 最大 —— 「合计」若占了 walk 的大头，同上结论；
+					//   ③ 细分 = classify（分类 + ACHR 探针）/ loot（判空）/ probe（诊断探针）/
+					//      flora（植物判据）/ 其它（= walk 减去上面四项，纯指针遍历 + 距离）；
+					//   ④ 调用 = 各项**真实执行次数**（配耗时一起看才有意义）+ 判空缓存命中；
+					//   ⑤ `vq` / `内核读` = 真的进了几次内核（订正 R4 之后应接近 0；
+					//      这两个数在动态场景里涨起来 = 直读撞异常 / INI 关了 FastReadMem）。
+					const auto avgUs = [&](std::uint64_t a_sum) -> std::uint64_t {
+						return g_state.scanFullSamples ? a_sum / g_state.scanFullSamples : 0;
+					};
+					const std::uint64_t walkAvg = avgUs(g_state.tWalkUs);
+					const std::uint64_t subAvg  = avgUs(g_state.tClassifyUs) + avgUs(g_state.tLootUs) +
+												  avgUs(g_state.tProbeUs) + avgUs(g_state.tFloraUs);
+					REX::INFO("  timing3: 完成={}轮 平均遍历={}个引用/轮 | 细分(µs/轮): walk={} classify={} loot={} probe={} flora={} 其它={} | "
+							  "调用/轮: classify={} loot={}(缓存命中={}) flora={} probe={} vq={} 内核读={} 直读异常={} | "
+							  "卡顿: 次数={} 合计={}µs 最大={}µs | 最慢一轮: 总={}µs cpu={}µs 引用={} walk={}µs 卡顿={}µs/{}次",
+						g_state.scanFullSamples,
+						g_state.scanFullSamples ? g_state.worstScanRefsSum / g_state.scanFullSamples : 0,
+						walkAvg, avgUs(g_state.tClassifyUs), avgUs(g_state.tLootUs),
+						avgUs(g_state.tProbeUs), avgUs(g_state.tFloraUs),
+						walkAvg > subAvg ? walkAvg - subAvg : 0,
+						g_state.scanFullSamples ? g_state.cntClassify / g_state.scanFullSamples : 0,
+						g_state.scanFullSamples ? g_state.cntLoot / g_state.scanFullSamples : 0,
+						g_state.scanFullSamples ? g_state.cntLootMemo / g_state.scanFullSamples : 0,
+						g_state.scanFullSamples ? g_state.cntFlora / g_state.scanFullSamples : 0,
+						g_state.scanFullSamples ? g_state.cntProbe / g_state.scanFullSamples : 0,
+						g_state.scanFullSamples ? (g_vqCalls - g_state.vqCalls) / g_state.scanFullSamples : 0,
+						g_state.scanFullSamples ? (g_kernelReads - g_state.kernelReads) / g_state.scanFullSamples : 0,
+						g_state.scanFullSamples ? (g_sehFaults - g_state.sehFaults) / g_state.scanFullSamples : 0,
+						g_state.stallCount, g_state.stallUs, g_state.stallMaxUs,
+						g_state.worstScanUs, g_state.worstCpuUs, g_state.worstRefs,
+						g_state.worstWalkUs, g_state.worstStallUs, g_state.worstStalls);
 				}
 				g_state.vqCalls       = g_vqCalls;
+				g_state.sehFaults     = g_sehFaults;
+				g_state.kernelReads   = g_kernelReads;
 				g_state.scanMsTotal   = 0;
 				g_state.scanMsMax     = 0;
 				g_state.scanMsSamples = 0;
-				g_state.tShapeMs      = 0;
-				g_state.tShapeMax     = 0;
-				g_state.tLoopMs       = 0;
-				g_state.tLoopMax      = 0;
-				g_state.tSyncMs       = 0;
-				g_state.tSyncMax      = 0;
-				g_state.tUnhMs        = 0;
-				g_state.tAddMs        = 0;
+				g_state.tShapeUs      = 0;
+				g_state.tShapeMaxUs     = 0;
+				g_state.tLoopUs       = 0;
+				g_state.tLoopMaxUs      = 0;
+				g_state.tSyncUs       = 0;
+				g_state.tSyncMaxUs      = 0;
+				g_state.tUnhUs        = 0;
+				g_state.tAddUs        = 0;
 				// ★ 订正 R3：新拆出来的几段（loop/sync 细分）同步清零
-				g_state.tWalkMs           = 0;
-				g_state.tLootMs           = 0;
-				g_state.tFloraMs          = 0;
-				g_state.t3DMs             = 0;
+				g_state.tWalkUs           = 0;
+				g_state.tLootUs           = 0;
+				g_state.tFloraUs          = 0;
+				g_state.t3DUs             = 0;
 				g_state.refsWalkCur       = 0;
 				g_state.refsWalkRing      = 0;
 				g_state.ringSliceDeferred = 0;
+				// ★★★ 订正 R4：新增的细分计时 / 卡顿检测 / 调用计数 / 最慢一轮快照
+				//   （timing3 行的数据源；分母 scanFullSamples 与 scanRefsLast 一并清零）
+				g_state.tClassifyUs       = 0;
+				g_state.tProbeUs          = 0;
+				g_state.scanFullSamples   = 0;
+				g_state.scanRefsLast      = 0;
+				g_state.stallCount        = 0;
+				g_state.stallUs           = 0;
+				g_state.stallMaxUs        = 0;
+				g_state.cntLoot           = 0;
+				g_state.cntLootMemo       = 0;
+				g_state.cntFlora          = 0;
+				g_state.cntClassify       = 0;
+				g_state.cntProbe          = 0;
+				g_state.worstScanUs       = 0;
+				g_state.worstScanRefsSum  = 0;
+				g_state.worstRefs         = 0;
+				g_state.worstWalkUs       = 0;
+				g_state.worstLootUs       = 0;
+				g_state.worstFloraUs      = 0;
+				g_state.worstClassifyUs   = 0;
+				g_state.worstStallUs      = 0;
+				g_state.worstStalls       = 0;
+				g_state.worstCpuUs        = 0;
 
 				// ★ v3.1：原来这里打的是 Papyrus 侧自报的引导线状态
 				//   （guideHb / guideState / guideMarkers），引导线功能已整体移除，
