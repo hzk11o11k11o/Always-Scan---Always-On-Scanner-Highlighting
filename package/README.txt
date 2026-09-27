@@ -5,7 +5,7 @@
 
 Version  : 2.0  (plugin build 5.1.0)
            2.0 = the mod brings its own outline colour channels (described
-           below), plus ten fixes, all from player reports.
+           below), plus eleven fixes, all from player reports.
            (1) "Ores and plants are green before *and* after scanning."
                The mod remembers a confirmed "surveyed" verdict so a target
                cannot fall back to cyan (added in 1.7.9 / 1.8.1), but that
@@ -293,8 +293,38 @@ Version  : 2.0  (plugin build 5.1.0)
                      instead of after raising the scanner once. The stats line
                      gained `播种=` and `跨星球放行=` inside the
                      `按物种扩散(★v5.1.8)` block.
-           Also in 2.0 (the headline feature) - the mod brings its own
-           outline colour channels instead of borrowing the game's.
+                     (11) Following directly from (10): plants now ask *the game itself*
+                     "has this species been surveyed in this save?" instead of
+                     relying on the mod's own memory. Player request (2026-09-27,
+                     translated): "can't you just read the game's own object state?
+                     ... let's go with reading the game's own state for plants too
+                     and drop our own memory." The game's per-reference evaluation
+                     (the very path that writes state 4 / 5 - surveyed green - for
+                     plants) reads one byte out of the game's own knowledge
+                     database: the species' survey `percent` (0..100; 100 =
+                     surveyed), reached through two read-only hash lookups. The mod
+                     now replays exactly that read-only chain (component -> species
+                     id, ref -> knowledge id, two FNV-1a table lookups, byte at
+                     [element+0x20]) at any time, for any reference - including
+                     runtime-created surface plants whose FormIDs change every
+                     session. percent == 100 = green; anything else falls through to
+                     the other checks (never short-circuits to green). Results are
+                     cached per species (the game's own granularity), so "scan one
+                     instance -> the whole species turns green" now comes from the
+                     game's data, not from a spread table. The mod's own memory
+                     layers are OFF by default now (FloraUseMemory=0): the
+                     reference-level memory, the species spread table, the seeding
+                     from the remembered file and the "keep the previous verdict"
+                     sticky rule no longer take part in any verdict. This also
+                     removes the suspected cause of "all planet resources are stuck
+                     green": the fix-(10) global spread plus seeding had filled the
+                     species table quite generously. Two new ini keys:
+                     FloraEngineProgress=1 (0 = turn the direct read off) and
+                     FloraUseMemory=0 (1 = bring the old memory layers back, for
+                     comparison only). The stats line gained an
+                     `引擎进度直读(★v5.2): 问= 满= 未满= 失败= 缓存命中= 冲突= ready= 记忆层=` block.
+                     Also in 2.0 (the headline feature) - the mod brings its own
+                     outline colour channels instead of borrowing the game's.
            The game has eleven outline "states"
            (0..10); six of them are painted by the game itself while the
            scanner is up (ordinary references such as people, and planet
@@ -834,7 +864,28 @@ Most useful options:
                         per-planet spread (fix (7)'s rule); it paints targets
                         that are surveyed in this save cyan whenever you
                         witnessed the species on another planet - comparison /
-                        fallback only.
+                        fallback only. Note: with fix (11) the memory layers
+                        are off by default (FloraUseMemory=0), so this key only
+                        matters when you set FloraUseMemory=1.
+  FloraEngineProgress=1
+                        fix (11), default: plants read the game's own survey
+                        progress - the very byte the game's state-4/5 path
+                        reads (PlayerKnowledge species percent; 100 = surveyed)
+                        - through a fully read-only replay of the engine's own
+                        lookups, at any time and for any reference (including
+                        runtime-created surface plants). percent == 100 = green;
+                        a lower value never short-circuits. 0 = turn the direct
+                        read off (falls back to the older checks).
+  FloraUseMemory=0
+                        fix (11), default: the mod's own memory layers are OFF
+                        (reference-level memory, species spread table, seeding
+                        from the remembered file, "keep the previous verdict").
+                        "Surveyed" is answered by the game's own data only
+                        (FloraEngineProgress + the read-only outline-state probe
+                        + GetOutlineState + the survey-data chain for LVLI
+                        deposits). 1 = bring the old layers back (comparison
+                        only; their false-green / false-cyan issues come back
+                        with them).
   ColorWeapon=FF2E2E    exact RGB per category (written by default):
   ColorApparel=FF2E2E     equipment (weapons / suits / clothing) red,
   ColorNote=B36BFF        notes & resources purple, misc blue - plus

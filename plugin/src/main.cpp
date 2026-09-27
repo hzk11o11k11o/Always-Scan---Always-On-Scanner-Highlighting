@@ -267,7 +267,22 @@ SFSE_PLUGIN_LOAD(const SFSE::LoadInterface* a_sfse)
 	//        物种表（启动载入后 + 每次读档剪枝后各一次）⇒ 同 species 的实例**不必等举扫描仪**
 	//        直接是绿的。
 	//   回退：INI `FloraSpeciesPlanetScope=1`（回到 R5 的严格口径，只为对照）。
-	REX::INFO("SAS_AlwaysScan v5.1.0 loading（订正 R8：物种表用落盘记忆播种 + 扩散不再按星球硬拒绝 —— 传送 / 换星球后已扫描的 species 直接是绿的）(SFSE build {})",
+	// ★★★ 2026-09-27 订正 R9（公开版仍是 2.0、DLL build 仍是 5.1.0）：
+	//   **植物「已扫描」改为直读引擎自己的扫描进度表 + 默认抛弃自建记忆**（用户指令：
+	//   「我们还是走植物也直接读游戏本身物件状态的方式，抛弃自己记忆的方法」）。
+	//   · 新增 `QueryFloraScanProgressDirect/Cached`：复刻引擎给「已扫描」植物写 state 4/5
+	//     时用的那条**纯查询**（`PlayerKnowledge` 物种槽 `percent`；`0x1307180(ref)` 取知识 ID +
+	//     两级只读哈希 `0x24105D0`/`0x23467B0`，命中读 `[元素+0x20]`）⇒ **任何时刻、任何
+	//     引用**（含外景运行时临时引用）都能问「这个物种在这个存档里扫过没」；
+	//     `percent == 100` ⇒ 已扫描（绿）；结果按 **base** 缓存（物种级，引擎口径）。
+	//   · 新增 `FloraUseMemory`（默认 **0 = 抛弃记忆**）：按引用记忆 / 按物种扩散 /
+	//     落盘播种 / 「沿用旧结论」全部**不参与判定** —— 用户报的「所有星球资源固定
+	//     显示已扫描绿」的主嫌就是 R8 的「跨星球放行 + 播种」把物种表大面积填充。
+	//   · 保留的判据全部是「引擎自己的数据」：进度直读 + 状态表只读探针（4/5）+
+	//     `GetOutlineState` + 资源链（LVLI）；全程签名 / 形状 / SEH 三重保护，任一环
+	//     走不通自动回退（不影响高亮本身）。
+	//   回退：INI `FloraEngineProgress=0`（关新判据）/ `FloraUseMemory=1`（回 v5.1.8 记忆口径）。
+	REX::INFO("SAS_AlwaysScan v5.1.0 loading（订正 R9：植物「已扫描」直读引擎扫描进度表（PlayerKnowledge 物种槽 percent=100）+ 默认抛弃自建记忆（FloraUseMemory=0）—— 不再依赖「引擎画过 / 我们记下来」）(SFSE build {})",
 		SFSE::GetSFSEVersion());
 
 	if (auto* messaging = SFSE::GetMessagingInterface()) {

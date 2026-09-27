@@ -1207,6 +1207,43 @@ namespace SAS
 			//   0 = 回退到 v5.1.6 的链证据路径（万一 Calendar 读不到也会自动回退）。
 			bool          floraSaveFingerprint = true;
 
+			// ================================================================
+			// ★★★ v5.2：植物「已扫描」= **直读引擎的扫描进度表**（用户要求：抛弃自建记忆）
+			// ----------------------------------------------------------------
+			// 用户指令（原文，2026-09-27）：「不能直接读取游戏自己的物件状态来判断吗？
+			//   …… 我们还是走植物也直接读游戏本身物件状态的方式，抛弃自己记忆的方法」。
+			// 做法：复刻引擎给「已扫描植物」写 state 4/5 时用的那条**纯查询**（见常量区
+			//   `kRvaFloraKnowledgeId` 那段的反汇编证据链）——即 `PlayerKnowledge` 的
+			//   物种槽 `percent`（0..100；== 100 = 已扫描）。查询是**只读**的：
+			//   · key1 = `[0x81 组件 + 0x28]`（可扫描组件的物种/资源 ID，直读内存）；
+			//   · key2 = `0x1307180(ref)`（"ref → 知识 ID"的纯查询函数）；
+			//   · 表  = `[[0x23FF640() + 0x8B0] + 0x268]`（TLS 单例 + 知识库主表）；
+			//   · `0x24105D0` / `0x23467B0` = 引擎自己的两级哈希查找（FNV-1a，纯只读）；
+			//   · 命中后读 `[元素+0x20]` 的 byte = 该物种的扫描进度。
+			// ⇒ 对**任何引用**（含植物、含运行时临时引用的外景目标）**任何时刻**可问，
+			//   不再依赖「引擎在可见窗口里画过 / 我们记下来」。判定：`percent == 100`
+			//   ⇒ 已扫描（绿）；`percent < 100` ⇒ **不短路**（继续走后面的判据，宁可青）。
+			//   结果按 **base（物种）**缓存 —— 「扫一个实例 ⇒ 同 species 全绿」由
+			//   **引擎数据本身**保证（进度就是物种级的），与 v5.1.2 的植物扩散同语义，
+			//   但数据源是引擎而不是我们的记忆；读档时清缓存（进度是存档级数据）。
+			// 签名 / 形状校验全过才启用；任何一步不符 ⇒ 自动回退（新判据不生效）。
+			// 0 = 关（回退到 v5.1.8 的记忆判据链）。
+			bool          floraEngineProgress = true;
+
+			// ★★★ v5.2：**自建记忆层总开关**（用户要求：抛弃记忆、直读引擎）。
+			//   0 = ★ 默认（v5.2）：以下全部**不参与判定**，也不再学习 / 落盘 ——
+			//       · ⓪ 按引用记忆（`floraRefKnow` / `SAS_AlwaysScan.flora-learn.txt`）；
+			//       · ⓪.2 按物种扩散表（`floraBaseKnow`）、R8 的「落盘记忆播种」；
+			//       · 「没有权威答案就沿用旧结论」的粘滞保护。
+			//       「已扫描」只由**引擎自己的数据**回答：扫描进度直读（上面那条）
+			//       + 引擎状态表只读探针（4/5）+ `GetOutlineState` + 资源链（LVLI）。
+			//       为什么能不要记忆了：v5.1 那一整族 bug（全绿 / 变青 / 跨星球外溢 /
+			//       跨存档外溢）的根源都是「我们的记忆 ≠ 引擎的事实」；进度直读把
+			//       「引擎的事实」本身变成了查询结果（进度是存档级数据、引擎自己管）。
+			//   1 = 保留 v5.1.8 的记忆行为（只为对照 / 回退；用户实测旧口径有问题时
+			//       不要再打开，改「读日志 → 修直读路径」）。
+			bool          floraUseMemory = false;
+
 			// 「已扫描」的星球目标用哪个 outline 状态（0..11）。默认 **5**：
 			//   引擎把「已经在勘测数据里的星球目标」写进 state 4（远）/ 5（近），
 			//   两者原生色都是**绿色 #27C684**（`outline colors` 日志里的
@@ -2342,6 +2379,24 @@ namespace SAS
 			std::uint64_t floraScanQueries    = 0;  // 真正问过引擎几次（累计，诊断）
 			std::uint64_t floraScanHits       = 0;  // 其中「已扫描」（累计，诊断）
 			std::uint64_t floraScanShapeFails = 0;  // 链的形状校验没过几次（累计，诊断）
+			// ★★★ v5.2：引擎扫描进度直读（抛弃记忆后的植物主判据）——
+			//   按 **base（物种）** 缓存：进度是**物种级**数据（引擎口径 —— 扫一个实例
+			//   ⇒ 该物种 percent 到 100），同 species 的实例共享一条记录 ⇒ 天然实现
+			//   「扫一个实例 ⇒ 同 species 全绿」，数据源是引擎而不是我们的记忆；
+			//   读档 / 换场景时随判据缓存一起清（进度是**存档级**数据）。
+			struct FloraProgressRec
+			{
+				std::uint8_t  progress = 0;      // 引擎给的进度（0..100）
+				std::uint64_t atMs     = 0;      // 查询时刻（TTL 用）
+				bool          ok       = false;  // 链路走通（false = 查询失败，TTL 较短）
+			};
+			std::unordered_map<std::uint32_t, FloraProgressRec> floraProgressByBase;
+			std::uint64_t floraProgQueries   = 0;  // 真正调用引擎链几次（诊断）
+			std::uint64_t floraProgFull      = 0;  // 其中查到 100（= 已扫描）
+			std::uint64_t floraProgPartial   = 0;  // 其中查到 <100（未满）
+			std::uint64_t floraProgFails     = 0;  // 查询失败（回退到旧判据）
+			std::uint64_t floraProgCacheHits = 0;  // 缓存命中（省掉的引擎链调用）
+			std::uint64_t floraProgConflict  = 0;  // 与「引擎状态表 4/5」相矛盾的次数（上限内打 WARN）
 			std::uint32_t floraScanProbes     = 0;  // 本会话已打的 `flora scan:` 探针数
 			std::uint32_t floraScanDumps      = 0;  // ★ v4.26：已打的「指针窗口」取证条数
 			std::uint64_t floraScanShapeWarnAtMs = 0;
@@ -4118,6 +4173,10 @@ namespace SAS
 			g_cfg.floraLoadBoundaryEvidence = getInt("FloraLoadBoundaryEvidence", 1) != 0;
 			// ★★★ v5.1.7（订正 R7）：读档边界 = 游戏时间指纹（详见 Config 里 v5.1.7 段）
 			g_cfg.floraSaveFingerprint   = getInt("FloraSaveFingerprint", 1) != 0;
+			// ★★★ v5.2：植物「已扫描」直读引擎扫描进度表（详见 Config 里 v5.2 段）
+			g_cfg.floraEngineProgress    = getInt("FloraEngineProgress", 1) != 0;
+			// ★★★ v5.2：自建记忆层总开关（默认 0 = 抛弃记忆；详见 Config 里 v5.2 段）
+			g_cfg.floraUseMemory         = getInt("FloraUseMemory", 0) != 0;
 			g_cfg.unhighlightGraceMs = std::clamp(getInt("UnhighlightGraceMs", 1500), 0, 60000);
 			g_cfg.maxOutlineOpsPerScan = std::clamp(getInt("MaxOutlineOpsPerScan", 64), 0, 4096);
 
@@ -4544,6 +4603,24 @@ namespace SAS
 					g_cfg.floraSaveFingerprint,
 					timeOk ? std::to_string(probeDays) + " 天"
 						   : std::string("此刻读不到（启动时还没进世界 —— 正常；读档时仍读不到才会回退）"));
+			}
+			// ★★★ v5.2：植物「已扫描」= 直读引擎扫描进度表（详见 Config 里 v5.2 段）
+			REX::INFO("config: floraEngineProgress={} -> ★ 植物「已扫描」直读引擎扫描进度表"
+					  "（`PlayerKnowledge` 物种槽 percent == 100 = 引擎写 4/5 的同一依据）："
+					  "key1=[0x81组件+0x28]、key2=0x1307180(ref)、两级只读哈希 0x24105D0/0x23467B0、"
+					  "进度@[元素+0x20]；按 base 缓存（绿 = 10 分钟 / 未满 = 见 FloraUnscannedTtlMs）、"
+					  "读档时清缓存；签名 / 形状校验不过会自动回退（日志搜 `flora progress:`）",
+				g_cfg.floraEngineProgress);
+			REX::INFO("config: floraUseMemory={} -> 自建记忆层（按引用记忆 / 按物种扩散 / 落盘播种 / 「沿用旧结论」）：{}",
+				g_cfg.floraUseMemory,
+				g_cfg.floraUseMemory
+					? "保留 = v5.1.8 旧行为（只为对照 / 回退）"
+					: "★ **关闭**（默认，v5.2）—— 「已扫描」只由引擎自己的数据回答："
+					  "扫描进度直读 + 引擎状态表探针（4/5）+ GetOutlineState + 资源链（LVLI）");
+			if (!g_cfg.floraUseMemory) {
+				REX::INFO("flora learn: ★ v5.2 记忆层关闭（FloraUseMemory=0）—— 不读 / 不写落盘学习表、"
+						  "不播种物种表、不查询引用记忆；旧的 `SAS_AlwaysScan.flora-learn.txt` 原样保留"
+						  "（想启用记忆时把 FloraUseMemory 设回 1 即可）");
 			}
 			LoadFloraLearnTable();
 
@@ -7316,6 +7393,89 @@ namespace SAS
 		constexpr std::uint32_t kFloraStateEngineGreenB = 5;
 		constexpr std::uint32_t kFloraStateEngineCyanA  = 7;
 		constexpr std::uint32_t kFloraStateEngineCyanB  = 8;
+
+		// ================================================================
+		// ★★★ v5.2：植物「已扫描」= **直读引擎的扫描进度表**（抛弃自建记忆；用户 2026-09-27 指令）
+		// ----------------------------------------------------------------
+		// 为什么是这几个地址（全部 1.16.244.0 反汇编实证，`out/dis_159ED90.txt` /
+		// `dis_130A270.txt` / `dis_1307180.txt` / `dis_24105D0.txt` / `dis_23467B0.txt`）：
+		//
+		//   引擎的「逐引用求值」函数 0x159ED90 在**给已扫描植物写 state 4/5** 时走
+		//   `0x159F32F~0x159F4B2` 段（这段对**所有类型**共用，植物正是在这里拿到 4/5）：
+		//     0130A2BA  movzx r8d, word [rip+0x4ed7ad2]  ; 类型常量（key 高 16 位）
+		//     0130A2C6  edx = [key1]                     ; ★ key1 = 0x7BCBD0 的直路输出
+		//     0130A2CB  r8 = ((常量<<32)|key1) << 16     ; key = 常量<<48 | key1<<16
+		//     0130A2EB  call 0x24105D0([mgr+0x268], &out, &key)   ; ① 主表查找（只读）
+		//     0130A31A  edi = word[bucket + idx*4 + 0x12]         ; ② 二级基址 = bucket+edi
+		//     0130A32F  call 0x23467B0(base2+0x38, &key2)         ; ③ 二级查找（只读）
+		//     0130A346  r14d = byte [elem + 0x20]                 ; ★★ 进度 byte（0..100）
+		//     0130A34F  [out_byte] = r14b
+		//     …
+		//     0159F3AE  r12b = [rbp+0xe0]（= 上面写的 out_byte）
+		//     0159F3B6  cmp r12b, 0x64                    ; == 100 ?
+		//     ⇒ 4 + ([rbp+0xe8] ? 1 : 0) = state 4/5（原生绿 #27C684）
+		//   上游：
+		//     · key1 = `[0x81 组件 + 0x28]`：0x159ED90 经 `0x7BCBD0(ref, &k1, &k2)` 拿它；
+		//       直路 = 组件存在且 [+0x28] 非 0（本实现**直接读内存**，不去碰 0x7BCBD0 ——
+		//       它在组件缺失时会走一条带 `lock xadd` + 表写的兜底路径）。
+		//     · key2 = `0x1307180(ref)`（0159F34B call 的纯查询）：有 0x2A 组件 ⇒ 返回
+		//       `[ref+0x28]`（FormID）；否则查主表取 `[entry+0x24]`（映射值）。
+		//     · mgr  = `[[0x23FF640() + 0x8B0]`（TLS 单例懒初始化；+0x8B0 = 知识库 DB，
+		//       即 commonlibsf `RE/P/PlayerKnowledge.h` 的 `PlayerKnowledge`）。
+		//     · 0x81 组件 = 可扫描组件容器里的"物种/资源"条目（0x7BCBD0 以 id 0x81 取它）；
+		//       0x81 组件 +0x30 → 另一对象 +0x28 = 实例知识 ID（out2，本实现不需要）。
+		//   ★ 和旧主判据（`GetOutlineState` 0x1306E80）的区别：0x1306E80 的路径
+		//     0x7B8260 查的是**实例级**红黑树（`[base2+0x80]`，键 = {d0,d1,d2}）——
+		//     对植物查不到（用户实测「问=446 已扫描=0」）；本判据查的是**物种级**
+		//     哈希（`[base2+0x38]`，键 = 知识 ID），**和引擎画 4/5 用的是同一份数据**。
+		//   ★ 全程只读：0x24105D0 / 0x23467B0 是 FNV-1a 哈希查找（不改表）；
+		//     0x1307180 内部只查组件 / 查表（引用计数 ++/-- 平衡）；0x347170 组件查询
+		//     走读锁；0x23FF640 是 TLS 懒初始化单例。**不碰** 0x159ED90（写状态 + 登记）、
+		//     也**不碰** 0x130A270 本身（它会写一个 vector：本实现只复刻它的读表段）。
+		constexpr std::uintptr_t kRvaFloraKnowledgeId = 0x1307180;  // ref → 知识 ID（key2）
+		constexpr std::uint8_t   kSigFloraKnowledgeId[16] = {
+			0x48, 0x89, 0x5C, 0x24, 0x10, 0x48, 0x89, 0x6C, 0x24, 0x18, 0x56, 0x57, 0x41, 0x56, 0x48, 0x83
+		};
+		constexpr std::uintptr_t kRvaFloraGetComponent = 0x347170;  // GetComponent(容器, id) → 组件指针
+		constexpr std::uint8_t   kSigFloraGetComponent[16] = {
+			0x48, 0x89, 0x5C, 0x24, 0x08, 0x48, 0x89, 0x6C, 0x24, 0x10, 0x48, 0x89, 0x74, 0x24, 0x18, 0x57
+		};
+		constexpr std::uintptr_t kRvaFloraHashFind = 0x24105D0;  // 主表查找（只读）
+		constexpr std::uint8_t   kSigFloraHashFind[16] = {
+			0x48, 0x89, 0x5C, 0x24, 0x08, 0x48, 0x89, 0x74, 0x24, 0x10, 0x57, 0x48, 0x83, 0xEC, 0x40, 0x33
+		};
+		constexpr std::uintptr_t kRvaFloraSubFind = 0x23467B0;  // 二级哈希查找（只读，FNV-1a）
+		constexpr std::uint8_t   kSigFloraSubFind[16] = {
+			0x4C, 0x8B, 0x51, 0x30, 0x4D, 0x8B, 0xCA, 0x4D, 0x85, 0xD2, 0x0F, 0x84, 0x81, 0x00, 0x00, 0x00
+		};
+		constexpr std::uintptr_t kRvaFloraSingleton = 0x23FF640;  // TLS 单例（知识库宿主）
+		constexpr std::uint8_t   kSigFloraSingleton[16] = {
+			0x48, 0x83, 0xEC, 0x28, 0xBA, 0xB8, 0x00, 0x00, 0x00, 0x65, 0x48, 0x8B, 0x04, 0x25, 0x58, 0x00
+		};
+		// 0x130A270 里 key「类型常量」的提取点（`44 0F B7 05 disp32` = movzx r8d, word [rip+disp]）：
+		//   启动时验证这 4 字节，再从 disp 算出常量地址读 word —— RVA 表一变也不会读错值。
+		constexpr std::uintptr_t kRvaFloraKeyTypePatch = 0x130A2BA;
+		constexpr std::uint8_t   kPatFloraKeyType[4] = { 0x44, 0x0F, 0xB7, 0x05 };
+		// 偏移与形状常量（全部来自上面那段反汇编）：
+		constexpr std::size_t   kOffRefrComponentContainer = 0xC8;   // REFR → 组件容器
+		constexpr std::uint8_t  kFloraScanCompId           = 0x81;   // 可扫描组件 id（物种/资源）
+		constexpr std::size_t   kOffFloraCompSpecie        = 0x28;   // [组件+0x28] = key1
+		constexpr std::size_t   kOffFloraMgrDb             = 0x8B0;  // 单例 + 0x8B0 = 知识库 DB
+		constexpr std::size_t   kOffFloraDbTable           = 0x268;  // DB + 0x268 = 主表
+		constexpr std::size_t   kOffFloraLookupBucket      = 0x10;   // 查找输出 +0x10 = 桶数据
+		constexpr std::size_t   kOffFloraLookupIndex       = 0x18;   // 查找输出 +0x18 = 索引
+		constexpr std::uint64_t kFloraLookupSentinel       = 0xFE0;  // +0x18 == 0xFE0 且 +0x10 == 0 = 未找到
+		constexpr std::size_t   kOffFloraSubEntryOff       = 0x12;   // word：桶内 → 二级基址的偏移
+		constexpr std::size_t   kOffFloraSubTable          = 0x38;   // 二级表（0x23467B0 的 this）
+		constexpr std::size_t   kOffFloraSubArray          = 0x60;   // 二级元素数组
+		constexpr std::size_t   kOffFloraSubCapacity       = 0x68;   // 二级容量（迭代器 == 它 = 未找到）
+		constexpr std::size_t   kFloraSubElemStride        = 0x30;   // 二级元素 stride
+		constexpr std::size_t   kOffFloraElemProgress      = 0x20;   // 元素 +0x20 = 进度 byte
+		constexpr std::uint8_t  kFloraProgressFull         = 100;    // 0x64 = 100% = 已扫描（引擎口径）
+		constexpr std::uint64_t kFloraProgressFullTtlMs    = 600000;  // 「已扫描」缓存 10 分钟（读档会清）
+		constexpr std::uint64_t kFloraProgressFailTtlMs    = 10000;   // 查询失败缓存 10 秒（避免每轮重撞）
+		constexpr std::size_t   kFloraProgressCacheMax     = 4096;    // 缓存条数上限（兜异常增长）
+
 		// 判据缓存的有效期（毫秒）：扫描状态只会在「举着扫描仪扫到」时变化，所以这个
 		// 值只影响「扫描完成 → 放下扫描仪」之后的刷新速度；放下扫描仪那一刻还有一次
 		// 强制作废（见 InvalidateFloraScannedCache 的调用点）。
@@ -7332,6 +7492,22 @@ namespace SAS
 		using GetOutlineState_t = std::uint8_t (*)(RE::TESObjectREFR*);
 		GetOutlineState_t g_scannableOutlineState      = nullptr;
 		bool              g_scannableOutlineStateReady = false;
+
+		// ★★★ v5.2：直读引擎扫描进度表用的 5 个**纯查询**函数（证据链见常量区 v5.2 段）。
+		//   全部「签名 + 形状 + SEH」三重保护；任何一项不过 ⇒ g_floraProgressReady=false
+		//   ⇒ 新判据整体不生效（自动回退到原判据链）。
+		using FloraKnowledgeId_t  = std::uint32_t (*)(RE::TESObjectREFR*);           // ref → 知识 ID
+		using FloraGetComponent_t = void* (*)(void*, std::uint8_t);                  // (容器, id) → 组件
+		using FloraHashFind_t     = void* (*)(void*, void*, const void*);            // (表, &out, &key) → out
+		using FloraSubFind_t      = std::uint64_t (*)(void*, const void*);           // (子表, &key) → 迭代器
+		using FloraSingleton_t    = void* (*)();                                     // TLS 单例
+		FloraKnowledgeId_t  g_floraKnowledgeId   = nullptr;
+		FloraGetComponent_t g_floraGetComponent  = nullptr;
+		FloraHashFind_t     g_floraHashFind      = nullptr;
+		FloraSubFind_t      g_floraSubFind       = nullptr;
+		FloraSingleton_t    g_floraSingleton     = nullptr;
+		bool                g_floraProgressReady = false;  // 5 个签名 + key 类型常量全过才置 1
+		std::uint64_t       g_floraKeyType       = 0;      // key 高 16 位（启动时从指令提取）
 
 		// 前置声明（定义在 ResolveNativeOutline 之后）
 		std::uintptr_t OutlineManagerFor(std::uint32_t a_state);
@@ -7756,6 +7932,233 @@ namespace SAS
 				s.empty() ? "（一个都没有）" : s, pcA, pcB);
 		}
 
+		// ================================================================
+		// ★★★ v5.2：引擎扫描进度直读 —— 解析 / 查询 / 缓存
+		// （常量与完整反汇编证据链见文件上方 v5.2 段；红线：只调只读函数）
+		// ================================================================
+
+		// ① 启动时解析：5 个函数的签名校验 + key 类型常量提取。
+		//   任何一项不过 ⇒ g_floraProgressReady 保持 false（新判据整体不生效）。
+		void ResolveFloraProgressFunctions()
+		{
+			g_floraProgressReady = false;
+			const auto base = ModuleBase();
+			if (!base) {
+				REX::WARN("flora progress: module base unavailable");
+				return;
+			}
+			const auto addrKid  = base + kRvaFloraKnowledgeId;
+			const auto addrComp = base + kRvaFloraGetComponent;
+			const auto addrFind = base + kRvaFloraHashFind;
+			const auto addrSub  = base + kRvaFloraSubFind;
+			const auto addrSing = base + kRvaFloraSingleton;
+			if (!SigMatches(addrKid, kSigFloraKnowledgeId) ||
+				!SigMatches(addrComp, kSigFloraGetComponent) ||
+				!SigMatches(addrFind, kSigFloraHashFind) ||
+				!SigMatches(addrSub, kSigFloraSubFind) ||
+				!SigMatches(addrSing, kSigFloraSingleton)) {
+				REX::WARN("flora progress: 签名不匹配（游戏版本变了？）-> 引擎扫描进度直读 DISABLED"
+						  "（植物退回旧判据链）。 kid=+0x{:X} comp=+0x{:X} find=+0x{:X} sub=+0x{:X} sing=+0x{:X}，"
+						  "请重新核对 RVA（证据链见本文件 v5.2 常量段）。",
+					kRvaFloraKnowledgeId, kRvaFloraGetComponent, kRvaFloraHashFind,
+					kRvaFloraSubFind, kRvaFloraSingleton);
+				return;
+			}
+			// key 高 16 位的「类型常量」：从 0x130A270 的指令里现取（`44 0F B7 05 disp32`），
+			// 这样即使 RVA 表变了，只要指令模式没变就读到正确的常量。
+			const auto   patch = base + kRvaFloraKeyTypePatch;
+			std::uint8_t head[8]{};
+			if (!SafeReadMem(reinterpret_cast<const void*>(patch), head, sizeof(head)) ||
+				std::memcmp(head, kPatFloraKeyType, sizeof(kPatFloraKeyType)) != 0) {
+				REX::WARN("flora progress: key 类型常量提取点签名不符（+0x{:X}）-> 引擎扫描进度直读 DISABLED",
+					kRvaFloraKeyTypePatch);
+				return;
+			}
+			std::uint64_t keyType = 0;
+			{
+				std::int32_t  disp = 0;
+				std::memcpy(&disp, head + 4, 4);
+				const auto    immAddr = patch + 8 + static_cast<std::intptr_t>(disp);
+				std::uint16_t word    = 0;
+				if (!SafeReadMem(reinterpret_cast<const void*>(immAddr), &word, sizeof(word))) {
+					REX::WARN("flora progress: 读 key 类型常量失败（+0x{:X}）-> 引擎扫描进度直读 DISABLED",
+						static_cast<std::uintptr_t>(immAddr - base));
+					return;
+				}
+				keyType = word;
+			}
+			if (keyType == 0) {
+				REX::WARN("flora progress: key 类型常量异常（0）-> 引擎扫描进度直读 DISABLED");
+				return;
+			}
+			g_floraKnowledgeId   = reinterpret_cast<FloraKnowledgeId_t>(addrKid);
+			g_floraGetComponent  = reinterpret_cast<FloraGetComponent_t>(addrComp);
+			g_floraHashFind      = reinterpret_cast<FloraHashFind_t>(addrFind);
+			g_floraSubFind       = reinterpret_cast<FloraSubFind_t>(addrSub);
+			g_floraSingleton     = reinterpret_cast<FloraSingleton_t>(addrSing);
+			g_floraKeyType       = keyType;
+			g_floraProgressReady = true;
+			REX::INFO("flora progress ready: kid=+0x{:X} comp=+0x{:X} find=+0x{:X} sub=+0x{:X} "
+					  "sing=+0x{:X} keyType=0x{:X} (sig verified) -> 植物「已扫描」直读引擎扫描进度表",
+				kRvaFloraKnowledgeId, kRvaFloraGetComponent, kRvaFloraHashFind, kRvaFloraSubFind,
+				kRvaFloraSingleton, g_floraKeyType);
+		}
+
+		// 单次查询的结果（ok=false = 任何一层没走通 ⇒ 上层回退到旧判据，绝不外抛）
+		struct FloraProgressResult
+		{
+			bool          ok       = false;  // 链路走通（拿到 shape 合法的进度值）
+			std::uint8_t  progress = 0;      // 0..100；== 100 = 已扫描（引擎口径）
+			std::uint32_t key1     = 0;      // 物种 / 资源 ID（0x81 组件 +0x28）
+			std::uint32_t key2     = 0;      // 知识 ID（0x1307180(ref)）
+		};
+
+		// ② 单次查询（全 SEH + 逐层形状校验）。只调只读函数：
+		//   0x347170（组件，读锁）→ 读 [comp+0x28] → 0x1307180（ref→知识ID）
+		//   → 0x23FF640（TLS 单例）→ 0x24105D0（主表）→ 0x23467B0（二级）→ 读 [元素+0x20]。
+		FloraProgressResult QueryFloraScanProgressDirect(const RE::TESObjectREFR* a_ref)
+		{
+			FloraProgressResult r{};
+			if (!g_floraProgressReady || !a_ref) {
+				return r;
+			}
+			__try {
+				const auto* raw = reinterpret_cast<const std::uint8_t*>(a_ref);
+				// ① 组件容器（ref+0xC8）→ 0x81 组件 → key1（物种/资源 ID）
+				std::uint64_t container = 0;
+				if (!SafeReadMem(raw + kOffRefrComponentContainer, &container, sizeof(container)) ||
+					!IsPlausiblePointer(container)) {
+					return r;
+				}
+				void* comp = g_floraGetComponent(reinterpret_cast<void*>(container), kFloraScanCompId);
+				if (!comp || !IsReadable(comp, kOffFloraCompSpecie + 4)) {
+					return r;
+				}
+				std::uint32_t key1 = 0;
+				if (!SafeReadMem(reinterpret_cast<const std::uint8_t*>(comp) + kOffFloraCompSpecie,
+						&key1, sizeof(key1)) ||
+					key1 == 0) {
+					return r;  // 没有物种/资源 ID ⇒ 这条链不适用（引擎自己也会跳过）
+				}
+				// ② key2 = 0x1307180(ref)（纯查询：有 0x2A 组件 ⇒ FormID；否则查表映射）
+				const std::uint32_t key2 = g_floraKnowledgeId(const_cast<RE::TESObjectREFR*>(a_ref));
+				// ③ mgr = [0x23FF640() + 0x8B0]（TLS 单例 + 知识库 DB）
+				void*         sing = g_floraSingleton();
+				std::uint64_t mgr  = 0;
+				if (!sing ||
+					!SafeReadMem(reinterpret_cast<const std::uint8_t*>(sing) + kOffFloraMgrDb, &mgr, sizeof(mgr)) ||
+					!IsPlausiblePointer(mgr)) {
+					return r;
+				}
+				// ④ 主表查找（0x24105D0，只读）；key = (类型常量 << 48) | (key1 << 16)
+				std::uint64_t       out[4]{};
+				const std::uint64_t keyA = (g_floraKeyType << 48) | (static_cast<std::uint64_t>(key1) << 16);
+				g_floraHashFind(reinterpret_cast<void*>(mgr + kOffFloraDbTable), out, &keyA);
+				const std::uint64_t bucket = out[kOffFloraLookupBucket / 8];
+				const std::uint64_t index  = out[kOffFloraLookupIndex / 8];
+				if (index == kFloraLookupSentinel && bucket == 0) {
+					return r;  // 表里没有这个物种 / 资源 ⇒ 无进度记录
+				}
+				if (!IsPlausiblePointer(bucket)) {
+					return r;
+				}
+				// ⑤ 二级基址 = bucket + word[bucket + index*4 + 0x12]
+				std::uint16_t subOff = 0;
+				if (!SafeReadMem(reinterpret_cast<const std::uint8_t*>(bucket) + index * 4 + kOffFloraSubEntryOff,
+						&subOff, sizeof(subOff))) {
+					return r;
+				}
+				const auto* base2 = reinterpret_cast<const std::uint8_t*>(bucket + subOff);
+				if (!IsReadable(base2, kOffFloraSubCapacity + 8)) {
+					return r;
+				}
+				// ⑥ 二级查找（0x23467B0，只读）；返回迭代器（索引），== 容量 ⇒ 未找到
+				const std::uint64_t iter =
+					g_floraSubFind(const_cast<std::uint8_t*>(base2) + kOffFloraSubTable, &key2);
+				std::uint64_t cap = 0;
+				std::uint64_t arr = 0;
+				if (!SafeReadMem(base2 + kOffFloraSubCapacity, &cap, sizeof(cap)) ||
+					!SafeReadMem(base2 + kOffFloraSubArray, &arr, sizeof(arr)) ||
+					!IsPlausiblePointer(arr) || cap == 0 || cap > (1u << 24)) {
+					return r;
+				}
+				if (iter >= cap) {
+					return r;  // 这个「知识 ID」在物种记录里没有条目
+				}
+				// ⑦ 进度 = byte[元素 + 0x20]（元素 stride 0x30）
+				const auto* elem = reinterpret_cast<const std::uint8_t*>(arr) + iter * kFloraSubElemStride;
+				std::uint8_t prog = 0;
+				if (!SafeReadMem(elem + kOffFloraElemProgress, &prog, sizeof(prog)) || prog > 100) {
+					return r;  // 形状不对 ⇒ 不采信
+				}
+				r.ok       = true;
+				r.progress = prog;
+				r.key1     = key1;
+				r.key2     = key2;
+			} __except (EXCEPTION_EXECUTE_HANDLER) {
+				r.ok = false;  // 指针失效 / 表结构变化等任何异常 ⇒ 当作「查不到」，绝不外抛
+			}
+			return r;
+		}
+
+		// ③ 带缓存：按 **base（物种）** 缓存（同 species 共享 ⇒ 天然「物种级扩散」）。
+		//   · 「已扫描」（100）：10 分钟 TTL（读档 / 换场景随判据缓存一起清）；
+		//   · 「未满」：FloraUnscannedTtlMs（默认 5 秒 —— 扫到 100 后最多这么久翻绿）；
+		//   · 「失败」：10 秒（避免每轮重撞；失败方向永远是「继续走旧判据」）。
+		FloraProgressResult QueryFloraScanProgressCached(const RE::TESObjectREFR* a_ref,
+			std::uint32_t a_baseFid, std::uint64_t a_now)
+		{
+			FloraProgressResult r{};
+			if (!g_cfg.floraEngineProgress || !g_floraProgressReady || !a_ref || a_baseFid == 0) {
+				return r;
+			}
+			const auto it = g_state.floraProgressByBase.find(a_baseFid);
+			if (it != g_state.floraProgressByBase.end()) {
+				const auto&         rec = it->second;
+				const std::uint64_t ttl = rec.ok
+					? (rec.progress == kFloraProgressFull
+							? kFloraProgressFullTtlMs
+							: (g_cfg.floraUnscannedTtlMs > 0
+									? static_cast<std::uint64_t>(g_cfg.floraUnscannedTtlMs)
+									: kFloraProgressFailTtlMs))
+					: kFloraProgressFailTtlMs;
+				if (a_now - rec.atMs < ttl) {
+					++g_state.floraProgCacheHits;
+					r.ok       = rec.ok;
+					r.progress = rec.progress;
+					return r;
+				}
+				g_state.floraProgressByBase.erase(it);
+			}
+			r = QueryFloraScanProgressDirect(a_ref);
+			if (r.ok) {
+				++g_state.floraProgQueries;
+				if (r.progress == kFloraProgressFull) {
+					++g_state.floraProgFull;
+				} else {
+					++g_state.floraProgPartial;
+				}
+			} else {
+				++g_state.floraProgFails;
+			}
+			if (g_state.floraProgressByBase.size() >= kFloraProgressCacheMax) {
+				g_state.floraProgressByBase.clear();  // 兜异常增长（正常情况下只有几十条）
+			}
+			g_state.floraProgressByBase.emplace(a_baseFid, State::FloraProgressRec{ r.progress, a_now, r.ok });
+			return r;
+		}
+
+		// ④ 缓存作废（读档 / 换场景 / 放下扫描仪时随判据缓存一起调 —— 见 InvalidateFloraScannedCache）。
+		void InvalidateFloraProgressCache(const char* a_reason)
+		{
+			if (g_state.floraProgressByBase.empty()) {
+				return;
+			}
+			const auto n = g_state.floraProgressByBase.size();
+			g_state.floraProgressByBase.clear();
+			REX::INFO("flora progress: 进度缓存作废（{}，清了 {} 条 base）-> 下一轮重新问引擎", a_reason, n);
+		}
+
 		// ★★★ v4.33 / v5.1 / v5.1.7：学习表落盘（定义在下面；这里先声明，因为
 		//   `RememberFloraRef` 的「绿」分支也要落盘）。★ v5.1 起一行 = 两个 FormID；
 		//   ★ v5.1.7 起追加第 3 个字段 = 见证时刻（游戏时间，天）。
@@ -7910,6 +8313,11 @@ namespace SAS
 		//     跨星球外溢正是用户这一轮报的「未扫描星球资源直接显示绿色」。
 		bool RememberFloraBase(std::uint32_t a_baseFid, std::uintptr_t a_ws, const char* a_reason)
 		{
+			// ★★★ v5.2：记忆层总开关（默认 0 = 抛弃记忆）—— 不写物种表。
+			//   「同 species 全绿」现在由 ⓠ 的引擎进度数据（按 base 缓存）保证。
+			if (!g_cfg.floraUseMemory) {
+				return false;
+			}
 			if (!a_baseFid || a_baseFid == 0xFFFFFF) {
 				return false;
 			}
@@ -8170,6 +8578,12 @@ namespace SAS
 		//   读回更早的存档时，属于「更新的时间线」的条目不算数（R5/R7 的规则不变）。
 		std::size_t SeedFloraBaseFromRefMemory(const char* a_reason)
 		{
+			// ★★★ v5.2：记忆层总开关（默认 0 = 抛弃记忆）—— 不播种。
+			//   用户报的「所有星球资源固定显示已扫描绿」的主嫌就是
+			//   「R8 跨星球放行 + 落盘播种」把物种表大面积填充；新口径下这整条路关闭。
+			if (!g_cfg.floraUseMemory) {
+				return 0;
+			}
 			if (!g_cfg.floraLearnPersist || g_cfg.floraMemoryScope != 1) {
 				return 0;  // 最严格口径（2）/ 旧行为（0）不播种
 			}
@@ -8223,6 +8637,10 @@ namespace SAS
 		bool RememberFloraRef(const RE::TESObjectREFR* a_ref, const RE::TESForm* a_base,
 			bool a_green, const char* a_reason)
 		{
+			// ★★★ v5.2：记忆层总开关（默认 0 = 抛弃记忆）—— 不学、不落盘。
+			if (!g_cfg.floraUseMemory) {
+				return false;
+			}
 			if (!a_ref || !a_base) {
 				return false;
 			}
@@ -8287,6 +8705,10 @@ namespace SAS
 		//     漏到刚读进来的档里 —— 用户实测的假绿就是这么来的）。
 		bool FloraRefKnown(const RE::TESObjectREFR* a_ref, std::uint32_t a_baseFid, bool* a_outGreen)
 		{
+			// ★★★ v5.2：记忆层总开关（默认 0 = 抛弃记忆）—— 记忆表不参与判定。
+			if (!g_cfg.floraUseMemory) {
+				return false;
+			}
 			if (!a_ref || !a_baseFid) {
 				return false;
 			}
@@ -8325,15 +8747,20 @@ namespace SAS
 		//         —— 用户报告的「1.8.1 随着游戏进行帧数持续降低」最可能的来源；
 		//       · 现在一个条目都不插、引用计数一个都不动 ⇒ 「捡漏」可以一直开着；
 		//       · 记录粒度也从 base 改成**引用**（治「同 species / 同资源全变绿」）。
-		void ProbeFloraEngineState(const RE::TESObjectREFR* a_ref, const RE::TESForm* a_base)
+		// ★★★ v5.2：返回值 = **结论**（0 = 引擎表里没有这个引用 / 1 = 引擎画的是青 /
+		//   2 = 引擎画的是绿）——「抛弃记忆」后调用方（FloraTargetScanned ⓪.5）要能**直接用**
+		//   这个结论，不再依赖 `floraRefKnow` 记忆表；下面写记忆的两行只在记忆开关
+		//   打开时才会生效（RememberFloraRef 自己判断）。
+		//   ★ 仍然**只读**（LookupOutlineStateReadOnly 自己走红黑树，不插条目、不动引用计数）。
+		std::uint8_t ProbeFloraEngineState(const RE::TESObjectREFR* a_ref, const RE::TESForm* a_base)
 		{
 			if (!g_state.nativeReady || !a_ref || !a_base) {
-				return;
+				return 0;
 			}
 			const auto* p = LookupOutlineStateReadOnly(a_ref);
 			if (!p) {
 				++g_state.floraTableNoEntry;
-				return;  // 引擎没给这个引用写过状态（没举过扫描仪时最常见）
+				return 0;  // 引擎没给这个引用写过状态（没举过扫描仪时最常见）
 			}
 			++g_state.floraTableProbes;
 			const std::uint32_t st = *p;
@@ -8345,11 +8772,15 @@ namespace SAS
 							  "-> 记下这个**引用**已扫描（★ v5.1：只读探针，不往状态表里插条目、跨会话落盘）",
 						a_ref->GetFormID(), a_base->GetFormID(), st);
 				}
-			} else if (st == kFloraStateEngineCyanA || st == kFloraStateEngineCyanB) {
+				return 2;
+			}
+			if (st == kFloraStateEngineCyanA || st == kFloraStateEngineCyanB) {
 				// 目前是青色（未扫描）——只在还没有「绿」记录时记一笔
 				++g_state.floraTableCyan;
 				RememberFloraRef(a_ref, a_base, false, "引擎亲手把它画成了青（outline state 7/8）");
+				return 1;
 			}
+			return 0;
 		}
 
 		// ★★★ v4.33 / v5.1：**按引用**记忆的落盘（`<esm 同级>\SAS_AlwaysScan.flora-learn.txt`）。
@@ -8383,6 +8814,12 @@ namespace SAS
 		// 启动时读回（文件不存在 = 首次运行，属正常）
 		void LoadFloraLearnTable()
 		{
+			// ★★★ v5.2：记忆层总开关（默认 0 = 抛弃记忆）—— 连落盘也不读；
+			//   旧文件原样保留（把 FloraUseMemory 设回 1 就恢复）。
+			if (!g_cfg.floraUseMemory) {
+				g_state.floraPersistReady = true;
+				return;
+			}
 			const auto path = FloraLearnTablePath();
 			if (!g_cfg.floraLearnPersist) {
 				g_state.floraPersistReady = true;
@@ -8492,7 +8929,8 @@ namespace SAS
 		//     「这个扫描发生在哪个存档的过去」（见 FloraEntryInScope / docs/40）。
 		void AppendFloraLearnRecord(std::uint32_t a_refFid, std::uint32_t a_baseFid, float a_days)
 		{
-			if (!g_cfg.floraLearnPersist) {
+			// ★★★ v5.2：记忆层总开关（默认 0 = 抛弃记忆）—— 不再落盘。
+			if (!g_cfg.floraUseMemory || !g_cfg.floraLearnPersist) {
 				return;
 			}
 			const auto path = FloraLearnTablePath();
@@ -8955,8 +9393,12 @@ namespace SAS
 			}
 			const bool engineStateOn = g_cfg.floraScannedByEngineState && g_scannableOutlineStateReady;
 			const bool chainOn       = g_cfg.floraScannedByResource && g_isResourceScannedReady;
-			if (!engineStateOn && !chainOn) {
-				return false;  // 两条判据都关了 / 都不可用 ⇒ 退回「扫没扫过看起来一样」
+			// ★★★ v5.2：新判据（引擎扫描进度直读）也算「一条可用判据」——
+			//   旧版这里只看「引擎状态」与「资源链」两条；少了这一条，
+			//   GetOutlineState 签名不匹配时会把新判据也一起挡掉。
+			const bool progressOn = g_cfg.floraEngineProgress && g_floraProgressReady;
+			if (!progressOn && !engineStateOn && !chainOn) {
+				return false;  // 所有判据都关了 / 都不可用 ⇒ 退回「扫没扫过看起来一样」
 			}
 			const std::uint32_t fid = a_base->GetFormID();
 			const auto          now = NowMs();
@@ -8991,6 +9433,38 @@ namespace SAS
 				g_state.floraScannedCache.clear();  // 兜异常增长（正常情况下几十条）
 			}
 
+			// ⓠ ★★★ v5.2：**直读引擎的扫描进度表**（= 本次「抛弃记忆」后的植物主判据）
+			// ----------------------------------------------------------------
+			// 用户指令（原文）：「不能直接读取游戏自己的物件状态来判断吗？……我们还是走
+			//   植物也直接读游戏本身物件状态的方式，抛弃自己记忆的方法」。
+			// 这条判据就是那份「游戏自己的物件状态」：引擎给**已扫描**植物写 state 4/5
+			//   用的就是它（`PlayerKnowledge` 物种槽的 `percent`，== 100 = 已扫描；
+			//   完整反汇编证据链见常量区 v5.2 段）—— **随时可问、只读**，
+			//   与「引擎在可见窗口里画过 / 我们记下来」无关。
+			// 语义：
+			//   · `percent == 100` ⇒ 已扫描（绿，短路）；
+			//   · `percent < 100`（查到了但未满）⇒ **不短路**（继续走 ⓪.5 / ① / ②）——
+			//     宁可青，也不赌「部分进度算不算已扫描」；
+			//   · 查询失败 ⇒ 不短路（自动回退旧判据链；`floraProgFails=` 计数可见）。
+			//   · 结果按 **base（物种）** 缓存 ⇒ 同 species 的实例共享一条结论
+			//     （引擎数据本来就是物种级的）——「扫一个实例 ⇒ 同 species 全绿」
+			//     由**引擎数据**保证，不再需要 v5.1.2 的物种扩散表。
+			if (a_ref) {
+				const auto pr = QueryFloraScanProgressCached(a_ref, fid, now);
+				if (pr.ok && pr.progress == kFloraProgressFull) {
+					++g_state.floraScanHits;
+					g_state.floraScannedCache.emplace(a_ref, State::FloraScanRec{ true, now, fid, 7 });
+					if (g_cfg.floraScanProbeMax > 0 &&
+						g_state.floraScanProbes < static_cast<std::uint32_t>(g_cfg.floraScanProbeMax)) {
+						++g_state.floraScanProbes;
+						REX::INFO("flora scan: ref=0x{:X} base=0x{:X} 判据 = 引擎扫描进度直读（★ v5.2）"
+								  "：percent={}/100（key1=0x{:X} key2=0x{:X}）-> 已扫描 ⇒ 状态 {}（原版「已扫描」绿）",
+							a_ref->GetFormID(), fid, pr.progress, pr.key1, pr.key2, FloraScannedState());
+					}
+					return true;
+				}
+			}
+
 			// ⓪ ★★★ v4.31 / v5.1：**按引用**的单向记忆（最早、最省）——
 			//   1) 「已扫描」：权威确认过 ⇒ 直接返回，不再重问引擎、也不再走链
 			//      （「低概率变青」的根治：引擎有时会「拿不到 / 答未扫描」，
@@ -9005,7 +9479,10 @@ namespace SAS
 			//      任何一条给出「已扫描」都会把它升级成绿（绿仍然单向、不会被翻回）。
 			//   ★ 粒度 = **引用**（+ base 校验）：同 base 的其它实例**不受影响** ——
 			//     v4.31~v5.0 记的是 base，那会让整片同 species / 同资源一起变绿。
-			if (a_ref) {
+			//   ★★★ v5.2：整段由 **`FloraUseMemory`** 控制 —— 默认 **0 = 抛弃记忆**
+			//     （用户指令），这段判据（以及下面的 ⓪.2 / 播种 / 落盘）全部不参与；
+			//     想回退到 v5.1.8 行为才把它设成 1。
+			if (g_cfg.floraUseMemory && a_ref) {
 				bool knownGreen = false;
 				if (FloraRefKnown(a_ref, fid, &knownGreen) && knownGreen) {
 					++g_state.floraRefHits;
@@ -9044,7 +9521,11 @@ namespace SAS
 			//   判定放在 ⓪ 之后、⓪.5（探针）之前：省掉一次状态表读取。
 			//   ★★★ v5.1.5（订正 R5）：**限制在同一颗星球**（worldspace）—— 用户报的
 			//     「未扫描星球资源直接显示绿色」有一半就是这么来的（跨星球外溢）。
-			if (FloraBaseKnown(fid, WorldspaceOfRef(a_ref))) {
+			//   ★★★ v5.2：同样由 **`FloraUseMemory`** 控制（默认 0 = 抛弃记忆）——
+			//     用户报的「所有星球资源固定显示已扫描绿」的主嫌就是这个物种表
+			//     （R8 的「跨星球放行 + 落盘播种」让它被大面积填充）；新口径下
+			//     「同 species 全绿」改由 ⓠ 的**引擎进度数据**保证。
+			if (g_cfg.floraUseMemory && FloraBaseKnown(fid, WorldspaceOfRef(a_ref))) {
 				++g_state.floraBaseHits;
 				++g_state.floraScanHits;
 				++g_state.floraLearnedHits;
@@ -9067,19 +9548,29 @@ namespace SAS
 			//   就不再捡。现在改成判据未命中时读一眼（纯内存读 + 引用级缓存限流，
 			//   同一个引用最多每 FloraUnscannedTtlMs 一次）⇒ 引擎留过的绿不会白丢。
 			if (a_ref) {
-				ProbeFloraEngineState(a_ref, a_base);
-				bool greenKnown = false;
+				// ★★★ v5.2：探针现在**返回结论**（2 = 引擎画的是绿）—— 记忆层关闭时
+				//   直接消费这个结论（不再要求"先记进记忆表再查"）；记忆层打开时再
+				//   回查记忆表（补上"以前学到过绿、此刻引擎表里已经没条目"的情况）。
+				const std::uint8_t engState   = ProbeFloraEngineState(a_ref, a_base);
+				bool               greenKnown = (engState == 2);
 				// ★★ v5.1.1：这里同样**只让「绿」短路**。v5.1 的写法是
 				//   「只要记忆里有结论（含「青」）就 return」—— 而记忆里的「青」
 				//   可能是很久以前探针记下的（此刻引擎表里早就没有它了），
 				//   于是每一轮都在这里被它挡住，① 主判据 / ② 资源链永远跑不到。
-				if (FloraRefKnown(a_ref, fid, &greenKnown) && greenKnown) {
+				if (!greenKnown && g_cfg.floraUseMemory) {
+					bool memGreen = false;
+					greenKnown = FloraRefKnown(a_ref, fid, &memGreen) && memGreen;
+				}
+				if (greenKnown) {
 					++g_state.floraStatusTableHits;
 					++g_state.floraScanHits;
 					++g_state.floraLearnedHits;
 					// ★★★ v5.1.2：同 ⓪ —— 命中即动态激活物种表（见那里的长注释）
 					//   ★ v5.1.5：带上 worldspace（只在同一颗星球扩散）
-					RememberFloraBase(fid, WorldspaceOfRef(a_ref), "状态表捡漏命中（动态激活）");
+					//   ★ v5.2：只在记忆层打开时做（默认关闭）
+					if (g_cfg.floraUseMemory) {
+						RememberFloraBase(fid, WorldspaceOfRef(a_ref), "状态表捡漏命中（动态激活）");
+					}
 					if (g_cfg.floraScanProbeMax > 0 &&
 						g_state.floraScanProbes < static_cast<std::uint32_t>(g_cfg.floraScanProbeMax)) {
 						++g_state.floraScanProbes;
@@ -9162,7 +9653,10 @@ namespace SAS
 			//     v4.31 之后依然复现的原因之一。
 			bool              result          = scanned;
 			const bool        noAuthoritative = chain.produceIsMisc || !chain.shapeOk;
-			if (noAuthoritative && hasPrev && prevScanned) {
+			//   ★★★ v5.2：「沿用旧结论」也归记忆层管（默认关闭）—— 新口径下每一轮
+			//     都由引擎数据（ⓠ / ⓪.5 / ① / ②）当场回答；TTL 内（30s / 5s）的
+			//     `floraScannedCache` 缓存仍然生效（那是性能缓存，不是语义记忆）。
+			if (g_cfg.floraUseMemory && noAuthoritative && hasPrev && prevScanned) {
 				result = true;
 				++g_state.floraStickyKeeps;
 			}
@@ -9197,6 +9691,9 @@ namespace SAS
 		// （换了一个存档 = 勘测数据可能完全不同）。
 		void InvalidateFloraScannedCache(const char* a_reason)
 		{
+			// ★★★ v5.2：引擎扫描进度缓存也在这里一起清（进度是**存档级**数据：
+			//   读档 / 切场景后可能完全不同；放下扫描仪时清掉只是多查几次，无副作用）。
+			InvalidateFloraProgressCache(a_reason);
 			if (g_state.floraScannedCache.empty()) {
 				return;
 			}
@@ -11829,6 +12326,7 @@ namespace SAS
 						  "| 读档边界(★v5.1.6): 事件保留={} 确认base={} 推进={} "
 						  "| 存档指纹(★v5.1.7): 锚={}天 处理={} 作废={}条 表剪={} 失败={} 存档={} "
 						  "| 引擎状态表: 条目={} 读={} 绿={} 青={} 无条目={} "
+						  "| 引擎进度直读(★v5.2): 问={} 满={} 未满={} 失败={} 缓存命中={} 冲突={} ready={} 记忆层={} "
 						  "| 学习表: 沿用={} 捡漏={} 落盘={} 写入={} 旧格式忽略={} 无时间={}"
 						  "（★ v5.1：按引用记忆 = 记忆粒度是引用；★ v5.1.2：按物种扩散 = 同 species / "
 						  "同资源被权威确认后，其**所有**实例一起变绿（引擎知识库本来就是这一级；"
@@ -11879,6 +12377,10 @@ namespace SAS
 					OutlineStateTableCount(),
 					g_state.floraTableProbes, g_state.floraTableGreen, g_state.floraTableCyan,
 					g_state.floraTableNoEntry,
+					g_state.floraProgQueries, g_state.floraProgFull, g_state.floraProgPartial,
+					g_state.floraProgFails, g_state.floraProgCacheHits, g_state.floraProgConflict,
+					g_floraProgressReady ? 1 : 0,
+					(g_cfg.floraUseMemory ? "ON（v5.1.8 旧口径）" : "关（默认，抛弃记忆）"),
 					g_state.floraStickyKeeps, g_state.floraStatusTableHits,
 					g_state.floraPersistLoaded, g_state.floraPersistWrites,
 					g_state.floraPersistIgnored, g_state.floraPersistNoTime,
@@ -12186,6 +12688,10 @@ namespace SAS
 			REX::WARN("原生 outline 不可用（签名不匹配）-> 本次运行不会高亮。"
 					  "按 docs/03 第七节重新核对 RVA 后再构建。");
 		}
+
+		// ★★★ v5.2：引擎扫描进度直读的 5 个**纯查询**函数（签名校验 + key 常量提取；
+		//   任何一项不过 ⇒ 自动禁用新判据、回退旧判据链，不影响高亮本身）
+		ResolveFloraProgressFunctions();
 
 		// ★ v4.0：读档自愈不再需要任何 Papyrus / ESM 通道 —— 直接看载入画面
 		//   （见 Tick 里的「载入画面由开变关」），另有「换 cell」与
