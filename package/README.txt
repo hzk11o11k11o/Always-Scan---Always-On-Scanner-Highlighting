@@ -1059,7 +1059,7 @@ categories).
 * With "Simple Immersive Looting" (Nexus 12677) installed, using its
   "Strip" option unequips a body's gear - the body starts glowing again
   because the gear is takeable now; loot it and the outline goes away.
-* The log is capped at 1 MiB: once it grows past that it is emptied and
+* The log is capped at 10 MiB: once it grows past that it is emptied and
   starts over, so it can never fill up your disk.
 * Since 4.3 the inventory calibration keeps retrying until it succeeds
   (it samples nearby containers or actors), so "looted means dark" also

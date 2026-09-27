@@ -29,9 +29,9 @@ namespace
 	// 避免两处写死不一致。
 	constexpr const char* kLogName = "SAS_AlwaysScan";
 
-	// 日志文件上限 1 MiB：写新一行时若会超过就把旧内容整体清空，
-	// 保证日志占用恒定 ~1 MiB（不是滚动保留旧文件）。
-	constexpr std::size_t kLogMaxBytes = 1024 * 1024;
+	// 日志文件上限 10 MiB：写新一行时若会超过就把旧内容整体清空，
+	// 保证日志占用恒定 ~10 MiB（不是滚动保留旧文件）。
+	constexpr std::size_t kLogMaxBytes = 10 * 1024 * 1024;
 
 	// 「单文件封顶」文件 sink。commonlibsf 默认建的是 basic_file_sink
 	// （纯追加、永不清理），长时间游玩日志会无限变大；本 sink 在写入前检查
