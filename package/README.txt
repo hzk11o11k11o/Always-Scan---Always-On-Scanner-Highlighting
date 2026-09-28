@@ -19,8 +19,18 @@ Version  : 2.0.1  (plugin build 5.1.0)
              * every other colour is unchanged; the mod carries fourteen
                colour channels (thirteen categories + surveyed plants)
                instead of thirteen.
+             * fixed (2026-09-28): an emptied container / corpse could keep its
+               highlight. The check that decides "this one is looted" has to
+               learn one engine offset before it can run; that learning step
+               kept sampling the same few containers, and in a location where
+               those happened to be empty it never finished - so "loot it empty
+               and the outline goes out" stayed off for the whole session (the
+               periodic log line says `invOff=未标定`). The step now also samples
+               your own inventory, which always has something in it, so it
+               completes right away.
+
            2.0 = the mod brings its own outline colour channels (described
-           below), plus sixteen fixes, all from player reports.
+           below), plus seventeen fixes, all from player reports.
            (1) "Ores and plants are green before *and* after scanning."
                The mod remembers a confirmed "surveyed" verdict so a target
                cannot fall back to cyan (added in 1.7.9 / 1.8.1), but that

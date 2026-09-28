@@ -620,6 +620,22 @@ namespace SAS
 		//     · 采纳还要求至少 kInvCalibNeedStrong 个**强样本**（见 IsPlausibleFormPtr）——
 		//       只有强样本才能证明「读到的条目真的是物品」，光靠指针可读太弱；
 		//     · 只有累计到 kInvCalibMaxRounds 轮仍然不通过才永久降级（打 WARN）。
+		// ★★★ 2026-09-28：**采样方式**再修一次 —— 治「判空整局沉默 ⇒ 容器 / 尸体
+		//   拿空不熄灭」。实测（用户 2026-09-28 18:45 那局，`SFSE\Logs` 之外的部署日志）：
+		//     `inventory calibration: 仍在攒样本（rounds=40 checks=160
+		//      votes=+0xA0:160 / +0xA8:0 strong=0/0 bad=0/160）`
+		//     + 整局统计行 `搜空: empty=0 … invOff=未标定` ⇒ 标定**一次都没成功**
+		//     ⇒ `g_invOff == 0` ⇒ 判空整段被跳过 ⇒ 所有容器 / 尸体照常亮（用户报的现象）。
+		//   根因（读代码即可确认，不是内存读错）：老实现每轮**都从数组头开始**扫样本，
+		//   于是 40 轮采到的是**同一批前 4 个引用**；那一局那 4 个都是空库存
+		//   （`size==0` ⇒ 只算弱票、拿不到强证据）⇒ `strong` 永远是 0 ⇒ 永不采纳。
+		//   两条修法（都不放松安全底线：仍然要求 ≥1 个强样本）：
+		//     ① **轮转采样**（`State::invCalibCursor`）：游标每轮往后走，扫到数组尾回到头
+		//        ⇒ 一个场景里所有容器 / ACHR 都有机会被采到，不再只认数组开头那几个；
+		//     ② **把玩家自己当一个样本**：背包里必然有东西（开锁器 / 信用币…），
+		//        是最稳定、最省事的强样本来源 ⇒ 正常场景第 1 轮就能标定成功。
+		//        玩家样本只投「赞成票」：形状不过时**不计 bad**（否则一旦它读不出来，
+		//        `bad <= kInvCalibMaxBad` 这道闸门会把标定永久卡死）。
 		constexpr std::uint32_t kInvCalibNeedOk     = 3;       // 至少 3 个样本通过形状校验
 		constexpr std::uint32_t kInvCalibNeedStrong = 1;       // 其中至少 1 个是「强样本」
 		constexpr std::uint32_t kInvCalibMaxBad     = 2;       // 且坏样本不超过 2 个
@@ -2269,6 +2285,25 @@ namespace SAS
 			std::uint32_t invBad[2]{};     // 各自形状校验失败的样本数
 			std::uint32_t invChecks    = 0;  // 一共采样了多少个引用（容器 + ACHR）
 			std::uint32_t invRounds    = 0;  // 已经尝试过多少轮（到 kInvCalibMaxRounds 才放弃）
+			// ★★★ 2026-09-28：**轮转采样游标** —— 老实现每轮都从数组头开始采样，
+			//   采到的永远是同一批前几个引用；若它们恰好都是空容器（实测：
+			//   `rounds=40 checks=160 strong=0`）⇒ 标定整局沉默 ⇒ 判空被安全降级
+			//   ⇒ 容器 / 尸体拿空不熄灭。游标每轮往后推进（扫到尾巴回数组头），
+			//   保证场景里的容器 / ACHR 都能被采到。完整推导见 CalibrateInventory。
+			std::uint32_t invCalibCursor = 0;
+			// ★★★ 2026-09-28：**末轮样本留痕**（只作诊断）—— 标定一直不成功时，
+			//   日志能把「最后这一轮采了谁、读到什么」摊开 ⇒ 一眼分清「采到的都是
+			//   空容器」还是「根本读不出形状（偏移错了 / 内存读不到）」。
+			struct InvCalibSample
+			{
+				std::uint32_t refFid  = 0;
+				std::uint32_t baseFid = 0;
+				std::uint32_t objFid  = 0;   // 第一条目的 object（强证据；0 = 没读到）
+				std::int32_t  size    = -1;  // +0xA0 候选读到的条目数；-1 = 形状不过
+				std::uint8_t  actor   = 0;   // 1 = ACHR（含玩家自己）
+			};
+			InvCalibSample invLastSample[kInvCalibPerRound]{};
+			std::uint32_t  invLastSampleCount = 0;
 
 			// --- v2.2：耗时统计（每次统计日志之间重置，用来定位卡顿）---
 			//   ★★★ 订正 R4：**单位从 ms 改成 µs**（见下面的长注释）。
@@ -6037,10 +6072,25 @@ namespace SAS
 			//     反汇编 `DestroyInventoryList`/`CreateInventoryList` 已证实：
 			//     数据指针 @+0xA0、锁 @+0xA8），所以两者都能当样本。
 			//     只采样 kInvCalibPerRound 个/轮 —— 单轮最多这么几次 VirtualQuery。
-			const std::uint32_t limit   = std::min<std::uint32_t>(a_size, kInvCalibScanCap);
-			std::uint32_t       sampled = 0;
-			for (std::uint32_t i = 0; i < limit && sampled < kInvCalibPerRound; ++i) {
-				auto* ref = a_list[i];
+			//   ★★★ 2026-09-28：**样本集合**改成「玩家自己 + 轮转窗口」（推导见常量区）：
+			//     ① 玩家自己排第一：它的背包必然有东西 ⇒ 正常第 1 轮就能拿到强样本；
+			//     ② 其余名额从 `invCalibCursor` 开始往后取（不再永远从数组头取 4 个），
+			//        游标本轮停在哪，下一轮就从哪里接着走（扫到尾巴回数组头）。
+			const std::uint32_t limit = std::min<std::uint32_t>(a_size, kInvCalibScanCap);
+
+			const RE::TESObjectREFR* sampleRefs[kInvCalibPerRound]{};
+			bool                     sampleCountBad[kInvCalibPerRound]{};  // 形状不过时是否计入 bad
+			std::uint32_t            sampleN = 0;
+			if (auto* pl = RE::PlayerCharacter::GetSingleton()) {
+				// 玩家样本**不计 bad**：它只是「送上门来的强证据」，万一读不出形状
+				// （理论上不该发生），也不能让 `bad <= kInvCalibMaxBad` 把标定卡死。
+				sampleRefs[sampleN]     = pl;
+				sampleCountBad[sampleN] = false;
+				++sampleN;
+			}
+			std::uint32_t scan = (s.invCalibCursor < limit) ? s.invCalibCursor : 0;
+			for (; scan < limit && sampleN < kInvCalibPerRound; ++scan) {
+				auto* ref = a_list[scan];
 				if (!ref || !IsPlausiblePointer(reinterpret_cast<std::uint64_t>(ref))) {
 					continue;
 				}
@@ -6052,14 +6102,41 @@ namespace SAS
 				if (!isCont && !isActor) {
 					continue;  // 只认「容器」与「Actor」（纯内存读判类型）
 				}
-				++sampled;
+				if (ref == sampleRefs[0]) {
+					continue;  // 玩家已经在表里了（省一次重复采样）
+				}
+				sampleRefs[sampleN]     = ref;
+				sampleCountBad[sampleN] = true;
+				++sampleN;
+			}
+			s.invCalibCursor = (scan >= limit) ? 0 : scan;  // 下一轮的起点（环形轮转）
+
+			s.invLastSampleCount = 0;  // 末轮样本留痕（诊断用；每轮重记）
+			for (std::uint32_t k = 0; k < sampleN; ++k) {
+				const auto* ref      = sampleRefs[k];
+				const bool  countBad = sampleCountBad[k];
+				const auto* refRaw   = reinterpret_cast<const std::uint8_t*>(ref);
+				const auto* base     = ref->data.objectReference.get();
+				const bool  isActor  = (refRaw[kOffFormType] == kFormTypeACHR);
 				++s.invChecks;
+				// 诊断留痕（只记候选 +0xA0 的结果：判别「空容器」与「读不出形状」够用了）
+				State::InvCalibSample* rec = nullptr;
+				if (s.invLastSampleCount < kInvCalibPerRound) {
+					rec          = &s.invLastSample[s.invLastSampleCount++];
+					rec->refFid  = ref->GetFormID();
+					rec->baseFid = base ? base->GetFormID() : 0u;
+					rec->objFid  = 0;
+					rec->size    = -1;
+					rec->actor   = isActor ? 1u : 0u;
+				}
 				for (int c = 0; c < 2; ++c) {
 					// ★ v4.15：候选偏移上的指针也用 SafeReadMem 取（换场景期引用随时可能失效）
 					std::uint64_t p = 0;
 					if (!SafeReadMem(refRaw + kOffInvCand[c], &p, sizeof(p)) ||
 						!IsPlausiblePointer(p) || !IsReadable(reinterpret_cast<const void*>(p), 0x38)) {
-						++s.invBad[c];
+						if (countBad) {
+							++s.invBad[c];
+						}
 						continue;
 					}
 					const auto* inv = reinterpret_cast<const std::uint8_t*>(p);
@@ -6069,32 +6146,48 @@ namespace SAS
 					if (!SafeReadMem(inv + kOffInvData, &size, sizeof(size)) ||
 						!SafeReadMem(inv + kOffInvData + 4, &cap, sizeof(cap)) ||
 						!SafeReadMem(inv + kOffInvData + 8, &data, sizeof(data))) {
-						++s.invBad[c];
+						if (countBad) {
+							++s.invBad[c];
+						}
 						continue;
 					}
 					if (size > kInvMaxItems || cap < size || cap > (1u << 20)) {
-						++s.invBad[c];
+						if (countBad) {
+							++s.invBad[c];
+						}
 						continue;
 					}
 					if (size == 0) {
 						// 空库存：数组头形状对，但拿不出「强证据」⇒ 只算弱票。
 						++s.invVotes[c];
+						if (c == 0 && rec) {
+							rec->size = 0;  // 诊断：这是一个「形状 OK 但空」的样本
+						}
 						continue;
 					}
 					if (!IsPlausiblePointer(data) ||
 						!IsReadable(reinterpret_cast<const void*>(data), kOffInvItemSize + 8)) {
-						++s.invBad[c];
+						if (countBad) {
+							++s.invBad[c];
+						}
 						continue;
 					}
 					// ★ 强证据（v4.3 新增）：第一条目的 `object` 必须是一个合法 TESForm。
 					//   标定选错偏移时读到的多半是垃圾指针，这一步会立刻失败。
 					const auto obj = *reinterpret_cast<const std::uint64_t*>(data + kOffInvItemObject);
 					if (!IsPlausibleFormPtr(obj)) {
-						++s.invBad[c];
+						if (countBad) {
+							++s.invBad[c];
+						}
 						continue;
 					}
 					++s.invVotes[c];
 					++s.invStrong[c];
+					if (c == 0 && rec) {
+						rec->size   = static_cast<std::int32_t>(size);
+						rec->objFid = *reinterpret_cast<const std::uint32_t*>(
+							reinterpret_cast<const std::uint8_t*>(obj) + kOffFormID);
+					}
 				}
 			}
 
@@ -6111,15 +6204,30 @@ namespace SAS
 
 			// 没通过：**不放弃**，只是降频（理由见函数顶部的长注释）。
 			//   注意：降频后这几条提示只在「还没成功」时才出现，成功那次会打上面那条 INFO。
+			//   ★ 2026-09-28：这两条都带上「末轮样本」明细 —— 标定一直不成功时，
+			//     日志里直接能看出「采到的是空容器」还是「根本读不出形状」。
 			if (s.invRounds == 1 || s.invRounds == kInvCalibFastRounds) {
-				REX::INFO("inventory calibration: 仍在攒样本（rounds={} checks={} votes=+0x{:X}:{} / +0x{:X}:{} strong={}/{} bad={}/{}）"
-						  " -> 搜空判空**暂不可用**（容器 / 尸体照常亮）",
+				char        sampleBuf[400]{};
+				std::size_t used = 0;
+				for (std::uint32_t k = 0; k < s.invLastSampleCount && used + 1 < sizeof(sampleBuf); ++k) {
+					const auto& r = s.invLastSample[k];
+					const int   n = std::snprintf(sampleBuf + used, sizeof(sampleBuf) - used,
+						" | [%u] ref=%08X base=%08X %s size=%d obj=%08X",
+						k, r.refFid, r.baseFid, r.actor ? "ACHR" : "CONT", r.size, r.objFid);
+					if (n <= 0) {
+						break;
+					}
+					used += static_cast<std::size_t>(n);
+				}
+				REX::INFO("inventory calibration: 仍在攒样本（rounds={} checks={} votes=+0x{:X}:{} / +0x{:X}:{} strong={}/{} bad={}/{} 游标={}）"
+						  " -> 搜空判空**暂不可用**（容器 / 尸体照常亮）{}",
 					s.invRounds, s.invChecks,
 					kOffInvCand[0], s.invVotes[0], kOffInvCand[1], s.invVotes[1],
-					s.invStrong[0], s.invStrong[1], s.invBad[0], s.invBad[1]);
+					s.invStrong[0], s.invStrong[1], s.invBad[0], s.invBad[1],
+					s.invCalibCursor, sampleBuf);
 			} else if (s.invRounds % 600 == 0) {
-				REX::INFO("inventory calibration: 仍无足够样本（rounds={} checks={}；换个有容器 / 尸体的场景就会重试）",
-					s.invRounds, s.invChecks);
+				REX::INFO("inventory calibration: 仍无足够样本（rounds={} checks={} 游标={}；换个有容器 / 尸体的场景就会重试）",
+					s.invRounds, s.invChecks, s.invCalibCursor);
 			}
 		}
 
