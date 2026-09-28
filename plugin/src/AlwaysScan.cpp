@@ -938,22 +938,46 @@ namespace SAS
 		constexpr std::uint32_t kMiscKeywordCapMax = 4096;  // capacity 合理性上限
 		constexpr std::uint32_t kMiscKwProbeMax   = 6;      // `misc kw probe:` 每会话最多几条
 		// ================================================================
-		// ★★★ 2026-09-28：「黄」组（开锁器 / 信用币）的三个 FormID
+		// ★★★ 2026-09-28：「黄」组（开锁器 / 信用条 / 信用币）的 **6 个** FormID
 		// ----------------------------------------------------------------
-		// 需求 = `颜色分类.md`：「黄：开锁器、信用币」+「杂项还是原版扫描仪的颜色
-		//   （除了开锁器、信用币）」⇒ 这两类要从「杂项」里拆出来单独一色。
-		// 离线取证（`tools/re/esm_pickcredit_probe.py`，Starfield.esm 1.16.244.0）：
+		// 需求 = `颜色分类.md`：「黄：开锁器、信用条」+「杂项还是原版扫描仪的颜色
+		//   （除了开锁器、信用币）」⇒ 这几类要从「杂项 / 植物」里拆出来单独一色。
+		// ---- ①②③ MISC 三条（离线取证 `tools/re/esm_pickcredit_probe.py`）----
 		//   · **1319 条 MISC** 里 EDID 命中 digipick / credit 的**只有 3 条**：
-		//       `Digipick`           0x0000000A
-		//       `Credits`            0x0000000F
+		//       `Digipick`           0x0000000A（zhhans 名 = 撬锁器）
+		//       `Credits`            0x0000000F（zhhans 名 = **信用币**，不是「信用条」）
 		//       `FFNeonZ03_Credits`  0x000A7312（霓虹城任务里的一笔钱）
 		//   · 三者的关键词**都只有共用的 `NotJunkJetAmmo`** ⇒ 没有可用的专用关键词，
 		//     判据只能按 **FormID**（与「资源」按 `ResourceType*` 关键词判不同）。
 		//   ★ 这也是资源自检的两个负样本（它们必须**不是**资源）—— 常量共用。
+		// ---- ④⑤⑥ ★★★ 2026-09-28 补：「信用条」根本不是 MISC，而是 FLOR ----
+		//   用户实测反馈「信用条并没有变成黄色」（截图里那枚小卡片仍是青色），复盘：
+		//     a) 截图物件的名字 = 「信用条」，而 `Credits` 的 zhhans 名是「信用币」
+		//        ⇒ **两条记录**，原来那三个 FormID 天然不可能命中它；
+		//     b) 从 `Starfield - Localization.ba2` 抽出 zhhans `.strings`，grep「信用条」
+		//        → 命中 **3 个字符串 ID**（0x2E65E / 0x2E660 / 0x2E662）；
+		//     c) 全量扫 Data 下所有 esm，捞出 **FULL = 这三个 ID** 的记录
+		//        （`tools/re/esm_credit_names_probe.py`）⇒ 是 **3 条 FLOR**：
+		//          `Loot_CredStick_Small`   0x003CC32C（FULL 0x2E65E）
+		//          `Loot_CredStick_Common`  0x003CC325（FULL 0x2E660）
+		//          `Loot_CredStick_Rare`    0x003CC32A（FULL 0x2E662）
+		//        （`tools/re/esm_loot_flor_probe.py`：全 Starfield.esm 里 `Loot_*` 的
+		//         FLOR 记录**正好就这 3 条**，且 KWDA 为空 ⇒ 同样只能按 FormID 判。）
+		//     d) 运行期证据（本机 SAS_AlwaysScan.log）：
+		//          `flora progress probe: base=0x3CC32C … stage=4`
+		//          `flora scan: base=0x3CC325 … -> 状态 7（原版「未扫描」青色脉冲）`
+		//        ⇒ 这一批**散落物形态的「信用条」被当成了「植物 / 星球目标」**
+		//          （走已扫描 / 未扫描判据、画青色），所以永远拿不到黄组的颜色。
+		//   ⇒ 判据：`ClassifyBase()` 的 kFLOR 分支**先**按 FormID 认这 3 条 ——
+		//     命中就归「黄组」，不再走植物那一整套（青色 / 已扫描 / 物种表）。
 		// ================================================================
-		constexpr std::uint32_t kFormIDDigipick    = 0x0000000A; // 开锁器：Digipick
-		constexpr std::uint32_t kFormIDCredits     = 0x0000000F; // 信用币：Credits
-		constexpr std::uint32_t kFormIDCreditsNeon = 0x000A7312; // 信用币：FFNeonZ03_Credits
+		constexpr std::uint32_t kFormIDDigipick    = 0x0000000A; // 开锁器：Digipick（MISC）
+		constexpr std::uint32_t kFormIDCredits     = 0x0000000F; // 信用币：Credits（MISC）
+		constexpr std::uint32_t kFormIDCreditsNeon = 0x000A7312; // 信用币：FFNeonZ03_Credits（MISC）
+		// 「信用条」（★ 散落物形态 = FLOR 记录，不是 MISC）：
+		constexpr std::uint32_t kFormIDCredStickSmall  = 0x003CC32C; // 信用条：Loot_CredStick_Small
+		constexpr std::uint32_t kFormIDCredStickCommon = 0x003CC325; // 信用条：Loot_CredStick_Common
+		constexpr std::uint32_t kFormIDCredStickRare   = 0x003CC32A; // 信用条：Loot_CredStick_Rare
 		// ★★ v4.22：自检的**正样本池**（资源 MISC 物品；任一「拿得到且命中」即算通过）。
 		//   为什么不是一个样本：**实测 0x5556E（InorgCommonIron）整局 `LookupByID` 都是
 		//   null**（用户那一局 121 次尝试全是 `iron=0`，而 Digipick / Credits 一次就拿到；
@@ -2059,6 +2083,10 @@ namespace SAS
 			// ★ v4.22：自检节流（一圈会遍历 1~8 个 cell ⇒ 每个都调一次太亏）+ 首个命中诊断。
 			std::uint64_t resKeywordNextTryMs  = 0;
 			std::uint32_t resKeywordFirstHit   = 0;  // 世界里首个被判成「资源」的 base FormID
+			// ★★★ 2026-09-28：「黄组」的首个命中诊断（会话内只打一条 INFO）——
+			//   用户实测反馈过「信用条没变黄」，而它的判据是写死的 FormID ⇒ 需要
+			//   一行证据说明「判据到底命中没命中、（首条）命中的是哪个 base」。
+			std::uint32_t pickCreditFirstHit   = 0;  // 世界里首个被判成「黄组」的 base FormID
 			// ★★★ v4.23：关键词数组的**偏移标定**（0 = 还没定）—— 见 IsResourceBaseRaw。
 			//   一旦从某个候选偏移读出「形状合格且非空」的数组就采纳它（会话级缓存），
 			//   之后热路径只读这一个偏移；日志里 `关键词数组标定 = base+0x…` 一行可核对。
@@ -5244,6 +5272,25 @@ namespace SAS
 				return static_cast<int>(Category::kDoor);
 			// ---- 植物（可采集）----
 			case RE::FormType::kFLOR:
+				// ★★★ 2026-09-28：「信用条」是**散落物形态的 FLOR**（`Loot_CredStick_*`
+				//   三条，判据 / 取证见常量区 kFormIDCredStick…）—— 它不是植物 /
+				//   星球目标，也不能走「已扫描 / 未扫描」那一套（否则永远是青色脉冲）。
+				//   ⇒ 命中这三个 FormID 就归「黄组」（与开锁器 / 信用币同色）。
+				switch (a_base->GetFormID()) {
+				case kFormIDCredStickSmall:
+				case kFormIDCredStickCommon:
+				case kFormIDCredStickRare:
+					// 会话内第一条 = 「黄组真的在干活」的最快证据（复盘时 grep 这一行）。
+					if (g_state.pickCreditFirstHit == 0) {
+						g_state.pickCreditFirstHit = a_base->GetFormID();
+						REX::INFO("pickcredit: 首个黄组命中 base=0x{:08X}（信用条 Loot_CredStick_*）"
+								  " -> 黄组生效（通道色 #FFE100）",
+							g_state.pickCreditFirstHit);
+					}
+					return static_cast<int>(Category::kLootPickCredit);
+				default:
+					break;
+				}
 				return static_cast<int>(Category::kFlora);
 			// ---- 其它：MSTT（MovableStatic）----
 			//   ★ v4.1：默认被 `EnableOther=0` 关掉 —— MSTT 里是纸箱 / 桌椅 / 吧台 /

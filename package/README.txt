@@ -10,6 +10,17 @@ Version  : 2.0.1  (plugin build 5.1.0)
                three matching item records were checked offline (Digipick,
                Credits, FFNeonZ03_Credits); they carry no dedicated keyword,
                so they are recognised by record id.
+             * fixed (2026-09-28), same category: the small credit sticks you
+               find lying around (the takeable card you grab for money; the
+               Chinese localisation calls the currency "credit" and this card
+               a "credit strip") stayed CYAN - they never turned yellow. They
+               are not "misc" items in the data at all: the game stores them
+               as **flora** records (Loot_CredStick_Small / _Common / _Rare,
+               records 0x3CC32C / 0x3CC325 / 0x3CC32A), so the mod had been
+               treating them as planet targets - cyan, run through the
+               surveyed / not-surveyed logic. They are now matched by record
+               id inside the flora branch too and join the yellow category;
+               the periodic log line's `pickcredit=` counter counts them.
              * doors are MAGENTA (they were white when the 2.0.1 package was
                first built). Computers / terminals / buttons (all
                "activators") were briefly grouped with the doors during the
@@ -743,12 +754,14 @@ Pick-up items follow the game's own inventory categories:
     ColorDevice=27C684 to repaint devices only)                        GREEN
   * Notes (notes, data slates, magazines, books) and resources (iron,
     aluminium, helium-3, organics, ...) - one purple               PURPLE
-  * Digipicks and credits (since 2.0.1; they used to be plain misc blue)
-                                                                     YELLOW
+  * Digipicks, credits and the loose credit sticks (since 2.0.1; they used
+    to be plain misc blue - the credit sticks used to be cyan, because the
+    game stores them as flora records and the mod treated them as planet
+    targets)                                                         YELLOW
     (write ColorPickCredit=FFE100 to tune; with ChannelMode=1 every
     category has its own channel, so this never affects anything else.
     Note: the yellow is a channel-mode feature - on the old fallback path
-    these two items fall back to the misc blue.)
+    these items fall back to the misc blue.)
   * Misc items (everything else: toys, coffee mugs, wrenches, ...)      BLUE
   * Containers (loot the good stuff)                                 ORANGE
   * Bodies / corpses - people, creatures and wrecked robots / turrets
@@ -826,10 +839,10 @@ plant has been surveyed". Plants now use the first two sources only,
 exactly like the game does; ores / gas / liquids are unchanged.
 FloraScannedByEngineState=0 / FloraScannedByResource=0 (or
 StateFloraScanned=7) in the INI restores the old "all cyan" behaviour. Resources vs. misc items: "resources" (iron, aluminium,
-helium-3, organics, ...) are purple; since 2.0.1 digipicks and credits are
-their own yellow category, and the remaining misc items (toys, mugs,
-wrenches, ...) are blue. If the resource check ever fails, the log says so
-and everything falls back to the misc color.
+helium-3, organics, ...) are purple; since 2.0.1 digipicks, credits and the
+loose credit sticks are their own yellow category, and the remaining misc
+items (toys, mugs, wrenches, ...) are blue. If the resource check ever fails,
+the log says so and everything falls back to the misc color.
 
 "Resources" are recognised from the item record itself (the game marks
 them with its own ResourceType keywords), so both vanilla and mod-added
@@ -921,6 +934,13 @@ Most useful options:
                         planet targets use state 5 as well (see
                         StateFloraScanned below) - same state, same green,
                         so nothing changes visually.
+  StatePickCredit=2     digipicks / credits / loose credit sticks (2.0.1). On
+                        the old fallback path this state is used with the
+                        colour left alone, i.e. misc blue - the yellow only
+                        exists in channel mode (the default). EnablePickCredit=0
+                        turns highlighting for all of them off; ColorPickCredit,
+                        AlphaPickCredit tune colour / transparency (channel
+                        mode).
   FloraScannedByEngineState=1
                         main switch: ask the game itself whether a planet
                         target has been surveyed already (default on,

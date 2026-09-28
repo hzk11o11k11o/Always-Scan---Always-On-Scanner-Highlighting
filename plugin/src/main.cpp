@@ -449,7 +449,14 @@ SFSE_PLUGIN_LOAD(const SFSE::LoadInterface* a_sfse)
 	//   **「电脑 / 按钮等所有可互动物品」退回 2.0** —— 品红 #FF3BD4 → **原版绿**
 	//   （state 6 → 4 + 颜色不覆盖；`kChannelColorDef[kDevice]` 0xFF3BD4 → 0x27C684）；
 	//   **「门」仍是品红 #FF3BD4**；黄 = 开锁器 / 信用币 不变 —— 完整记录见 docs/51。
-	REX::INFO("SAS_AlwaysScan v5.1.0 loading（订正 R14：日志**完全关闭**开关（N 网公开版口径）—— `[General] LogMaxMB` 升级为「开关 + 上限」：**0 = 完全关闭**（不建文件、清空全部 sink + level off，零输出零文件；★ 内置默认也是 0）、**>0 = 开启**（上限 N MiB，钳制 1024）；本机部署 INI 显式写 10；R13 的诊断可观测性（判绿行/链判决行「每 base 首条」+ 缓存回填 key1/key2）原样保留；★ 除日志开关外行为零改动；★ 2026-09-28 第二轮配色修订：门 / 电脑 / 按钮 = 品红 #FF3BD4（白 #FFFFFF 起不再使用，见 docs/50）；★★ 第三轮配色修订：电脑 / 按钮等可互动物品**退回 2.0** = 原版绿 #27C684（state 6 → 4 + 不覆盖、通道默认色同步），门仍品红 #FF3BD4；黄 = 开锁器 / 信用币不变（见 docs/51））(SFSE build {})",
+	// ★★★ 2026-09-28（第四轮 · 用户实测反馈修复；公开版仍 2.0.1、DLL 内部 build 仍 5.1.0）：
+	//   **「信用条」没有变黄** —— 真根因：**它不是 MISC，而是 FLOR**
+	//   （`Loot_CredStick_Small/Common/Rare` = 0x3CC32C / 0x3CC325 / 0x3CC32A，
+	//    zhhans 名 = 信用条；而 `Credits` 0xF 的 zhhans 名是「信用币」）。
+	//   之前它们掉进「植物 / 星球目标」分支 ⇒ 走已扫描 / 未扫描判据、画青色脉冲。
+	//   ⇒ `ClassifyBase()` 的 kFLOR 分支先按 FormID 认这 3 条并归「黄组」#FFE100。
+	//   证据链（zhhans .strings → FULL 反查 → 运行期 flora 日志）见 docs/53。
+	REX::INFO("SAS_AlwaysScan v5.1.0 loading（订正 R14：日志**完全关闭**开关（N 网公开版口径）—— `[General] LogMaxMB` 升级为「开关 + 上限」：**0 = 完全关闭**（不建文件、清空全部 sink + level off，零输出零文件；★ 内置默认也是 0）、**>0 = 开启**（上限 N MiB，钳制 1024）；本机部署 INI 显式写 10；R13 的诊断可观测性（判绿行/链判决行「每 base 首条」+ 缓存回填 key1/key2）原样保留；★ 除日志开关外行为零改动；★ 2026-09-28 第二轮配色修订：门 / 电脑 / 按钮 = 品红 #FF3BD4（白 #FFFFFF 起不再使用，见 docs/50）；★★ 第三轮配色修订：电脑 / 按钮等可互动物品**退回 2.0** = 原版绿 #27C684（state 6 → 4 + 不覆盖、通道默认色同步），门仍品红 #FF3BD4；黄 = 开锁器 / 信用币不变（见 docs/51）；★★★ 第四轮（行为修复）：**「信用条」= FLOR**（`Loot_CredStick_Small/Common/Rare` 0x3CC32C/0x3CC325/0x3CC32A）—— 之前被当成「植物 / 星球目标」（青色脉冲；被 `Credits` 的中文名「信用币」误导过一轮），现在归入黄组 #FFE100（见 docs/53））(SFSE build {})",
 		SFSE::GetSFSEVersion());
 
 	if (auto* messaging = SFSE::GetMessagingInterface()) {
