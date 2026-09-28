@@ -19,7 +19,7 @@
 | --- | --- |
 | **Mod name** | `Always Scan - Always-On Scanner Highlighting (SFSE)` |
 | **Summary**（约 250 字符以内） | `Keep the scanner highlight on at all times. No need to hold the handheld scanner: everything inside a configurable radius gets the vanilla outline, color-coded by category. Full-radius highlighting, one toggle hotkey, fully configurable via INI. SFSE plugin.` |
-| **Version** | `2.0.1`（引擎 build 5.1.0；Nexus 上的 1.0 → … → 1.8.1 → 2.0 → **2.0.1**。★ 2026-09-28 **2.0.1 = 配色需求更新版**：**黄 = 开锁器 / 信用币（新增类别）**、**门 / 电脑 / 按钮等所有可互动物品（设备并入该组）** —— 自建通道 13 → 14，公开版日志仍默认完全关闭；★ 2026-09-28 第二轮修订：该组颜色 **白 → 品红 #FF3BD4**（选色：313° 落在「紫 269° → 红 0°」空档正中，与紫 / 红各拉开 ~44° / ~47°）。2.0 的 16 项修复见英文 Version history (1)~(16) 与中文 ①~⑮） |
+| **Version** | `2.0.1`（引擎 build 5.1.0；Nexus 上的 1.0 → … → 1.8.1 → 2.0 → **2.0.1**。★ 2026-09-28 **2.0.1 = 配色需求更新版**：**黄 = 开锁器 / 信用币（新增类别）**、**品红 = 门**、**电脑 / 按钮等可互动物品（设备）退回 2.0 = 原版绿（与弹药 / 救援同色）** —— 自建通道 13 → 14，公开版日志仍默认完全关闭；★ 同日三轮配色修订：白 → 品红 #FF3BD4（选色：313° 落在「紫 269° → 红 0°」空档正中，与紫 / 红各拉开 ~44° / ~47°），最终定稿把「电脑 / 按钮」放回 2.0 的原版绿（第一 / 二轮曾与门同色：白 → 品红）。2.0 的 16 项修复见英文 Version history (1)~(16) 与中文 ①~⑮） |
 | **Category** | `Gameplay`（Alternate suggestion: `Items and Objects - Gameplay`） |
 | **Requirements（依赖）** | `Starfield Script Extender (SFSE) 0.2.21+`、`(1.16.244.0) SFSE Address Library`、游戏版本 `1.16.244.0` |
 | **主文件（Main file）** | `StarfieldAlwaysScan-2.0.1.zip` |
@@ -47,17 +47,17 @@ In the vanilla game you have to equip the handheld scanner to see which objects 
   | --- | --- | --- |
   | Weapons & throwables | guns, melee, grenades, mines | **red** |
   | Spacesuits / helmets / packs / clothing | anything in the Apparel tab | **red** (one colour for the whole equipment set since 1.8.0, same as weapons; the game's own light cyan-blue in 1.7.9) |
-  | Ammo & aid | ammo, meds, food, drinks | **the game's own green** (states 4/5 are shared with the vanilla "scanned planet target" green since 1.7.6; `ColorAmmoAid=00FF66` brings bright green back) |
+  | Ammo & aid + computers / terminals / buttons | ammo, meds, food, drinks; terminals, switches, buttons | **the game's own green** (devices are back on the game's own green = the 2.0 layout; the 2026-09-28 colour revisions briefly grouped them with the doors. States 4/5 are shared with the vanilla "scanned planet target" green since 1.7.6; `ColorAmmoAid=00FF66` / `ColorDevice=27C684` tune them) |
   | Notes | notes, data slates, magazines, books | **purple** (same colour as resources since 1.8.0; the game's own cyan in 1.7.9) |
   | Resources | iron, aluminium, helium-3, organics, ... | **purple** |
   | Digipicks & credits | digipicks, the credits you pick up | **yellow** (new in **2.0.1**; these used to be plain misc blue — `ColorPickCredit` tunes it) |
   | Misc items | toys, coffee mugs, wrenches, ... | **blue (unchanged from 1.5)** |
   | Containers | crates, safes, lockers | **orange** (back since 1.7.9; briefly the game's own cyan in 1.7.8) |
   | Bodies / corpses | dead people, creatures, and wrecked robots / turrets | **orange** (same colour as containers; back since 1.7.9) |
-  | Doors, computers & buttons | doors, terminals, switches, buttons — every interactive object | **magenta** (one group since 2.0.1; **magenta since the 2026-09-28 colour revision** — they were white before that; `ColorDoor` / `ColorDevice` tune it) |
+  | Doors | doors | **magenta** since the 2026-09-28 colour revision (they were white when the 2.0.1 package was first built; `ColorDoor` tunes it) |
   | Flora | plants — the game stores ores, gas vents and liquid pools in this same record type too (see below) | **the game's own colours**: cyan pulse while unscanned, **green** once scanned — with or without the scanner up; a confirmed "surveyed" verdict is remembered **per reference** (since 2.0 build 5.1.0; per species in 1.8.1), across scenes and across game sessions, so a target cannot drop back to cyan — and scanning one plant no longer turns the rest of its species green |
 
-  Colors are written by the mod through the engine's per-state colour block, and **only five of the eleven states are written at all** (misc blue, notes & resources purple, doors / devices magenta, containers / corpses orange, equipment red) — and **since 2.0 the default `ChannelMode=1` writes no engine state at all** (every category gets its own colour channel; the five-state layout is the `ChannelMode=0` fallback). The other six are owned by the game and are never touched: states **0 / 1** — which the game itself uses while the scanner is up to outline plain references, **people included** (native cyan / light cyan; that is why NPCs look vanilla since 1.7.8) — plus **4 / 5** (scanned planet targets, native green; since 1.7.6) and **7 / 8** (unscanned planet targets, native cyan; since 1.7.5). **Grouping since 1.8.0:** the whole equipment set (weapons, throwables, suits, helmets, packs, clothing) shares one **red**, notes share the resources' **purple**, and ammo & aid keep the game's own **green** — every requested colour now fits inside the five borrowable states with nothing left over, so no colour has to step aside anymore. (1.7.9 still had to give up apparel and notes to bring back "containers orange / doors white"; that trade-off is history — both are back to their group colours now.)
+  Colors are written by the mod through the engine's per-state colour block, and **only five of the eleven states are written at all** (misc blue, notes & resources purple, doors magenta, containers / corpses orange, equipment red) — and **since 2.0 the default `ChannelMode=1` writes no engine state at all** (every category gets its own colour channel; the five-state layout is the `ChannelMode=0` fallback). The other six are owned by the game and are never touched: states **0 / 1** — which the game itself uses while the scanner is up to outline plain references, **people included** (native cyan / light cyan; that is why NPCs look vanilla since 1.7.8) — plus **4 / 5** (scanned planet targets, native green; since 1.7.6) and **7 / 8** (unscanned planet targets, native cyan; since 1.7.5). **Grouping since 1.8.0:** the whole equipment set (weapons, throwables, suits, helmets, packs, clothing) shares one **red**, notes share the resources' **purple**, and ammo & aid **and computers / terminals / buttons** keep the game's own **green** — every requested colour now fits inside the five borrowable states with nothing left over, so no colour has to step aside anymore. (1.7.9 still had to give up apparel and notes to bring back "containers orange / doors white"; that trade-off is history — both are back to their group colours now. Likewise, the 2026-09-28 revisions first moved the devices into the doors' colour group and then handed them back to their own 2.0 green.)
 
   Since **1.7.3** the outline is drawn as a **contour instead of a fill**: the mod writes alpha=0 into the outline's base color — the same "no fill" state the engine itself uses for its scannable targets — so you see the item's own material and shape in full, with the category color sitting on the contour. Set `NoFill=0` in the INI to restore the old filled look (1.7.1 / 1.7.2). Note for upgraders from 1.7.2: that release's opacity options (`AlphaXxx`) turned out to have **no visible effect at all** — pixel measurements on a screenshot showed the covered area was pixel-identical at 40% and 100%, because the engine ignores that alpha byte for the fill. `AlphaXxx` now only changes the pulse (contour) transparency.
 
@@ -243,7 +243,8 @@ Built with **SFSE** and **CommonLibSF**. Huge thanks to their authors and to eve
 - **分类分色**（1.6 起**按物品栏分类**给可拾取物品上色；1.8.0 起**分组定稿**，大部分可配）：
   **红 = 武器 / 投掷物 + 太空服 / 背包 / 头盔 / 服饰（整组一个红）**、
   **橙 = 容器 / 尸体**、**紫 = 笔记 + 资源**、
-  **绿 = 弹药 / 救援（原版绿）**、**品红 = 门 / 电脑 / 按钮（2026-09-28 第二轮由白改品红）**、
+  **绿 = 弹药 / 救援 + 电脑 / 按钮等所有可互动物品（2026-09-28 第三轮定稿：设备退回
+  2.0 = 原版绿；第一 / 二轮曾与门同色：白 → 品红）**、**品红 = 门**、
   **蓝 = 杂项（原版蓝 —— 与 1.5 一模一样，没有变化）**；
   **植物 / 矿脉 / 气泉 / 液池（原版青色脉冲 = 未扫描；扫描完成后 = 原版绿 ——
   这四个槽位的颜色 MOD 一个字节都不改；**背不背扫描仪都一样**，见下）**；
@@ -251,11 +252,13 @@ Built with **SFSE** and **CommonLibSF**. Huge thanks to their authors and to eve
 - **★★★ 2.0.1（引擎 5.1.0）：配色需求更新版（2026-09-28）** ——
   **黄 = 开锁器 / 信用币**（新增类别：三条记录按 FormID 识别 —— `Digipick` 0xA /
   `Credits` 0xF / `FFNeonZ03_Credits` 0xA7312，离线取证显示它们没有专用关键词；
-  通道模式 = 独立通道 **#FFE100**）、**门 / 电脑 / 按钮等所有可互动物品**
-  （设备 ACTI/TERM **4 → 6**，与门共槽同色 —— **state 4 就此完全不占用**）。
+  通道模式 = 独立通道 **#FFE100**）、**品红 = 门 #FF3BD4**、
+  **电脑 / 按钮等所有可互动物品 = 2.0 的原版绿**（设备 ACTI/TERM：第一轮 4 → 6 与门
+  共槽同色，第三轮定稿 **6 → 4** + 颜色不覆盖 = 引擎原生绿 #27C684，与弹药 / 救援同色）。
   ⇒ 类别 12 → 13、自建通道 13 → 14；其余配色一字未动。
-  ★ 同日第二轮修订：该组颜色 **白 → 品红 #FF3BD4**（313° 落在「紫 269° → 红 0°」
-  空档正中；只改颜色值 —— 通道数 / 槽位 / 其余类别一字未动）。
+  ★ 同日三轮修订：第一轮设备并入门（组色 = 白）、第二轮整组白 → 品红 #FF3BD4
+  （313° 落在「紫 269° → 红 0°」空档正中）、第三轮定稿把「电脑 / 按钮」放回 2.0 的
+  原版绿（「品红 = 门」只剩门自己）。
   新键：`StatePickCredit` / `EnablePickCredit` / `ColorPickCredit` / `AlphaPickCredit`。
   ⚠️ 黄色只在通道模式（默认）下表达；旧路径（`ChannelMode=0`）没有空闲槽位 ⇒
   开锁器 / 信用币退回杂项蓝（不污染引擎的 NPC / 星球目标槽位）。

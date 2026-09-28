@@ -401,6 +401,14 @@ if (-not $SkipDeploy) {
     #     用过的颜色，不是纸面新造色）。只改颜色值：通道数 14、槽位分配、其余
     #     类别一字未动（`kChannelColorDef` 的 kDevice / kDoor 与旧路径
     #     `colorOverride` 的 kDoor）。完整记录见 docs/50。
+    #   ★ 2026-09-28（第三轮 · 用户指令；公开版仍 2.0.1 / DLL build 仍 5.1.0）：
+    #     **「电脑 / 按钮等所有可互动物品」退回 2.0** —— 需求 `颜色分类.md` 定稿：
+    #     「绿 = 弹药、救援、电脑、按钮等所有可互动物品」⇒ 设备（ACTI/TERM）
+    #     `stateByCategory` / `kStateDef` **6 → 4**（+ `colorOverride` 保持
+    #     kColorUnset = 引擎原生绿 #27C684）、`kChannelColorDef[kDevice]`
+    #     **0xFF3BD4 → 0x27C684**；「门」仍 = state 6 品红 #FF3BD4（第一 / 二轮
+    #     曾把设备并与门同色，本轮取消）。其余类别（红 / 橙 / 紫 / 黄 / 蓝 /
+    #     原版青↔绿）一字未动。完整记录见 docs/51。
     Set-Content -LiteralPath (Join-Path $modRoot 'meta.ini') -Value "[General]`nmodid=18268`nversion=2.0.1`ncomment=Always-on scanner highlighting (SFSE)" -Encoding UTF8
 
     Get-ChildItem -LiteralPath $modRoot -Recurse -File | ForEach-Object {

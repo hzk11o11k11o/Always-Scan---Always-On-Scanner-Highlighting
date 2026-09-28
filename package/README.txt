@@ -4,20 +4,21 @@
 ========================================================================
 
 Version  : 2.0.1  (plugin build 5.1.0)
-           2.0.1 = colour layout update (one category added, one merged):
+           2.0.1 = colour layout update (one category added):
              * NEW - digipicks and credits are their own category now and are
                highlighted YELLOW (they used to be plain "misc" blue). The
                three matching item records were checked offline (Digipick,
                Credits, FFNeonZ03_Credits); they carry no dedicated keyword,
                so they are recognised by record id.
-             * computers / terminals / buttons (all "activators") share one
-               colour with doors - "doors, computers, buttons and every
-               other interactive object are one group". With the 2026-09-28
-               colour revision that group is MAGENTA (it was white when the
-               2.0.1 package was first built).
-               Nothing else about the colours changed; the mod now carries
-               fourteen colour channels (thirteen categories + surveyed
-               plants) instead of thirteen.
+             * doors are MAGENTA (they were white when the 2.0.1 package was
+               first built). Computers / terminals / buttons (all
+               "activators") were briefly grouped with the doors during the
+               2026-09-28 colour revisions; the final layout of that day
+               puts them back exactly where 2.0 had them - the game's own
+               GREEN, the same colour as ammo & aid.
+             * every other colour is unchanged; the mod carries fourteen
+               colour channels (thirteen categories + surveyed plants)
+               instead of thirteen.
            2.0 = the mod brings its own outline colour channels (described
            below), plus sixteen fixes, all from player reports.
            (1) "Ores and plants are green before *and* after scanning."
@@ -724,8 +725,12 @@ Highlights are color-coded by category (all values configurable).
 Pick-up items follow the game's own inventory categories:
   * Weapons, throwables and the whole equipment set (guns, melee, grenades,
     mines, spacesuits, helmets, packs, clothing)                      RED
-  * Ammo and aid (meds, food, drinks) - the game's own green
-    (write ColorAmmoAid=00FF66 for bright green instead)               GREEN
+  * Ammo and aid (meds, food, drinks), and computers / terminals /
+    buttons (all "activators") - the game's own green. Devices are back
+    to the game's green since the 2026-09-28 final colour revision (the
+    first two revisions of that day grouped them with the doors; 2.0 had
+    them green). (write ColorAmmoAid=00FF66 for bright green instead, or
+    ColorDevice=27C684 to repaint devices only)                        GREEN
   * Notes (notes, data slates, magazines, books) and resources (iron,
     aluminium, helium-3, organics, ...) - one purple               PURPLE
   * Digipicks and credits (since 2.0.1; they used to be plain misc blue)
@@ -738,10 +743,8 @@ Pick-up items follow the game's own inventory categories:
   * Containers (loot the good stuff)                                 ORANGE
   * Bodies / corpses - people, creatures and wrecked robots / turrets
     (anything you can search) - same state as containers             ORANGE
-  * Doors, computers / terminals and buttons / activators - one magenta
-    (since 2.0.1 they share one colour: "doors, computers, buttons and
-    every other interactive object"; magenta since the 2026-09-28 colour
-    revision - they were white before that)                       MAGENTA
+  * Doors - magenta since the 2026-09-28 colour revision (white before
+    that)                                                        MAGENTA
   * Flora, ores, gas vents, liquid pools (all one record type in the game
     data) - the game's own "scannable target" colour, a cyan pulse; once
     you have surveyed one it switches to the game's own "scanned" green.
@@ -756,9 +759,10 @@ Pick-up items follow the game's own inventory categories:
 
 Since 1.8.0 the categories are grouped into colours that are easy to tell
 apart (red = equipment, orange = lootable world objects, purple = knowledge
-and crafting materials, green = consumables, magenta = doors / computers /
-buttons since the 2026-09-28 colour revision (white before that), plus the
-original misc blue and the game's own cyan / green for planet targets).
+and crafting materials, green = consumables and interactables (computers /
+terminals / buttons), magenta = doors since the 2026-09-28 colour revision
+(white before that), plus the original misc blue and the game's own cyan /
+green for planet targets).
 Every colour is assigned explicitly by the mod (see ColorXxx in the INI),
 by writing into the engine's per-state colour block. Five of the eleven
 states are written in total (2 / 3 / 6 / 9 / 10); the other six are
@@ -887,11 +891,13 @@ Most useful options:
   StateResource=3         notes / resources -> 3 (purple)
   StateLoot=2             ammo & aid -> 5 (the game's own green)
   StateContainer=9        misc -> 2 (blue, = 1.5)
-  StateDevice=6           containers & bodies -> 9 (orange)
-  StateDoor=6             doors & devices -> 6 (one group; magenta since
-  StateFlora=7            the 2026-09-28 revision, white in 2.0.1)
-                        flora 7 (= the vanilla scannable-target state,
-                        colour not overwritten) and MSTT 2.
+  StateDevice=4           containers & bodies -> 9 (orange)
+  StateDoor=6             devices -> 4 (the game's own green = 2.0; the
+  StateFlora=7            2026-09-28 revisions briefly used 6, sharing
+                        the doors' colour), doors -> 6 (magenta since the
+                        2026-09-28 revision; white in the first 2.0.1
+                        build), flora 7 (= the vanilla scannable-target
+                        state, colour not overwritten) and MSTT 2.
                         Five of the eleven states are written in total
                         (2 / 3 / 6 / 9 / 10); the other six are never
                         touched: 0 / 1 (the game paints plain references
@@ -899,9 +905,9 @@ Most useful options:
                         left alone since 1.7.8), 7 / 8 (vanilla "not
                         scanned planet target" states; since 1.7.5) and
                         4 / 5 (vanilla "scanned planet target" states,
-                        native green; since 1.7.6). Ammo & aid uses 5
-                        (devices moved to 6 in 2.0.1), so it shows the
-                        game's own green by default (1.7.6). Since 1.7.7 already-scanned
+                        native green; since 1.7.6). Ammo & aid uses 5 and
+                        devices use 4, so both show the game's own green by
+                        default (1.7.6). Since 1.7.7 already-scanned
                         planet targets use state 5 as well (see
                         StateFloraScanned below) - same state, same green,
                         so nothing changes visually.
@@ -1020,13 +1026,16 @@ Most useful options:
   ColorWeapon=FF2E2E    exact RGB per category (written by default):
   ColorApparel=FF2E2E     equipment (weapons / suits / clothing) red,
   ColorNote=B36BFF        notes & resources purple, misc blue - plus
-  ColorResource=B36BFF    containers & corpses orange and doors / devices
-  ColorContainer=FF9500   magenta (magenta since the 2026-09-28 revision,
-  ColorDoor=FF3BD4        white before that). Five states are written in
-                          total (states 2 / 3 / 6 / 9 / 10). Ammo & aid /
-                          flora / MSTT are NOT written - they show the
-                          game's own colours (green / cyan-green / blue
-                          respectively). ★ Since 2.0 the default is
+  ColorResource=B36BFF    containers & corpses orange and doors magenta
+  ColorContainer=FF9500   (magenta since the 2026-09-28 revision, white
+  ColorDoor=FF3BD4        before that). Five states are written in total
+                          (states 2 / 3 / 6 / 9 / 10). Ammo & aid /
+                          devices / flora / MSTT are NOT written - they
+                          show the game's own colours (green / green /
+                          cyan-green / blue respectively; devices are back
+                          on the game's own green, exactly as in 2.0 - the
+                          2026-09-28 colour revisions briefly grouped them
+                          with the doors). ★ Since 2.0 the default is
                           ChannelMode=1: each category has its own outline
                           colour channel and no engine state is written at
                           all - the five-state description above applies to
@@ -1035,12 +1044,14 @@ Most useful options:
                           also left untouched, and since 1.7.8 the two
                           "plain reference / NPC" states (0 / 1) as well.
   ColorAmmoAid / ColorDevice
-                        write these (00FF66 / 00E5FF) only if you want the
-                        old bright green / cyan back - it will hide the
-                        vanilla "scanned planet target" green again.
-                        (Since 2.0.1 devices share the doors' colour: on
-                        the old fallback path a ColorDevice also repaints
-                        the doors; in channel mode it affects devices only.)
+                        write these (00FF66 / 27C684) only if you want the
+                        old bright green back - it will hide the vanilla
+                        "scanned planet target" green again (they sit in
+                        the states the game uses for that, 5 and 4).
+                        (ColorDevice: in channel mode it affects devices
+                        only; on the old fallback path it also repaints the
+                        "scanned planet target (far)" green, because
+                        devices live in state 4.)
                         Note that any ColorXxx writes the engine's global
                         per-state color block, so the same state of the
                         vanilla scanner changes too (see the INI).
