@@ -394,6 +394,13 @@ if (-not $SkipDeploy) {
     #        （与门共槽 ⇒ 同白 #FFFFFF）；state 4 就此**完全不占用**。
     #     ⇒ 类别 12 → 13、自建通道 13 → 14；通道模式下「并组」只剩用户偏好
     #       （ColorApparel / ColorNote 想拆随时改）。DLL build 号仍 5.1.0。
+    #   ★ 2026-09-28（第二轮 · 用户指令；公开版仍 2.0.1 / DLL build 仍 5.1.0）：
+    #     **配色修订 ——「门 / 电脑 / 按钮」白 #FFFFFF → 品红 #FF3BD4** ——
+    #     选色：313° 落在「紫 269° → 红 0°」这段 91° 空档正中（与最近的紫 / 红
+    #     各拉开 ~44° / ~47°，离其余类别全部 ≥82°；#FF3BD4 是 v4.19~v4.30 实测
+    #     用过的颜色，不是纸面新造色）。只改颜色值：通道数 14、槽位分配、其余
+    #     类别一字未动（`kChannelColorDef` 的 kDevice / kDoor 与旧路径
+    #     `colorOverride` 的 kDoor）。完整记录见 docs/50。
     Set-Content -LiteralPath (Join-Path $modRoot 'meta.ini') -Value "[General]`nmodid=18268`nversion=2.0.1`ncomment=Always-on scanner highlighting (SFSE)" -Encoding UTF8
 
     Get-ChildItem -LiteralPath $modRoot -Recurse -File | ForEach-Object {

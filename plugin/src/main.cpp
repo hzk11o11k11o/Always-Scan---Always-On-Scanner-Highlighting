@@ -440,7 +440,12 @@ SFSE_PLUGIN_LOAD(const SFSE::LoadInterface* a_sfse)
 	//   置 off，日志调用零输出零文件）；**>0 = 开启**，上限 N MiB（钳制到 1024）。
 	//   内置默认 1 → **0（关闭）** = 公开版口径（INI 缺失 / 手动安装也不产生日志）；
 	//   本机部署 INI 显式写 `LogMaxMB=10`（开发排障口径，行为不变）。
-	REX::INFO("SAS_AlwaysScan v5.1.0 loading（订正 R14：日志**完全关闭**开关（N 网公开版口径）—— `[General] LogMaxMB` 升级为「开关 + 上限」：**0 = 完全关闭**（不建文件、清空全部 sink + level off，零输出零文件；★ 内置默认也是 0）、**>0 = 开启**（上限 N MiB，钳制 1024）；本机部署 INI 显式写 10；R13 的诊断可观测性（判绿行/链判决行「每 base 首条」+ 缓存回填 key1/key2）原样保留；★ 除日志开关外行为零改动）(SFSE build {})",
+	// ★★★ 2026-09-28（第二轮 · 用户指令；公开版仍 2.0.1、DLL 内部 build 仍 5.1.0）：
+	//   **配色修订 ——「门 / 电脑 / 按钮」白 #FFFFFF → 品红 #FF3BD4**
+	//   （`颜色分类.md` 同步；只改颜色值 —— 通道数 14、槽位分配、其余类别一字未动；
+	//   选色推导见 docs/50：313° 落在「紫 269° → 红 0°」空档正中，与最近的紫 / 红
+	//   各拉开 ~44° / ~47°，离其余类别全部 ≥82°）。
+	REX::INFO("SAS_AlwaysScan v5.1.0 loading（订正 R14：日志**完全关闭**开关（N 网公开版口径）—— `[General] LogMaxMB` 升级为「开关 + 上限」：**0 = 完全关闭**（不建文件、清空全部 sink + level off，零输出零文件；★ 内置默认也是 0）、**>0 = 开启**（上限 N MiB，钳制 1024）；本机部署 INI 显式写 10；R13 的诊断可观测性（判绿行/链判决行「每 base 首条」+ 缓存回填 key1/key2）原样保留；★ 除日志开关外行为零改动；★ 2026-09-28 第二轮配色修订：门 / 电脑 / 按钮 = 品红 #FF3BD4（白 #FFFFFF 起不再使用，见 docs/50））(SFSE build {})",
 		SFSE::GetSFSEVersion());
 
 	if (auto* messaging = SFSE::GetMessagingInterface()) {
