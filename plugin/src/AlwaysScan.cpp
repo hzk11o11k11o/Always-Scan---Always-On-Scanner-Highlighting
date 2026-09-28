@@ -861,13 +861,22 @@ namespace SAS
 			//   判死/判活见 ClassifyRef()；活着的 NPC / 生物**一个都不亮**（红线）。
 			//   容器 / 尸体都要「搜空即熄灭」——见 RefLootState()。
 			kCorpse,
+			// ★★★ 2026-09-28（需求 `颜色分类.md`）：**黄 = 开锁器 + 信用币**。
+			//   从「杂项」里拆出来的第 7 个「物品子类」：
+			//     · 判据 = base FormID（3 条，见常量区 kFormIDDigipick…）；
+			//     · 通道模式（默认）下有自己的通道 ⇒ **黄 #FFE100**；
+			//     · 旧路径（ChannelMode=0 / 通道自动回退）里**没有空闲槽位**可用
+			//       （2/3/6/9/10 已占满、0/1/4/5/7/8 归还引擎）⇒ 退回 state 2 +
+			//       不覆盖 = 与「杂项」同蓝（正好等于本改动之前的观感，
+			//       绝不为了一个颜色去污染引擎的星球目标 / NPC 槽位）。
+			kLootPickCredit,
 			kCount
 		};
 		constexpr std::size_t kCategoryCount = static_cast<std::size_t>(Category::kCount);
 
 		constexpr const char* kCategoryName[kCategoryCount] = {
 			"loot", "weapon", "apparel", "ammoaid", "note", "resource",
-			"container", "device", "door", "flora", "other", "corpse"
+			"container", "device", "door", "flora", "other", "corpse", "pickcredit"
 		};
 
 		// ================================================================
@@ -912,8 +921,23 @@ namespace SAS
 		constexpr std::uint32_t kMiscKeywordMax   = 64;     // 防呆上限（资源物品实测最多 4 个）
 		constexpr std::uint32_t kMiscKeywordCapMax = 4096;  // capacity 合理性上限
 		constexpr std::uint32_t kMiscKwProbeMax   = 6;      // `misc kw probe:` 每会话最多几条
-		constexpr std::uint32_t kResKeywordDigipick = 0x0000000A; // Digipick（自检：杂项）
-		constexpr std::uint32_t kResKeywordCredits = 0x0000000F;  // Credits（自检：杂项）
+		// ================================================================
+		// ★★★ 2026-09-28：「黄」组（开锁器 / 信用币）的三个 FormID
+		// ----------------------------------------------------------------
+		// 需求 = `颜色分类.md`：「黄：开锁器、信用币」+「杂项还是原版扫描仪的颜色
+		//   （除了开锁器、信用币）」⇒ 这两类要从「杂项」里拆出来单独一色。
+		// 离线取证（`tools/re/esm_pickcredit_probe.py`，Starfield.esm 1.16.244.0）：
+		//   · **1319 条 MISC** 里 EDID 命中 digipick / credit 的**只有 3 条**：
+		//       `Digipick`           0x0000000A
+		//       `Credits`            0x0000000F
+		//       `FFNeonZ03_Credits`  0x000A7312（霓虹城任务里的一笔钱）
+		//   · 三者的关键词**都只有共用的 `NotJunkJetAmmo`** ⇒ 没有可用的专用关键词，
+		//     判据只能按 **FormID**（与「资源」按 `ResourceType*` 关键词判不同）。
+		//   ★ 这也是资源自检的两个负样本（它们必须**不是**资源）—— 常量共用。
+		// ================================================================
+		constexpr std::uint32_t kFormIDDigipick    = 0x0000000A; // 开锁器：Digipick
+		constexpr std::uint32_t kFormIDCredits     = 0x0000000F; // 信用币：Credits
+		constexpr std::uint32_t kFormIDCreditsNeon = 0x000A7312; // 信用币：FFNeonZ03_Credits
 		// ★★ v4.22：自检的**正样本池**（资源 MISC 物品；任一「拿得到且命中」即算通过）。
 		//   为什么不是一个样本：**实测 0x5556E（InorgCommonIron）整局 `LookupByID` 都是
 		//   null**（用户那一局 121 次尝试全是 `iron=0`，而 Digipick / Credits 一次就拿到；
@@ -1372,7 +1396,11 @@ namespace SAS
 					//      9 的原生色本来就是橙（TargetFullyScanned #FFAA00，v4.19 起
 					//      一直覆盖成 #FF9500：加了 noFill 的「轮廓橙」）⇒ 用户要的
 					//      「恢复容器橙」回来了（见 v4.31 段）
-				4,  // kDevice      设备 —— 原版绿 #27C684（不覆盖，state 4；★ v4.24 归还引擎）
+				// ★★★ 2026-09-28（需求 `颜色分类.md`：「白：门、电脑、按钮等所有
+				//   可互动物品」）：**设备 4 → 6** —— 与「门」共槽（⇒ 共色 = 白）。
+				//   顺带把 state 4 **彻底归还引擎**（v4.24 起本就不覆盖它，现在连
+				//   挂都不挂了）⇒「已扫描的星球目标（远）」的原版绿更安全。
+				6,  // kDevice      设备 / 电脑 / 按钮 —— 白 #FFFFFF（与门共槽 6）
 				6,  // kDoor        门 —— ★★★ v4.31：0 → **6** + **覆盖为白**。
 					//      6 是**引擎从不写**的唯一槽位（v4.24 订正后的结论）⇒
 					//      用它 = 对原版零影响，「门白」原样恢复（见 v4.31 段）
@@ -1380,7 +1408,11 @@ namespace SAS
 				//     （= 原版 `TargetScannable`，颜色**不覆盖** ⇒ 原生青色脉冲轮廓）
 				//     理由见上面 v4.23 段与 categoryEnabled 里的长注释。
 				2,  // kOther       MSTT（默认关）—— 与杂项同 state（同蓝、不覆盖）
-				9   // kCorpse      尸体 —— ★★★ v4.31：1 → **9**（= 容器；橙、与容器同色）
+				9,  // kCorpse      尸体 —— ★★★ v4.31：1 → **9**（= 容器；橙、与容器同色）
+				2   // kLootPickCredit 开锁器 / 信用币 —— ★★★ 2026-09-28 新增（黄组）:
+					//     旧路径这个值是**兜底**（2 + 不覆盖 = 与杂项同蓝）——
+					//     旧路径没有空闲槽位，黄色只在通道模式下表达（见
+					//     kChannelColorDef / kCategoryName 上的长注释）
 			};
 
 			// ================================================================
@@ -1399,7 +1431,8 @@ namespace SAS
 			//
 			// ★ 想恢复高亮 MSTT（或只想留其中几类）就改 INI 的
 			//   `EnableLoot / EnableWeapon / EnableApparel / EnableAmmoAid /
-			//    EnableNote / EnableResource / EnableContainer / EnableDevice /
+			//    EnableNote / EnableResource / EnablePickCredit / EnableContainer /
+			//    EnableDevice /
 			//    EnableDoor / EnableFlora / EnableOther`，改完重进游戏生效。
 			//   ★ v4.17：`EnableLoot` 现在的含义 = **杂项**（原来那一坨里剩下的）；
 			//     新增的 5 个物品子类各有自己的开关（默认全开）。
@@ -1459,7 +1492,8 @@ namespace SAS
 				//   ⇒ 不用扫描仪 = 青色常亮；用扫描仪 = 完全原版（含扫描前后的区别）。
 				true,  // kFlora
 				false, // kOther（MSTT —— 默认关，理由见上）
-				true   // kCorpse
+				true,  // kCorpse
+				true   // kLootPickCredit（开锁器 / 信用币，2026-09-28 新增：默认开）
 			};
 
 			// ★ v4.0.1：可选的「自定义类别颜色」（INI 里写 ColorLoot=RRGGBB 之类）。
@@ -1542,11 +1576,14 @@ namespace SAS
 				//   沿用 v4.19~v4.29 的橙值（+ noFill ⇒ 轮廓橙）；9 的引擎目标罕见
 				//   （城市实况约 3 个元素），代价与「借 9/10 当色槽」同源。
 				0x00FF9500,    // kContainer   容器 —— 橙 #FF9500（★ v4.31 恢复）
-				// ★★★ v4.24：**不覆盖** —— state 4 是引擎给「已扫描的星球目标（远）」
-				//   画绿色的槽位（同上）。设备（终端 / 开关等）现在显示原版绿
-				//   #27C684；想恢复青色 ⇒ `ColorDevice=00E5FF`（代价：原版扫描后的
-				//   绿色（远目标）会被盖掉，INI 里已注明）。
-				kColorUnset,   // kDevice      设备 —— 原版绿 #27C684（state 4 归还引擎）
+				// ★★★ 2026-09-28（需求 `颜色分类.md`：「白：门、电脑、按钮等所有
+				//   可互动物品」）：**本项仍是 kColorUnset，但设备挪到了 state 6**
+				//   （与门共槽）⇒ 旧路径下它读到的就是「门」写的那个**白 #FFFFFF**，
+				//   与通道模式的观感一致；而 state 4 从「不覆盖」升级为**不占用**，
+				//   「已扫描的星球目标（远）」的原版绿更安全（v4.24 的结论不变）。
+				//   ★ 想给设备单独配色 ⇒ `ColorDevice=E5C8FF`（旧路径下会连带盖掉
+				//     门 / 通道模式下只影响设备自己；INI 里已注明）。
+				kColorUnset,   // kDevice      设备 / 电脑 / 按钮 —— 白（state 6，与门共槽）
 				// ★★★ v4.31：**覆盖为白 #FFFFFF** —— 用户要求「恢复门白」。
 				//   ★ 为什么这次放在 6：**state 6 是引擎全镜像唯一不写的槽位**
 				//     （v4.24 订正后的结论）⇒ 覆盖它**对原版零影响**（只有 MOD
@@ -1559,7 +1596,12 @@ namespace SAS
 				//     有）就被抹平 —— 这正是 v4.17~v4.21 那几轮「扫描前后分不出」的来源。
 				kColorUnset,   // kFlora       植物 / 矿脉 —— 原版色（state 7 不覆盖）
 				kColorUnset,   // kOther       MSTT（默认关）—— 不覆盖（原生蓝）
-				0x00FF9500     // kCorpse      尸体 —— 橙 #FF9500（★ v4.31 恢复，= 容器）
+				0x00FF9500,    // kCorpse      尸体 —— 橙 #FF9500（★ v4.31 恢复，= 容器）
+				// ★★★ 2026-09-28（黄组）：**仍然 kColorUnset** —— 旧路径没有空闲槽位，
+				//   硬塞一个黄色只能去污染引擎的槽位（NPC / 星球目标）⇒ 明确选择
+				//   「旧路径下与杂项同蓝、不覆盖」；黄色只在通道模式（默认）下由
+				//   `kChannelColorDef[kLootPickCredit]` / INI `ColorPickCredit` 表达。
+				kColorUnset    // kLootPickCredit 开锁器 / 信用币 —— 旧路径不覆盖（= 杂项蓝）
 			};
 
 			// ★ v4.20：每个类别的「覆盖不透明度」（0~255；**0 = 特殊值 = 保留引擎原值**）。
@@ -1582,7 +1624,8 @@ namespace SAS
 				0,    // kDoor        门
 				0,    // kFlora       植物
 				0,    // kOther       MSTT（默认关）
-				0     // kCorpse      尸体
+				0,    // kCorpse      尸体
+				0     // kLootPickCredit 开锁器 / 信用币（2026-09-28 新增）
 			};
 
 			// ★★ v4.21：**「不填充」总开关**（本轮定性的落地）。
@@ -1607,9 +1650,9 @@ namespace SAS
 			// ================================================================
 			// ★★★ v5.0：**完全自建颜色通道**总开关（默认 1 = 开）
 			// ----------------------------------------------------------------
-			// 1 = 走自建通道（docs/32）：13 条自建 HighlightManager 各自一份 32 字节
-			//     参数；**不写引擎状态表、不覆盖引擎配色块** ⇒ 原版扫描仪 / NPC /
-			//     星球目标的颜色 100% 原版；类别配色互不干扰（不再并组 / 让位）。
+			// 1 = 走自建通道（docs/32）：**每个类别一条**自建 HighlightManager，
+			//     各自一份 32 字节参数；**不写引擎状态表、不覆盖引擎配色块**
+			//     ⇒ 原版扫描仪 / NPC / 星球目标的颜色 100% 原版；类别配色互不干扰。
 			// 0 = 完全回到 v4.33 的旧路径（state 覆盖；回退用，一行 INI 切换）。
 			// ★ 自建通道不可用时（引擎版本变化导致签名不符 / 模板标定失败）会
 			//   **自动回退旧路径**并打 WARN —— 不需要手动改这个键。
@@ -4269,7 +4312,8 @@ namespace SAS
 			//   （★ v4.17 追加 5 个物品栏子类 —— 武器 / 服饰 / 弹药救援 / 笔记 / 资源）
 			const char* const kStateKeys[kCategoryCount] = {
 				"StateLoot", "StateWeapon", "StateApparel", "StateAmmoAid", "StateNote", "StateResource",
-				"StateContainer", "StateDevice", "StateDoor", "StateFlora", "StateOther", "StateCorpse"
+				"StateContainer", "StateDevice", "StateDoor", "StateFlora", "StateOther", "StateCorpse",
+				"StatePickCredit"
 			};
 			// ★★★ v4.23：这张表必须与 Config::stateByCategory 的默认值**逐项一致**
 			//   （INI 缺键时用的就是它；v4.22 忘了同步 resource/other，这次一并订正：
@@ -4281,7 +4325,9 @@ namespace SAS
 			//    门 0→**6**、尸体 1→**9**。
 			//   ★★★ v4.32：分组配色定稿 —— **服饰 1→10**（并进武器红组）、
 			//    **笔记 0→3**（并进资源紫组）；其余不动（见 v4.32 段）。
-			const int kStateDef[kCategoryCount] = { 2, 10, 10, 5, 3, 3, 9, 4, 6, 7, 2, 9 };
+			//   ★★★ 2026-09-28：**device 4 → 6**（并入「门」的白槽，「电脑 / 按钮」= 白）、
+			//    尾部追加 `pickcredit = 2`（黄组的旧路径兜底 = 杂项蓝，见枚举注释）。
+			const int kStateDef[kCategoryCount] = { 2, 10, 10, 5, 3, 3, 9, 6, 6, 7, 2, 9, 2 };
 			for (std::size_t i = 0; i < kCategoryCount; ++i) {
 				g_cfg.stateByCategory[i] = std::clamp(getInt(kStateKeys[i], kStateDef[i]), 0, 11);
 			}
@@ -4290,9 +4336,10 @@ namespace SAS
 			{
 				const char* const kEnableKeys[kCategoryCount] = {
 					"EnableLoot", "EnableWeapon", "EnableApparel", "EnableAmmoAid", "EnableNote", "EnableResource",
-					"EnableContainer", "EnableDevice", "EnableDoor", "EnableFlora", "EnableOther", "EnableCorpse"
+					"EnableContainer", "EnableDevice", "EnableDoor", "EnableFlora", "EnableOther", "EnableCorpse",
+					"EnablePickCredit"
 				};
-				const int kEnableDef[kCategoryCount] = { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1 };
+				const int kEnableDef[kCategoryCount] = { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1 };
 				std::string s;
 				for (std::size_t i = 0; i < kCategoryCount; ++i) {
 					g_cfg.categoryEnabled[i] = getInt(kEnableKeys[i], kEnableDef[i]) != 0;
@@ -4389,7 +4436,8 @@ namespace SAS
 			{
 				const char* const kColorKeys[kCategoryCount] = {
 					"ColorLoot", "ColorWeapon", "ColorApparel", "ColorAmmoAid", "ColorNote", "ColorResource",
-					"ColorContainer", "ColorDevice", "ColorDoor", "ColorFlora", "ColorOther", "ColorCorpse"
+					"ColorContainer", "ColorDevice", "ColorDoor", "ColorFlora", "ColorOther", "ColorCorpse",
+					"ColorPickCredit"
 				};
 				for (std::size_t i = 0; i < kCategoryCount; ++i) {
 					char hex[32]{};
@@ -4450,7 +4498,7 @@ namespace SAS
 				REX::INFO("config: channelMode={} -> {}",
 					g_cfg.channelMode,
 					g_cfg.channelMode
-						? "★ v5.0 自建颜色通道：13 条独立通道（不写状态表 / 不覆盖引擎配色块；"
+						? "★ v5.0 自建颜色通道：每个类别一条独立通道（不写状态表 / 不覆盖引擎配色块；"
 						  "原版扫描仪 / NPC / 星球目标颜色 100% 原版）；"
 						  "引擎签名不符或模板标定失败时自动回退旧路径"
 						: "旧路径（v4.33 行为：借 state 槽位 + 覆盖引擎配色块）");
@@ -4462,7 +4510,8 @@ namespace SAS
 			{
 				const char* const kAlphaKeys[kCategoryCount] = {
 					"AlphaLoot", "AlphaWeapon", "AlphaApparel", "AlphaAmmoAid", "AlphaNote", "AlphaResource",
-					"AlphaContainer", "AlphaDevice", "AlphaDoor", "AlphaFlora", "AlphaOther", "AlphaCorpse"
+					"AlphaContainer", "AlphaDevice", "AlphaDoor", "AlphaFlora", "AlphaOther", "AlphaCorpse",
+					"AlphaPickCredit"
 				};
 				std::string alphaLog;
 				for (std::size_t i = 0; i < kCategoryCount; ++i) {
@@ -4527,27 +4576,33 @@ namespace SAS
 			//   → 「该资源已扫描」⇒ `add edx,4`）写 **state 4（远）/ 5（近）**，
 			//   而这两个槽位的原生色 = **绿色 #27C684**（= 用户说的那个绿）。
 			//   详证见 Config 配色数组上方的长注释 / `docs/23`。
-			REX::INFO("config: state4_5 归还引擎 -> 「设备」(state {}) / 「弹药救援」(state {}) "
-					  "的颜色**不再覆盖**（= 引擎原生绿 #27C684）：引擎用这两个槽位画"
-					  "「已扫描的星球目标」（近 = 5 / 远 = 4）⇒ 举着扫描仪时看到的是原版色",
-				g_cfg.stateByCategory[static_cast<std::size_t>(Category::kDevice)],
+			// ★★★ 2026-09-28：设备已从 4 挪到 6（并入「门」的白槽）⇒ 现在
+			//   **state 4 完全不占用**，只剩「弹药 / 救援」还挂在 5（原版绿、不覆盖）。
+			REX::INFO("config: state4_5 归还引擎 -> state 4 已完全不用；「弹药救援」(state {}) "
+					  "的颜色**不覆盖**（= 引擎原生绿 #27C684）：引擎用 4（远）/ 5（近）画"
+					  "「已扫描的星球目标」⇒ 举着扫描仪时看到的是原版色",
 				g_cfg.stateByCategory[static_cast<std::size_t>(Category::kLootAmmoAid)]);
 
-			// ★★★ v4.32：分组配色定稿（用户需求 `颜色分类.md`）—— 只并组、不新增：
-			//   红 = 武器 / 投掷物 / 太空服 / 背包 / 头盔 / 服饰（state 10）、
-			//   橙 = 容器 / 尸体（state 9）、紫 = 笔记 / 资源（state 3）、
-			//   绿 = 弹药 / 救援（state 5，原版绿）、白 = 门（state 6）；
-			//   杂项 = 2（原版蓝）、植物 / 矿石 = 7（原版青）、NPC / 星球目标不动。
-			//   覆盖槽位仍是 **5 个（2/3/6/9/10）**、覆盖色一字未变 ⇒ 零新风险。
-			REX::INFO("config: 配色分组(v4.32) -> 「武器 / 投掷物 / 太空服 / 背包 / 头盔 / 服饰」"
+			// ★★★ 2026-09-28：分组配色按最新需求 `颜色分类.md` 定稿（发布版 2.0.1）——
+			//   红 = 武器 / 投掷物 / 太空服 / 背包 / 头盔 / 服饰、
+			//   橙 = 容器 / 尸体、紫 = 笔记 / 资源、绿 = 弹药 / 救援、
+			//   **黄 = 开锁器 / 信用币（本轮新增）**、
+			//   **白 = 门 / 电脑 / 按钮等所有可互动物品（设备本轮并入）**；
+			//   青↔绿（原版）= 星球上的矿物 / 植物（扫描前 / 后）、杂项 = 原版蓝。
+			//   通道模式（默认）：每个类别一条独立通道 ⇒ 颜色 = kChannelColorDef /
+			//   INI `ColorXxx`；旧路径：设备与门共槽 6（自然同白）、黄组退回
+			//   state 2（= 与杂项同蓝，没有空闲槽位可用，见枚举注释）。
+			REX::INFO("config: 配色分组(2026-09-28) -> 「武器 / 投掷物 / 太空服 / 背包 / 头盔 / 服饰」"
 					  "= state {}（红 #FF2E2E）、「容器 / 尸体」= {}（橙 #FF9500）、"
 					  "「笔记 / 资源」= {}（紫 #B36BFF）、「弹药 / 救援」= {}（原版绿）、"
-					  "「门」= {}（白 #FFFFFF）；杂项 = {}（原版蓝）、0/1/4/5/7/8 仍归还引擎",
+					  "「门 / 电脑 / 按钮」= {}（白 #FFFFFF）、「开锁器 / 信用币」= {}"
+					  "（黄 #FFE100，仅通道模式）；杂项 = {}（原版蓝）、0/1/4/5/7/8 归还引擎",
 				g_cfg.stateByCategory[static_cast<std::size_t>(Category::kLootWeapon)],
 				g_cfg.stateByCategory[static_cast<std::size_t>(Category::kContainer)],
 				g_cfg.stateByCategory[static_cast<std::size_t>(Category::kLootResource)],
 				g_cfg.stateByCategory[static_cast<std::size_t>(Category::kLootAmmoAid)],
-				g_cfg.stateByCategory[static_cast<std::size_t>(Category::kDoor)],
+				g_cfg.stateByCategory[static_cast<std::size_t>(Category::kDevice)],
+				g_cfg.stateByCategory[static_cast<std::size_t>(Category::kLootPickCredit)],
 				g_cfg.stateByCategory[static_cast<std::size_t>(Category::kLoot)]);
 
 			// ★★★ v4.25 / v4.28：星球目标「已扫描」⇒ 也用原版那个绿（放下扫描仪之后）
@@ -4996,8 +5051,10 @@ namespace SAS
 				}
 			}
 			// ---- 负样本：真杂物命中 = 判据有误（会误报资源） ----
-			auto* pick = RE::TESForm::LookupByID(kResKeywordDigipick);
-			auto* cred = RE::TESForm::LookupByID(kResKeywordCredits);
+			//   （2026-09-28：开锁器 / 信用币已从「杂项」升级为「黄组」，但「必须
+			//     不是资源」这条负样本性质不变 —— 常量见 kFormIDDigipick 那一组。）
+			auto* pick = RE::TESForm::LookupByID(kFormIDDigipick);
+			auto* cred = RE::TESForm::LookupByID(kFormIDCredits);
 			const bool pickHit = pick && IsResourceBaseRaw(pick);
 			const bool credHit = cred && IsResourceBaseRaw(cred);
 			if (pickHit || credHit) {
@@ -5086,7 +5143,21 @@ namespace SAS
 			case RE::FormType::kBOOK:  // 笔记（书 / 杂志 / 数据板 / 便条）
 			case RE::FormType::kNOTE:  // （Starfield.esm 里没有 NOTE 记录，留作兜底）
 				return static_cast<int>(Category::kLootNote);
-			case RE::FormType::kMISC:  // 资源（关键词命中）↔ 杂项
+			case RE::FormType::kMISC:  // 黄组（开锁器 / 信用币）↔ 资源（关键词命中）↔ 杂项
+				// ★★★ 2026-09-28（需求 `颜色分类.md`：「黄：开锁器、信用币」）：
+				//   两条「非资源杂物」按 **FormID** 单列（离线取证：EDID 命中
+				//   digipick/credit 的 MISC 只有 3 条，且没有专用关键词 ⇒ 只能按
+				//   FormID 判；证据与常量见 `kFormIDDigipick` 那一组）。
+				//   ★ 顺序放在资源判据**之前**：一次整数比较，最省；
+				//     且这三个 FormID 本来就不带 ResourceType* ⇒ 先后无歧义。
+				switch (a_base->GetFormID()) {
+				case kFormIDDigipick:
+				case kFormIDCredits:
+				case kFormIDCreditsNeon:
+					return static_cast<int>(Category::kLootPickCredit);
+				default:
+					break;
+				}
 				if (IsResourceBase(a_base)) {
 					// ★ v4.22：世界里**首个**命中 —— 「资源分类真的在干活」的最快证据
 					//   （用户实测过「资源和杂物同色」，复盘时就 grep 这一行）。
@@ -7238,7 +7309,8 @@ namespace SAS
 		// 32 字节参数块里的两个颜色 dword（布局见 docs/32 §2.3）：
 		constexpr std::size_t    kOffChannelBaseColor  = 0x00;       // 基色（★ 真正画出来的颜色）
 		constexpr std::size_t    kOffChannelPulseColor = 0x08;       // 脉冲色
-		// 通道数 = 12 个类别各一条 + 1 条「植物已扫描」（青 / 绿两态各一条）。
+		// 通道数 = **每个类别各一条** + 1 条「植物已扫描」（青 / 绿两态各一条）。
+		//   ★ 2026-09-28：类别 12 → 13（新增「开锁器 / 信用币」黄组）⇒ 通道 13 → 14。
 		constexpr std::size_t    kChannelCount         = kCategoryCount + 1;
 		constexpr std::size_t    kChannelFloraScanned  = kCategoryCount;
 
@@ -7314,7 +7386,7 @@ namespace SAS
 			std::uint32_t mgrId = 0xFFFFFFu;  // 全局句柄 id（ctor 写在 mgr+0x40）
 		};
 		ChannelSlot   g_channels[kChannelCount]{};
-		bool          g_channelsReady  = false;  // 13 条全部建好（通道模式才挂载）
+		bool          g_channelsReady  = false;  // 全部通道建好（通道模式才挂载）
 		bool          g_channelsFailed = false;  // 模板标定失败（只报一次；自动回退旧路径）
 		std::uint32_t g_channelRetries = 0;      // 模板重试轮数（防死循环刷日志）
 		// `HighlightManager* ctor(void* mem, void* params32)`（0x6532F0）
@@ -10781,7 +10853,14 @@ namespace SAS
 
 		// 通道 i 的最终颜色（0xRRGGBB）：
 		//   ① INI `ColorXxx`（!= kColorUnset）优先；
-		//   ② 否则用内置通道默认表（= v4.32 分组配色的「观感」逐项固化）。
+		//   ② 否则用内置通道默认表（= `颜色分类.md` 的分组配色，逐项固化）。
+		// ★★★ 2026-09-28（需求 `颜色分类.md`）：两处变更 ——
+		//   · `kDevice` 0x27C684 → **0xFFFFFF**（「白：门、**电脑、按钮等所有可交互
+		//     物品**」）；通道模式下设备本来就有独立通道 ⇒ 改色零风险，
+		//     旧路径由「与门共槽 6」自然获得同一个白（见 stateByCategory）。
+		//   · `kLootPickCredit` **新增 = 0xFFE100**（「黄：开锁器、信用币」）——
+		//     选 0xFFE100 而不是 #FFD700：与容器橙 #FF9500 的色相拉开约 19°
+		//     且亮度更高（用户要求「区分度要高」）。
 		constexpr std::uint32_t kChannelColorDef[kCategoryCount] = {
 			0x1F8EE2u,  // kLoot        杂项 —— 原版蓝
 			0xFF2E2Eu,  // kLootWeapon  武器 / 投掷物 —— 红
@@ -10790,11 +10869,12 @@ namespace SAS
 			0xB36BFFu,  // kLootNote    笔记 —— 紫
 			0xB36BFFu,  // kLootResource 资源 —— 紫（与笔记同组）
 			0xFF9500u,  // kContainer   容器 —— 橙
-			0x27C684u,  // kDevice      设备 —— 原版绿
+			0xFFFFFFu,  // kDevice      设备 / 电脑 / 按钮 —— ★ 白（2026-09-28 改）
 			0xFFFFFFu,  // kDoor        门 —— 白
 			0x72E8FFu,  // kFlora       植物 / 矿脉（未扫描）—— 原版青脉冲的脉冲色
 			0x1F8EE2u,  // kOther       MSTT（默认关）—— 与杂项同蓝
 			0xFF9500u,  // kCorpse      尸体 —— 橙（与容器同色）
+			0xFFE100u,  // kLootPickCredit 开锁器 / 信用币 —— ★ 黄（2026-09-28 新增）
 		};
 
 		std::uint32_t ChannelColorFor(std::size_t a_ch)
@@ -10883,7 +10963,7 @@ namespace SAS
 			return ChannelLedgerMode() ? a_e.channel : a_e.state;
 		}
 
-		// 懒创建 13 条通道（模板就绪后一次建满；失败有重试上限与自动回退）。
+		// 懒创建全部通道（模板就绪后一次建满；失败有重试上限与自动回退）。
 		// 常量：每 200ms 一轮扫描最多重试 1 次 ⇒ 50 轮 ≈ 10 秒。
 		constexpr std::uint32_t kChannelRetryWarnAt = 50;
 		constexpr std::uint32_t kChannelRetryFailAt = 100;

@@ -104,10 +104,10 @@ foreach ($rel in $payload.Keys) {
     }
 }
 
-# ★ 2026-09-27：包内 INI 的**日志上限**以 resources 模板为准（= N 网公开版口径 1 MiB）——
-#   部署目录那份是**本机开发**口径（LogMaxMB=10，见 AGENTS.md「N 网公开版日志最大 1M、
-#   本机开发版本日志最大 10M」），不能直接进包。只改这一个键；其余内容照旧（含用户
-#   对部署 INI 的其它自定义）。模板值就是单一事实源（默认 1）。
+# ★ 2026-09-27：包内 INI 的**日志开关 / 上限**以 resources 模板为准（= N 网公开版口径：
+#   **0 = 完全关闭**，一个字节都不写；见 AGENTS.md 与 docs/48）——
+#   部署目录那份是**本机开发**口径（LogMaxMB=10），不能直接进包。只改这一个键；其余内容
+#   照旧（含用户对部署 INI 的其它自定义）。模板值就是单一事实源（当前 = 0）。
 $tplIni    = Join-Path $root 'resources\SAS_AlwaysScan.ini'
 $stagedIni = Join-Path $staging 'SAS_AlwaysScan.ini'
 if ((Test-Path -LiteralPath $tplIni) -and (Test-Path -LiteralPath $stagedIni)) {

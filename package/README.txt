@@ -3,7 +3,19 @@
  Always-on scanner highlighting for Starfield
 ========================================================================
 
-Version  : 2.0  (plugin build 5.1.0)
+Version  : 2.0.1  (plugin build 5.1.0)
+           2.0.1 = colour layout update (one category added, one merged):
+             * NEW - digipicks and credits are their own category now and are
+               highlighted YELLOW (they used to be plain "misc" blue). The
+               three matching item records were checked offline (Digipick,
+               Credits, FFNeonZ03_Credits); they carry no dedicated keyword,
+               so they are recognised by record id.
+             * computers / terminals / buttons (all "activators") are now
+               WHITE, the same colour as doors - "white = doors, computers,
+               buttons and every other interactive object".
+               Nothing else about the colours changed; the mod now carries
+               fourteen colour channels (thirteen categories + surveyed
+               plants) instead of thirteen.
            2.0 = the mod brings its own outline colour channels (described
            below), plus sixteen fixes, all from player reports.
            (1) "Ores and plants are green before *and* after scanning."
@@ -434,8 +446,9 @@ Version  : 2.0  (plugin build 5.1.0)
            per-id tables that grow on demand ("colour parameters" per
            manager id, and "which manager paints this reference"); the
            eleven states are only the game's own book-keeping on top of
-           that. So 2.0 creates its own colour channels - thirteen of them,
-           one per category plus one for surveyed plants - without touching
+           that. So 2.0 creates its own colour channels - fourteen of them
+           since 2.0.1 (thirteen categories plus one for surveyed plants),
+           thirteen in 2.0 - without touching
            the game's state table or its colour blocks at all.
            What you get:
              - vanilla colours are never modified: people, planet targets
@@ -710,17 +723,22 @@ Pick-up items follow the game's own inventory categories:
   * Weapons, throwables and the whole equipment set (guns, melee, grenades,
     mines, spacesuits, helmets, packs, clothing)                      RED
   * Ammo and aid (meds, food, drinks) - the game's own green
-    (state 4/5 is shared with the vanilla "scanned planet target" green;
-    write ColorAmmoAid=00FF66 for bright green instead)                GREEN
+    (write ColorAmmoAid=00FF66 for bright green instead)               GREEN
   * Notes (notes, data slates, magazines, books) and resources (iron,
     aluminium, helium-3, organics, ...) - one purple               PURPLE
-  * Misc items (digipicks, credits, toys) - unchanged from 1.5        BLUE
+  * Digipicks and credits (since 2.0.1; they used to be plain misc blue)
+                                                                     YELLOW
+    (write ColorPickCredit=FFE100 to tune; with ChannelMode=1 every
+    category has its own channel, so this never affects anything else.
+    Note: the yellow is a channel-mode feature - on the old fallback path
+    these two items fall back to the misc blue.)
+  * Misc items (everything else: toys, coffee mugs, wrenches, ...)      BLUE
   * Containers (loot the good stuff)                                 ORANGE
   * Bodies / corpses - people, creatures and wrecked robots / turrets
     (anything you can search) - same state as containers             ORANGE
-  * Interactive devices / computers - the game's own green (same note as
-    above; write ColorDevice=00E5FF for cyan instead)                  GREEN
-  * Doors                                                             WHITE
+  * Doors, computers / terminals and buttons / activators - one white
+    (since 2.0.1 they share one colour: "white = doors, computers,
+    buttons and every other interactive object")                     WHITE
   * Flora, ores, gas vents, liquid pools (all one record type in the game
     data) - the game's own "scannable target" colour, a cyan pulse; once
     you have surveyed one it switches to the game's own "scanned" green.
@@ -790,9 +808,10 @@ plant has been surveyed". Plants now use the first two sources only,
 exactly like the game does; ores / gas / liquids are unchanged.
 FloraScannedByEngineState=0 / FloraScannedByResource=0 (or
 StateFloraScanned=7) in the INI restores the old "all cyan" behaviour. Resources vs. misc items: "resources" (iron, aluminium,
-helium-3, organics, ...) are purple, misc items (digipicks, credits,
-toys) are blue. If the resource check ever fails, the log says so and
-everything falls back to the misc color.
+helium-3, organics, ...) are purple; since 2.0.1 digipicks and credits are
+their own yellow category, and the remaining misc items (toys, mugs,
+wrenches, ...) are blue. If the resource check ever fails, the log says so
+and everything falls back to the misc color.
 
 "Resources" are recognised from the item record itself (the game marks
 them with its own ResourceType keywords), so both vanilla and mod-added

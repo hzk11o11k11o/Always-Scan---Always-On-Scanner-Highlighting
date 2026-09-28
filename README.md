@@ -1,6 +1,6 @@
 # Always Scan — Always-On Scanner Highlighting (SFSE)
 
-**Nexus Mods:** <https://www.nexusmods.com/starfield/mods/18268> · **Release:** 2.0 (plugin build 5.1.0)
+**Nexus Mods:** <https://www.nexusmods.com/starfield/mods/18268> · **Release:** 2.0.1 (plugin build 5.1.0)
 
 Keep the vanilla scanner highlight on at all times — no need to hold the handheld scanner up. Every object inside a configurable radius (default **50 m**, not just the centre circle) is outlined using the game's own outline system, colour-coded by category.
 
@@ -10,7 +10,7 @@ An SFSE plugin for **Starfield 1.16.244.0**.
 
 - **Always on** — highlighting stays visible while you run, fight, loot or fly; the scanner stays in your pocket. Toggle with **F8** (rebindable), with a short HUD confirmation (`Always Scan: ON / OFF`).
 - **Full radius** — objects in every direction inside the configured radius (5–500 m), not just the scanner's centre circle.
-- **Vanilla visuals** — the mod drives the game's own outline system (contour, not fill, since 1.7.3), so shape / thickness / pulse behave exactly like the handheld scanner. Since **2.0** it brings its own colour channels (13, one per category) and never writes the game's own outline states or colour blocks — NPCs, planet targets and the vanilla scanner keep their stock colours.
+- **Vanilla visuals** — the mod drives the game's own outline system (contour, not fill, since 1.7.3), so shape / thickness / pulse behave exactly like the handheld scanner. Since **2.0** it brings its own colour channels (**14** since 2.0.1 — one per category plus surveyed plants) and never writes the game's own outline states or colour blocks — NPCs, planet targets and the vanilla scanner keep their stock colours.
 - **Category colours** (all configurable in the INI):
 
   | Category | Default colour |
@@ -18,9 +18,10 @@ An SFSE plugin for **Starfield 1.16.244.0**.
   | Weapons / throwables + spacesuits / helmets / packs / clothing | **red** |
   | Notes + resources | **purple** |
   | Ammo & aid | **green** (the game's own) |
+  | Digipicks + credits | **yellow** (since 2.0.1; they used to be misc blue) |
   | Misc items | **blue** (the game's own) |
   | Containers + bodies / corpses | **orange** |
-  | Doors | **white** |
+  | Doors + computers / terminals / buttons | **white** (one colour since 2.0.1) |
   | Flora / ores / gas vents / liquid pools | **vanilla cyan** unscanned → **vanilla green** surveyed (read from the game's own survey progress) |
 
 - **Loot-aware** — containers and bodies stop being outlined once emptied; display cases / racks glow even while closed and go dark once you have taken everything out of them.
@@ -90,7 +91,7 @@ tr/            localization tooling & workspace used while researching third-par
 crash-reports/ crash-dump analysis notes
 ```
 
-Versioning: the Nexus release version (currently **2.0**) and the plugin's internal build number (currently **5.1.0**) are bumped manually, per release.
+Versioning: the Nexus release version (currently **2.0.1**) and the plugin's internal build number (currently **5.1.0**) are bumped manually, per release.
 
 ## Credits
 
@@ -108,8 +109,8 @@ Plugin license: **GPL-3.0-or-later** (see `plugin/xmake.lua`).
 
 - **常驻高亮**：默认 **F8** 开关（可改键），HUD 有提示；
 - **全半径**：周围可配半径（默认 50 米，5~500 米）内全方位高亮，不再受中央圆圈限制；
-- **观感就是原版**：直接驱动引擎自带 outline 描边（轮廓而非填充），形状 / 粗细 / 呼吸感与原版一致；2.0 起自建 13 条颜色通道，原版扫描仪 / NPC / 星球目标的颜色一个字节都不改；
-- **分类分色**（全部可在 INI 配置）：红 = 武器 / 投掷物 + 太空服 / 背包 / 头盔 / 服饰，橙 = 容器 / 尸体，紫 = 笔记 + 资源，绿 = 弹药 / 救援（原版绿），白 = 门，蓝 = 杂项（原版蓝），植物 / 矿脉 / 气泉 / 液池 = 原版青（未扫描）→ 原版绿（已扫描，直读引擎自身数据）；
+- **观感就是原版**：直接驱动引擎自带 outline 描边（轮廓而非填充），形状 / 粗细 / 呼吸感与原版一致；2.0 起自建颜色通道（2.0.1 起 14 条），原版扫描仪 / NPC / 星球目标的颜色一个字节都不改；
+- **分类分色**（全部可在 INI 配置）：红 = 武器 / 投掷物 + 太空服 / 背包 / 头盔 / 服饰，橙 = 容器 / 尸体，紫 = 笔记 + 资源，绿 = 弹药 / 救援（原版绿），**黄 = 开锁器 + 信用币（2.0.1 新增）**，**白 = 门 / 电脑 / 按钮等所有可互动物品（2.0.1 起设备并入白组）**，蓝 = 杂项（原版蓝），植物 / 矿脉 / 气泉 / 液池 = 原版青（未扫描）→ 原版绿（已扫描，直读引擎自身数据）；
 - **搜空即熄灭**、展示柜关着也亮、**活着的 NPC / 生物永不描边**、**不影响任何交互**、与原版扫描仪完全不冲突；
 - **日志默认完全关闭**（公开版 `LogMaxMB=0`）：排查问题时把 INI 里 `LogMaxMB` 改为 10 重启即可，日志与配置都在 esm 同级目录。
 

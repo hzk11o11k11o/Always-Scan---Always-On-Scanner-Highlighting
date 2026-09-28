@@ -381,7 +381,20 @@ if (-not $SkipDeploy) {
     #   ③ 统计行新增 `引擎状态: 未知=`（引擎答 0 的次数）。见 docs/34。
     #   ★ 用户要求（2026-09-27）：**公开版号保持 2.0、不再自行提升版本号**（等通知）；
     #     2.1 包已删除；DLL 内部 build 号也保持 5.1.0（日志用 `RVA 0x5F39CE0` 区分）。
-    Set-Content -LiteralPath (Join-Path $modRoot 'meta.ini') -Value "[General]`nmodid=18268`nversion=2.0`ncomment=Always-on scanner highlighting (SFSE)" -Encoding UTF8
+    #   ★ 2026-09-28（用户通知：**发布版号 → 2.0.1**）：**配色需求更新版**
+    #     （用户需求 `颜色分类.md` 更新）—— 两处：
+    #     ① **黄 = 开锁器 / 信用币**（新增第 7 个物品子类）：判据 = base FormID
+    #        （离线取证 `tools/re/esm_pickcredit_probe.py`：1319 条 MISC 里只有
+    #        `Digipick` 0xA / `Credits` 0xF / `FFNeonZ03_Credits` 0xA7312 三条，
+    #        且关键词只有共用的 NotJunkJetAmmo ⇒ 只能按 FormID 判）；
+    #        通道模式 = 独立通道 **黄 #FFE100**；旧路径无空闲槽位 ⇒ 退回 state 2
+    #        （与杂项同蓝，不污染引擎）。新键：StatePickCredit / EnablePickCredit /
+    #        ColorPickCredit / AlphaPickCredit。
+    #     ② **白 = 门、电脑、按钮等所有可互动物品**：设备（ACTI/TERM）**4 → 6**
+    #        （与门共槽 ⇒ 同白 #FFFFFF）；state 4 就此**完全不占用**。
+    #     ⇒ 类别 12 → 13、自建通道 13 → 14；通道模式下「并组」只剩用户偏好
+    #       （ColorApparel / ColorNote 想拆随时改）。DLL build 号仍 5.1.0。
+    Set-Content -LiteralPath (Join-Path $modRoot 'meta.ini') -Value "[General]`nmodid=18268`nversion=2.0.1`ncomment=Always-on scanner highlighting (SFSE)" -Encoding UTF8
 
     Get-ChildItem -LiteralPath $modRoot -Recurse -File | ForEach-Object {
         Write-Host ("  {0}  ({1} bytes)" -f $_.FullName.Substring($modRoot.Length + 1), $_.Length)
