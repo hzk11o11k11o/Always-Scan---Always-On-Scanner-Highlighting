@@ -524,6 +524,10 @@ namespace SAS
 		constexpr std::uint32_t kDcWatchMissMax      = 8;
 		constexpr float kDcWatchRadiusMeters         = 20.0f;  // 只逐帧观察这么近的展示柜
 		constexpr std::size_t kDisplayCaseTraceMaxDefault = 24;  // 投影出现/消失追踪日志上限
+		// ★★★ 订正 R17：展示柜「已确认拿空」的**跨场景粘性表**上限（FormID 键，FIFO 淘汰）。
+		//   治用户报告「武器箱/武器柜在玩家远离后又会重新亮起」—— 场景切换
+		//   （载入画面关闭 / 换 cell）与引用对象重建都不再丢失这个事实，见 State::dcStickyFids。
+		constexpr std::size_t kDcStickyFidMax = 512;
 		constexpr std::size_t kMenuDumpMax           = 6;     // 「此刻开着的菜单」快照最多打几次
 		constexpr std::uint64_t kMenuEvtBadMax       = 5;     // 事件负载「不像菜单事件」到几条就注销通道
 
@@ -591,9 +595,15 @@ namespace SAS
 		//      ⇒ 永久亮（用户实测：「这个武器箱空了却还在高亮」，docs/54）。
 		//     ④ = 快速面板**为它打开过** + 这一段打开期里**从头到尾没见到内容**
 		//      + 没收到过拿走事件 + 连续读到空 + 打开后已观察 ≥ `DisplayCaseEmptyNoContentMs`
-		//      （默认 2000ms，覆盖投影装填期 0.4~0.7 秒）⇒ 判空（粘性熄灭）。
-		//      唯一的误灭面（有内容 + 打开后 <0.7s 就关掉 ⇒ 投影没来得及建立）
-		//      极窄且可自愈（再打开一次即恢复）—— 完整记录见 Config 注释与 docs/54。
+		//      （★ 订正 R17 起默认 **3000ms**：投影可以晚到 2.13 秒，见下）⇒ 判空（粘性熄灭）。
+		//      唯一的误灭面（有内容 + 打开后投影还没建立就关掉）极窄且可自愈
+		//      （再打开一次 / 往里放东西即恢复）—— 完整记录见 Config 注释、docs/54 与 docs/56。
+		//   ★★★ 订正 R17（v5.3）再补「**跨场景粘性**」：①~④ 判决出的「已确认拿空」
+		//      过去只存在 per-ref（指针键）判决表里，而 `ResetForNewScene`（载入画面
+		//      关闭 / 换 cell）会整体清掉它、引用对象重建后指针也会变 ⇒ 用户「远离
+		//      后再回来」时箱子重新亮起（用户实测报告）。修法：把「已确认拿空」
+		//      额外登记进 **FormID 键**的粘性表（`State::dcStickyFids`，跨场景保留；
+		//      往里放东西 / 再读到内容时自动清除）—— 判据 ⑤。
 		//
 		// ★ 安全姿势与 v4.11/v4.12 完全相同：注册前**硬核对 vtable**（不是那个
 		//   类型就绝不注册）、BSTEventSource 形状校验、负载全部 `SafeReadMem` 读、
@@ -615,9 +625,13 @@ namespace SAS
 		//   快速面板、全程没有投影条目（tpS=0）、没有拿走事件、ui=0 ⇒ v4.10 的
 		//   「同一段打开期」/ v4.13 的记账 / v4.14 加严后的兜底**三条判据全部要求
 		//   「曾见内容」** ⇒ 「打开确认是空」的展示柜永远不会被判定为空 ⇒ 永久亮）。
-		//   取值依据：面板打开后引擎把内容投影进库存需要 0.4~0.7 秒（v4.14 实测）
-		//   ⇒ 2000ms = 3 倍余量；「有内容的箱子」到这个时间点必然已读到内容（不会误灭）。
-		constexpr std::uint64_t kDcEmptyNoContentMs   = 2000;
+		//   取值依据（★ 订正 R17 修订）：面板打开后引擎把内容投影进库存需要
+		//   0.4~0.7 秒（v4.14 实测），**但投影可以更晚** —— 订正 R17 的日志实证
+		//   （docs/56）：ref=00183BD5 打开后 **2.13 秒**才第一次读到投影，而
+		//   2000ms 阈值在 2.01 秒就抢先判出「空箱」（误灭一例，随即被投影 / 记账
+		//   纠正）。⇒ 默认从 2000ms 提到 **3000ms**（对上述观测仍有 0.87 秒余量；
+		//   「有内容的箱子」到这个时间点读到过内容就不会再走这条判据）。
+		constexpr std::uint64_t kDcEmptyNoContentMs   = 3000;
 
 		// 【判空】容器 / 尸体的「库存列表」——
 		//   `TESObjectREFR::inventoryList` 是 `BSGuarded<BGSInventoryList*, BSReadWriteLock>`，
@@ -1981,10 +1995,17 @@ namespace SAS
 			//   + 这一段打开期里**从头到尾没见到内容** + 没收到过拿走事件
 			//   + 连续读到空 + 打开后已观察 ≥ N 毫秒 ⇒ 判「空」（粘性熄灭：
 			//   关掉后保持灭，直到往里放东西 / 再次打开读到内容）。
-			//   ★ 已知的唯一误灭面（如实记录，极窄且可自愈）：**有内容**的箱子被
-			//   「打开后不到 0.7 秒就关掉」—— 投影还没建立就被关闭 ⇒ 会被当成空箱；
-			//   **再打开它一次**（投影出现）或往里放东西即自动恢复（NoteDisplayCaseOccupied
-			//   / put 事件都会清粘性）。
+			//   ★ 已知的唯一误灭面（如实记录，极窄且可自愈）：**有内容**的箱子在
+			//   投影建立之前就被判/被关 ⇒ 会被当成空箱；**再打开它一次**（投影出现）
+			//   或往里放东西即自动恢复（NoteDisplayCaseOccupied / put 事件都会清粘性）。
+			//   ★★★ 订正 R17（v5.3）**默认 2000 → 3000ms** —— 日志实证投影可以**晚到
+			//   2.13 秒**（ref=00183BD5：21:26:01.921 打开 → 21:26:03.930（+2.009s）
+			//   被 2000ms 阈值误判「空箱」→ 21:26:04.050 才第一次读到投影），
+			//   3000ms 对上述观测仍有 0.87 秒余量。日志原因码 `why=4` 不变。
+			//   ★ 同时修「跨场景粘性」：判决出的「已确认拿空」登记进 FormID 粘性表
+			//   （`State::dcStickyFids`），过门 / 快速旅行 / 换 cell 后不再丢失
+			//   （用户报告「武器箱/武器柜似乎在玩家远离后，又会重新亮起」）；
+			//   日志 `display case sticky kept` / 统计行 `粘性复用=`，见 docs/56。
 			//   设 0 = 关（退回 v4.14 行为：空展示柜永远亮）。
 			int           displayCaseEmptyNoContentMs = static_cast<int>(kDcEmptyNoContentMs);
 			// 物品事件 / 快速面板事件的日志上限（诊断；默认 32 条）。
@@ -2319,6 +2340,37 @@ namespace SAS
 			// ★★★ 订正 R15：窗口内「空箱判据」判出的次数（诊断；与 displayCaseEmptied
 			//   同一口径 = 窗口内、统计行打完清零）。
 			std::uint64_t displayCaseEmptyNoContent = 0;
+			// ★★★ 订正 R17：展示柜「已确认拿空」的**跨场景粘性表**（FormID 键）。
+			// ----------------------------------------------------------------
+			//   为什么需要它（用户报告：「武器箱/武器柜似乎在玩家远离后，又会重新亮起」）：
+			//     `displayCaseVerdict` 是**指针键**、且在 `ResetForNewScene`（载入画面
+			//     关闭 / 换 cell）里被整体 `clear()`（旧世界的引用随时可能被销毁）——
+			//     而「已确认拿空」是**世界里的事实**，不该随场景切换丢掉：
+			//       · 玩家走过一道门 / 快速旅行（内景 ≠ 连续过渡 ⇒ 触发 reset）；
+			//       · 远近决定 cell 卸载 / 重载 ⇒ 引用对象重建 ⇒ 指针键必然失配。
+			//     ⇒ 结果：曾经的「拿空即灭」在离开 - 回来后被重置成「内容未知 ⇒ 照常亮」，
+			//       用户看到的正是「远离后又亮起」。
+			//   设计：
+			//     · 只登记「已确认拿空」这一个**单向事实**，键 = 引用 FormID
+			//       （FormID 是值、不会悬垂；放置类引用跨 cell 重载后 FormID 不变）；
+			//     · 命中 ⇒ `DisplayCaseReadsEmpty` 直接返回 `kDcEmptyStickyFid`（判空）；
+			//     · **可自愈**：往里放东西（put 事件）或再次读到内容
+			//       （`NoteDisplayCaseOccupied`）⇒ 立刻清除该 FormID 的粘性（重新亮）；
+			//     · 表满（kDcStickyFidMax）⇒ FIFO 淘汰最老的（近似），不清整表；
+			//     · 不落盘、不跨进程（会话级）—— 与「显示/高亮」一样是一次性的运行时状态。
+			//   ★ 如实记录的取舍：读回**更早的存档**（箱子在那边还有东西）时，粘性可能
+			//     偏保守（箱子不亮）—— 打开它一次（投影出现）或放东西即自愈；
+			//     反方向（拿空后重新亮起）正是用户反复报告的问题，两害相权取此。
+			struct DcStickyFidRec
+			{
+				std::uint32_t fid  = 0;  // 引用 FormID
+				std::uint64_t atMs = 0;  // 登记 / 刷新时刻（诊断用）
+			};
+			std::array<DcStickyFidRec, kDcStickyFidMax> dcStickyFids{};
+			std::size_t   dcStickyCount  = 0;  // 有效条数（≤ kDcStickyFidMax）
+			std::size_t   dcStickyCursor = 0;  // 满了以后的覆盖位置（近似 FIFO）
+			// ★ 订正 R17：窗口内「跨场景粘性」命中并恢复熄灭的次数（诊断；统计行 `粘性复用=`）。
+			std::uint64_t displayCaseStickyRestored = 0;
 			// ★ v4.13：事件通道的开关 / 注册状态（sink 由 EnginesLootEventSinks 挂）
 			bool          lootEvtActive       = false;  // 是否解释物品事件
 			bool          quickOpenActive     = false;  // 是否解释快速面板事件
@@ -4592,7 +4644,7 @@ namespace SAS
 			// ★ v4.13：游戏事件通道（理由 / 离线取证见常量区「v4.13」长注释）
 			g_cfg.containerLootEvents          = getInt("ContainerLootEvents", 1) != 0;
 			g_cfg.displayCaseQuickOpenEmpty    = getInt("DisplayCaseQuickOpenEmpty", 0) != 0;  // v4.14 默认关（误灭面见 Config 注释）
-			// ★ 订正 R15：空展示柜判据（毫秒；0 = 关；默认 2000 —— 依据见 Config 注释）
+			// ★ 订正 R15 / R17：空展示柜判据（毫秒；0 = 关；★ 默认 3000 —— 依据见 Config 注释）
 			g_cfg.displayCaseEmptyNoContentMs  = std::clamp(getInt("DisplayCaseEmptyNoContentMs",
 				  static_cast<int>(kDcEmptyNoContentMs)), 0, 60000);
 			g_cfg.lootEventLogMax              = std::clamp(getInt("LootEventLogMax", 32), 0, 4096);
@@ -4616,6 +4668,7 @@ namespace SAS
 			REX::INFO("config: containerLootEvents={} displayCaseQuickOpenEmpty={} displayCaseEmptyNoContentMs={} lootEventLogMax={} "
 					  "-> 展示柜拿空判据 = 记账（TESContainerChangedEvent 减账到 0）{}；"
 					  "空箱判据（★ 订正 R15）= {}；"
+					  "跨场景粘性（★ 订正 R17）= {}（过门 / 快速旅行 / 换 cell 后「已确认拿空」保持，治「远离后又亮起」）；"
 					  "事件源 = 静态对象 RVA 0x{:X}/0x{:X}（vtable 0x{:X}/0x{:X} 注册前硬核对）",
 				g_cfg.containerLootEvents, g_cfg.displayCaseQuickOpenEmpty, g_cfg.displayCaseEmptyNoContentMs,
 				g_cfg.lootEventLogMax,
@@ -4625,6 +4678,9 @@ namespace SAS
 				g_cfg.displayCaseEmptyNoContentMs > 0
 					? "开（打开后 ≥N ms 一直无内容 ⇒ 判空熄灭；治「空的武器箱/展示柜一直亮」）"
 					: "关（退回 v4.14 行为：空展示柜永远亮）",
+				(g_cfg.skipDisplayCaseEmpty && g_cfg.displayCaseUiEmpty)
+					? "开（FormID 键粘性表，跨场景保留；放东西 / 再读到内容即自愈）"
+					: "关（展示柜判空整体关着）",
 				kInvEvtSourceRva, kQuickOpenSourceRva, kInvEvtSourceVtblRva, kQuickOpenSourceVtblRva);
 
 			// --- ★ v4.0.1：可选的自定义类别颜色（ColorLoot=RRGGBB …，留空 = 用引擎原生配色）---
@@ -5959,6 +6015,73 @@ namespace SAS
 				builtin, static_cast<unsigned long long>(biTotal), detail);
 		}
 
+		// ================================================================
+		// ★★★ 订正 R17：展示柜「已确认拿空」的跨场景粘性 —— 三个小助手
+		// ----------------------------------------------------------------
+		//   （完整动机与设计见 State::dcStickyFids 上方长注释；这里只管表操作）
+		//   · `DcStickyFidHas`   —— 判决（`DisplayCaseReadsEmpty`）与诊断（ContProbe）
+		//   · `DcStickyFidAdd`   —— 落粘性（`MarkDisplayCaseEmptied` 专用）
+		//   · `DcStickyFidErase` —— 自愈（放回东西 / 又读到内容）；返回「是否真的删了」
+		//   全部线性查找（≤ kDcStickyFidMax 条，调用频率 = 展示柜判决，可忽略）。
+		// ================================================================
+		bool DcStickyFidHas(std::uint32_t a_fid)
+		{
+			if (a_fid == 0) {
+				return false;
+			}
+			for (std::size_t i = 0; i < g_state.dcStickyCount; ++i) {
+				if (g_state.dcStickyFids[i].fid == a_fid) {
+					return true;
+				}
+			}
+			return false;
+		}
+
+		bool DcStickyFidErase(std::uint32_t a_fid)
+		{
+			if (a_fid == 0) {
+				return false;
+			}
+			for (std::size_t i = 0; i < g_state.dcStickyCount; ++i) {
+				if (g_state.dcStickyFids[i].fid != a_fid) {
+					continue;
+				}
+				// 保持顺序（FIFO 语义）：后面的整体前移一格
+				for (std::size_t k = i; k + 1 < g_state.dcStickyCount; ++k) {
+					g_state.dcStickyFids[k] = g_state.dcStickyFids[k + 1];
+				}
+				--g_state.dcStickyCount;
+				g_state.dcStickyFids[g_state.dcStickyCount] = {};
+				g_state.dcStickyCursor = 0;  // 未满状态：覆盖游标归零（下次满时从最老开始）
+				return true;
+			}
+			return false;
+		}
+
+		void DcStickyFidAdd(std::uint32_t a_fid)
+		{
+			if (a_fid == 0) {
+				return;
+			}
+			const auto now = NowMs();
+			for (std::size_t i = 0; i < g_state.dcStickyCount; ++i) {
+				if (g_state.dcStickyFids[i].fid == a_fid) {
+					g_state.dcStickyFids[i].atMs = now;  // 已在表里 ⇒ 只刷新时刻
+					return;
+				}
+			}
+			if (g_state.dcStickyCount < kDcStickyFidMax) {
+				g_state.dcStickyFids[g_state.dcStickyCount++] = State::DcStickyFidRec{ a_fid, now };
+				if (g_state.dcStickyCount == kDcStickyFidMax) {
+					g_state.dcStickyCursor = 0;  // 刚满：最老的在 0 号槽
+				}
+				return;
+			}
+			// 表满：覆盖最老的一格（近似 FIFO —— 正常一局远到不了 512 个展示柜）
+			g_state.dcStickyFids[g_state.dcStickyCursor] = State::DcStickyFidRec{ a_fid, now };
+			g_state.dcStickyCursor = (g_state.dcStickyCursor + 1) % kDcStickyFidMax;
+		}
+
 		// ★★ v4.8 诊断：`cont probe:` —— 容器「判空链路快照」。
 		//   背景（用户实测反馈）：*「这个武器箱子表现有点奇怪，关闭的时候没有高亮，
 		//   只有打开的时候才会开始高亮」* —— 也就是：**关着的容器不进候选（不亮），
@@ -6023,15 +6146,22 @@ namespace SAS
 				(first ? " dc=1" : " dc=1 (changed)") :
 				(first ? "" : " (changed)");
 			// ★ v4.10：展示柜的判决状态（`ui=` 容器界面是否开着；`st=` 0=未知 1=有东西
-			//   2=已确认拿空；`tpS=` 这一段打开期里见过投影条目）—— 「拿空即灭」
-			//   有没有生效、卡在哪一步，看这三个字段（见常量区「v4.10」）。
+			//   2=已确认拿空；★ 订正 R17 起 **3=跨场景粘性命中**（本场景判决表里
+			//   没有，但 FormID 粘性表里有 —— 远离 / 换场景回来后应看到它）；
+			//   `tpS=` 这一段打开期里见过投影条目）—— 「拿空即灭」
+			//   有没有生效、卡在哪一步，看这几个字段（见常量区「v4.10」/「订正 R17」）。
 			//   ★ v4.11：再加 `ev=`（**事件侧**判定「容器界面开着」）与 `mEv=`（收到的
 			//     菜单事件总数）—— v4.10 实测 `ui=` 全程 0，这两个字段一眼区分
 			//     「事件通道没生效」还是「菜单名不对」（见常量区「v4.11」）。
 			char dcBuf[96]{};
 			if (a_displayCase) {
 				const auto dsIt = g_state.displayCaseVerdict.find(a_ref);
-				const int  st   = (dsIt != g_state.displayCaseVerdict.end()) ? dsIt->second.lastKnown : 0;
+				int        st   = (dsIt != g_state.displayCaseVerdict.end()) ? dsIt->second.lastKnown : 0;
+				// ★ 订正 R17：跨场景粘性命中 ⇒ `st=3`（与 `st=2`「本场景已确认拿空」
+				//   区分开）—— 用户复查「远离 / 换场景后再回来是否保持熄灭」看这一档。
+				if (st != 2 && DcStickyFidHas(a_ref->GetFormID())) {
+					st = 3;
+				}
 				const bool tpS  = (dsIt != g_state.displayCaseVerdict.end()) &&
 								  dsIt->second.lastTpSerial != 0 &&
 								  dsIt->second.lastTpSerial == g_state.containerUiSerial;
@@ -6501,6 +6631,15 @@ namespace SAS
 		void NoteDisplayCaseOccupied(const RE::TESObjectREFR* a_ref, bool a_sawTemporary,
 			const DcSnapOut* a_snap = nullptr)
 		{
+			// ★ 订正 R17：又读到内容 ⇒ **撤销跨场景粘性**（东西又有了 ⇒ 重新亮）。
+			//   这条是自愈路径的关键一半：① 读回更早的存档（箱子其实有东西）后
+			//   打开它一次；② 订正 R15 空箱判据万一误灭（投影晚到）时投影一到
+			//   就自动恢复。两处都只在这里记一行（表里真有才打，不刷屏）。
+			if (a_ref && DcStickyFidErase(a_ref->GetFormID())) {
+				REX::INFO("display case sticky cleared (又读到内容 / 有东西了) [★ 订正 R17]: "
+						  "ref={:08X} -> 撤销「已确认拿空」粘性（重新亮）",
+					a_ref->GetFormID());
+			}
 			auto& ds = DisplayCaseVerdictFor(a_ref);
 			ds.lastKnown = 1;
 			// ★ v4.14：这一段打开期里确实读到过内容（兜底判据的前置证据，见字段注释）
@@ -6531,7 +6670,8 @@ namespace SAS
 			kDcEmptySticky      = 1,  // ① 已确认拿空（粘性，关掉后保持灭）
 			kDcEmptySameSession = 2,  // ② v4.10：同一段打开期里读到空
 			kDcEmptyFallback    = 3,  // ③ v4.13 兜底（默认关：打开过 + 见过内容 + 连续空）
-			kDcEmptyNoContent   = 4   // ④ ★ 订正 R15：打开后一直无内容（空箱）
+			kDcEmptyNoContent   = 4,  // ④ ★ 订正 R15：打开后一直无内容（空箱）
+			kDcEmptyStickyFid   = 5   // ⑤ ★ 订正 R17：跨场景粘性（FormID 表命中）
 		};
 
 		const char* DcEmptyReasonText(int a_why)
@@ -6541,6 +6681,7 @@ namespace SAS
 			case kDcEmptySameSession: return "同一段打开期里读到空";
 			case kDcEmptyFallback:    return "兜底（快速面板 + 连续读到空）";
 			case kDcEmptyNoContent:   return "空箱（打开后一直无内容）";
+			case kDcEmptyStickyFid:   return "粘性（已确认拿空·跨场景保持）";
 			default:                  return "未知判据";
 			}
 		}
@@ -6559,14 +6700,25 @@ namespace SAS
 		//     ④ ★★★ 订正 R15（v5.3）：**空箱判据** —— 快速面板为这个 ref 打开过、
 		//        这一段打开期里**从头到尾没见到内容**（`sawContentInSession==false`
 		//        ⇒ 打开后一直没有 kTemporary 投影）、没收到过拿走事件、连续读到空、
-		//        且距打开事件已 ≥ `DisplayCaseEmptyNoContentMs`（默认 2000ms，
-		//        覆盖投影装填期 0.4~0.7 秒）⇒ 「本来就空的展示柜」（EMPTY 版 /
-		//        被拿空过的，打开时也没有投影）。这是「空了却还在高亮」的修复：
-		//        v4.10 / v4.13 / v4.14 三条判据全部要求「曾见内容」，对这类箱子
-		//        永远不会成立 ⇒ 永久亮；本条是它们的补集。
+		//        且距打开事件已 ≥ `DisplayCaseEmptyNoContentMs`（★ 订正 R17 起默认
+		//        **3000ms**：投影可以晚到 2.13 秒，2000ms 曾误灭一例）⇒
+		//        「本来就空的展示柜」（EMPTY 版 / 被拿空过的，打开时也没有投影）。
+		//        这是「空了却还在高亮」的修复：v4.10 / v4.13 / v4.14 三条判据全部
+		//        要求「曾见内容」，对这类箱子永远不会成立 ⇒ 永久亮；本条是它们的补集。
+		//     ⑤ ★★★ 订正 R17（v5.3）：**跨场景粘性** —— `MarkDisplayCaseEmptied`
+		//        落粘性时同步登记进 FormID 粘性表（`State::dcStickyFids`）；
+		//        场景切换（载入画面关闭 / 换 cell）与引用对象重建都**不再丢失**
+		//        「已确认拿空」这个事实（`ResetForNewScene` 只清指针键的判决表）。
+		//        治用户报告：「武器箱/武器柜似乎在玩家远离后，又会重新亮起」。
+		//        自愈：put 事件 / 又读到内容 ⇒ 清除该 FormID 粘性（重新亮）。
 		//   其余（关着 / 从没见过投影 / 从没打开过）⇒ 内容未知 ⇒ 照常亮（v4.9 目标）。
 		int DisplayCaseReadsEmpty(const RE::TESObjectREFR* a_ref, std::uint64_t a_nowMs = 0)
 		{
+			// ★ 订正 R17：**跨场景粘性优先** —— 指针重建 / 场景切换后判决表可能是空，
+			//   但「已确认拿空」在 FormID 粘性表里跨场景保留（设计见 State::dcStickyFids）。
+			if (a_ref && DcStickyFidHas(a_ref->GetFormID())) {
+				return kDcEmptyStickyFid;  // ⑤ 远离 / 换场景后仍保持熄灭
+			}
 			const auto it = g_state.displayCaseVerdict.find(a_ref);
 			if (it == g_state.displayCaseVerdict.end()) {
 				return kDcEmptyNone;  // 从没见过它的投影 ⇒ 未知 ⇒ 照常亮
@@ -6619,6 +6771,21 @@ namespace SAS
 				return;  // 已经粘住了（避免每帧重复计数 / 重复写日志）
 			}
 			ds.lastKnown = 2;
+			const std::uint32_t fid = a_ref ? a_ref->GetFormID() : 0;
+			// ★ 订正 R17：无论哪条判据落下的粘性，都**同步登记进 FormID 粘性表** ——
+			//   它是「跨场景保留」的那一份（指针键判决表会被 ResetForNewScene 清掉）。
+			//   自愈路径（清除）见 NoteDisplayCaseOccupied 与 put 事件两处。
+			DcStickyFidAdd(fid);
+			// ★ 订正 R17：这一条不是「这次判出拿空」，而是「**记得它拿空过**」
+			//   （场景切换 / 引用重建后重新命中）⇒ 单独计数 + 单独文案，
+			//   不混进 `展示柜拿空=`（看统计行一眼能分清两条路径）。
+			if (a_whyCode == kDcEmptyStickyFid) {
+				++g_state.displayCaseStickyRestored;
+				REX::INFO("display case sticky kept (跨场景粘性·保持熄灭) [why={}]: ref={:08X} "
+						  "-> 场景切换 / 引用重建后命中 FormID 粘性表（★ 订正 R17）",
+					a_whyCode, fid);
+				return;
+			}
 			++g_state.displayCaseEmptied;
 			if (a_whyCode == kDcEmptyFallback) {
 				++g_state.quickOpenFallbackDecided;
@@ -6627,7 +6794,7 @@ namespace SAS
 				++g_state.displayCaseEmptyNoContent;
 			}
 			REX::INFO("display case emptied ({}) [why={}]: ref={:08X} -> 关掉后保持熄灭（粘性）",
-				a_why, a_whyCode, a_ref ? a_ref->GetFormID() : 0);
+				a_why, a_whyCode, fid);
 		}
 
 		// ★ v4.13：`AddToSnap`（快照累加）定义在 `RefLootState` 前面（读库存那段），
@@ -6827,9 +6994,14 @@ namespace SAS
 							}
 						}
 					}
-					if (ds.lastKnown == 2) {
+					// ★ 订正 R17：跨场景粘性同步撤销 —— 指针键判决表在换场景后可能是
+					//   新条目（`ds.lastKnown` 不是 2），不能只看它；FormID 粘性表才是
+					//   「跨场景保留」的那一份。
+					const bool dcStickyErased = DcStickyFidErase(rec.refFid);
+					if (ds.lastKnown == 2 || dcStickyErased) {
 						ds.lastKnown = 1;  // 又有东西了 ⇒ 撤销「拿空」粘性（重新亮）
-						REX::INFO("display case re-lit (事件：放进了东西): ref={:08X} base={:08X} x{}",
+						REX::INFO("display case re-lit (事件：放进了东西{}): ref={:08X} base={:08X} x{}",
+							dcStickyErased ? "·撤销跨场景粘性 ★ 订正 R17" : "",
 							rec.refFid, rec.baseFid, rec.count);
 					}
 					if (ds.evtLogs < kLootEvtPerRefLogMax && LootEvtMayLog()) {
@@ -7330,14 +7502,22 @@ namespace SAS
 		// 换 cell / 读档：把这批引用从引擎的高亮表里摘掉（分批，见下）。
 		void ResetForNewScene(std::uint64_t a_nowMs, const char* a_reason)
 		{
-			REX::INFO("reset ({}) outline={}", a_reason, g_state.outlined.size());
+			REX::INFO("reset ({}) outline={} | 展示柜粘性保留={} 条（★ 订正 R17：跨场景不丢）",
+				a_reason, g_state.outlined.size(), g_state.dcStickyCount);
 
 			// ★ v4.4：换场景 / 读档 ⇒ 判决缓存与探针去重集合都作废
 			//   （旧世界的引用随时可能被销毁，留着它们只会是野键）。
 			g_state.achrVerdict.clear();
 			g_state.lootProbed.clear();
 			g_state.contProbed.clear();       // ★ v4.8
-			g_state.displayCaseVerdict.clear();  // ★ v4.10（旧世界的引用随时可能被销毁）
+			// ★ v4.10（旧世界的引用随时可能被销毁）
+			//   ★★★ 订正 R17：清掉的只是**指针键**的判决表 —— 「已确认拿空」这个
+			//   事实同时登记在 FormID 粘性表（`dcStickyFids`）里，**这里不清**：
+			//   否则玩家「远离（过门 / 快速旅行 / 换 cell）后再回来」时，被拿空的
+			//   展示柜会重新亮起（正是用户报告：「武器箱/武器柜似乎在玩家远离后，
+			//   又会重新亮起」）。FormID 是值、不会悬垂；自愈路径见
+			//   NoteDisplayCaseOccupied / put 事件。
+			g_state.displayCaseVerdict.clear();
 			// ★★★ 订正 R4：判空缓存同样是「旧世界的引用 → 结论」⇒ 一起作废
 			//   （不清的话：指针被回收后，新的容器会读到别的容器的旧结论）。
 			g_state.lootMemo.clear();
@@ -13275,7 +13455,7 @@ namespace SAS
 							  "| ACHR: 见到={} 判活跳过={} | StartsUnconscious跳过={} "
 							  "| 前置过滤: deleted/disabled={} 非本cell={} "
 							  "| 搜空: empty={} notEmpty={} unknown={} null={} shapeBad={} invOff={} "
-							  "| 判空跳过: np={} eq={} bi={} | 展示柜跳过={} 展示柜拿空={} 空箱判空={} 逐帧拿空={} 逐帧帧数={}",
+							  "| 判空跳过: np={} eq={} bi={} | 展示柜跳过={} 展示柜拿空={} 空箱判空={} 粘性复用={} 逐帧拿空={} 逐帧帧数={}",
 						g_state.corpseSeen, g_state.corpseByBit, g_state.corpseByFlag,
 						g_state.corpseByLife, g_state.corpseByBleed,
 						g_state.corpseProps, g_state.corpseUncSeen,
@@ -13286,7 +13466,7 @@ namespace SAS
 						g_state.lootNullInv, g_state.lootBadShape, invOff,
 						g_state.lootSkipNonPlayable, g_state.lootSkipEquipped, g_state.lootSkipBuiltin,
 						g_state.displayCaseSkips, g_state.displayCaseEmptied,
-						g_state.displayCaseEmptyNoContent,
+						g_state.displayCaseEmptyNoContent, g_state.displayCaseStickyRestored,
 						g_state.displayCaseEmptiedFrame, g_state.dcWatchFrames);
 					// ★ v4.11：容器界面信号与菜单事件（诊断一行看完）：
 					//   `ui=` 事件∨轮询的最终状态；`ev=` 事件侧；`opens=`= 开过的段数；
@@ -13339,6 +13519,9 @@ namespace SAS
 					g_state.displayCaseSkips = 0;
 					g_state.displayCaseEmptied = 0;  // ★ v4.10
 					g_state.displayCaseEmptyNoContent = 0;  // ★ 订正 R15（空箱判据判出的次数）
+					g_state.displayCaseStickyRestored = 0;  // ★ 订正 R17（跨场景粘性复用次数）
+					//   ★ 订正 R17：`dcStickyFids` **不重置**（它是跨场景 / 跨统计窗口
+					//   保留的「已确认拿空」事实，只由 put 事件 / 读到内容 / FIFO 淘汰）。
 					g_state.displayCaseEmptiedFrame = 0;  // ★ v4.11（逐帧判出「拿空」的次数）
 					g_state.dcWatchFrames    = 0;         // ★ v4.11（逐帧观察跑了多少帧）
 					g_state.achrSeen         = 0;

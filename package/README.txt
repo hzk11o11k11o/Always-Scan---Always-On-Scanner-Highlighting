@@ -54,7 +54,8 @@ Version  : 2.0.1  (plugin build 5.1.0)
                as empty after two seconds - the outline goes out and stays out
                until you put something in (or open it again with items in it).
                New ini key `DisplayCaseEmptyNoContentMs` (default 2000 ms;
-               0 turns it off).
+               raised to 3000 ms by the fix below - player logs showed the game
+               can take 2.13 s to list a case's contents; 0 turns it off).
                * fixed (2026-10-03): a **robot** corpse could keep its highlight
                after you looted it empty (it came and went). Its two arm guns
                (records 0x1DC415 / 0x1DC416) are built-in body parts, not loot:
@@ -71,6 +72,25 @@ Version  : 2.0.1  (plugin build 5.1.0)
                robot parts plus the virtual unarmed-attack and gas-trap
                records). New ini key `SkipBuiltinLoot` (default 1; 0 turns it
                off); the stats line gained a `bi=` counter next to `np=`/`eq=`.
+             * fixed (2026-10-03): an emptied display case / weapon case could
+               light up **again after you walked away** - walk out of the room,
+               fast-travel, or leave and come back through a door, and a case
+               you had already looted empty glowed again. The "this one is
+               empty" verdict was remembered per reference *object*: a loading
+               screen or a cell change drops that memory, and when the game
+               rebuilds the object the pointer no longer matches either - so the
+               case fell back to "contents unknown -> highlight". The verdict is
+               now also remembered by **record id**, which survives scene
+               changes and object rebuilds: the case stays dark when you come
+               back, until something is put in (or it is opened with items in
+               it again). The same fix raises the confirm window of the
+               empty-case rule above from 2000 ms to **3000 ms** - player logs
+               showed the game can take 2.13 s to list a case's contents, so the
+               old 2-second window judged one non-empty case empty by a hair
+               (the contents and item events arrived right after and corrected
+               it). Log lines to watch: `display case sticky kept` (why=5), the
+               probe field `st=3`, and the `粘性复用=` counter in the stats
+               line.
 
 
            2.0 = the mod brings its own outline colour channels (described
