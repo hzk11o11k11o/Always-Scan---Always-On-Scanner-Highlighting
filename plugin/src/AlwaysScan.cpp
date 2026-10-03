@@ -696,11 +696,10 @@ namespace SAS
 		//   下结论；如果玩家的第一个场景容器少 / 容器排得靠后 ⇒ 直接 FAILED 且
 		//   **永久降级**（容器 / 尸体拿空了也不熄灭）。现在：
 		//     · 样本来源放宽到「任何拥有库存的引用」（CONT 优先，ACHR 也算）；
-		//     · 每轮最多采样 kInvCalibPerRound 个（避免一轮里烧太多 VirtualQuery），
-		//       累计到 kInvCalibNeedOk 票才采纳 ⇒ 换场景 / 走几步自然会攒够；
-		//     · 采纳还要求至少 kInvCalibNeedStrong 个**强样本**（见 IsPlausibleFormPtr）——
-		//       只有强样本才能证明「读到的条目真的是物品」，光靠指针可读太弱；
-		//     · 只有累计到 kInvCalibMaxRounds 轮仍然不通过才永久降级（打 WARN）。
+		//     · 每轮最多采样 kInvCalibPerRound 个（避免一轮里烧太多 VirtualQuery）；
+		//     · 采纳要求**强证据**（见 IsPlausibleFormPtr）—— 只有强样本才能证明
+		//       「读到的条目真的是物品」，光靠指针可读太弱；
+		//     · **永不放弃**，长时间攒不到就降频（见 CalibrateInventory）。
 		// ★★★ 2026-09-28：**采样方式**再修一次 —— 治「判空整局沉默 ⇒ 容器 / 尸体
 		//   拿空不熄灭」。实测（用户 2026-09-28 18:45 那局，`SFSE\Logs` 之外的部署日志）：
 		//     `inventory calibration: 仍在攒样本（rounds=40 checks=160
@@ -715,11 +714,47 @@ namespace SAS
 		//        ⇒ 一个场景里所有容器 / ACHR 都有机会被采到，不再只认数组开头那几个；
 		//     ② **把玩家自己当一个样本**：背包里必然有东西（开锁器 / 信用币…），
 		//        是最稳定、最省事的强样本来源 ⇒ 正常场景第 1 轮就能标定成功。
-		//        玩家样本只投「赞成票」：形状不过时**不计 bad**（否则一旦它读不出来，
-		//        `bad <= kInvCalibMaxBad` 这道闸门会把标定永久卡死）。
-		constexpr std::uint32_t kInvCalibNeedOk     = 3;       // 至少 3 个样本通过形状校验
-		constexpr std::uint32_t kInvCalibNeedStrong = 1;       // 其中至少 1 个是「强样本」
-		constexpr std::uint32_t kInvCalibMaxBad     = 2;       // 且坏样本不超过 2 个
+		// ★★★★ 2026-10-03 订正 R18：**采纳判据重做 —— 「强证据胜场 + 反证闸门」**。
+		//   用户报告（原文）：`出问题了，现在所有的容器拿空后都不熄灭了`。
+		//   实测（用户 2026-10-03 22:10~22:21 那一局，本机部署日志，DLL = R17 版）：
+		//     `inventory calibration: 仍在攒样本（rounds=40 checks=134
+		//      votes=+0xA0:92 / +0xA8:0 strong=79/0 bad=42/94 游标=622）`
+		//     + 整局统计行 `搜空: empty=0 … invOff=未标定` ⇒ **又是标定沉默** ⇒
+		//     `g_invOff == 0` ⇒ 判空整段被跳过 ⇒ 所有容器 / 尸体照常亮（= 用户现象）。
+		//   ★ 真根因（v4.3 判据的三个设计缺陷，与内存读无关）：
+		//     ① 上一版的采纳闸门是 `votes>=3 && strong>=1 && **bad<=2**`，而 bad 是
+		//        **跨轮永不重置的累计值**（2026-09-28 引入轮转采样之后，样本池从
+		//        「永远同一批前 4 个引用」变成「整个场景的容器 / ACHR」）⇒ 只要场景里
+		//        有**几个**「读不出库存形状」的引用（实测：船舶类容器 `SpaceshipInventory`
+		//        / `CaptainsLocker01` / `ShipOutpost_*_EMPTY_*`，以及被引擎销毁过
+		//        库存列表的引用 —— 它们的 `+0xA0` 是 null 或指向已释放的内存），
+		//        bad 就单调涨过 2 ⇒ **该候选此后永远不可能被采纳**（哪怕已有 79 个强样本）。
+		//     ② 「指针为 null」被错当成反证：`+0xA0 == null` 在语义上就是
+		//        「这个引用没有库存列表」（v4.3 自己在 `RefLootState` 里就是这么解读的：
+		//        `ptrRaw == 0` ⇒ 判空），它**不能**用来否证偏移 —— 却把标定卡死了。
+		//     ③ 判据是「绝对票数」，没有**在同一引用上比较两个候选**：真正有区分度的
+		//        信号是「同一个引用：+0xA0 读出一份带合法物品的清单，而 +0xA8 读不出」。
+		//   ⇒ 新判据（只改标定，热路径与判空语义一字未动）：
+		//     · 每个样本按候选分档：`强`（形状对且第一条目 object 是合法表单）/
+		//       `空`（形状对、条目数 0）/ `形状坏`（读到了数组头但自相矛盾）/
+		//       `中性`（`+off` 是 null 或内存读不到 —— null 是**合法状态**，不是反证）。
+		//     · **强证据胜场**：同一个引用上，本候选「强」而另一候选不「强」⇒ 胜场 +1；
+		//       反过来（另一候选强、本候选不强）⇒ **反证** +1；两个都强 ⇒ 歧义（只记录）。
+		//     · 采纳 = 胜场 ≥ kInvCalibNeedWins **且** 反证 ≤ kInvCalibMaxLoss。
+		//       若给过胜场的只有**一个**引用（典型：只有玩家自己），门槛抬到
+		//       kInvCalibNeedWinsSolo —— 单个引用重复采样只能证明「这个引用上对」。
+		//     · `形状坏` / `空` / `中性` **都不再是闸门**，只进日志（诊断口径见
+		//       `inventory calibration: 仍在攒样本`）—— 场景里有多少读不出形状的
+		//       引用，都不再影响标定。
+		//   ★ 安全底线不变（绝不把没验证的偏移放进热路径）：胜场**只认强证据**
+		//     （合法 TESForm 指针 + 形状自洽），且反证（另一候选拿到强证据）≤ 2。
+		//   ★ 兜底（本轮的第二个口子）：INI **`InventoryListOffset`** —— 0 = 自动标定
+		//     （默认），`0xA0` / `0xA8` = 手动指定、跳过标定（反汇编已证明 +0xA0 是数据、
+		//     +0xA8 是锁；万一自动判据再被什么场景卡住，改这一个键就能立刻恢复）。
+		//     完整证据链 / 改动表 / 验收判据见 docs/57。
+		constexpr std::uint32_t kInvCalibNeedWins     = 3;    // 强证据胜场 ≥ 3（≥2 个引用给过胜场时）
+		constexpr std::uint32_t kInvCalibNeedWinsSolo = 8;    // 只有 1 个引用（= 玩家）给胜场时的门槛
+		constexpr std::uint32_t kInvCalibMaxLoss      = 2;    // 反证（另一候选拿到强证据）≤ 2
 		constexpr std::uint32_t kInvCalibPerRound   = 4;       // 每轮扫描最多采样几个引用
 		constexpr std::uint32_t kInvCalibScanCap    = 4000;    // 单轮最多看多少个引用去找样本
 		constexpr std::uint32_t kInvCalibFastRounds = 40;      // 前多少轮「每轮都采样」（之后降频）
@@ -1838,6 +1873,17 @@ namespace SAS
 			//   （不判空，容器 / 尸体照常亮），日志里有明确警告。
 			bool          skipEmptyLoot     = true;
 
+			// ★★★★ 订正 R18：库存列表偏移（`TESObjectREFR` 里的 `BGSInventoryList*`）
+			//   **手动指定** —— 0 = 自动标定（默认，见 CalibrateInventory）；
+			//   `0xA0` / `0xA8` = 跳过标定直接用它。
+			//   为什么留这个键（三轮回溯，见 docs/57）：反汇编早已证明 **+0xA0 = 数据指针、
+			//   +0xA8 = 读写锁**，但自动标定的「采纳闸门」前后被三次踩坑
+			//   （v4.2 一次性采样 / 2026-09-28 只采数组头 4 个 / 2026-10-03 `bad<=2`
+			//   被少量「读不出形状的引用」永久卡死）——每一次的表现都是**判空整局沉默**
+			//   = 容器 / 尸体拿空后不熄灭。R18 已把自动判据改成「强证据胜场 + 反证闸门」，
+			//   这个键是万一还卡住时的「一行恢复」口子：改成 0xA0 立刻恢复判空，不用换 DLL。
+			std::size_t   invListOffsetOverride = 0;  // 0 = 自动；0xA0 / 0xA8 = 手动
+
 			// ★ v4.3（诊断）：每个会话最多打几条 `actor probe:`（半径内**所有** ACHR
 			//   的判决明细，含被判成活人的）。用途：用户报「某具尸体该亮没亮」时，
 			//   一次日志就能看到它被判成了什么、boolBits / formFlags 是什么。
@@ -2466,14 +2512,28 @@ namespace SAS
 			std::uint64_t skipParentCell   = 0;
 
 			// --- ★ v4.2：库存列表偏移的标定状态（见 CalibrateInventory）---
-			//   ★ v4.3：改成「跨轮累计」——每轮最多采样 kInvCalibPerRound 个，
-			//     攒够票才采纳；只有累计 kInvCalibMaxRounds 轮仍不通过才永久降级。
+			//   ★ v4.3：改成「跨轮累计」——每轮最多采样 kInvCalibPerRound 个。
+			//   ★★ 订正 R18：判据换成「**强证据胜场 + 反证闸门**」（完整推导见常量区
+			//     「订正 R18」与 CalibrateInventory 顶部注释）：
+			//       · `invWins`  —— 强证据胜场：同一个引用上本候选「强」、另一候选不「强」
+			//       · `invLoss`  —— 反证：另一候选「强」而本候选不「强」（采纳闸门）
+			//       · 其余四档只进日志（**不再是闸门**，见常量区）：
+			//         `invAmbiguous`（两个候选都强）/ `invShapeBad`（读到数组头但自相矛盾）
+			//         / `invWeakEmpty`（形状对、条目数 0）/ `invNullPtr`（null 或读不到）
 			bool          invCalibDone = false;
-			std::uint32_t invVotes[2]{};   // 两个候选偏移各自通过形状校验的样本数
-			std::uint32_t invStrong[2]{};  // 其中「强样本」数（读到的条目里 object 是合法表单）
-			std::uint32_t invBad[2]{};     // 各自形状校验失败的样本数
+			std::uint32_t invWins[2]{};       // 强证据胜场（候选下标同 kOffInvCand）
+			std::uint32_t invLoss[2]{};       // 反证（另一候选拿到强证据的次数）
+			std::uint32_t invAmbiguous[2]{};  // 两个候选都强（只记录；理论上不该出现）
+			std::uint32_t invShapeBad[2]{};   // 形状自相矛盾（诊断；★ 不再封杀候选）
+			std::uint32_t invWeakEmpty[2]{};  // 形状对但空（弱票，诊断）
+			std::uint32_t invNullPtr[2]{};    // `+off` 为 null / 读不到（中性，诊断）
+			// ★ 订正 R18：**给过胜场的不同引用数**（饱和到 2）+ 前两个引用的 FormID ——
+			//   只有一个引用（典型：只有玩家自己）给过胜场时，采纳门槛抬到
+			//   kInvCalibNeedWinsSolo：单个引用重复采样只能证明「这个引用上对」。
+			std::uint32_t invWinRefCount[2]{};
+			std::uint32_t invWinRefFid[2][2]{};
 			std::uint32_t invChecks    = 0;  // 一共采样了多少个引用（容器 + ACHR）
-			std::uint32_t invRounds    = 0;  // 已经尝试过多少轮（到 kInvCalibMaxRounds 才放弃）
+			std::uint32_t invRounds    = 0;  // 已经尝试过多少轮（**永不放弃**，只降频）
 			// ★★★ 2026-09-28：**轮转采样游标** —— 老实现每轮都从数组头开始采样，
 			//   采到的永远是同一批前几个引用；若它们恰好都是空容器（实测：
 			//   `rounds=40 checks=160 strong=0`）⇒ 标定整局沉默 ⇒ 判空被安全降级
@@ -2483,13 +2543,17 @@ namespace SAS
 			// ★★★ 2026-09-28：**末轮样本留痕**（只作诊断）—— 标定一直不成功时，
 			//   日志能把「最后这一轮采了谁、读到什么」摊开 ⇒ 一眼分清「采到的都是
 			//   空容器」还是「根本读不出形状（偏移错了 / 内存读不到）」。
+			//   ★ 订正 R18：新增 `st0` / `st1` —— 两个候选各自的**分档字母**
+			//     （G = 强证据 / E = 形状对但空 / X = 形状坏 / N = null / R = 读不到）。
 			struct InvCalibSample
 			{
 				std::uint32_t refFid  = 0;
 				std::uint32_t baseFid = 0;
 				std::uint32_t objFid  = 0;   // 第一条目的 object（强证据；0 = 没读到）
-				std::int32_t  size    = -1;  // +0xA0 候选读到的条目数；-1 = 形状不过
+				std::int32_t  size    = -1;  // +0xA0 候选读到的条目数；-1 = 没读到形状
 				std::uint8_t  actor   = 0;   // 1 = ACHR（含玩家自己）
+				char          st0     = '-';  // +0xA0 候选的分档字母
+				char          st1     = '-';  // +0xA8 候选的分档字母
 			};
 			InvCalibSample invLastSample[kInvCalibPerRound]{};
 			std::uint32_t  invLastSampleCount = 0;
@@ -4597,6 +4661,35 @@ namespace SAS
 			// --- ★ v4.2：尸体 / 搜空（v4.2.1 起 CorpseUnconscious 默认 1，理由见 Config 里的说明）---
 			g_cfg.corpseUnconscious = getInt("CorpseUnconscious", 1) != 0;
 			g_cfg.skipEmptyLoot     = getInt("SkipEmptyLoot", 1) != 0;
+			// ★★★★ 订正 R18：库存列表偏移（0 = 自动标定；0xA0 / 0xA8 = 手动指定）。
+			//   字符串键 ⇒ 支持 `0xA0` / `160` 两种写法（strtoul base 0）；
+			//   别的值一律 WARN + 忽略（**只认反汇编证明过的那两个偏移**，见 Config 注释）。
+			{
+				char offBuf[32]{};
+				::GetPrivateProfileStringA("General", "InventoryListOffset", "", offBuf, sizeof(offBuf), ini);
+				char* p = offBuf;
+				while (*p == ' ' || *p == '\t') {
+					++p;
+				}
+				if (*p != '\0') {
+					char*      end = nullptr;
+					const auto v   = std::strtoul(p, &end, 0);  // 支持 0xA0 / 160
+					if (end != p && (v == 0xA0u || v == 0xA8u)) {
+						g_cfg.invListOffsetOverride = static_cast<std::size_t>(v);
+					} else {
+						REX::WARN("config: InventoryListOffset='{}' 无效（只接受 0xA0 / 0xA8；"
+								  "0 或留空 = 自动标定）-> 忽略，走自动标定",
+							p);
+					}
+				}
+			}
+			if (g_cfg.invListOffsetOverride != 0) {
+				REX::INFO("config: inventoryListOffset=+0x{:X} -> **手动指定**（跳过自动标定；★ 订正 R18，见 docs/57）",
+					g_cfg.invListOffsetOverride);
+			} else {
+				REX::INFO("config: inventoryListOffset=0 -> 自动标定（★ 订正 R18：强证据胜场 + 反证闸门；"
+						  "万一整局 `invOff=未标定` ⇒ 把它写成 0xA0 即可恢复判空）");
+			}
 			// ★ v4.4：判死改用引擎自己的 lifeState 枚举（理由见常量区与 Config 的长注释）
 			g_cfg.corpseLifeState   = getInt("CorpseLifeState", 1) != 0;
 			g_cfg.corpseBleedout    = getInt("CorpseBleedout", 1) != 0;
@@ -6386,10 +6479,110 @@ namespace SAS
 		std::size_t g_invOff = 0;  // 0 = 还没标定
 		// ★ v4.3：采样节流 —— 长时间攒不到样本时降频（见 CalibrateInventory 顶部说明）
 		std::uint64_t g_invCalibNextMs = 0;
+
+		// ★★★★ 订正 R18：**候选偏移分档器** —— 标定判据的唯一证据来源。
+		//   把「`ref + <候选偏移>` 上读到的到底是什么」一次性分档（动机见常量区「订正 R18」）：
+		//     · `kNull`       —— `+off` 是 0（或连那 8 字节都读不出来）⇒ **中性**：
+		//        语义就是「这个引用没有库存列表」（`RefLootState` 对 `ptrRaw == 0` 就是这么
+		//        判的：默认算「空」）⇒ 它既不能证明也不能否证偏移。
+		//        ★ R18 之前这一档被当成**反证**（`bad` 累计），于是场景里几个这样的引用
+		//          就能把标定永久卡死（实测 2026-10-03：`bad=42/94` ⇒ 标定整局沉默 ⇒
+		//          容器 / 尸体拿空后不熄灭）。
+		//     · `kUnreadable` —— 指针看着像但内存读不到（换场景 / 引用刚被释放）⇒ 中性。
+		//     · `kShapeBad`   —— 读到了数组头但**自相矛盾**（size>cap / cap 过大 /
+		//        data 不可读 / 第一条目 object 不是合法表单）⇒ 反证（只进日志 +
+		//        参与「同引用对比」的反面，**不单独封杀候选**）。
+		//     · `kEmpty`      —— 形状自洽、条目数 0 ⇒ 弱票（只进日志）。
+		//     · `kStrong`     —— 形状自洽 + 第一条目 `object` 是合法 TESForm
+		//        （`IsPlausibleFormPtr`）⇒ **强证据**（只有它能构成「胜场」）。
+		enum class InvCandState : std::uint8_t
+		{
+			kNull = 0,    // +off 为 0 / 读不出来（中性）
+			kUnreadable,  // 指针不可读（中性）
+			kShapeBad,    // 读到数组头但自相矛盾（反证）
+			kEmpty,       // 形状对、条目数 0（弱票）
+			kStrong,      // 形状对 + 第一条目 object 是合法表单（强证据）
+		};
+		char InvCandStateChar(InvCandState a_st)
+		{
+			switch (a_st) {
+			case InvCandState::kStrong:     return 'G';
+			case InvCandState::kEmpty:      return 'E';
+			case InvCandState::kShapeBad:   return 'X';
+			case InvCandState::kUnreadable: return 'R';
+			default:                        return 'N';
+			}
+		}
+		// 只读、零副作用（SafeReadMem / IsReadable，绝不解引用未验证的指针）
+		InvCandState ProbeInvCandidate(const std::uint8_t* a_refRaw, std::size_t a_off,
+			std::uint32_t* a_outSize = nullptr, std::uint32_t* a_outObjFid = nullptr)
+		{
+			if (a_outSize) {
+				*a_outSize = 0;
+			}
+			if (a_outObjFid) {
+				*a_outObjFid = 0;
+			}
+			// ★ v4.15：候选偏移上的指针也用 SafeReadMem 取（换场景期引用随时可能失效）
+			std::uint64_t p = 0;
+			if (!SafeReadMem(a_refRaw + a_off, &p, sizeof(p))) {
+				return InvCandState::kNull;  // 连指针都读不出来 ⇒ 中性
+			}
+			if (p == 0 || !IsPlausiblePointer(p)) {
+				return InvCandState::kNull;  // null / 明显不是指针 ⇒ 中性（不是反证！）
+			}
+			if (!IsReadable(reinterpret_cast<const void*>(p), 0x38)) {
+				return InvCandState::kUnreadable;
+			}
+			const auto*   inv  = reinterpret_cast<const std::uint8_t*>(p);
+			std::uint32_t size = 0;
+			std::uint32_t cap  = 0;
+			std::uint64_t data = 0;
+			if (!SafeReadMem(inv + kOffInvData, &size, sizeof(size)) ||
+				!SafeReadMem(inv + kOffInvData + 4, &cap, sizeof(cap)) ||
+				!SafeReadMem(inv + kOffInvData + 8, &data, sizeof(data))) {
+				return InvCandState::kUnreadable;
+			}
+			if (size > kInvMaxItems || cap < size || cap > (1u << 20)) {
+				return InvCandState::kShapeBad;  // 数组三元组不自洽 = 读到的不是清单
+			}
+			if (size == 0) {
+				return InvCandState::kEmpty;  // 形状对但空 ⇒ 弱票
+			}
+			if (!IsPlausiblePointer(data) ||
+				!IsReadable(reinterpret_cast<const void*>(data), kOffInvItemSize + 8)) {
+				return InvCandState::kShapeBad;
+			}
+			// ★ 强证据：第一条目的 `object` 必须是一个合法 TESForm。
+			const auto obj = *reinterpret_cast<const std::uint64_t*>(data + kOffInvItemObject);
+			if (!IsPlausibleFormPtr(obj)) {
+				return InvCandState::kShapeBad;
+			}
+			if (a_outSize) {
+				*a_outSize = size;
+			}
+			if (a_outObjFid) {
+				*a_outObjFid = *reinterpret_cast<const std::uint32_t*>(
+					reinterpret_cast<const std::uint8_t*>(obj) + kOffFormID);
+			}
+			return InvCandState::kStrong;
+		}
 		void CalibrateInventory(const RE::TESObjectREFR* const* a_list, std::uint32_t a_size)
 		{
 			auto& s = g_state;
 			if (s.invCalibDone) {
+				return;
+			}
+			// ★★★★ 订正 R18：INI 手动指定偏移（`InventoryListOffset`）⇒ 跳过自动标定。
+			//   只接受 0xA0 / 0xA8（反汇编已证明：数据 @+0xA0、锁 @+0xA8；见上面长注释），
+			//   启动时已校验过一遍（非法值只 WARN + 忽略）。这是「自动判据万一还被
+			//   什么场景卡住」的兜底口子：改一个键就能立刻恢复判空，不用换 DLL。
+			if (g_cfg.invListOffsetOverride != 0) {
+				g_invOff       = g_cfg.invListOffsetOverride;
+				s.invCalibDone = true;
+				REX::INFO("inventory calibration: 跳过自动标定 —— INI `InventoryListOffset=0x{:X}`"
+						  "（★ 订正 R18 手动指定；见 docs/57）-> 搜空判空**启用**",
+					g_invOff);
 				return;
 			}
 			// ★ v4.3：节流 + **永不放弃**。
@@ -6419,13 +6612,13 @@ namespace SAS
 			const std::uint32_t limit = std::min<std::uint32_t>(a_size, kInvCalibScanCap);
 
 			const RE::TESObjectREFR* sampleRefs[kInvCalibPerRound]{};
-			bool                     sampleCountBad[kInvCalibPerRound]{};  // 形状不过时是否计入 bad
 			std::uint32_t            sampleN = 0;
 			if (auto* pl = RE::PlayerCharacter::GetSingleton()) {
-				// 玩家样本**不计 bad**：它只是「送上门来的强证据」，万一读不出形状
-				// （理论上不该发生），也不能让 `bad <= kInvCalibMaxBad` 把标定卡死。
-				sampleRefs[sampleN]     = pl;
-				sampleCountBad[sampleN] = false;
+				// 玩家自己排在第一位（背包里必然有东西 ⇒ 最稳定的**强证据**来源）。
+				//   ★ 订正 R18：玩家样本不再特殊对待 —— 旧版「玩家不计 bad」是为了
+				//     绕开 `bad <= 2` 那道闸门；新判据里 null / 形状坏都只是日志口径
+				//     （不再封杀候选），不需要例外（见常量区「订正 R18」）。
+				sampleRefs[sampleN] = pl;
 				++sampleN;
 			}
 			std::uint32_t scan = (s.invCalibCursor < limit) ? s.invCalibCursor : 0;
@@ -6445,99 +6638,85 @@ namespace SAS
 				if (ref == sampleRefs[0]) {
 					continue;  // 玩家已经在表里了（省一次重复采样）
 				}
-				sampleRefs[sampleN]     = ref;
-				sampleCountBad[sampleN] = true;
+				sampleRefs[sampleN] = ref;
 				++sampleN;
 			}
 			s.invCalibCursor = (scan >= limit) ? 0 : scan;  // 下一轮的起点（环形轮转）
 
 			s.invLastSampleCount = 0;  // 末轮样本留痕（诊断用；每轮重记）
 			for (std::uint32_t k = 0; k < sampleN; ++k) {
-				const auto* ref      = sampleRefs[k];
-				const bool  countBad = sampleCountBad[k];
-				const auto* refRaw   = reinterpret_cast<const std::uint8_t*>(ref);
-				const auto* base     = ref->data.objectReference.get();
-				const bool  isActor  = (refRaw[kOffFormType] == kFormTypeACHR);
+				const auto* ref     = sampleRefs[k];
+				const auto* refRaw  = reinterpret_cast<const std::uint8_t*>(ref);
+				const auto* base    = ref->data.objectReference.get();
+				const bool  isActor = (refRaw[kOffFormType] == kFormTypeACHR);
 				++s.invChecks;
-				// 诊断留痕（只记候选 +0xA0 的结果：判别「空容器」与「读不出形状」够用了）
-				State::InvCalibSample* rec = nullptr;
-				if (s.invLastSampleCount < kInvCalibPerRound) {
-					rec          = &s.invLastSample[s.invLastSampleCount++];
-					rec->refFid  = ref->GetFormID();
-					rec->baseFid = base ? base->GetFormID() : 0u;
-					rec->objFid  = 0;
-					rec->size    = -1;
-					rec->actor   = isActor ? 1u : 0u;
+
+				// ★★★★ 订正 R18：**同一个引用上把两个候选都分档**，再做「同引用对比」——
+				//   这是整套判据里唯一有区分度的信号：一个引用上不可能同时存在两份
+				//   「合法的物品清单」，所以「本候选强 / 另一候选不强」才算一次胜场。
+				//   （null / 读不到 / 形状坏都不再单独封杀候选，只进日志。）
+				InvCandState  st[2]{};
+				std::uint32_t sz[2]{};
+				std::uint32_t objFid[2]{};
+				for (int c = 0; c < 2; ++c) {
+					st[c] = ProbeInvCandidate(refRaw, kOffInvCand[c], &sz[c], &objFid[c]);
 				}
 				for (int c = 0; c < 2; ++c) {
-					// ★ v4.15：候选偏移上的指针也用 SafeReadMem 取（换场景期引用随时可能失效）
-					std::uint64_t p = 0;
-					if (!SafeReadMem(refRaw + kOffInvCand[c], &p, sizeof(p)) ||
-						!IsPlausiblePointer(p) || !IsReadable(reinterpret_cast<const void*>(p), 0x38)) {
-						if (countBad) {
-							++s.invBad[c];
+					const auto other = st[1 - c];
+					switch (st[c]) {
+					case InvCandState::kStrong:
+						if (other == InvCandState::kStrong) {
+							++s.invAmbiguous[c];  // 两个候选都强 = 歧义（只记录，不作证据）
+						} else {
+							++s.invWins[c];
+							// 「给过胜场的不同引用数」饱和到 2（只为门槛：只有 1 个引用
+							// 给过胜场时要求 kInvCalibNeedWinsSolo 次，见常量区）。
+							const auto fid = ref->GetFormID();
+							if (s.invWinRefCount[c] < 2) {
+								bool seen = false;
+								for (std::uint32_t j = 0; j < s.invWinRefCount[c]; ++j) {
+									seen = seen || (s.invWinRefFid[c][j] == fid);
+								}
+								if (!seen) {
+									s.invWinRefFid[c][s.invWinRefCount[c]] = fid;
+									++s.invWinRefCount[c];
+								}
+							}
 						}
-						continue;
+						break;
+					case InvCandState::kShapeBad: ++s.invShapeBad[c]; break;
+					case InvCandState::kEmpty:    ++s.invWeakEmpty[c]; break;
+					default:                      ++s.invNullPtr[c]; break;
 					}
-					const auto* inv = reinterpret_cast<const std::uint8_t*>(p);
-					std::uint32_t size = 0;
-					std::uint32_t cap  = 0;
-					std::uint64_t data = 0;
-					if (!SafeReadMem(inv + kOffInvData, &size, sizeof(size)) ||
-						!SafeReadMem(inv + kOffInvData + 4, &cap, sizeof(cap)) ||
-						!SafeReadMem(inv + kOffInvData + 8, &data, sizeof(data))) {
-						if (countBad) {
-							++s.invBad[c];
-						}
-						continue;
+					if (other == InvCandState::kStrong && st[c] != InvCandState::kStrong) {
+						++s.invLoss[c];  // 反证：**另一个候选**在这个引用上拿到了强证据
 					}
-					if (size > kInvMaxItems || cap < size || cap > (1u << 20)) {
-						if (countBad) {
-							++s.invBad[c];
-						}
-						continue;
-					}
-					if (size == 0) {
-						// 空库存：数组头形状对，但拿不出「强证据」⇒ 只算弱票。
-						++s.invVotes[c];
-						if (c == 0 && rec) {
-							rec->size = 0;  // 诊断：这是一个「形状 OK 但空」的样本
-						}
-						continue;
-					}
-					if (!IsPlausiblePointer(data) ||
-						!IsReadable(reinterpret_cast<const void*>(data), kOffInvItemSize + 8)) {
-						if (countBad) {
-							++s.invBad[c];
-						}
-						continue;
-					}
-					// ★ 强证据（v4.3 新增）：第一条目的 `object` 必须是一个合法 TESForm。
-					//   标定选错偏移时读到的多半是垃圾指针，这一步会立刻失败。
-					const auto obj = *reinterpret_cast<const std::uint64_t*>(data + kOffInvItemObject);
-					if (!IsPlausibleFormPtr(obj)) {
-						if (countBad) {
-							++s.invBad[c];
-						}
-						continue;
-					}
-					++s.invVotes[c];
-					++s.invStrong[c];
-					if (c == 0 && rec) {
-						rec->size   = static_cast<std::int32_t>(size);
-						rec->objFid = *reinterpret_cast<const std::uint32_t*>(
-							reinterpret_cast<const std::uint8_t*>(obj) + kOffFormID);
-					}
+				}
+				// 末轮留痕（只作诊断；候选 +0xA0 的 size / obj 沿用旧口径）
+				if (s.invLastSampleCount < kInvCalibPerRound) {
+					auto& rec    = s.invLastSample[s.invLastSampleCount++];
+					rec.refFid  = ref->GetFormID();
+					rec.baseFid = base ? base->GetFormID() : 0u;
+					rec.objFid  = objFid[0];
+					rec.size    = (st[0] == InvCandState::kEmpty || st[0] == InvCandState::kStrong)
+									? static_cast<std::int32_t>(sz[0])
+									: -1;
+					rec.actor   = isActor ? 1u : 0u;
+					rec.st0     = InvCandStateChar(st[0]);
+					rec.st1     = InvCandStateChar(st[1]);
 				}
 			}
 
+			// ★★★★ 订正 R18：采纳 = **胜场够 + 反证少**（不再看 bad 累计）。
 			for (int c = 0; c < 2; ++c) {
-				if (s.invVotes[c] >= kInvCalibNeedOk && s.invBad[c] <= kInvCalibMaxBad &&
-					s.invStrong[c] >= kInvCalibNeedStrong) {
+				const auto need = (s.invWinRefCount[c] >= 2) ? kInvCalibNeedWins : kInvCalibNeedWinsSolo;
+				if (s.invWins[c] >= need && s.invLoss[c] <= kInvCalibMaxLoss) {
 					g_invOff       = kOffInvCand[c];
 					s.invCalibDone = true;
-					REX::INFO("inventory calibration: off=+0x{:X} ok={} strong={} bad={} checks={} rounds={} -> 搜空判空**启用**",
-						g_invOff, s.invVotes[c], s.invStrong[c], s.invBad[c], s.invChecks, s.invRounds);
+					REX::INFO("inventory calibration: off=+0x{:X} 强证据胜场={}（不同引用={}）反证={} 弱票={} 形状坏={} 中性={} checks={} rounds={} -> 搜空判空**启用**",
+						g_invOff, s.invWins[c], s.invWinRefCount[c], s.invLoss[c],
+						s.invWeakEmpty[c], s.invShapeBad[c], s.invNullPtr[c],
+						s.invChecks, s.invRounds);
 					return;
 				}
 			}
@@ -6546,28 +6725,33 @@ namespace SAS
 			//   注意：降频后这几条提示只在「还没成功」时才出现，成功那次会打上面那条 INFO。
 			//   ★ 2026-09-28：这两条都带上「末轮样本」明细 —— 标定一直不成功时，
 			//     日志里直接能看出「采到的是空容器」还是「根本读不出形状」。
+			//   ★ 订正 R18：样本明细新增 `st=候选A/候选B` 分档字母（G / E / X / N / R），
+			//     且判据相关计数换成「胜场 / 反证 / 不同引用 / 弱票 / 形状坏 / 中性」。
 			if (s.invRounds == 1 || s.invRounds == kInvCalibFastRounds) {
-				char        sampleBuf[400]{};
+				char        sampleBuf[560]{};
 				std::size_t used = 0;
 				for (std::uint32_t k = 0; k < s.invLastSampleCount && used + 1 < sizeof(sampleBuf); ++k) {
 					const auto& r = s.invLastSample[k];
 					const int   n = std::snprintf(sampleBuf + used, sizeof(sampleBuf) - used,
-						" | [%u] ref=%08X base=%08X %s size=%d obj=%08X",
-						k, r.refFid, r.baseFid, r.actor ? "ACHR" : "CONT", r.size, r.objFid);
+						" | [%u] ref=%08X base=%08X %s st=%c/%c size=%d obj=%08X",
+						k, r.refFid, r.baseFid, r.actor ? "ACHR" : "CONT",
+						r.st0, r.st1, r.size, r.objFid);
 					if (n <= 0) {
 						break;
 					}
 					used += static_cast<std::size_t>(n);
 				}
-				REX::INFO("inventory calibration: 仍在攒样本（rounds={} checks={} votes=+0x{:X}:{} / +0x{:X}:{} strong={}/{} bad={}/{} 游标={}）"
+				REX::INFO("inventory calibration: 仍在攒样本（rounds={} checks={} 胜场=+0x{:X}:{} / +0x{:X}:{} 反证={}/{} 不同引用={}/{} 弱票={}/{} 形状坏={}/{} 中性={}/{} 游标={}）"
 						  " -> 搜空判空**暂不可用**（容器 / 尸体照常亮）{}",
 					s.invRounds, s.invChecks,
-					kOffInvCand[0], s.invVotes[0], kOffInvCand[1], s.invVotes[1],
-					s.invStrong[0], s.invStrong[1], s.invBad[0], s.invBad[1],
-					s.invCalibCursor, sampleBuf);
+					kOffInvCand[0], s.invWins[0], kOffInvCand[1], s.invWins[1],
+					s.invLoss[0], s.invLoss[1], s.invWinRefCount[0], s.invWinRefCount[1],
+					s.invWeakEmpty[0], s.invWeakEmpty[1], s.invShapeBad[0], s.invShapeBad[1],
+					s.invNullPtr[0], s.invNullPtr[1], s.invCalibCursor, sampleBuf);
 			} else if (s.invRounds % 600 == 0) {
-				REX::INFO("inventory calibration: 仍无足够样本（rounds={} checks={} 游标={}；换个有容器 / 尸体的场景就会重试）",
-					s.invRounds, s.invChecks, s.invCalibCursor);
+				REX::INFO("inventory calibration: 仍无足够样本（rounds={} checks={} 胜场={}/{} 反证={}/{} 游标={}；换个有容器 / 尸体的场景就会重试）",
+					s.invRounds, s.invChecks, s.invWins[0], s.invWins[1],
+					s.invLoss[0], s.invLoss[1], s.invCalibCursor);
 			}
 		}
 

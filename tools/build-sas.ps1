@@ -433,6 +433,28 @@ if (-not $SkipDeploy) {
     #     「无 MODL 且无 0x04」的 WEAP（正好 14 条：12 条 `crModelA_*` + UnarmedHuman
     #     + GasTrapDummy）；新 INI 键 `SkipBuiltinLoot`（默认 1）+ 统计行 `bi=` +
     #     探针 `bi=` / `skipBi=` / `builtin=` 标记。完整证据链见 docs/55。
+    #   ★★★★★ 2026-10-03 订正 R17（用户实测反馈修复；公开版仍 2.0.1 / DLL build 仍 5.1.0）：
+    #     **「武器箱/武器柜似乎在玩家远离后，又会重新亮起」** —— 展示柜的「已确认拿空」
+    #     粘性原先只存在**指针键**判决表里（换场景被 clear、引用重建后指针失配）
+    #     ⇒ 新增 **FormID 键**粘性表 `dcStickyFids`（跨场景保留；放东西 / 再读到内容即
+    #     自愈；日志 `display case sticky kept [why=5]`、探针 `st=3`、统计行 `粘性复用=`）；
+    #     同一轮把 R15 阈值默认 2000 → **3000ms**。完整证据链见 docs/56。
+    #   ★★★★★★ 2026-10-03 订正 R18（用户实测反馈修复；公开版仍 2.0.1 / DLL build 仍 5.1.0）：
+    #     **「所有的容器拿空后都不熄灭了」** —— **判空标定整局沉默**（`invOff=未标定`
+    #     ⇒ 判空整段被跳过 ⇒ 容器 / 尸体照常亮）。真根因 = 旧采纳判据
+    #     `votes>=3 && strong>=1 && **bad<=2**` 里的 `bad` 是**跨轮累计、永不重置**的
+    #     计数，而采样是轮转的（扫遍整个场景）⇒ 场景里几个「读不出库存形状」的引用
+    #     （船舶类容器 `SpaceshipInventory` / `CaptainsLocker01` / `ShipOutpost_*_EMPTY_*`、
+    #     库存清单为 null / 已释放的引用）就能把它涨过 2 ⇒ **该候选此后永不可能被采纳**
+    #     （日志实证 `strong=79 bad=42` 而整局 `invOff=未标定`）。
+    #     修法：① null / 读不到一律**中性**（不再当反证）；② 每个样本在**同一引用上
+    #     对比两个候选**，只认「本候选强、另一候选不强」的**胜场**（强 = 形状自洽 +
+    #     第一条目 object 是合法 TESForm）；③ 采纳 = 胜场 ≥ 3（只有 1 个引用给过胜场
+    #     时 ≥ 8）+ 反证 ≤ 2；④ 新 INI 键 **`InventoryListOffset`**（0 = 自动 /
+    #     `0xA0` / `0xA8` = 手动指定并跳过标定 —— 反汇编已证明 +0xA0 = 数据、+0xA8 = 锁）；
+    #     ⑤ `仍在攒样本` 行换新口径（胜场 / 反证 / 不同引用 / 弱票 / 形状坏 / 中性）+
+    #     末轮样本 `st=候选A/候选B` 分档字母。核对脚本 `tools/re/check_dll_r18.py`；
+    #     完整证据链 / 改动表 / 验收判据见 docs/57。
     Set-Content -LiteralPath (Join-Path $modRoot 'meta.ini') -Value "[General]`nmodid=18268`nversion=2.0.1`ncomment=Always-on scanner highlighting (SFSE)" -Encoding UTF8
 
     Get-ChildItem -LiteralPath $modRoot -Recurse -File | ForEach-Object {

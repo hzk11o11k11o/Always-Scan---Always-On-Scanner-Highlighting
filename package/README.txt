@@ -91,6 +91,34 @@ Version  : 2.0.1  (plugin build 5.1.0)
                it). Log lines to watch: `display case sticky kept` (why=5), the
                probe field `st=3`, and the `粘性复用=` counter in the stats
                line.
+               * fixed (2026-10-03): **every** container and corpse kept its
+               highlight after you looted it empty (the whole session). The
+               check behind "loot it empty and the outline goes out" first has to
+               learn the address of the reference's inventory list, and it only
+               enables itself once that address has been verified on real items.
+               The old acceptance rule allowed at most two samples to ever fail
+               to read like a list - and that counter was cumulative for the
+               whole session while the sampling walks the whole area. So a
+               handful of objects whose list cannot be read at all (ship
+               containers such as `SpaceshipInventory` / `CaptainsLocker01` /
+               `ShipOutpost_*_EMPTY_*`, and references whose list is null or has
+               already been released by the game) pushed it past two, and the
+               address could then **never** be accepted no matter how many valid
+               samples followed (the reported session's log: `strong=79 bad=42`
+               while `invOff=未标定` stayed for the whole session). Now a null /
+               unreadable list is *neutral* - it means "this reference has no
+               inventory list", which proves nothing either way - and every
+               sample compares the two candidate addresses on the **same**
+               reference: only "candidate A reads as a real item list here while
+               candidate B does not" counts as a win. The address is accepted
+               after 3 wins (8 if only your own inventory ever won) with at most
+               2 counter-wins; the strong-evidence rule itself (a valid item
+               record at the first entry) is unchanged. New ini key
+               `InventoryListOffset` (0 = learn it automatically, the default;
+               `0xA0` = pin the address the disassembly proves, skipping the
+               learning step entirely) - if a log ever shows `invOff=未标定`
+               again, that single line restores the check.
+
 
 
            2.0 = the mod brings its own outline colour channels (described
@@ -1227,6 +1255,15 @@ Most useful options:
   SkipEmptyLoot=1       stop outlining containers / bodies once they are
                         empty (default on; see "corpses and empty
                         containers" in the INI for the details)
+  InventoryListOffset=0 which address inside a reference the mod reads the
+                        inventory list from. 0 (default) = learn it at
+                        startup from real items. `0xA0` (or `0xA8`) pins it and
+                        skips the learning step - the disassembly proves +0xA0
+                        holds the list and +0xA8 the lock, so this is only
+                        needed if the log ever shows `invOff=未标定` for a whole
+                        session (which means the check is off and containers /
+                        bodies keep their outline after you loot them). See the
+                        2026-10-03 note in the 2.0.1 section above.
   TreatNullInvAsEmpty=1 a reference whose inventory list was never created
                         counts as empty (default on). Set it to 0 only if
                         you ever find a body / container you never looted
@@ -1270,13 +1307,15 @@ Most useful options:
   DisplayCaseUiEmpty=1  a display case you have emptied goes dark and
                         stays dark (default on). The mod tracks what you
                         take out of it, item by item.
-  DisplayCaseEmptyNoContentMs=2000
+  DisplayCaseEmptyNoContentMs=3000
                         a display case that shows no contents when you open
                         it (an "EMPTY" variant, or one you looted earlier)
                         goes dark after this many milliseconds of the panel
-                        being open with nothing in it (default 2000; the
-                        game needs ~0.7 s to list a case's real contents, so
-                        2000 leaves a comfortable margin). Going dark this
+                        being open with nothing in it (default 3000 since the
+                        2026-10-03 note above - player logs showed the game
+                        can take 2.13 s to list a case's real contents, so a
+                        2000 ms window judged one non-empty case empty by a
+                        hair). Going dark this
                         way also sticks after you close the case, until you
                         put something in (or open it again with items). 0 =
                         off (such cases stay lit until an item event). See
@@ -1463,7 +1502,8 @@ categories).
     part of the contents keeps it glowing, by design. If it still looks
     wrong, send me the log lines starting with "display case trace:"
     and "loot events"; the log line saying why a case went dark ends
-    with "why=1..4" (4 = "empty case, opened with nothing in it").
+    with "why=1..5" (4 = "empty case, opened with nothing in it",
+    5 = "already confirmed empty and remembered across scene changes").
 * A walking NPC is outlined (should not happen):
     set CorpseUnconscious=0 in the INI - the log line starting with
     "corpse probe:" will tell you which reference it was.
