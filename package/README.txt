@@ -55,6 +55,23 @@ Version  : 2.0.1  (plugin build 5.1.0)
                until you put something in (or open it again with items in it).
                New ini key `DisplayCaseEmptyNoContentMs` (default 2000 ms;
                0 turns it off).
+               * fixed (2026-10-03): a **robot** corpse could keep its highlight
+               after you looted it empty (it came and went). Its two arm guns
+               (records 0x1DC415 / 0x1DC416) are built-in body parts, not loot:
+               they have no model, are never listed in the loot panel and
+               cannot be taken - but their records are missing the
+               "non-playable" flag in the game's data, so the mod's rules for
+               untakeable items (SkipNonPlayableLoot / SkipEquippedLoot) did
+               not cover them and the corpse always still read as "has loot".
+               A robot carries two arm guns and only one of them sits in the
+               unequipped state, so the leftover entry only showed up once you
+               had taken everything else - hence the intermittency. The mod
+               now skips such model-less virtual weapons (an offline pass over
+               the game's files found exactly fourteen: twelve `crModelA_*`
+               robot parts plus the virtual unarmed-attack and gas-trap
+               records). New ini key `SkipBuiltinLoot` (default 1; 0 turns it
+               off); the stats line gained a `bi=` counter next to `np=`/`eq=`.
+
 
            2.0 = the mod brings its own outline colour channels (described
            below), plus seventeen fixes, all from player reports.
@@ -1214,6 +1231,14 @@ Most useful options:
                         it cannot be taken either, so it does not count
                         as loot (default on). This is what makes enemies
                         killed in combat go dark once looted. Set to 0
+                        only for debugging.
+ SkipBuiltinLoot=1     same for built-in weapons of robots and creatures
+                        (the arm guns of the "Robot Model A" walkers and
+                        similar parts): they have no model, the loot panel
+                        never lists them and you cannot take them, but
+                        their records miss the "non-playable" flag, so the
+                        two rules above do not catch them (default on).
+                        This is what lets a looted robot go dark. Set to 0
                         only for debugging.
   SkipDisplayCaseEmpty=1  weapon cases / weapon racks and other display
                         cases glow even while closed (default on): the

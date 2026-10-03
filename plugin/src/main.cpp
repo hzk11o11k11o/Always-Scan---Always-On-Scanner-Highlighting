@@ -469,7 +469,19 @@ SFSE_PLUGIN_LOAD(const SFSE::LoadInterface* a_sfse)
 	//   覆盖投影装填期 0.4~0.7 秒；0 = 关）⇒ 判空（粘性熄灭）。日志原因码
 	//   `why=4` / `display case emptied (空箱（打开后一直无内容）) [why=4]`。
 	//   完整证据链 / 误灭面分析 / 验收判据见 docs/54。
-	REX::INFO("SAS_AlwaysScan v5.1.0 loading（订正 R14：日志**完全关闭**开关（N 网公开版口径）—— `[General] LogMaxMB` 升级为「开关 + 上限」：**0 = 完全关闭**（不建文件、清空全部 sink + level off，零输出零文件；★ 内置默认也是 0）、**>0 = 开启**（上限 N MiB，钳制 1024）；本机部署 INI 显式写 10；R13 的诊断可观测性（判绿行/链判决行「每 base 首条」+ 缓存回填 key1/key2）原样保留；★ 除日志开关外行为零改动；★ 2026-09-28 第二轮配色修订：门 / 电脑 / 按钮 = 品红 #FF3BD4（白 #FFFFFF 起不再使用，见 docs/50）；★★ 第三轮配色修订：电脑 / 按钮等可互动物品**退回 2.0** = 原版绿 #27C684（state 6 → 4 + 不覆盖、通道默认色同步），门仍品红 #FF3BD4；黄 = 开锁器 / 信用币不变（见 docs/51）；★★★ 第四轮（行为修复）：**「信用条」= FLOR**（`Loot_CredStick_Small/Common/Rare` 0x3CC32C/0x3CC325/0x3CC32A）—— 之前被当成「植物 / 星球目标」（青色脉冲；被 `Credits` 的中文名「信用币」误导过一轮），现在归入黄组 #FFE100（见 docs/53）；★★★★ 订正 R15（行为修复）：**空展示柜判据** —— 治「这个武器箱空了却还在高亮」（EMPTY 版 / 被拿空过的展示柜：打开时也没有投影 ⇒ 原有三条判据全部要求「曾见内容」⇒ 永久亮）；新增 INI `DisplayCaseEmptyNoContentMs`（默认 2000ms，0 = 关）—— 快速面板打开过 + 打开后一直无内容 + 连续读到空 ≥ N ms ⇒ 判空（粘性熄灭；日志 `why=4`，见 docs/54））(SFSE build {})",
+	// ★★★ 2026-10-03 订正 R16（公开版仍 2.0.1、DLL build 仍 5.1.0；行为修复）：
+	//   **「这个机器人拿空了还在高亮」**（用户截图：瞄准「战斗机器人N型」、搜刮
+	//   面板已空、橙色轮廓不灭；偶发）—— 真根因：战斗机器人（Model A）的**手臂炮**
+	//   `crModelA_CombatRight/LeftGun_Auto`（0x1DC415/0x1DC416）是**身体部件**
+	//   （无 MODL 的虚拟 WEAP，面板不显示、玩家拿不走），但记录里**漏标**了
+	//   0x04（Non-Playable）⇒ v4.5 / v4.6 的跳过规则都盖不到它们 ⇒ 残留条目
+	//   `fl=0 ff=40000009 np=0` ⇒ RefLootState 恒返回「有东西」⇒ 永久亮。
+	//   修法：判空时跳过「生物 / 机器人内置武器」—— 名单 = 离线穷举全 esm
+	//   「无 MODL 且无 0x04」的 WEAP，正好 14 条（12 条 `crModelA_*` + UnarmedHuman
+	//   + GasTrapDummy）；新增 INI `SkipBuiltinLoot`（默认 1，0 = 关）；统计行
+	//   `判空跳过: np= eq= bi=` 新增 `bi`；探针明细加 `bi=` 标记。
+	//   完整证据链 / 验收判据见 docs/55。
+	REX::INFO("SAS_AlwaysScan v5.1.0 loading（订正 R14：日志**完全关闭**开关（N 网公开版口径）—— `[General] LogMaxMB` 升级为「开关 + 上限」：**0 = 完全关闭**（不建文件、清空全部 sink + level off，零输出零文件；★ 内置默认也是 0）、**>0 = 开启**（上限 N MiB，钳制 1024）；本机部署 INI 显式写 10；R13 的诊断可观测性（判绿行/链判决行「每 base 首条」+ 缓存回填 key1/key2）原样保留；★ 除日志开关外行为零改动；★ 2026-09-28 第二轮配色修订：门 / 电脑 / 按钮 = 品红 #FF3BD4（白 #FFFFFF 起不再使用，见 docs/50）；★★ 第三轮配色修订：电脑 / 按钮等可互动物品**退回 2.0** = 原版绿 #27C684（state 6 → 4 + 不覆盖、通道默认色同步），门仍品红 #FF3BD4；黄 = 开锁器 / 信用币不变（见 docs/51）；★★★ 第四轮（行为修复）：**「信用条」= FLOR**（`Loot_CredStick_Small/Common/Rare` 0x3CC32C/0x3CC325/0x3CC32A）—— 之前被当成「植物 / 星球目标」（青色脉冲；被 `Credits` 的中文名「信用币」误导过一轮），现在归入黄组 #FFE100（见 docs/53）；★★★★ 订正 R15（行为修复）：**空展示柜判据** —— 治「这个武器箱空了却还在高亮」（EMPTY 版 / 被拿空过的展示柜：打开时也没有投影 ⇒ 原有三条判据全部要求「曾见内容」⇒ 永久亮）；新增 INI `DisplayCaseEmptyNoContentMs`（默认 2000ms，0 = 关）—— 快速面板打开过 + 打开后一直无内容 + 连续读到空 ≥ N ms ⇒ 判空（粘性熄灭；日志 `why=4`，见 docs/54）；★★★★★ 订正 R16（行为修复）：**判空跳过「生物 / 机器人内置武器」** —— 治「战斗机器人（Model A）拿空了还高亮」（`crModelA_CombatRight/LeftGun_Auto` 手臂炮等 **14 条「无模型虚拟 WEAP」**在数据里**漏标 0x04** ⇒ v4.5/v4.6 跳过规则盖不到 ⇒ 残留条目让判空恒「有东西」；名单 = 离线穷举全 esm「无 MODL 且无 0x04」的 WEAP）；新增 INI `SkipBuiltinLoot`（默认 1，0 = 关）+ 统计行 `判空跳过: np= eq= bi=` + 探针明细 `bi=` 标记（见 docs/55））(SFSE build {})",
 		SFSE::GetSFSEVersion());
 
 	if (auto* messaging = SFSE::GetMessagingInterface()) {

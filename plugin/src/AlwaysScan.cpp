@@ -195,6 +195,55 @@ namespace SAS
 		//   ⇒ 判空时**跳过**这类条目：`object->formFlags & 0x04` ⇒ 不算「有东西」。
 		//     回退开关：INI `SkipNonPlayableLoot=0`（不改判定，只关这一条）。
 		constexpr std::uint32_t kFormFlagNonPlayable = 0x00000004u;
+		// ================================================================
+		// ★★★ 订正 R16（2026-10-03）：机器人 / 生物的「内置武器」也要跳过 ——
+		//   治「战斗机器人搜刮拿空后仍高亮（偶发）」
+		// ================================================================
+		// 用户报告（2026-10-03，附截图：瞄准「战斗机器人N型」、搜刮面板已空、
+		//   橙色轮廓不灭）。当日会话日志实证（`001EB181` 那具，d=0.6m）：
+		//   `loot probe: … size=3 playable=2 nonPlayable=1
+		//     [ft=30 id=001DC416 n=1 c=1 fl=0 ff=40000009 eq=0 np=0]
+		//     [ft=30 id=001DC415 n=1 c=1 fl=0 ff=40000009 eq=0 np=0]`
+		//   ⇒ 残留的两条**没被任何跳过规则覆盖**（ff 不含 0x04、fl=0 装备槽为空）
+		//     ⇒ 判空恒「有东西」⇒ **永久亮**。
+		// 离线取证（tools/re/esm_nomodl_weap_probe.py，扫全 Starfield.esm）：
+		//   这两条 = `crModelA_CombatRightGun_Auto` / `crModelA_CombatLeftGun_Auto`
+		//   —— **战斗机器人（Model A）的手臂炮**，即**身体部件**（不是战利品）。
+		//   它们的记录**没有 MODL（模型）**、也没有 0x04（Non-Playable）：
+		//   · 无模型 ⇒ 虚拟武器：搜刮面板不显示、玩家也拿不走（B 社对「生物
+		//     内置武器」的标准做法；对照组：`crTurretLaser_Auto` / `crModelA_Equinox`
+		//     **都**标了 0x04 ⇒ v4.5 的判据本可覆盖 —— 这 12 条 `crModelA_*` 是
+		//     B 社数据里**漏标 0x04** 的一批）；
+		//   · 全 esm 的 WEAP 里「无 MODL **且**无 0x04」**正好就这 14 条**
+		//     （12 条 `crModelA_*` + `UnarmedHuman` 虚拟徒手 + `GasTrapDummy`
+		//     虚拟毒气武器）—— 名单完整性由工具脚本可复跑证明。
+		// 修法：判空时**跳过**这 14 条（与「0x04 / 装备中」同等对待 ⇒ 不算
+		//   「有东西」）。为什么「偶发」：机器人身上的手臂炮**只有一只**处于
+		//   `fl=0`（未装备）状态（日志 4 具样本一致：左/右手之一），另一只
+		//   `fl=1` 被 v4.6 规则跳过 ⇒ 只有当**残留条目恰好是那只 fl=0 的**、
+		//   且面板里其余东西都被拿走时才复发。
+		// 回退开关：INI `SkipBuiltinLoot=0`（不改判定以外的任何东西）。
+		constexpr std::uint32_t kBuiltinLootForms[] = {
+			0x000001F4u,  // UnarmedHuman（虚拟徒手）
+			0x000001F6u,  // GasTrapDummy（虚拟毒气武器）
+			0x001DC415u,  // crModelA_CombatRightGun_Auto（战斗机器人右臂炮）★ 用户实测命中
+			0x001DC416u,  // crModelA_CombatLeftGun_Auto （战斗机器人左臂炮）★ 用户实测命中
+			0x00238940u,  // crModelA_Combat_Head_Armored（战斗机器人装甲头）
+			0x003B9AB2u,  // crModelA_Crimsonfleet_RightGun_Auto
+			0x003B9AB3u,  // crModelA_Crimsonfleet_LeftGun_Auto
+			0x003B9AB4u,  // ModelA_LaserTracker
+			0x003BF755u,  // crModelA_Crimsonfleet_FlameRightGun
+			0x003BF756u,  // crModelA_Crimsonfleet_FlameLeftGun
+			0x003BF757u,  // crModelA_CrimsonFleet_ArmoredRightGun
+			0x003BF758u,  // crModelA_CrimsonFleet_ArmoredLeftGun
+			0x003CB56Cu,  // crModelA_Security_HeavyLeftGun
+			0x003CB56Du,  // crModelA_Security_HeavyRightGun
+		};
+		constexpr std::uint32_t kBuiltinLootFormCount =
+			sizeof(kBuiltinLootForms) / sizeof(kBuiltinLootForms[0]);
+		// 「首次命中」日志的条数上限（每会话）—— 正常每局玩家也就搜刮几具机器人，
+		// 4 条足够证明「判据在生效」，又不刷屏。
+		constexpr std::uint32_t kLootBuiltinLogMax = 4;
 		constexpr std::size_t   kOffActorBoolBits = 0x208;                 // Actor::boolBits（u32）
 		constexpr std::uint32_t kActorDeadBit     = 1u << 11;              // Actor::BOOL_BITS::kDead
 		// 诊断：每个会话最多打几条尸体探针（一个 cell 也就几十个 Actor，够对号入座）
@@ -1825,6 +1874,18 @@ namespace SAS
 			bool          skipNonPlayableLoot = true;
 
 			// ================================================================
+			// ★★ 订正 R16（2026-10-03）：判空时也跳过「生物 / 机器人内置武器」
+			//   （无模型虚拟 WEAP —— 面板不显示、玩家拿不走）—— 默认 1
+			// ================================================================
+			// 背景 / 取证见常量区 `kBuiltinLootForms` 的长注释（一句话版）：
+			//   战斗机器人（Model A）的**手臂炮**（`crModelA_CombatLeft/RightGun_Auto`
+			//   等 12 条身体部件 + 2 条虚拟武器）在数据里**漏标**了 0x04（Non-Playable）
+			//   ⇒ v4.5 / v4.6 的跳过规则一条都盖不到它们 ⇒ 机器人搜刮拿空后
+			//   `RefLootState` 恒返回「有东西」⇒ **永久亮**（用户 2026-10-03 截图）。
+			//   设 0 = 退回旧行为（把它们算「有东西」，只在排查时用）。
+			bool          skipBuiltinLoot     = true;
+
+			// ================================================================
 			// ★★ v4.6：判空时也跳过「正穿在身上的装备」（`BGSInventoryItem::flags`
 			//   的低 3 位 kSlotMask ≠ 0）—— 默认 1
 			// ================================================================
@@ -2157,12 +2218,16 @@ namespace SAS
 			std::uint64_t lootNotEmpty     = 0;  // 判到「有东西」（正常，会亮）
 			std::uint64_t lootNullInv      = 0;  // ★ v4.3：inventoryList 指针就是 null（库存还没被引擎创建）
 			std::uint64_t lootBadShape     = 0;  // ★ v4.3：形状不像 BGSInventoryList（疑似标定选错了偏移）
-			// ★ v4.6：判空时被「跳过」的条目数（= 面板拿不走的那两类），分两路来源计数。
-			//   ★ 注意 RefLootState 找到第一件**真能拿**的东西就早退，所以这两个数只是
+			// ★ v4.6：判空时被「跳过」的条目数（= 面板拿不走的那几类），分路来源计数。
+			//   ★ 注意 RefLootState 找到第一件**真能拿**的东西就早退，所以这几个数只是
 			//     「本轮走到的那部分」里的累计值 —— 用途是确认**规则有没有在生效**
 			//     （非 0 且持续增长 = 生效）；精确的残留明细看 `loot probe:` 那几行。
 			std::uint64_t lootSkipNonPlayable = 0;  // 记录标志 0x04（`*_NOTPLAYABLE`）
 			std::uint64_t lootSkipEquipped    = 0;  // 装备中（kSlotMask ≠ 0，还穿在身上）
+			// ★★ 订正 R16（2026-10-03）：生物 / 机器人「内置武器」（无模型虚拟 WEAP，
+			//   见常量区 kBuiltinLootForms）—— 治「战斗机器人拿空还亮」。
+			std::uint64_t lootSkipBuiltin     = 0;  // 被这一条跳过的条目数（诊断用）
+			std::uint32_t lootBuiltinLogs     = 0;  // 「跳过」明细日志已打条数（≤ kLootBuiltinLogMax）
 			std::uint64_t corpseSeen       = 0;  // 判定为尸体的引用数（ACHR 尸体 + 尸体道具）
 			std::uint64_t corpseByBit      = 0;  // 其中靠运行时 kDead 位判定的
 			std::uint64_t corpseByFlag     = 0;  // 其中靠记录标志 Starts Dead 判定的
@@ -4499,6 +4564,9 @@ namespace SAS
 			g_cfg.skipNonPlayableLoot = getInt("SkipNonPlayableLoot", 1) != 0;
 			// ★ v4.6：判空跳过「正穿在身上的装备（kSlotMask）」」（默认 1；理由见 Config 里的说明）
 			g_cfg.skipEquippedLoot = getInt("SkipEquippedLoot", 1) != 0;
+			// ★ 订正 R16：判空跳过「生物 / 机器人内置武器（无模型虚拟 WEAP）」
+			//   （默认 1；理由与名单见常量区 kBuiltinLootForms）
+			g_cfg.skipBuiltinLoot = getInt("SkipBuiltinLoot", 1) != 0;
 			// ★ v4.9：展示柜容器不判空（默认 1；理由见 Config 里的说明）
 			g_cfg.skipDisplayCaseEmpty = getInt("SkipDisplayCaseEmpty", 1) != 0;
 			// ★ v4.10：展示柜「拿空即灭」（默认 1；理由与判据见常量区「v4.10」）
@@ -4530,10 +4598,10 @@ namespace SAS
 			g_cfg.lootEventLogMax              = std::clamp(getInt("LootEventLogMax", 32), 0, 4096);
 			REX::INFO("config: corpseUnconscious={} corpseLifeState={} corpseBleedout={} skipEmptyLoot={}",
 				g_cfg.corpseUnconscious, g_cfg.corpseLifeState, g_cfg.corpseBleedout, g_cfg.skipEmptyLoot);
-			REX::INFO("config: actorProbeMax={} actorChangeProbeMax={} lootProbeMax={} contProbeMax={} treatNullInvAsEmpty={} skipNonPlayableLoot={} skipEquippedLoot={} skipDisplayCaseEmpty={}",
+			REX::INFO("config: actorProbeMax={} actorChangeProbeMax={} lootProbeMax={} contProbeMax={} treatNullInvAsEmpty={} skipNonPlayableLoot={} skipEquippedLoot={} skipDisplayCaseEmpty={} skipBuiltinLoot={}",
 				g_cfg.actorProbeMax, g_cfg.actorChangeProbeMax, g_cfg.lootProbeMax, g_cfg.contProbeMax,
 				g_cfg.treatNullInvAsEmpty, g_cfg.skipNonPlayableLoot, g_cfg.skipEquippedLoot,
-				g_cfg.skipDisplayCaseEmpty);
+				g_cfg.skipDisplayCaseEmpty, g_cfg.skipBuiltinLoot);
 			REX::INFO("config: displayCaseUiEmpty={} containerMenu=\"{}\" -> 展示柜拿空判据={}",
 				g_cfg.displayCaseUiEmpty, g_cfg.containerMenuName,
 				(g_cfg.skipDisplayCaseEmpty && g_cfg.displayCaseUiEmpty) ? "同一段打开期读到空即熄灭" : "关闭也亮（v4.9 行为）");
@@ -5391,6 +5459,30 @@ namespace SAS
 			return (flags & kFormFlagNonPlayable) != 0;
 		}
 
+		// ★★ 订正 R16（2026-10-03）：某个物品（TESForm*）是不是「生物 / 机器人
+		//   内置武器」（无模型虚拟 WEAP —— 搜刮面板不显示、玩家拿不走）——
+		//   判定 = formID 落在常量区 `kBuiltinLootForms`（14 条；离线穷举了
+		//   全 esm「无 MODL 且无 0x04」的 WEAP，工具 tools/re/esm_nomodl_weap_probe.py）。
+		//   取证 / 为什么按 FormID 而不是按标志位：见常量区长注释。
+		//   ★ 与 IsNonPlayableForm 同一姿势：SafeReadMem + 读不出来返回 false
+		//     （= 当作「可拿的物品」），由调用方后面的形状校验兜住。
+		bool IsCreatureBuiltinForm(std::uint64_t a_obj)
+		{
+			if (a_obj == 0) {
+				return false;
+			}
+			std::uint32_t fid = 0;
+			if (!SafeReadMem(reinterpret_cast<const void*>(a_obj + kOffFormID), &fid, sizeof(fid))) {
+				return false;
+			}
+			for (std::uint32_t i = 0; i < kBuiltinLootFormCount; ++i) {
+				if (fid == kBuiltinLootForms[i]) {
+					return true;
+				}
+			}
+			return false;
+		}
+
 		// ★★ v4.4：读**引擎自己的 lifeState 枚举**（`[Actor+0xF8]` 的 bits 17..20，0..15）。
 		//   `IsDead()` / `IsUnconscious()` / `IsBleedingOut()` 三个 Papyrus native 读的都是它
 		//   （反汇编实证见文件顶部常量区的长注释），所以这是「引擎怎么判」的**权威来源**。
@@ -5764,18 +5856,21 @@ namespace SAS
 			}
 
 			std::string   detail;
-			// ★ v4.5 / ★ v4.6：把「有 count>0 的条目」拆成**三桶**（= 判空的真实口径）——
+			// ★ v4.5 / ★ v4.6：把「有 count>0 的条目」拆成**分桶**（= 判空的真实口径）——
 			//   `playable`    = 玩家**真能拿走**的（判空只看它：`fl=0` 且 `ff` 不含 0x04）
 			//   `equipped`    = **装备中**（`fl` 低 3 位 ≠ 0）：v4.6 起判空跳过
 			//   `nonPlayable` = 记录标志 0x04 的 NPC 隐形装备：v4.5 起判空跳过
+			//   ★ 订正 R16：`builtin` = 生物 / 机器人内置武器（无模型虚拟 WEAP）：跳过
 			//   这样一行日志就能验证「修好了没有」：面板拿空后 `playable` 应变成 0，
-			//   剩下的应该全落在 `equipped` / `nonPlayable` 这两桶里。
+			//   剩下的应该全落在 `equipped` / `nonPlayable` / `builtin` 这三桶里。
 			std::uint32_t playable    = 0;
 			std::uint64_t total       = 0;
 			std::uint32_t equipped    = 0;
 			std::uint64_t eqTotal     = 0;
 			std::uint32_t nonPlayable = 0;
 			std::uint64_t npTotal     = 0;
+			std::uint32_t builtin     = 0;  // ★ 订正 R16
+			std::uint64_t biTotal     = 0;  // ★ 订正 R16
 			const auto    items       = std::min<std::uint32_t>(size, kInvWalkItemsMax);
 			for (std::uint32_t i = 0; i < items; ++i) {
 				// ★ v4.15：条目头整块安全读（一次 SafeReadMem 覆盖下面用到的所有字段）
@@ -5820,24 +5915,31 @@ namespace SAS
 				const auto itemFlags = *reinterpret_cast<const std::uint32_t*>(item + kOffInvItemFlags);
 				const bool np = IsNonPlayableForm(obj);
 				const bool eq = !np && (itemFlags & kInvItemFlagSlotMask) != 0;
+				// ★ 订正 R16：生物内置武器桶（与 RefLootState 的判定链同序：np → eq → bi）
+				const bool bi = !np && !eq && IsCreatureBuiltinForm(obj);
 				if (np) {
 					++nonPlayable;
 					npTotal += sum;
 				} else if (eq) {
 					++equipped;
 					eqTotal += sum;
+				} else if (bi) {
+					++builtin;
+					biTotal += sum;
 				} else {
 					++playable;
 					total += sum;
 				}
-				// 明细：真能拿的列前 4 条、装备中的列前 2 条、非玩家物品列前 2 条
-				//   （每条都带 `fl=` 原始 flags、`eq=` 是否装备中、`np=` 是否非玩家物品）
-				if ((!np && !eq && playable <= 4) || (eq && equipped <= 2) || (np && nonPlayable <= 2)) {
+				// 明细：真能拿的列前 4 条、装备中的列前 2 条、非玩家物品列前 2 条、
+				//   内置武器列前 2 条（每条都带 `fl=` 原始 flags、`eq=` 是否装备中、
+				//   `np=` 是否非玩家物品、`bi=` 是否生物内置武器）
+				if ((!np && !eq && !bi && playable <= 4) || (eq && equipped <= 2) ||
+					(np && nonPlayable <= 2) || (bi && builtin <= 2)) {
 					const auto* objRaw  = reinterpret_cast<const std::uint8_t*>(obj);
 					const auto  objType = objRaw[kOffFormType];
 					const auto  objFid  = reinterpret_cast<const RE::TESForm*>(obj)->GetFormID();
 					char buf[160];
-					std::snprintf(buf, sizeof(buf), " [ft=%02X id=%08X n=%u c=%llu fl=%X ff=%X eq=%d np=%d]",
+					std::snprintf(buf, sizeof(buf), " [ft=%02X id=%08X n=%u c=%llu fl=%X ff=%X eq=%d np=%d bi=%d]",
 						static_cast<unsigned>(objType),
 						static_cast<unsigned>(objFid),
 						static_cast<unsigned>(sn),
@@ -5845,14 +5947,16 @@ namespace SAS
 						static_cast<unsigned>(itemFlags),
 						static_cast<unsigned>(objFlags),
 						eq ? 1 : 0,
-						np ? 1 : 0);
+						np ? 1 : 0,
+						bi ? 1 : 0);
 					detail += buf;
 				}
 			}
-			REX::INFO("loot probe: ref={:08X} d={:.1f}m size={} playable={} total={} equipped={} eqTotal={} nonPlayable={} npTotal={}{}",
+			REX::INFO("loot probe: ref={:08X} d={:.1f}m size={} playable={} total={} equipped={} eqTotal={} nonPlayable={} npTotal={} builtin={} biTotal={}{}",
 				fid, dM, size, playable, static_cast<unsigned long long>(total),
 				equipped, static_cast<unsigned long long>(eqTotal),
-				nonPlayable, static_cast<unsigned long long>(npTotal), detail);
+				nonPlayable, static_cast<unsigned long long>(npTotal),
+				builtin, static_cast<unsigned long long>(biTotal), detail);
 		}
 
 		// ★★ v4.8 诊断：`cont probe:` —— 容器「判空链路快照」。
@@ -5986,13 +6090,15 @@ namespace SAS
 			}
 
 			// 逐条摊开（最多 kInvWalkItemsMax 条；明细只列前 4 条）。
-			//   口径与 RefLootState 完全一致：先判 np（0x04）再判 eq（kSlotMask）。
+			//   口径与 RefLootState 完全一致：先判 np（0x04）再判 eq（kSlotMask），
+			//   最后判 bi（生物内置武器，★ 订正 R16）。
 			std::uint32_t withCount = 0;  // 有条目 count > 0 的条目数
 			std::uint32_t keepCnt   = 0;  // 判空口径里「算数」的条目数（可拿）
 			std::uint64_t sumRaw    = 0;  // 所有条目 count 之和
 			std::uint64_t sumKeep   = 0;  // 判空口径里「算数」的 count 之和
 			std::uint32_t skipNp    = 0;
 			std::uint32_t skipEq    = 0;
+			std::uint32_t skipBi    = 0;  // ★ 订正 R16（生物内置武器）
 			std::string   detail;
 			char          buf[192];
 			const auto    items = std::min<std::uint32_t>(size, kInvWalkItemsMax);
@@ -6028,6 +6134,7 @@ namespace SAS
 				const auto itemFlags = *reinterpret_cast<const std::uint32_t*>(item + kOffInvItemFlags);
 				const bool np        = IsNonPlayableForm(obj);
 				const bool eq        = !np && (itemFlags & kInvItemFlagSlotMask) != 0;
+				const bool bi        = !np && !eq && IsCreatureBuiltinForm(obj);  // ★ 订正 R16
 				sumRaw += sum;
 				if (sum > 0) {
 					++withCount;
@@ -6036,6 +6143,8 @@ namespace SAS
 					++skipNp;
 				} else if (eq) {
 					++skipEq;
+				} else if (bi) {
+					++skipBi;
 				} else {
 					++keepCnt;
 					sumKeep += sum;
@@ -6052,8 +6161,9 @@ namespace SAS
 					const auto objType = objFt;
 					// ★ v4.9：明细里加 `tp=`（kTemporary，fl 的 bit5）—— 展示柜的
 					//   临时投影条目一眼可辨（`fl=20` 时 tp=1），见常量区「v4.9 展示柜」。
+					//   ★ 订正 R16：加 `bi=`（生物内置武器，如 crModelA_* 手臂炮）。
 					std::snprintf(buf, sizeof(buf),
-						" [i=%u ft=%02X id=%08X n=%u c=%llu fl=%X ff=%X eq=%d np=%d tp=%d]",
+						" [i=%u ft=%02X id=%08X n=%u c=%llu fl=%X ff=%X eq=%d np=%d tp=%d bi=%d]",
 						static_cast<unsigned>(i),
 						static_cast<unsigned>(objType),
 						static_cast<unsigned>(objFid),
@@ -6063,7 +6173,8 @@ namespace SAS
 						static_cast<unsigned>(objFlg),
 						eq ? 1 : 0,
 						np ? 1 : 0,
-						(itemFlags & kInvItemFlagTemporary) ? 1 : 0);
+						(itemFlags & kInvItemFlagTemporary) ? 1 : 0,
+						bi ? 1 : 0);
 					detail += buf;
 				}
 			}
@@ -6096,22 +6207,22 @@ namespace SAS
 				}
 			} else if (sumRaw == 0) {
 				std::snprintf(whyBuf, sizeof(whyBuf),
-					"所有条目 count 都是 0（条目数=%u，其中被跳过 np=%u eq=%u）",
-					size, skipNp, skipEq);
-			} else if (skipNp + skipEq > 0) {
+					"所有条目 count 都是 0（条目数=%u，其中被跳过 np=%u eq=%u bi=%u）",
+					size, skipNp, skipEq, skipBi);
+			} else if (skipNp + skipEq + skipBi > 0) {
 				std::snprintf(whyBuf, sizeof(whyBuf),
-					"有条目的 count>0，但全被跳过（np=%u eq=%u，原始合计=%llu）",
-					skipNp, skipEq, static_cast<unsigned long long>(sumRaw));
+					"有条目的 count>0，但全被跳过（np=%u eq=%u bi=%u，原始合计=%llu）",
+					skipNp, skipEq, skipBi, static_cast<unsigned long long>(sumRaw));
 			} else {
 				std::snprintf(whyBuf, sizeof(whyBuf),
 					"其它（条目=%u 有数=%u 原始合计=%llu 可拿合计=%llu）",
 					size, withCount, static_cast<unsigned long long>(sumRaw),
 					static_cast<unsigned long long>(sumKeep));
 			}
-			REX::INFO("cont probe{}: ref={:08X} base={:08X} d={:.1f}m loot={} size={} keep={}(sum={}) withCount={} sumRaw={} skipNp={} skipEq={} why={}{}{}",
+			REX::INFO("cont probe{}: ref={:08X} base={:08X} d={:.1f}m loot={} size={} keep={}(sum={}) withCount={} sumRaw={} skipNp={} skipEq={} skipBi={} why={}{}{}",
 				tag, fid, bid, dM, a_loot, size, keepCnt,
 				static_cast<unsigned long long>(sumKeep), withCount,
-				static_cast<unsigned long long>(sumRaw), skipNp, skipEq, whyBuf, detail, dcBuf);
+				static_cast<unsigned long long>(sumRaw), skipNp, skipEq, skipBi, whyBuf, detail, dcBuf);
 		}
 
 		// 【v4.2 / v4.3】标定「库存列表指针」在 TESObjectREFR 里的真实偏移（0xA0 / 0xA8）。
@@ -7123,6 +7234,29 @@ namespace SAS
 					++g_state.lootSkipEquipped;
 					if (a_outSnap) {
 						a_outSnap->uncertain = true;  // ★ v4.13：同上
+					}
+					continue;
+				}
+				// ★★★ 订正 R16（2026-10-03）：跳过「生物 / 机器人内置武器」——
+				//   `crModelA_*` 系列（战斗机器人手臂炮 / 装甲头等 12 条）+ 2 条虚拟武器
+				//   （名单与完整取证见常量区 kBuiltinLootForms）。它们是**无 MODL
+				//   （无模型）**的虚拟 WEAP：搜刮面板不显示、玩家也拿不走，但记录里
+				//   **漏标**了 0x04（Non-Playable）⇒ v4.5 / v4.6 两条规则都盖不到
+				//   ⇒ 战斗机器人（Model A）搜刮拿空后**永久亮**（用户当日截图 +
+				//   `001EB181` 的 loot probe：残留 = fl=0 的 crModelA_CombatLeft/RightGun_Auto）。
+				//   跳过之后：面板拿空 ⇒ 判「空」⇒ 熄灭。
+				//   ★ 只有 `SkipBuiltinLoot=1`（默认）时才跳；设 0 = 退回旧行为。
+				if (g_cfg.skipBuiltinLoot && IsCreatureBuiltinForm(obj)) {
+					++g_state.lootSkipBuiltin;
+					if (g_state.lootBuiltinLogs < kLootBuiltinLogMax) {
+						++g_state.lootBuiltinLogs;
+						std::uint32_t biFid = 0;
+						SafeReadMem(reinterpret_cast<const void*>(obj + kOffFormID), &biFid, sizeof(biFid));
+						REX::INFO("loot: 跳过「生物内置武器」base={:08X}（无模型虚拟 WEAP ⇒ 面板不显示 / 玩家拿不走；★ 订正 R16）[{}]",
+							biFid, g_state.lootBuiltinLogs);
+					}
+					if (a_outSnap) {
+						a_outSnap->uncertain = true;  // ★ 与 np / eq 一致：快照不完整
 					}
 					continue;
 				}
@@ -13141,7 +13275,7 @@ namespace SAS
 							  "| ACHR: 见到={} 判活跳过={} | StartsUnconscious跳过={} "
 							  "| 前置过滤: deleted/disabled={} 非本cell={} "
 							  "| 搜空: empty={} notEmpty={} unknown={} null={} shapeBad={} invOff={} "
-							  "| 判空跳过: np={} eq={} | 展示柜跳过={} 展示柜拿空={} 空箱判空={} 逐帧拿空={} 逐帧帧数={}",
+							  "| 判空跳过: np={} eq={} bi={} | 展示柜跳过={} 展示柜拿空={} 空箱判空={} 逐帧拿空={} 逐帧帧数={}",
 						g_state.corpseSeen, g_state.corpseByBit, g_state.corpseByFlag,
 						g_state.corpseByLife, g_state.corpseByBleed,
 						g_state.corpseProps, g_state.corpseUncSeen,
@@ -13150,7 +13284,7 @@ namespace SAS
 						g_state.skipDeleted, g_state.skipParentCell,
 						g_state.emptySkips, g_state.lootNotEmpty, g_state.lootUnknown,
 						g_state.lootNullInv, g_state.lootBadShape, invOff,
-						g_state.lootSkipNonPlayable, g_state.lootSkipEquipped,
+						g_state.lootSkipNonPlayable, g_state.lootSkipEquipped, g_state.lootSkipBuiltin,
 						g_state.displayCaseSkips, g_state.displayCaseEmptied,
 						g_state.displayCaseEmptyNoContent,
 						g_state.displayCaseEmptiedFrame, g_state.dcWatchFrames);
@@ -13200,6 +13334,8 @@ namespace SAS
 					g_state.lootBadShape     = 0;
 					g_state.lootSkipNonPlayable = 0;
 					g_state.lootSkipEquipped = 0;
+					g_state.lootSkipBuiltin  = 0;  // ★ 订正 R16
+					// ★ 订正 R16：`lootBuiltinLogs` **不重置**（每会话上限 kLootBuiltinLogMax）
 					g_state.displayCaseSkips = 0;
 					g_state.displayCaseEmptied = 0;  // ★ v4.10
 					g_state.displayCaseEmptyNoContent = 0;  // ★ 订正 R15（空箱判据判出的次数）

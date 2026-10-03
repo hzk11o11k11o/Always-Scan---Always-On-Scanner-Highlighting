@@ -423,6 +423,16 @@ if (-not $SkipDeploy) {
     #     ≥ N 毫秒（新 INI 键 `DisplayCaseEmptyNoContentMs`，默认 **2000**，0 = 关）
     #     ⇒ 判空（粘性熄灭）。日志：`display case emptied (空箱（打开后一直无内容）)
     #     [why=4]` + 统计行 `空箱判空=`。完整证据链 / 误灭面分析见 docs/54。
+    #   ★★★★ 2026-10-03 订正 R16（用户实测反馈修复；公开版仍 2.0.1 / DLL build 仍 5.1.0）：
+    #     **「这个机器人拿空了还在高亮（偶发）」** —— 战斗机器人（Model A）的
+    #     **手臂炮**（`crModelA_CombatRightGun_Auto` / `crModelA_CombatLeftGun_Auto`
+    #     = 0x1DC415 / 0x1DC416）是身体部件（无模型虚拟武器、面板不显示 / 拿不走），
+    #     但记录里**漏标**了 0x04（Non-Playable）⇒ v4.5 / v4.6 两条跳过规则都盖不到
+    #     ⇒ 判空永远「有东西」⇒ 永久亮；「偶发」= 两门手臂炮里恰好只有一门 `fl=0`。
+    #     修法：判空跳过「生物 / 机器人内置武器」—— 名单 = 离线穷举全 esm
+    #     「无 MODL 且无 0x04」的 WEAP（正好 14 条：12 条 `crModelA_*` + UnarmedHuman
+    #     + GasTrapDummy）；新 INI 键 `SkipBuiltinLoot`（默认 1）+ 统计行 `bi=` +
+    #     探针 `bi=` / `skipBi=` / `builtin=` 标记。完整证据链见 docs/55。
     Set-Content -LiteralPath (Join-Path $modRoot 'meta.ini') -Value "[General]`nmodid=18268`nversion=2.0.1`ncomment=Always-on scanner highlighting (SFSE)" -Encoding UTF8
 
     Get-ChildItem -LiteralPath $modRoot -Recurse -File | ForEach-Object {
