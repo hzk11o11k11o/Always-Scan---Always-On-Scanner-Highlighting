@@ -409,6 +409,20 @@ if (-not $SkipDeploy) {
     #     **0xFF3BD4 → 0x27C684**；「门」仍 = state 6 品红 #FF3BD4（第一 / 二轮
     #     曾把设备并与门同色，本轮取消）。其余类别（红 / 橙 / 紫 / 黄 / 蓝 /
     #     原版青↔绿）一字未动。完整记录见 docs/51。
+    #   ★ 2026-09-28（第四轮 · 用户实测反馈修复；公开版仍 2.0.1 / DLL build 仍 5.1.0）：
+    #     **「信用条」没有变黄** —— 真根因：**它不是 MISC，而是 FLOR**
+    #     （`Loot_CredStick_Small/Common/Rare` = 0x3CC32C / 0x3CC325 / 0x3CC32A，
+    #     zhhans 名 = 信用条）⇒ `ClassifyBase()` 的 kFLOR 分支按 FormID 归黄组
+    #     #FFE100。证据链见 docs/53。
+    #   ★★★ 2026-10-03 订正 R15（用户实测反馈修复；公开版仍 2.0.1 / DLL build 仍 5.1.0）：
+    #     **「这个武器箱空了却还在高亮」** —— EMPTY 版 / 被拿空过的展示柜：
+    #     打开时也没有投影条目 ⇒ v4.10「同一段打开期」/ v4.13 记账 / v4.14 加严后的
+    #     兜底**三条判据全部要求「曾见内容」** ⇒ 永远不会被判空 ⇒ 永久亮。
+    #     `DisplayCaseReadsEmpty` 新增**空箱判据**（④）：快速面板为它打开过 +
+    #     这一段打开期从头到尾无内容 + 无拿走事件 + 连续读到空 + 打开后已观察
+    #     ≥ N 毫秒（新 INI 键 `DisplayCaseEmptyNoContentMs`，默认 **2000**，0 = 关）
+    #     ⇒ 判空（粘性熄灭）。日志：`display case emptied (空箱（打开后一直无内容）)
+    #     [why=4]` + 统计行 `空箱判空=`。完整证据链 / 误灭面分析见 docs/54。
     Set-Content -LiteralPath (Join-Path $modRoot 'meta.ini') -Value "[General]`nmodid=18268`nversion=2.0.1`ncomment=Always-on scanner highlighting (SFSE)" -Encoding UTF8
 
     Get-ChildItem -LiteralPath $modRoot -Recurse -File | ForEach-Object {

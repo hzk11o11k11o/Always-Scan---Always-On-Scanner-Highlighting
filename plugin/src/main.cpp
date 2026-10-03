@@ -456,7 +456,20 @@ SFSE_PLUGIN_LOAD(const SFSE::LoadInterface* a_sfse)
 	//   之前它们掉进「植物 / 星球目标」分支 ⇒ 走已扫描 / 未扫描判据、画青色脉冲。
 	//   ⇒ `ClassifyBase()` 的 kFLOR 分支先按 FormID 认这 3 条并归「黄组」#FFE100。
 	//   证据链（zhhans .strings → FULL 反查 → 运行期 flora 日志）见 docs/53。
-	REX::INFO("SAS_AlwaysScan v5.1.0 loading（订正 R14：日志**完全关闭**开关（N 网公开版口径）—— `[General] LogMaxMB` 升级为「开关 + 上限」：**0 = 完全关闭**（不建文件、清空全部 sink + level off，零输出零文件；★ 内置默认也是 0）、**>0 = 开启**（上限 N MiB，钳制 1024）；本机部署 INI 显式写 10；R13 的诊断可观测性（判绿行/链判决行「每 base 首条」+ 缓存回填 key1/key2）原样保留；★ 除日志开关外行为零改动；★ 2026-09-28 第二轮配色修订：门 / 电脑 / 按钮 = 品红 #FF3BD4（白 #FFFFFF 起不再使用，见 docs/50）；★★ 第三轮配色修订：电脑 / 按钮等可互动物品**退回 2.0** = 原版绿 #27C684（state 6 → 4 + 不覆盖、通道默认色同步），门仍品红 #FF3BD4；黄 = 开锁器 / 信用币不变（见 docs/51）；★★★ 第四轮（行为修复）：**「信用条」= FLOR**（`Loot_CredStick_Small/Common/Rare` 0x3CC32C/0x3CC325/0x3CC32A）—— 之前被当成「植物 / 星球目标」（青色脉冲；被 `Credits` 的中文名「信用币」误导过一轮），现在归入黄组 #FFE100（见 docs/53））(SFSE build {})",
+	// ★★★ 2026-10-03 订正 R15（公开版仍 2.0.1、DLL build 仍 5.1.0；行为修复）：
+	//   **「这个武器箱空了却还在高亮」** —— 用户实测（ref=00183CF7 /
+	//   base=001A23DE `Loot_Display_WeaponsCase_Pistols_EMPTY`）：两次打开快速
+	//   面板（QuickContainerOpenedEvent 命中 2 次），但全程无投影（`tpS=0`）、
+	//   无拿走事件、`ui=0` ⇒ v4.10「同一段打开期」/ v4.13 记账 / v4.14 加严后的
+	//   兜底**三条判据全部要求「曾见内容」** —— 而**本来就空的**展示柜打开时也
+	//   没有投影 ⇒ 永远不会被判空 ⇒ 永久亮。
+	//   修法：`DisplayCaseReadsEmpty` 新增**空箱判据**（④）—— 快速面板为它
+	//   打开过 + 这一段打开期**从头到尾无内容** + 无拿走事件 + 连续读到空 +
+	//   打开后已观察 ≥ `DisplayCaseEmptyNoContentMs`（新 INI 键，默认 **2000ms**，
+	//   覆盖投影装填期 0.4~0.7 秒；0 = 关）⇒ 判空（粘性熄灭）。日志原因码
+	//   `why=4` / `display case emptied (空箱（打开后一直无内容）) [why=4]`。
+	//   完整证据链 / 误灭面分析 / 验收判据见 docs/54。
+	REX::INFO("SAS_AlwaysScan v5.1.0 loading（订正 R14：日志**完全关闭**开关（N 网公开版口径）—— `[General] LogMaxMB` 升级为「开关 + 上限」：**0 = 完全关闭**（不建文件、清空全部 sink + level off，零输出零文件；★ 内置默认也是 0）、**>0 = 开启**（上限 N MiB，钳制 1024）；本机部署 INI 显式写 10；R13 的诊断可观测性（判绿行/链判决行「每 base 首条」+ 缓存回填 key1/key2）原样保留；★ 除日志开关外行为零改动；★ 2026-09-28 第二轮配色修订：门 / 电脑 / 按钮 = 品红 #FF3BD4（白 #FFFFFF 起不再使用，见 docs/50）；★★ 第三轮配色修订：电脑 / 按钮等可互动物品**退回 2.0** = 原版绿 #27C684（state 6 → 4 + 不覆盖、通道默认色同步），门仍品红 #FF3BD4；黄 = 开锁器 / 信用币不变（见 docs/51）；★★★ 第四轮（行为修复）：**「信用条」= FLOR**（`Loot_CredStick_Small/Common/Rare` 0x3CC32C/0x3CC325/0x3CC32A）—— 之前被当成「植物 / 星球目标」（青色脉冲；被 `Credits` 的中文名「信用币」误导过一轮），现在归入黄组 #FFE100（见 docs/53）；★★★★ 订正 R15（行为修复）：**空展示柜判据** —— 治「这个武器箱空了却还在高亮」（EMPTY 版 / 被拿空过的展示柜：打开时也没有投影 ⇒ 原有三条判据全部要求「曾见内容」⇒ 永久亮）；新增 INI `DisplayCaseEmptyNoContentMs`（默认 2000ms，0 = 关）—— 快速面板打开过 + 打开后一直无内容 + 连续读到空 ≥ N ms ⇒ 判空（粘性熄灭；日志 `why=4`，见 docs/54））(SFSE build {})",
 		SFSE::GetSFSEVersion());
 
 	if (auto* messaging = SFSE::GetMessagingInterface()) {

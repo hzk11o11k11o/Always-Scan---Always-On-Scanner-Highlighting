@@ -536,6 +536,15 @@ namespace SAS
 		//        「不走物品事件的展示柜」至今没有任何实测证据。项目红线是
 		//        「宁可少灭一次，绝不误灭」（v4.9/v4.12 两轮验收都依赖这条）。
 		//   ③ 两条都不成立 ⇒ 退回 v4.9/v4.12 行为（照常亮），绝不乱灭。
+		//   ★★★ 订正 R15（v5.3）补第 ④ 条 —— **空箱判据**：①②③ 全部要求
+		//      「曾见内容」（拿到过东西 / 投影出现过 / UI 信号），而**本来就空的**
+		//      展示柜（EMPTY 版 / 被拿空过的）打开时也没有投影 ⇒ 永远不会被判空
+		//      ⇒ 永久亮（用户实测：「这个武器箱空了却还在高亮」，docs/54）。
+		//     ④ = 快速面板**为它打开过** + 这一段打开期里**从头到尾没见到内容**
+		//      + 没收到过拿走事件 + 连续读到空 + 打开后已观察 ≥ `DisplayCaseEmptyNoContentMs`
+		//      （默认 2000ms，覆盖投影装填期 0.4~0.7 秒）⇒ 判空（粘性熄灭）。
+		//      唯一的误灭面（有内容 + 打开后 <0.7s 就关掉 ⇒ 投影没来得及建立）
+		//      极窄且可自愈（再打开一次即恢复）—— 完整记录见 Config 注释与 docs/54。
 		//
 		// ★ 安全姿势与 v4.11/v4.12 完全相同：注册前**硬核对 vtable**（不是那个
 		//   类型就绝不注册）、BSTEventSource 形状校验、负载全部 `SafeReadMem` 读、
@@ -551,6 +560,15 @@ namespace SAS
 		constexpr std::uint64_t kDcEmptyConfirmMs     = 400;    // 「连续读到空」多久算确认（兜底判据用）
 		constexpr std::uint64_t kQuickOpenSessionMs   = 30000;  // 「快速面板打开」会话的有效期
 		constexpr std::uint64_t kLootEvtSinkCheckMs   = 60000;  // 每 60 秒核对 sink 还在不在
+		// ★★★ 订正 R15（v5.3）：空展示柜判据 —— 「打开后一直无内容」多久算「空箱」。
+		//   治用户实测的「这个武器箱空了却还在高亮」（ref=00183CF7 /
+		//   base=001A23DE `Loot_Display_WeaponsCase_Pistols_EMPTY`：用户两次打开
+		//   快速面板、全程没有投影条目（tpS=0）、没有拿走事件、ui=0 ⇒ v4.10 的
+		//   「同一段打开期」/ v4.13 的记账 / v4.14 加严后的兜底**三条判据全部要求
+		//   「曾见内容」** ⇒ 「打开确认是空」的展示柜永远不会被判定为空 ⇒ 永久亮）。
+		//   取值依据：面板打开后引擎把内容投影进库存需要 0.4~0.7 秒（v4.14 实测）
+		//   ⇒ 2000ms = 3 倍余量；「有内容的箱子」到这个时间点必然已读到内容（不会误灭）。
+		constexpr std::uint64_t kDcEmptyNoContentMs   = 2000;
 
 		// 【判空】容器 / 尸体的「库存列表」——
 		//   `TESObjectREFR::inventoryList` 是 `BSGuarded<BGSInventoryList*, BSReadWriteLock>`，
@@ -1889,6 +1907,25 @@ namespace SAS
 			//      目前没有任何实测证据 ⇒ 「宁少灭、不误灭」（项目红线）。
 			//      真要开回来：INI 设 1（会重新带上 ② 的误灭风险）。
 			bool          displayCaseQuickOpenEmpty = false;
+			// ★★★ 订正 R15（v5.3）：空展示柜判据（默认 2000 毫秒；0 = 关）
+			//   背景（用户实测 2026-10-03，日志见 docs/54）：「这个武器箱空了却还在高亮」——
+			//   ref=00183CF7 / base=001A23DE（`Loot_Display_WeaponsCase_Pistols_EMPTY`）：
+			//   用户两次打开快速面板（事件命中 2 次），全程没有投影条目（`tpS=0`）、
+			//   没有任何拿走事件、`ui=0` ⇒ v4.10「同一段打开期」/ v4.13 记账 /
+			//   v4.14 加严后的兜底**三条判据全部要求「曾见内容」**
+			//   （`sawContentInSession` / `snap.valid` / UI 信号）—— 而**本来就空的**
+			//   展示柜（EMPTY 版 / 被拿空过的）打开时也没有投影 ⇒ 永远不会被判定为空
+			//   ⇒ 永久亮着（`展示柜跳过=` 一直涨、`展示柜拿空=` 恒 0）。
+			//   判据（`DisplayCaseReadsEmpty` ④）：快速面板**为这个 ref 打开过**
+			//   + 这一段打开期里**从头到尾没见到内容** + 没收到过拿走事件
+			//   + 连续读到空 + 打开后已观察 ≥ N 毫秒 ⇒ 判「空」（粘性熄灭：
+			//   关掉后保持灭，直到往里放东西 / 再次打开读到内容）。
+			//   ★ 已知的唯一误灭面（如实记录，极窄且可自愈）：**有内容**的箱子被
+			//   「打开后不到 0.7 秒就关掉」—— 投影还没建立就被关闭 ⇒ 会被当成空箱；
+			//   **再打开它一次**（投影出现）或往里放东西即自动恢复（NoteDisplayCaseOccupied
+			//   / put 事件都会清粘性）。
+			//   设 0 = 关（退回 v4.14 行为：空展示柜永远亮）。
+			int           displayCaseEmptyNoContentMs = static_cast<int>(kDcEmptyNoContentMs);
 			// 物品事件 / 快速面板事件的日志上限（诊断；默认 32 条）。
 			int           lootEventLogMax = 32;
 
@@ -2206,10 +2243,17 @@ namespace SAS
 				//   （关闭状态库存本来就空）会被当成「连续读到空」⇒ 误判拿空。
 				//   实测证据见常量区「v4.13」尾部的 v4.14 段（2026-09-19 那一局的
 				//   `display case emptied (兜底…)` 就是它误判出来的）。
+				//   ★★★ 订正 R15（v5.3）：它也是**空箱判据**的另一半 —— 反过来用：
+				//   `sawContentInSession == false` + `quickOpenMs != 0`（打开过）
+				//   ⇒ 打开后一直无内容 ⇒ 本来就空的展示柜 ⇒ 判空（见
+				//   `DisplayCaseReadsEmpty` 判据 ④ 与 docs/54）。
 				bool          sawContentInSession = false;
 			};
 			std::unordered_map<const RE::TESObjectREFR*, DisplayCaseVerdict> displayCaseVerdict;
 			std::uint64_t displayCaseEmptied = 0;
+			// ★★★ 订正 R15：窗口内「空箱判据」判出的次数（诊断；与 displayCaseEmptied
+			//   同一口径 = 窗口内、统计行打完清零）。
+			std::uint64_t displayCaseEmptyNoContent = 0;
 			// ★ v4.13：事件通道的开关 / 注册状态（sink 由 EnginesLootEventSinks 挂）
 			bool          lootEvtActive       = false;  // 是否解释物品事件
 			bool          quickOpenActive     = false;  // 是否解释快速面板事件
@@ -4480,6 +4524,9 @@ namespace SAS
 			// ★ v4.13：游戏事件通道（理由 / 离线取证见常量区「v4.13」长注释）
 			g_cfg.containerLootEvents          = getInt("ContainerLootEvents", 1) != 0;
 			g_cfg.displayCaseQuickOpenEmpty    = getInt("DisplayCaseQuickOpenEmpty", 0) != 0;  // v4.14 默认关（误灭面见 Config 注释）
+			// ★ 订正 R15：空展示柜判据（毫秒；0 = 关；默认 2000 —— 依据见 Config 注释）
+			g_cfg.displayCaseEmptyNoContentMs  = std::clamp(getInt("DisplayCaseEmptyNoContentMs",
+				  static_cast<int>(kDcEmptyNoContentMs)), 0, 60000);
 			g_cfg.lootEventLogMax              = std::clamp(getInt("LootEventLogMax", 32), 0, 4096);
 			REX::INFO("config: corpseUnconscious={} corpseLifeState={} corpseBleedout={} skipEmptyLoot={}",
 				g_cfg.corpseUnconscious, g_cfg.corpseLifeState, g_cfg.corpseBleedout, g_cfg.skipEmptyLoot);
@@ -4498,13 +4545,18 @@ namespace SAS
 			REX::INFO("config: displayCaseFrameWatch={} displayCaseTraceMax={} -> 展示柜逐帧观察={}",
 				g_cfg.displayCaseFrameWatch, g_cfg.displayCaseTraceMax,
 				g_cfg.displayCaseFrameWatch ? "开（拿空窗口缩到 1 帧）" : "关（只在 200ms 扫描节拍上判）");
-			REX::INFO("config: containerLootEvents={} displayCaseQuickOpenEmpty={} lootEventLogMax={} "
+			REX::INFO("config: containerLootEvents={} displayCaseQuickOpenEmpty={} displayCaseEmptyNoContentMs={} lootEventLogMax={} "
 					  "-> 展示柜拿空判据 = 记账（TESContainerChangedEvent 减账到 0）{}；"
+					  "空箱判据（★ 订正 R15）= {}；"
 					  "事件源 = 静态对象 RVA 0x{:X}/0x{:X}（vtable 0x{:X}/0x{:X} 注册前硬核对）",
-				g_cfg.containerLootEvents, g_cfg.displayCaseQuickOpenEmpty, g_cfg.lootEventLogMax,
+				g_cfg.containerLootEvents, g_cfg.displayCaseQuickOpenEmpty, g_cfg.displayCaseEmptyNoContentMs,
+				g_cfg.lootEventLogMax,
 				g_cfg.displayCaseQuickOpenEmpty
 					? " + 兜底（QuickContainerOpenedEvent + 连续读到空；★ v4.14 起非默认——会误灭「打开不拿就关掉」）"
 					: "（兜底已关＝v4.14 默认：只信记账，避免「打开不拿就关掉」被误灭）",
+				g_cfg.displayCaseEmptyNoContentMs > 0
+					? "开（打开后 ≥N ms 一直无内容 ⇒ 判空熄灭；治「空的武器箱/展示柜一直亮」）"
+					: "关（退回 v4.14 行为：空展示柜永远亮）",
 				kInvEvtSourceRva, kQuickOpenSourceRva, kInvEvtSourceVtblRva, kQuickOpenSourceVtblRva);
 
 			// --- ★ v4.0.1：可选的自定义类别颜色（ColorLoot=RRGGBB …，留空 = 用引擎原生配色）---
@@ -6357,9 +6409,35 @@ namespace SAS
 			}
 		}
 
+		// ================================================================
+		// ★★★ 订正 R15（v5.3）：展示柜「读到空」的**判决原因码**
+		//   返回值从 bool 升级成原因码 —— 日志文案要精确到「哪一条判据下的结论」
+		//   （原来调用点用「quickOpenMs && !sawTakeEvt」猜原因，会把新判据记成旧兜底）。
+		// ================================================================
+		enum : int
+		{
+			kDcEmptyNone        = 0,  // 不算空（照常亮）
+			kDcEmptySticky      = 1,  // ① 已确认拿空（粘性，关掉后保持灭）
+			kDcEmptySameSession = 2,  // ② v4.10：同一段打开期里读到空
+			kDcEmptyFallback    = 3,  // ③ v4.13 兜底（默认关：打开过 + 见过内容 + 连续空）
+			kDcEmptyNoContent   = 4   // ④ ★ 订正 R15：打开后一直无内容（空箱）
+		};
+
+		const char* DcEmptyReasonText(int a_why)
+		{
+			switch (a_why) {
+			case kDcEmptySticky:      return "粘性（此前已确认拿空）";
+			case kDcEmptySameSession: return "同一段打开期里读到空";
+			case kDcEmptyFallback:    return "兜底（快速面板 + 连续读到空）";
+			case kDcEmptyNoContent:   return "空箱（打开后一直无内容）";
+			default:                  return "未知判据";
+			}
+		}
+
 		// ★ v4.10：展示柜读到「空」时的判决（**只看状态，不改状态**）——
-		//   返回 true = 这是「真拿空」（调用方会改成「不进候选 ⇒ 熄灭」）。
-		//   判据（完整推导见常量区「v4.10」/「v4.13」）：
+		//   返回非 0 = 这是「真拿空」（调用方会改成「不进候选 ⇒ 熄灭」），
+		//   返回值 = 判决原因码（kDcEmpty*；日志文案用 DcEmptyReasonText）。
+		//   判据（完整推导见常量区「v4.10」/「v4.13」/「订正 R15」）：
 		//     ① 粘性：此前已确认拿空过（`lastKnown==2`）⇒ 关闭后也保持熄灭
 		//        —— 这正是用户要的「拿空即灭」；
 		//     ② v4.10 的「同一段打开期」（UI 是菜单时代的产物 —— 实测拿不到，
@@ -6367,39 +6445,63 @@ namespace SAS
 		//     ③ ★ v4.13 兜底：**快速搜刮面板确认为这个 ref 开着**、这一段打开期里
 		//        **一次拿走事件都没收到**、且连续读到空 ≥ kDcEmptyConfirmMs。
 		//        （收到过拿走事件的情形由记账判据直接落粘性，不走这里。）
+		//     ④ ★★★ 订正 R15（v5.3）：**空箱判据** —— 快速面板为这个 ref 打开过、
+		//        这一段打开期里**从头到尾没见到内容**（`sawContentInSession==false`
+		//        ⇒ 打开后一直没有 kTemporary 投影）、没收到过拿走事件、连续读到空、
+		//        且距打开事件已 ≥ `DisplayCaseEmptyNoContentMs`（默认 2000ms，
+		//        覆盖投影装填期 0.4~0.7 秒）⇒ 「本来就空的展示柜」（EMPTY 版 /
+		//        被拿空过的，打开时也没有投影）。这是「空了却还在高亮」的修复：
+		//        v4.10 / v4.13 / v4.14 三条判据全部要求「曾见内容」，对这类箱子
+		//        永远不会成立 ⇒ 永久亮；本条是它们的补集。
 		//   其余（关着 / 从没见过投影 / 从没打开过）⇒ 内容未知 ⇒ 照常亮（v4.9 目标）。
-		bool DisplayCaseReadsEmpty(const RE::TESObjectREFR* a_ref, std::uint64_t a_nowMs = 0)
+		int DisplayCaseReadsEmpty(const RE::TESObjectREFR* a_ref, std::uint64_t a_nowMs = 0)
 		{
 			const auto it = g_state.displayCaseVerdict.find(a_ref);
 			if (it == g_state.displayCaseVerdict.end()) {
-				return false;  // 从没见过它的投影 ⇒ 未知 ⇒ 照常亮
+				return kDcEmptyNone;  // 从没见过它的投影 ⇒ 未知 ⇒ 照常亮
 			}
-			const auto& ds = it->second;
+			const auto& ds  = it->second;
+			const auto  now = a_nowMs ? a_nowMs : NowMs();
 			if (ds.lastKnown == 2) {
-				return true;  // ① 粘性：已确认拿空（关掉后仍保持熄灭）
+				return kDcEmptySticky;  // ① 粘性：已确认拿空（关掉后仍保持熄灭）
 			}
 			if (g_state.containerUiOpen && ds.lastTpSerial != 0 &&
 				ds.lastTpSerial == g_state.containerUiSerial) {
-				return true;  // ② 同一段打开期（v4.10 判据）
+				return kDcEmptySameSession;  // ② 同一段打开期（v4.10 判据）
 			}
 			// ③ ★ v4.13 兜底（★ v4.14 默认关 + 加严，完整依据见常量区「v4.13」尾部的 v4.14 段）
 			//   加严：`sawContentInSession` —— 这一段打开期里必须**真的读到过内容**。
 			//   没有它时会误判：面板刚打开、投影还没建立的那一段（关闭状态库存本来就空）
 			//   会被当成「连续读到空 ≥ 400ms」⇒ 一打开就判拿空（2026-09-19 的日志实证）。
-			if (!g_cfg.displayCaseQuickOpenEmpty || ds.quickOpenMs == 0 ||
-				ds.sawTakeEvt || ds.emptySinceMs == 0 || !ds.sawContentInSession) {
-				return false;
+			if (g_cfg.displayCaseQuickOpenEmpty && ds.quickOpenMs != 0 &&
+				!ds.sawTakeEvt && ds.emptySinceMs != 0 && ds.sawContentInSession &&
+				now - ds.quickOpenMs <= kQuickOpenSessionMs &&
+				(now - ds.emptySinceMs) >= kDcEmptyConfirmMs) {
+				return kDcEmptyFallback;
 			}
-			const auto now = a_nowMs ? a_nowMs : NowMs();
-			if (now - ds.quickOpenMs > kQuickOpenSessionMs) {
-				return false;  // 这一段打开期早就过期了（防呆：别拿很久以前的事件当依据）
+			// ④ ★★★ 订正 R15：空箱判据（完整推导见 Config::displayCaseEmptyNoContentMs 与 docs/54）
+			//   · `quickOpenMs != 0`  = 快速面板**为用户打开过**（有证据才判，绝不猜）；
+			//   · `!sawContentInSession` = 打开后**一直没见到内容**（有内容必有投影，
+			//     投影建立只需 0.4~0.7 秒 << N）；见到过 ⇒ 交给记账 / ③，绝不在这里灭；
+			//   · `!sawTakeEvt`       = 没收到过拿走事件（收到过 ⇒ 箱里曾有东西 ⇒ 同上）；
+			//   · `emptySinceMs != 0 && >= quickOpenMs` = 当前处于「连续读到空」，
+			//     且空窗口起点在打开之后（防拿旧状态当依据）；
+			//   · `now - quickOpenMs >= N` = 从打开起已观察满 N 毫秒（默认 2000ms）。
+			//   ★ 唯一的误灭面（有内容 + 打开后 <0.7s 就关掉）已在 Config 注释如实记录。
+			if (g_cfg.displayCaseEmptyNoContentMs > 0 && ds.quickOpenMs != 0 &&
+				!ds.sawTakeEvt && !ds.sawContentInSession &&
+				ds.emptySinceMs != 0 && ds.emptySinceMs >= ds.quickOpenMs &&
+				now - ds.quickOpenMs >= static_cast<std::uint64_t>(g_cfg.displayCaseEmptyNoContentMs)) {
+				return kDcEmptyNoContent;
 			}
-			return (now - ds.emptySinceMs) >= kDcEmptyConfirmMs;
+			return kDcEmptyNone;
 		}
 
 		// ★ v4.10 / v4.13：把上面的判决**真正落到状态**（只有调用方决定「熄灭」时
 		//   才调，所以粘性只会因为「确认拿空」而建立）。`a_why` 进日志（诊断哪条判据）。
-		void MarkDisplayCaseEmptied(const RE::TESObjectREFR* a_ref, const char* a_why, bool a_fallback = false)
+		//   ★ 订正 R15：`a_whyCode`（kDcEmpty*）驱动「兜底 / 空箱」两个诊断计数，
+		//   并把原因码写进日志行 —— 同一行就能看出是哪条判据落的粘性。
+		void MarkDisplayCaseEmptied(const RE::TESObjectREFR* a_ref, const char* a_why, int a_whyCode = kDcEmptyNone)
 		{
 			auto& ds = DisplayCaseVerdictFor(a_ref);
 			if (ds.lastKnown == 2) {
@@ -6407,11 +6509,14 @@ namespace SAS
 			}
 			ds.lastKnown = 2;
 			++g_state.displayCaseEmptied;
-			if (a_fallback) {
+			if (a_whyCode == kDcEmptyFallback) {
 				++g_state.quickOpenFallbackDecided;
 			}
-			REX::INFO("display case emptied ({}): ref={:08X} -> 关掉后保持熄灭（粘性）",
-				a_why, a_ref ? a_ref->GetFormID() : 0);
+			if (a_whyCode == kDcEmptyNoContent) {
+				++g_state.displayCaseEmptyNoContent;
+			}
+			REX::INFO("display case emptied ({}) [why={}]: ref={:08X} -> 关掉后保持熄灭（粘性）",
+				a_why, a_whyCode, a_ref ? a_ref->GetFormID() : 0);
 		}
 
 		// ★ v4.13：`AddToSnap`（快照累加）定义在 `RefLootState` 前面（读库存那段），
@@ -6827,16 +6932,17 @@ namespace SAS
 					NoteDisplayCaseOccupied(w.ref, sawTp, &snap);
 				} else {
 					// 空（刚变空 / 一直空）：每帧都按判据问一次 —— v4.13 的兜底判据
-					//   需要「连续空一段时间」才成立，只在跳变那一帧问会漏掉它。
-					const bool byFallback =
-						(ds.lastKnown != 2) && ds.quickOpenMs != 0 && !ds.sawTakeEvt;
-					if (DisplayCaseReadsEmpty(w.ref, now)) {
+					//   与 ★ 订正 R15 的空箱判据都需要「持续一段时间」才成立，
+					//   只在跳变那一帧问会漏掉它们。
+					//   ★ 订正 R15：判决返回**原因码**（不再用「quickOpenMs && !sawTakeEvt」
+					//   猜原因 —— 那会把空箱判据记成旧兜底）。
+					const int dcWhy = DisplayCaseReadsEmpty(w.ref, now);
+					if (dcWhy != kDcEmptyNone) {
 						if (prev != 0) {
 							DcTrace(w.ref, loot, false);
 							++g_state.displayCaseEmptiedFrame;
 						}
-						MarkDisplayCaseEmptied(w.ref,
-							byFallback ? "兜底（快速面板 + 连续读到空）" : "打开期里读到空", byFallback);
+						MarkDisplayCaseEmptied(w.ref, DcEmptyReasonText(dcWhy), dcWhy);
 					} else if (prev == 1) {
 						// 投影消失但判不出「拿空」⇒ 内容未知（关掉了 / 信号没接上）
 						DcTrace(w.ref, loot, false);
@@ -12413,12 +12519,11 @@ namespace SAS
 								if (ds.emptySinceMs == 0) {
 									ds.emptySinceMs = a_nowMs;
 								}
-								emptyNow = DisplayCaseReadsEmpty(ref, a_nowMs);
+								// ★ 订正 R15：判决返回**原因码**（空箱判据与旧兜底分开记）。
+								const int dcWhy = DisplayCaseReadsEmpty(ref, a_nowMs);
+								emptyNow = dcWhy != kDcEmptyNone;
 								if (emptyNow) {
-									MarkDisplayCaseEmptied(ref,
-										ds.quickOpenMs && !ds.sawTakeEvt ? "兜底（快速面板 + 连续读到空）"
-																		 : "打开期里读到空",
-										ds.quickOpenMs != 0 && !ds.sawTakeEvt);
+									MarkDisplayCaseEmptied(ref, DcEmptyReasonText(dcWhy), dcWhy);
 								}
 							}
 							if (emptyNow) {
@@ -13036,7 +13141,7 @@ namespace SAS
 							  "| ACHR: 见到={} 判活跳过={} | StartsUnconscious跳过={} "
 							  "| 前置过滤: deleted/disabled={} 非本cell={} "
 							  "| 搜空: empty={} notEmpty={} unknown={} null={} shapeBad={} invOff={} "
-							  "| 判空跳过: np={} eq={} | 展示柜跳过={} 展示柜拿空={} 逐帧拿空={} 逐帧帧数={}",
+							  "| 判空跳过: np={} eq={} | 展示柜跳过={} 展示柜拿空={} 空箱判空={} 逐帧拿空={} 逐帧帧数={}",
 						g_state.corpseSeen, g_state.corpseByBit, g_state.corpseByFlag,
 						g_state.corpseByLife, g_state.corpseByBleed,
 						g_state.corpseProps, g_state.corpseUncSeen,
@@ -13047,6 +13152,7 @@ namespace SAS
 						g_state.lootNullInv, g_state.lootBadShape, invOff,
 						g_state.lootSkipNonPlayable, g_state.lootSkipEquipped,
 						g_state.displayCaseSkips, g_state.displayCaseEmptied,
+						g_state.displayCaseEmptyNoContent,
 						g_state.displayCaseEmptiedFrame, g_state.dcWatchFrames);
 					// ★ v4.11：容器界面信号与菜单事件（诊断一行看完）：
 					//   `ui=` 事件∨轮询的最终状态；`ev=` 事件侧；`opens=`= 开过的段数；
@@ -13096,6 +13202,7 @@ namespace SAS
 					g_state.lootSkipEquipped = 0;
 					g_state.displayCaseSkips = 0;
 					g_state.displayCaseEmptied = 0;  // ★ v4.10
+					g_state.displayCaseEmptyNoContent = 0;  // ★ 订正 R15（空箱判据判出的次数）
 					g_state.displayCaseEmptiedFrame = 0;  // ★ v4.11（逐帧判出「拿空」的次数）
 					g_state.dcWatchFrames    = 0;         // ★ v4.11（逐帧观察跑了多少帧）
 					g_state.achrSeen         = 0;

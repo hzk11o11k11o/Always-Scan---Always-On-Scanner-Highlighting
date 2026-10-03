@@ -39,6 +39,22 @@ Version  : 2.0.1  (plugin build 5.1.0)
                periodic log line says `invOff=未标定`). The step now also samples
                your own inventory, which always has something in it, so it
                completes right away.
+             * fixed (2026-10-03): an **empty** display case / weapon case could
+               keep its highlight forever. Display cases only list their
+               contents while the loot panel is open, so "this one is empty"
+               can never be read from the case itself; every existing rule for
+               clearing the highlight required having seen items in it first.
+               For a case whose contents are already gone - the "EMPTY"
+               variants, or one looted earlier - there are no items to see, so
+               none of the rules could ever fire and the outline stayed. Now,
+               opening such a case is itself the evidence: the fast loot panel
+               event tells the mod the panel really was opened for this case,
+               and if no contents ever show up while it is open (the game takes
+               ~0.7 s to move real contents into the panel), the case is treated
+               as empty after two seconds - the outline goes out and stays out
+               until you put something in (or open it again with items in it).
+               New ini key `DisplayCaseEmptyNoContentMs` (default 2000 ms;
+               0 turns it off).
 
            2.0 = the mod brings its own outline colour channels (described
            below), plus seventeen fixes, all from player reports.
@@ -859,7 +875,9 @@ Display cases are covered as well: weapon cases, weapon racks, helmet /
 backpack / datapad racks and the outpost display cases glow even while
 they are closed (the game does not keep their contents in the normal
 container inventory), and they go dark once you have taken everything
-out of them.
+out of them. A case that is empty to begin with (the "EMPTY" variants,
+or one you looted earlier) goes dark as soon as you open it and it shows
+no contents - see the 2026-10-03 note in the 2.0.1 section above.
 
 Press the toggle hotkey (default: F8) to switch the whole thing on or
 off at any moment. A short HUD message confirms the new state.
@@ -1207,6 +1225,17 @@ Most useful options:
   DisplayCaseUiEmpty=1  a display case you have emptied goes dark and
                         stays dark (default on). The mod tracks what you
                         take out of it, item by item.
+  DisplayCaseEmptyNoContentMs=2000
+                        a display case that shows no contents when you open
+                        it (an "EMPTY" variant, or one you looted earlier)
+                        goes dark after this many milliseconds of the panel
+                        being open with nothing in it (default 2000; the
+                        game needs ~0.7 s to list a case's real contents, so
+                        2000 leaves a comfortable margin). Going dark this
+                        way also sticks after you close the case, until you
+                        put something in (or open it again with items). 0 =
+                        off (such cases stay lit until an item event). See
+                        the 2026-10-03 note in the 2.0.1 section above.
   ActorProbeMax=24      how many per-actor diagnostic lines ("actor
                         probe:") the log prints per session. Set to 0 to
                         turn them off; they are only useful when reporting
@@ -1383,10 +1412,13 @@ categories).
     way around):
     display cases (weapon cases, weapon racks, outpost displays) are
     tracked separately: they glow even while closed, and they go dark
-    once you have taken everything out of them. Taking only part of the
-    contents - or opening one and taking nothing - keeps it glowing, by
-    design. If it still looks wrong, send me the log lines starting
-    with "display case trace:" and "loot events".
+    once you have taken everything out of them - or, since 2026-10-03,
+    once you open one and it shows no contents at all (that is how an
+    "EMPTY" case, or one you looted earlier, goes dark). Taking only
+    part of the contents keeps it glowing, by design. If it still looks
+    wrong, send me the log lines starting with "display case trace:"
+    and "loot events"; the log line saying why a case went dark ends
+    with "why=1..4" (4 = "empty case, opened with nothing in it").
 * A walking NPC is outlined (should not happen):
     set CorpseUnconscious=0 in the INI - the log line starting with
     "corpse probe:" will tell you which reference it was.
@@ -1405,6 +1437,9 @@ categories).
   normal container inventory until the case is opened, so they are
   handled separately. Once you take everything out of one, it goes dark
   like any other container; taking part of its contents leaves it lit.
+  A case that has no contents to show when you open it (the "EMPTY"
+  variants, or one that was looted earlier) also goes dark, a moment
+  after you open it.
 * With "Simple Immersive Looting" (Nexus 12677) installed, using its
   "Strip" option unequips a body's gear - the body starts glowing again
   because the gear is takeable now; loot it and the outline goes away.
