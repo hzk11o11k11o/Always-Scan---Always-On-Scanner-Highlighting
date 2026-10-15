@@ -2071,7 +2071,7 @@ namespace SAS
 			// （外景 / 城市里走动时加载线程一直在流式增删引用）。设 0 = 退回旧判据
 			// （任何长度变化都要重新等 kRefsStableRounds 轮）。
 			int           streamJumpTolerance = static_cast<int>(kRefsStreamJumpMax);
-			// 每轮最多复检多少个「已挂」目标的 3D 根（0 = 关掉这条自愈，仅排查用）。
+			// 每轮最多修复多少个「3D 根变化」的已挂目标（0 = 关掉自愈，仅排查用）。
 			//   引擎侧描边是按 3D 图节点登记的，3D 被重建（外景流式加载 / LOD 切换）
 			//   就会丢，而账本还记着「挂着」⇒ 从此不亮。这一项让 MOD 发现后重挂。
 			int           verify3DPerScan = static_cast<int>(kVerify3DPerScan);
@@ -2123,6 +2123,7 @@ namespace SAS
 			// 0 = 还在选中集合里；非 0 = 掉队时刻（到这个时刻之后才真正摘除）。
 			// 见 Config::unhighlightGraceMs 的说明。
 			std::uint64_t                    dropAt     = 0;
+			std::uint64_t                    lastVerifiedMs = 0;
 			// ★ v4.0：挂上去时用的 outline 状态（分类分色），只作诊断/日志用。
 			//   摘除时**不读它** —— 先读引擎状态表里的真实值（原版可能覆盖过），
 			//   这是 v2.3 起就守着的做法。
@@ -2202,6 +2203,17 @@ namespace SAS
 			// ★ 这里存的是 NiPointer 而不是裸指针：摘高亮时要调引擎的函数，而它会
 			//   解引用引用取 3D —— 裸指针在引用被销毁后就是野指针。
 			std::unordered_map<RE::TESObjectREFR*, OutlineEntry> outlined;
+			struct NearbyRef
+			{
+				RE::NiPointer<RE::TESObjectREFR> ref;
+				RE::TESObjectCELL*              cell = nullptr;
+				std::uint64_t                   seenMs = 0;
+			};
+			std::unordered_map<RE::TESObjectREFR*, NearbyRef> nearbyRefs;
+			std::uint64_t nearbyReused = 0;
+			std::uint64_t no3DSkips = 0;
+			std::uint64_t repairPending = 0;
+			std::uint64_t outlineScheduleRound = 0;
 			bool          nativeReady      = false;  // 核心三个引擎函数都已按签名校验通过
 			// 「摘除」两个函数（Remove / Deactivate）是否可用。不可用时退化成
 			// 「只把状态写回 12」——能少一点描边残留，但**摘不干净**（见上方长注释）。
@@ -2921,7 +2933,6 @@ namespace SAS
 			std::uint64_t tickGapMsTotal = 0;
 
 			// --- ★ v4.7：3D 复检（引擎侧描边丢了就重挂）---
-			std::size_t   verifyCursor       = 0;  // 轮转游标（覆盖所有已挂目标）
 			std::uint64_t outline3DProbes    = 0;  // 复检了多少次
 			std::uint64_t outline3DReasserts = 0;  // 其中发现 3D 变了、重挂了多少次
 
@@ -5090,6 +5101,9 @@ namespace SAS
 			REX::INFO("config: exteriorContinuous={} settleOnCellCross={}ms streamJumpTolerance={} verify3DPerScan={}",
 				g_cfg.exteriorContinuous, g_cfg.settleOnCellCrossMs,
 				g_cfg.streamJumpTolerance, g_cfg.verify3DPerScan);
+			REX::INFO("config: discovery (订正 R19) -> 分片只负责发现；附近引用每轮重判、无3D不占名额/预算；"
+					  "3D变化每轮比较，Verify3DPerScan={} 为修复上限（0=关闭），总预算内优先保障1/4、余量回流",
+				g_cfg.verify3DPerScan);
 			// ★★★ 2026-09-27（订正 R3，性能）：环内 cell 分片遍历 —— 治用户报告的
 			//   「帧数仍有下降」（当轮日志 scan avg=79ms：loop 55ms 几乎全是「每轮全量
 			//   遍历环内 cell 的引用」，环总量可达 kRingRefsCap=60000）。
@@ -7691,6 +7705,7 @@ namespace SAS
 
 			// ★ v4.4：换场景 / 读档 ⇒ 判决缓存与探针去重集合都作废
 			//   （旧世界的引用随时可能被销毁，留着它们只会是野键）。
+			g_state.nearbyRefs.clear();
 			g_state.achrVerdict.clear();
 			g_state.lootProbed.clear();
 			g_state.contProbed.clear();       // ★ v4.8
@@ -7777,6 +7792,7 @@ namespace SAS
 				// 把这批引用从引擎的高亮表里**真正摘掉**
 				// （Remove(managers[state]+0x18, &id) → Deactivate(id) → 状态写回 12）
 				ClearAllNativeOutline();
+				g_state.nearbyRefs.clear();
 			}
 
 			// ★ v4.0：游戏内提示（Tick 里写进 SAS_Notify，桥脚本轮询到之后弹 HUD）
@@ -7813,6 +7829,8 @@ namespace SAS
 			// ★★★ v5.0：自建通道号（ChannelMode=1 时用；旧路径忽略）。
 			//   = 该目标该挂到哪条自建颜色通道（见 docs/32 与 EnsureChannels）。
 			std::uint32_t      channel = 0;
+			RE::NiPointer<RE::NiAVObject> root;
+			bool               attempted = false;
 		};
 
 		// ====================================================================
@@ -11843,18 +11861,14 @@ namespace SAS
 		//   visitor = { vtable = 0x4B2FA10, data = &{manager, manager->0x40} }
 		//   ★ 回调（0x653FC0 = add rcx,8; jmp 0x653DD0）期望 rcx = visitor+8，
 		//     即 data 指向的 8 字节里存的就是「data 字段的值」—— 两个字段都要照抄。
-		bool OutlineRefViaChannel(RE::TESObjectREFR* a_ref, std::uint32_t a_ch)
+		bool OutlineRefViaChannel(RE::NiAVObject* a_root, std::uint32_t a_ch)
 		{
-			if (!g_channelsReady || a_ch >= kChannelCount) {
+			if (!g_channelsReady || a_ch >= kChannelCount || !a_root) {
 				return false;
 			}
 			auto* const mgr = g_channels[a_ch].mgr;
 			if (!mgr) {
 				return false;
-			}
-			const auto root = RefGet3D(a_ref);
-			if (!root) {
-				return false;  // 3D 还没加载 ⇒ 与旧路径一致：等下一轮
 			}
 			struct MountData
 			{
@@ -11869,7 +11883,7 @@ namespace SAS
 			};
 			MountData data{ mgr, g_channels[a_ch].mgrId, 0 };
 			Visitor   visitor{ reinterpret_cast<void*>(g_channelMountVisorVt), &data };
-			g_outlineVisit(&visitor, root.get());
+			g_outlineVisit(&visitor, a_root);
 			return true;
 		}
 
@@ -11914,9 +11928,10 @@ namespace SAS
 
 		// 把引用挂到（或重申到）原生 outline 的 a_state 状态。
 		// ★★★ v5.0：a_ch = 自建通道号（ChannelMode=1 时用；0xFFFFFFFF = 不带通道信息）。
-		bool OutlineRef(RE::TESObjectREFR* a_ref, std::uint32_t a_state, std::uint32_t a_ch = 0xFFFFFFFFu)
+		bool OutlineRef(RE::TESObjectREFR* a_ref, std::uint32_t a_state,
+			std::uint32_t a_ch, RE::NiAVObject* a_root)
 		{
-			if (!g_state.nativeReady || !a_ref) {
+			if (!g_state.nativeReady || !a_ref || !a_root) {
 				return false;
 			}
 			// ★★★ v5.0：通道模式 —— 走自建通道（不读状态表、不碰引擎配色块）。
@@ -11926,7 +11941,7 @@ namespace SAS
 				if (!EnsureChannels() || a_ch >= kChannelCount) {
 					return false;
 				}
-				return OutlineRefViaChannel(a_ref, a_ch);
+				return OutlineRefViaChannel(a_root, a_ch);
 			}
 			// ↓↓↓ 旧路径（ChannelMode=0，或通道自动回退后）↓↓↓
 			// ★ 必须先确认管理器存在：SetOutlineState 内部会直接解引用
@@ -12129,6 +12144,7 @@ namespace SAS
 				budgetLimit = g_cfg.resyncBoostBudget;
 			}
 			std::uint32_t budget = budgetLimit;
+			const auto schedulePhase = g_state.outlineScheduleRound++ % 3;
 			g_state.opsThisScan  = 0;
 			g_state.opsDeferred  = 0;
 
@@ -12162,15 +12178,83 @@ namespace SAS
 				}
 			}
 
+			const auto reassert = static_cast<std::uint64_t>(g_cfg.reassertMs);
+			const auto nextMs = reassert ? a_nowMs + reassert : UINT64_MAX;
+			const auto apply = [&](Candidate* c) {
+				if (c->attempted || !c->root) {
+					return false;
+				}
+				if (budget == 0) {
+					++g_state.opsDeferred;
+					return false;
+				}
+				--budget;
+				++g_state.opsThisScan;
+				c->attempted = true;
+				auto it = g_state.outlined.find(c->ref);
+				if (it != g_state.outlined.end() && LedgerKeyOf(it->second) != LedgerKeyOf(*c)) {
+					UnoutlineRef(c->ref, it->second.channel);
+				}
+				if (!OutlineRef(c->ref, c->state, c->channel, c->root.get())) {
+					if (it != g_state.outlined.end()) {
+						g_state.outlined.erase(it);
+					}
+					return false;
+				}
+				auto& e = g_state.outlined[c->ref];
+				if (!e.ref) {
+					e.ref = RE::NiPointer<RE::TESObjectREFR>{ c->ref };
+				}
+				e.reassertMs = nextMs;
+				e.dropAt = 0;
+				e.state = c->state;
+				e.channel = c->channel;
+				e.cat = c->cat;
+				e.last3D = c->root.get();
+				e.lastVerifiedMs = a_nowMs;
+				return true;
+			};
+
+			std::vector<Candidate*> repairs;
+			std::size_t repairServiced = 0;
+			if (g_cfg.verify3DPerScan > 0) {
+				PhaseTimer t3D{ &g_state.t3DUs };
+				for (auto* c : a_chosen) {
+					const auto it = g_state.outlined.find(c->ref);
+					if (it == g_state.outlined.end()) {
+						continue;
+					}
+					++g_state.outline3DProbes;
+					if (c->root.get() != it->second.last3D) {
+						repairs.push_back(c);
+					}
+				}
+				std::sort(repairs.begin(), repairs.end(), [&](const Candidate* a, const Candidate* b) {
+					const auto ta = g_state.outlined.at(a->ref).lastVerifiedMs;
+					const auto tb = g_state.outlined.at(b->ref).lastVerifiedMs;
+					return ta != tb ? ta < tb : a->ref->GetFormID() < b->ref->GetFormID();
+				});
+				const auto repairQuota = budgetLimit == 1
+					? (schedulePhase == 0 ? 1u : 0u) : std::max(1u, budgetLimit / 4);
+				const auto repairLimit = std::min<std::size_t>(repairs.size(),
+					std::min<std::uint32_t>(static_cast<std::uint32_t>(g_cfg.verify3DPerScan), repairQuota));
+				for (; repairServiced < repairLimit; ++repairServiced) {
+					if (apply(repairs[repairServiced])) {
+						++g_state.outline3DReasserts;
+					}
+				}
+			}
+
 			// ---- 2) 到期的摘除（受预算限制）----
 			{
 				PhaseTimer tUnh{ &g_state.tUnhUs };
+				const auto removalFloor = budgetLimit == 1 && schedulePhase == 2 ? 1u : 0u;
 				for (auto it = g_state.outlined.begin(); it != g_state.outlined.end();) {
 					if (it->second.dropAt == 0 || a_nowMs < it->second.dropAt) {
 						++it;
 						continue;
 					}
-					if (budget == 0) {
+					if (budget <= removalFloor) {
 						++g_state.opsDeferred;  // 预算用完，下一轮继续
 						++it;
 						continue;
@@ -12181,12 +12265,6 @@ namespace SAS
 					it = g_state.outlined.erase(it);
 				}
 			}
-
-			// 重挂后「下次重申时刻」的公共计算（2.5 步与第 3 步共用）。
-			// ★ v4.0：状态不再是全局一个 —— 每个候选带自己的 state（分类分色，
-			//   由 Rescan 里的 ClassifyBase + g_cfg.stateByCategory 算好）。
-			const auto reassert = static_cast<std::uint64_t>(g_cfg.reassertMs);
-			const auto nextMs   = reassert ? a_nowMs + reassert : UINT64_MAX;
 
 			// ---- 2.5) ★★★ v4.29：状态变化优先（青 → 绿 / 绿 → 青）----
 			//   背景（用户实测：「植物和矿石的高亮速度明显低于其他物品」）：
@@ -12210,18 +12288,8 @@ namespace SAS
 						++g_state.opsDeferred;
 						break;
 					}
-					--budget;
-					++g_state.opsThisScan;
-					++changed;
-					UnoutlineRef(c->ref, it->second.channel);  // 先摘（否则两条通道各留一条 = 双层描边）
-					if (OutlineRef(c->ref, c->state, c->channel)) {
-						it->second.reassertMs = nextMs;
-						it->second.state      = c->state;
-						it->second.channel    = c->channel;  // ★ v5.0
-						it->second.cat        = c->cat;
-						it->second.last3D     = RefGet3D(c->ref).get();
-					} else {
-						it = g_state.outlined.erase(it);
+					if (apply(c)) {
+						++changed;
 					}
 				}
 				// 只在「优先换色」真的干活且量较大时留一行（免得刷日志）
@@ -12234,125 +12302,31 @@ namespace SAS
 			// ---- 3) 新目标 / 到重申时刻的（同样受预算限制）----
 			PhaseTimer tAdd{ &g_state.tAddUs };
 			for (auto* c : a_chosen) {
-				auto it = g_state.outlined.find(c->ref);
-				if (it == g_state.outlined.end()) {
-					if (budget == 0) {
-						++g_state.opsDeferred;
-						continue;
-					}
-					--budget;
-					++g_state.opsThisScan;
-					if (OutlineRef(c->ref, c->state, c->channel)) {
-						OutlineEntry e;
-						e.ref        = RE::NiPointer<RE::TESObjectREFR>{ c->ref };
-						e.reassertMs = nextMs;
-						e.state      = c->state;
-						e.channel    = c->channel;  // ★ v5.0：通道模式用
-						e.cat        = c->cat;  // ★ v4.25：让位保护按类别判断
-						// ★ v4.7：记下挂的时候的 3D 根（之后只要它变了就说明 3D 被重建过 ⇒
-						//   引擎侧那条登记已经丢了 ⇒ 见「4) 3D 复检」）
-						e.last3D = RefGet3D(c->ref).get();
-						g_state.outlined[c->ref] = std::move(e);
-					}
-				} else if (a_nowMs >= it->second.reassertMs || LedgerKeyOf(it->second) != LedgerKeyOf(*c)) {
-					// ★★★ v4.25：`it->second.state != c->state` 这一条是**必须的** ——
-					//   默认 `ReassertMs=0` 时 reassertMs 写成 UINT64_MAX（= 永不重申），
-					//   若只按时间判断，「星球目标刚被扫描完 ⇒ 该从青色换成绿色」这件事
-					//   就永远不会被应用（那条高亮会一直停在扫描前的状态）。
-					//   ⇒ 只要「想要的 state」与「挂着的 state」不一致就立刻走一次
-					//     摘 + 挂（走同一份每轮预算，不会突发）。
-					if (budget == 0) {
-						++g_state.opsDeferred;
-						continue;
-					}
-					--budget;
-					++g_state.opsThisScan;
-					// 状态 / 通道变了：先把旧的摘掉，
-					// 否则同一个引用会同时留在两个管理器里 ⇒ 两层描边。
-					if (LedgerKeyOf(it->second) != LedgerKeyOf(*c)) {
-						UnoutlineRef(c->ref, it->second.channel);
-					}
-					if (OutlineRef(c->ref, c->state, c->channel)) {
-						it->second.reassertMs = nextMs;
-						it->second.state      = c->state;
-						it->second.channel    = c->channel;  // ★ v5.0
-						it->second.cat        = c->cat;  // ★ v4.25
-						it->second.last3D     = RefGet3D(c->ref).get();  // ★ v4.7
-					} else {
-						// 挂不上（管理器又没了）：本轮撤账，下轮重新试
-						it = g_state.outlined.erase(it);
+				if (c->attempted) {
+					continue;
+				}
+				const auto it = g_state.outlined.find(c->ref);
+				if (it == g_state.outlined.end() || a_nowMs >= it->second.reassertMs ||
+					LedgerKeyOf(it->second) != LedgerKeyOf(*c)) {
+					apply(c);
+				}
+			}
+			if (budget > 0 && repairServiced < repairs.size()) {
+				PhaseTimer t3D{ &g_state.t3DUs };
+				const auto limit = std::min<std::size_t>(repairs.size(),
+					static_cast<std::size_t>(g_cfg.verify3DPerScan));
+				for (; repairServiced < limit && budget > 0; ++repairServiced) {
+					if (apply(repairs[repairServiced])) {
+						++g_state.outline3DReasserts;
 					}
 				}
 			}
-
-			// ================================================================
-			// ★★ v4.7：4) 3D 复检 —— 引擎把描边丢了就重挂
-			// ================================================================
-			// 背景（用户实测「星球表面地图上，原本已经高亮的物体突然不亮了」）：
-			//   描边是引擎按「3D 图节点」登记在 HighlightManager 里的（v2.3 实证：
-			//   摘除用的 0x653F60 那个 id 取自 **3D 图的叶子节点**，不是 FormID）。
-			//   外景走动时引擎会流式卸载 / 重建 3D（LOD ↔ 真模型互换就是最典型的），
-			//   重建之后管理器里那条登记就没了 —— 而我们的账本还记着「挂着」，
-			//   默认 `ReassertMs=0` 下**永远不会再 Set 一次** ⇒ 那个物体从此不亮，
-			//   直到它掉出半径再进来（这正是用户看到的「突然不亮」）。
-			//   与 v3.2 修的「用完扫描仪后全灭」是同一类问题：**账本与引擎侧脱节**，
-			//   只是那一次是整表被销毁（有管理器数量下跌这条判据），这一次是单条丢失
-			//   （管理器数量不变，任何全局判据都看不到）。
-			//
-			// 做法：每轮按游标复检 `Verify3DPerScan` 个**已挂**目标，
-			//   发现它的 3D 根指针与「挂的时候记下的」不一样（重建过 / 第一次加载出来）
-			//   就重新 Set 一次（同样走每轮预算）。
-			//   ★ 只比指针、**绝不解引用**记下的那个旧指针（3D 可能已经销毁）。
-			//   ★ 3D 现在是 null 就不动：看不见的东西本来就没描边，等它加载出来
-			//     指针自然会变，那时再挂。
-			//   ★ 成本：每轮最多 kVerify3DPerScan 次「取 3D」（虚调用 + 引用计数），
-			//     默认 32/轮 = 160/s，与每轮 5~40 条 Set/Remove 相比可以忽略。
-			//   诊断：统计行里的 `3D复检: probes=… reassert=…`（后者持续增长 = 这条
-			//   自愈在真的干活；用户下次报告里这两个数就是证据）。
-			if (g_state.nativeReady && g_cfg.verify3DPerScan > 0 && !a_chosen.empty()) {
-				// ★ 订正 R3：3D 复检（RefGet3D × Verify3DPerScan）耗时单列 ——
-				//   它原来是混在 tAdd 里的，而 RefGet3D 是**引擎虚调用**（不是纯内存读），
-				//   是 add 段 14ms 的主要候选来源（见 timing2 输出）。
-				PhaseTimer t3D{ &g_state.t3DUs };
-				const std::size_t total = a_chosen.size();
-				const std::size_t step  = std::min<std::size_t>(total, static_cast<std::size_t>(g_cfg.verify3DPerScan));
-				std::uint32_t     probed = 0;
-				for (std::size_t k = 0; k < step; ++k) {
-					const std::size_t idx = (g_state.verifyCursor + k) % total;
-					auto*             c   = a_chosen[idx];
-					auto              it  = g_state.outlined.find(c->ref);
-					if (it == g_state.outlined.end() || it->second.dropAt != 0) {
-						continue;  // 已经不在选中集合里（待摘的不要复活）
-					}
-					++probed;
-					auto root = RefGet3D(c->ref);
-					if (!root) {
-						continue;  // 3D 还没（重新）加载出来，等下一轮
-					}
-					const void* cur = root.get();
-					if (cur == it->second.last3D) {
-						continue;  // 3D 没变过 ⇒ 引擎侧那条登记还在，什么都不用做
-					}
-					if (budget == 0) {
-						++g_state.opsDeferred;
-						break;
-					}
-					--budget;
-					++g_state.opsThisScan;
-					if (OutlineRef(c->ref, c->state, c->channel)) {
-						it->second.last3D = cur;
-						++g_state.outline3DReasserts;
-						// 只打前 32 条 + 之后每 100 条一条（外景走动时可能很频繁，
-						// 免得把日志刷爆）；趋势看统计行的 `3D复检: reassert=` 就够。
-						if (g_state.outline3DReasserts <= 32 || g_state.outline3DReasserts % 100 == 0) {
-							REX::INFO("native outline: 3D 重建（ref={:08X} 状态 {}）-> 重挂一次"
-									  "（累计 {} 次；引擎侧描边按 3D 节点登记，重建即丢）",
-								c->ref->GetFormID(), c->state, g_state.outline3DReasserts);
-						}
-					}
+			for (auto* c : repairs) {
+				const auto it = g_state.outlined.find(c->ref);
+				if (it == g_state.outlined.end() || it->second.last3D != c->root.get()) {
+					++g_state.repairPending;
+					++g_state.opsDeferred;
 				}
-				g_state.outline3DProbes += probed;
-				g_state.verifyCursor = (g_state.verifyCursor + step) % total;
 			}
 		}
 
@@ -12626,6 +12600,7 @@ namespace SAS
 				//   遍历总量从 kRingRefsCap(60000) 降到 ≈ 总量 / RingSliceMaxRounds。
 				std::uint32_t             begin = 0;
 				std::uint32_t             count = 0;
+				std::vector<RE::TESObjectREFR*> known;
 			};
 			static std::array<ScanCell, 1 + kRingCellMax> scanCells;
 			std::size_t                                    cellCount = 0;
@@ -12703,7 +12678,7 @@ namespace SAS
 				scanCells[cellCount++] = ScanCell{ cell,
 					reinterpret_cast<RE::TESObjectREFR* const*>(arr.data),
 					0,  // ★ 订正 R3：当前 cell 不分片（玩家所在处每轮全扫）
-					std::min<std::uint32_t>(arr.size, kMaxRefsSanity) };
+					std::min<std::uint32_t>(arr.size, kMaxRefsSanity), {} };
 				// 当前 cell 进环（= 玩家真的在这里；「连续过渡」判据与「边界对面也扫」都靠它）
 				RingTouch(cell, a_nowMs, arr.size);
 			}
@@ -12776,7 +12751,7 @@ namespace SAS
 					}
 					scanCells[cellCount++] = ScanCell{ rc.cell,
 						reinterpret_cast<RE::TESObjectREFR* const*>(ringArr.data),
-						begin, take };
+						begin, take, {} };
 				}
 				RingTrimByRefs();
 			}
@@ -12796,11 +12771,12 @@ namespace SAS
 			const float fwdX     = std::sin(yaw) * kYawForwardSign;
 			const float fwdY     = std::cos(yaw);
 
-			static std::vector<Candidate>   cands;
+			std::vector<Candidate>          cands;
 			std::vector<Candidate*>         chosen;
-			cands.clear();
 			cands.reserve(512);
 			g_state.candTypes.fill(0);  // ★ v4.1：候选类型直方图只统计「最近一轮」
+			static std::unordered_set<RE::TESObjectREFR*> visited;
+			visited.clear();
 
 			// ★ v2.3：遍历 + 排序 + 挑选这一整段（纯内存读，理论上应该在 1ms 量级；
 			//   实测却是 30ms 上下，所以必须单独计时把它和形状校验分开看）。
@@ -12809,6 +12785,26 @@ namespace SAS
 				// ★ 订正 R3：loop 内「遍历引用 + 分类 + 距离」整段（**含**下面
 				//   tLoot / tFlora 两个子项；配合 refsWalkCur/Ring 判断是否遍历量问题）。
 				PhaseTimer tWalk{ &g_state.tWalkUs };
+
+			const auto nearbyTtl = static_cast<std::uint64_t>(g_cfg.ringSliceRoundsEff + 2) *
+				static_cast<std::uint64_t>(g_cfg.scanIntervalMs);
+			for (auto it = g_state.nearbyRefs.begin(); it != g_state.nearbyRefs.end();) {
+				auto& known = it->second;
+				auto* ref = known.ref.get();
+				auto* end = scanCells.data() + cellCount;
+				auto* sc = std::find_if(scanCells.data(), end,
+					[&](const ScanCell& candidate) { return candidate.cell == known.cell; });
+				if (sc == end || a_nowMs - known.seenMs >= nearbyTtl ||
+					ref->IsDeleted() || ref->IsDisabled() || ref->parentCell != known.cell ||
+					!(origin.GetSquaredDistance(ref->data.location) <= radius2)) {
+					it = g_state.nearbyRefs.erase(it);
+					continue;
+				}
+				if (sc != scanCells.data()) {
+					sc->known.push_back(ref);
+				}
+				++it;
+			}
 
 			// ★ v4.7：对「当前 cell + 环内 cell」逐个遍历（见上面 scanCells 的说明）。
 			//   每个 cell 只认**它自己**的引用（`ref->parentCell == sc.cell`）：
@@ -12840,7 +12836,8 @@ namespace SAS
 			}
 
 			g_state.stallCheckUs = NowUs();  // ★ 订正 R4：卡顿检测的起点
-			for (std::uint32_t j = 0; j < count; ++j) {
+			const auto visitCount = static_cast<std::size_t>(count) + sc.known.size();
+			for (std::size_t j = 0; j < visitCount; ++j) {
 				// ★★★ 订正 R4：**卡顿检测** —— 每 64 个引用取一次时刻；相邻两次的间隔
 				//   ≥ kStallThresholdUs(3ms) 就记一次。用途：把「我们的指令慢」与
 				//   「主线程被抢占 / 等内存（页错误）／卡在内核」分开 ——
@@ -12857,10 +12854,13 @@ namespace SAS
 					}
 					g_state.stallCheckUs = ts;
 				}
-				auto* ref = list[begin + j];
+				auto* ref = j < count ? list[begin + j] : sc.known[j - count];
 				// 全部是纯内存读，零引擎调用
 				if (!ref || !IsPlausiblePointer(reinterpret_cast<std::uint64_t>(ref))) {
 					continue;
+				}
+				if (j >= count) {
+					++g_state.nearbyReused;
 				}
 				if (ref == a_player || ref->IsDeleted() || ref->IsDisabled() || ref->IsPlayerRef()) {
 					++g_state.skipDeleted;
@@ -12873,7 +12873,7 @@ namespace SAS
 				// ★ 先判距离再判类型：这样「白名单没通过」的统计只在半径内做，
 				//   日志里的类型统计才是有意义的（否则满屏都是墙和地形的类型）。
 				const float d2 = origin.GetSquaredDistance(ref->data.location);
-				if (d2 > radius2) {
+				if (!(d2 <= radius2) || !visited.insert(ref).second) {
 					continue;
 				}
 
@@ -12899,6 +12899,16 @@ namespace SAS
 				if (!g_cfg.categoryEnabled[static_cast<std::size_t>(cat)]) {
 					++g_state.disabledSkips;
 					continue;
+				}
+				if (j < count) {
+					auto known = g_state.nearbyRefs.find(ref);
+					if (known != g_state.nearbyRefs.end()) {
+						known->second.cell = sc.cell;
+						known->second.seenMs = a_nowMs;
+					} else if (g_state.nearbyRefs.size() < kRingRefsCap) {
+						g_state.nearbyRefs.emplace(ref, State::NearbyRef{
+							RE::NiPointer<RE::TESObjectREFR>{ ref }, sc.cell, a_nowMs });
+					}
 				}
 				// ★★★ v4.23：举着扫描仪时，**星球扫描目标（「植物」= FLOR）让位原版** ——
 				//   它们用的是 state 7（原版 `TargetScannable`），引擎此刻正在往这个
@@ -13098,6 +13108,7 @@ namespace SAS
 				//   带缓存；举着扫描仪时这一段根本走不到（上面已经 yield 掉了）。
 				//   ⇒ 放下扫描仪之后：扫过的 = 绿、没扫过的 = 青，与原版一致。
 				const bool floraJudgeOn =
+					(g_cfg.floraEngineProgress && g_floraProgressReady) ||
 					(g_cfg.floraScannedByEngineState && g_scannableOutlineStateReady) ||
 					(g_cfg.floraScannedByResource && g_isResourceScannedReady);
 				if (cat == static_cast<int>(Category::kFlora) && floraJudgeOn) {
@@ -13137,6 +13148,11 @@ namespace SAS
 			for (auto& c : cands) {
 				if (chosen.size() >= static_cast<std::size_t>(g_cfg.maxTargets)) {
 					break;
+				}
+				c.root = RefGet3D(c.ref);
+				if (!c.root) {
+					++g_state.no3DSkips;
+					continue;
 				}
 				chosen.push_back(&c);
 			}
@@ -13480,6 +13496,12 @@ namespace SAS
 					g_state.streamMoves,
 					g_state.outline3DProbes, g_state.outline3DReasserts,
 					g_state.moveMeters);
+				REX::INFO("  discovery (订正 R19): nearby={} 跨片复用={} 无3D跳过={} 待修复={}（窗口累加；无3D不占名额/预算）",
+					g_state.nearbyRefs.size(), g_state.nearbyReused,
+					g_state.no3DSkips, g_state.repairPending);
+				g_state.nearbyReused = 0;
+				g_state.no3DSkips = 0;
+				g_state.repairPending = 0;
 				g_state.skipOff        = 0;
 				g_state.skipThrottle   = 0;
 				g_state.skipLoading    = 0;
@@ -13759,7 +13781,9 @@ namespace SAS
 						avg(g_state.tShapeUs), g_state.tShapeMaxUs / 1000,
 						g_state.scanFullSamples ? (g_vqCalls - g_state.vqCalls) / g_state.scanFullSamples : 0,
 						avg(g_state.tLoopUs), g_state.tLoopMaxUs / 1000,
-						avg(g_state.refsWalkCur), avg(g_state.refsWalkRing), avg(g_state.ringSliceDeferred),
+						g_state.scanFullSamples ? g_state.refsWalkCur / g_state.scanFullSamples : 0,
+						g_state.scanFullSamples ? g_state.refsWalkRing / g_state.scanFullSamples : 0,
+						g_state.scanFullSamples ? g_state.ringSliceDeferred / g_state.scanFullSamples : 0,
 						avg(g_state.tWalkUs), avg(g_state.tLootUs), avg(g_state.tFloraUs),
 						avg(g_state.tSyncUs), g_state.tSyncMaxUs / 1000,
 						avg(g_state.tUnhUs), avg(g_state.tAddUs), avg(g_state.t3DUs));
