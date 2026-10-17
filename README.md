@@ -1,6 +1,6 @@
 # Always Scan — Always-On Scanner Highlighting (SFSE)
 
-**Nexus Mods:** <https://www.nexusmods.com/starfield/mods/18268> · **Release:** 2.0.1 (plugin build 5.1.0)
+**Nexus Mods:** <https://www.nexusmods.com/starfield/mods/18268> · **Release:** 2.0.2 (plugin build 5.1.0)
 
 Keep the vanilla scanner highlight on at all times — no need to hold the handheld scanner up. Every object inside a configurable radius (default **50 m**, not just the centre circle) is outlined using the game's own outline system, colour-coded by category.
 
@@ -91,7 +91,7 @@ tr/            localization tooling & workspace used while researching third-par
 crash-reports/ crash-dump analysis notes
 ```
 
-Versioning: the Nexus release version (currently **2.0.1**) and the plugin's internal build number (currently **5.1.0**) are bumped manually, per release.
+Versioning: the Nexus release version (currently **2.0.2**) and the plugin's internal build number (currently **5.1.0**) are bumped manually, per release.
 
 ## Credits
 

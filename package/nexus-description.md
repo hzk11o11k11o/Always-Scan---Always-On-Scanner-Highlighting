@@ -19,10 +19,10 @@
 | --- | --- |
 | **Mod name** | `Always Scan - Always-On Scanner Highlighting (SFSE)` |
 | **Summary**（约 250 字符以内） | `Keep the scanner highlight on at all times. No need to hold the handheld scanner: everything inside a configurable radius gets the vanilla outline, color-coded by category. Full-radius highlighting, one toggle hotkey, fully configurable via INI. SFSE plugin.` |
-| **Version** | `2.0.1`（引擎 build 5.1.0；Nexus 上的 1.0 → … → 1.8.1 → 2.0 → **2.0.1**。★ 2026-09-28 **2.0.1 = 配色需求更新版**：**黄 = 开锁器 / 信用币（新增类别）**、**品红 = 门**、**电脑 / 按钮等可互动物品（设备）退回 2.0 = 原版绿（与弹药 / 救援同色）** —— 自建通道 13 → 14，公开版日志仍默认完全关闭；★ 同日三轮配色修订：白 → 品红 #FF3BD4（选色：313° 落在「紫 269° → 红 0°」空档正中，与紫 / 红各拉开 ~44° / ~47°），最终定稿把「电脑 / 按钮」放回 2.0 的原版绿（第一 / 二轮曾与门同色：白 → 品红）。★ 同日再补一项修复：**地上的「信用条」其实是 FLOR 记录**（`Loot_CredStick_*`），以前被当成「植物 / 星球目标」画青色 ⇒ 现已并入黄组（英文 (17) / 中文 ⑰）。★ 2026-10-03 **再补一项修复：空的展示柜（EMPTY 版 / 已拿空的武器箱）打开确认没东西后也会熄灭** —— 原先「拿空即灭」的三条判据都要求「曾见内容」，本来就空的箱子一条都命不中 ⇒ 永久亮（英文 (18) / 中文 ⑱）。★ 同日**再补一项（行为修复）：机器人搜刮拿空后仍高亮（偶发）** —— 机器人的**手臂炮**是身体部件（无模型虚拟武器、面板不显示 / 拿不走），但数据里**漏标**了 Non-Playable ⇒ 判空把它们算作「有东西」；现已忽略这类虚拟武器（离线穷举**全部 14 条**：12 条 `crModelA_*` + 2 条虚拟武器），新 INI 键 `SkipBuiltinLoot`（默认 1）（英文 (19) / 中文 ⑲）。★ 同日**再补一项（行为修复）：展示柜「已确认拿空」跨场景粘性** —— 治「武器箱/武器柜似乎在玩家远离后，又会重新亮起」（粘性原先只存在指针键判决表里、换场景 / 引用重建即丢；现改为额外登记 **FormID 键**粘性表：过门 / 快速旅行 / 换 cell 后再回来**保持熄灭**，放回东西 / 再读到内容即自愈），同一轮把空箱判据确认窗口 2000 → **3000 毫秒**（日志实证投影可晚到 2.13 秒）（英文 (20) / 中文 ⑳）。2.0 的 16 项修复见英文 Version history (1)~(16) 与中文 ①~⑮） |
+| **Version** | `2.0.2`（引擎 build 5.1.0；Nexus 上的 1.0 → … → 2.0 → 2.0.1 → **2.0.2**。★ 2026-10-17 **2.0.2 = 两项玩家报告修复**：**室外矿石 / 植物的高亮延迟**（跨片候选保留、模型就绪后才占名额、修复预算公平轮转）、**展示柜 / 武器架拿空后仍高亮**（快速面板事件改在主线程按 FormID 解析、满表替换最久未交互项、判空计时独立于切换）；无新 INI 键，颜色 / 14 条通道 / ESM / Papyrus 未变。★ 2026-09-28 **2.0.1 = 配色需求更新版**：**黄 = 开锁器 / 信用币（新增类别）**、**品红 = 门**、**电脑 / 按钮等可互动物品（设备）退回 2.0 = 原版绿（与弹药 / 救援同色）** —— 自建通道 13 → 14，公开版日志仍默认完全关闭；★ 同日三轮配色修订：白 → 品红 #FF3BD4（选色：313° 落在「紫 269° → 红 0°」空档正中，与紫 / 红各拉开 ~44° / ~47°），最终定稿把「电脑 / 按钮」放回 2.0 的原版绿（第一 / 二轮曾与门同色：白 → 品红）。★ 同日再补一项修复：**地上的「信用条」其实是 FLOR 记录**（`Loot_CredStick_*`），以前被当成「植物 / 星球目标」画青色 ⇒ 现已并入黄组（英文 (17) / 中文 ⑰）。★ 2026-10-03 **再补一项修复：空的展示柜（EMPTY 版 / 已拿空的武器箱）打开确认没东西后也会熄灭** —— 原先「拿空即灭」的三条判据都要求「曾见内容」，本来就空的箱子一条都命不中 ⇒ 永久亮（英文 (18) / 中文 ⑱）。★ 同日**再补一项（行为修复）：机器人搜刮拿空后仍高亮（偶发）** —— 机器人的**手臂炮**是身体部件（无模型虚拟武器、面板不显示 / 拿不走），但数据里**漏标**了 Non-Playable ⇒ 判空把它们算作「有东西」；现已忽略这类虚拟武器（离线穷举**全部 14 条**：12 条 `crModelA_*` + 2 条虚拟武器），新 INI 键 `SkipBuiltinLoot`（默认 1）（英文 (19) / 中文 ⑲）。★ 同日**再补一项（行为修复）：展示柜「已确认拿空」跨场景粘性** —— 治「武器箱/武器柜似乎在玩家远离后，又会重新亮起」（粘性原先只存在指针键判决表里、换场景 / 引用重建即丢；现改为额外登记 **FormID 键**粘性表：过门 / 快速旅行 / 换 cell 后再回来**保持熄灭**，放回东西 / 再读到内容即自愈），同一轮把空箱判据确认窗口 2000 → **3000 毫秒**（日志实证投影可晚到 2.13 秒）（英文 (20) / 中文 ⑳）。2.0 的 16 项修复见英文 Version history (1)~(16) 与中文 ①~⑮） |
 | **Category** | `Gameplay`（Alternate suggestion: `Items and Objects - Gameplay`） |
 | **Requirements（依赖）** | `Starfield Script Extender (SFSE) 0.2.21+`、`(1.16.244.0) SFSE Address Library`、游戏版本 `1.16.244.0` |
-| **主文件（Main file）** | `StarfieldAlwaysScan-2.0.1.zip` |
+| **主文件（Main file）** | `StarfieldAlwaysScan-2.0.2.zip` |
 | **Permissions** | 允许转载需注明出处？建议：**不得重新上传（No re-uploading）**；允许个人修改（源码已含 Papyrus 部分） |
 
 ---
@@ -183,7 +183,13 @@ At startup the log prints the active config and whether the native outline funct
 
 ### Version history
 
-*(This release is **2.0.1** — the build number inside the plugin is 5.1.0. The list below uses the plugin's internal build numbers where an older release is concerned.)*
+*(This release is **2.0.2** — the build number inside the plugin is 5.1.0. The list below uses the plugin's internal build numbers where an older release is concerned.)*
+
+- **2.0.2** *(plugin build 5.1.0)* — **Two more fixes, both from player reports: outdoor targets that took too long to light up, and display cases / weapon racks you had already looted empty lighting up again while you checked several of them in a row.** No new INI keys; the colours (fourteen channels), the ESM, Papyrus and every INI option are unchanged. Details in (22) and (23) below.
+
+**(22) "Ores and plants outdoors take a while to get highlighted — or light up late while I move."** (reported 2026-10-15) Outdoors the mod walks the cells around you in slices (a fraction of each cell per pass, so a whole area can be covered without one long stall). But the list of targets to handle was rebuilt from scratch every pass with only the current slice, so anything found in a slice lost its pending work when the rotation moved on; the per-pass target cap was filled **before** the 3D model check, so references whose model had not streamed in yet burned the budget while drawable objects waited; and the "restore a lost outline" pass looked at only a fixed window of the candidate list, which could keep landing on the same slice. In practice, moving through an area full of ore / plants, a target could wait for several rotations, and freshly streamed targets stayed late. Targets found in any slice are now kept alive across slices (reference-counted, re-validated every pass for distance, deletion, category, NPC exclusion, looted state, field of view, scanner hand-off and colour; dropped when they leave the radius, are invalidated or the scene resets), de-duplicated, and sorted by distance **before** their 3D is fetched — no model means no target slot and no mount budget, and the next pass retries as soon as the model is ready. Mounting, recolouring and re-asserting an outline now share one per-pass budget, with a share reserved for repairs and a fair rotation, so an object never waits for the slice to come round again. Everything else — colours, categories, loot checks — is unchanged; the log line `discovery (订正 R19)` reports the cross-slice cache.
+
+**(23) "I check several weapon cases / racks in a row, and the ones I already looted empty stay highlighted."** (reported 2026-10-17) Display cases (weapon cases, weapon racks, helmet / backpack displays) only list their contents while the panel is open, so the mod watches them per frame. That watch table holds at most 12 entries, and the fast-loot panel events (open / take / put) used to be handled **only** for targets that were already in the table: once 12 cases or containers had been seen, a new case's events were silently dropped, and entries were never aged out by distance, so old ones could occupy the table for good. On top of that, switching to another case cleared the pending "empty" evidence, and re-opening the same one reset its clock — while the empty verdict needs 3000 ms of continuous reads. Checking several empty racks in a row therefore kept cancelling the confirmation, and they stayed lit. Now the event only carries the address / record id and time; the main thread resolves it through the game's own record lookup, re-checking the address, record type, deleted / disabled state, cell and distance, and a target no longer has to be in the table already. The table keeps 12 interactive targets (range 20 m, inside the scan radius); when it is full the oldest interaction is replaced, and passive scanning can never push out the case you are using. The empty-case clock is independent: switching to another case or re-opening one no longer cancels it — only taking / putting an item or seeing contents does. An unreadable read pauses the clock instead of counting as empty (the case then stays lit, the conservative choice), and 3000 ms of continuous valid empty reads after the opening is still required before the verdict. Verified-empty verdicts are still remembered by record id across scene changes (the 2.0.1 fix). Nothing to configure.
 
 - **2.0.1** *(plugin build 5.1.0)* — **Colour layout update** (requested): **digipicks and credits are yellow** — they now have a category of their own (they used to be plain "misc" blue; the game stores them as three item records, recognised by record id because they carry no keyword of their own) — and **computers / terminals / buttons share the doors' colour**, so "doors, computers, buttons and every other interactive object are one group" (that group is **magenta** since the 2026-09-28 colour revision; it was white when 2.0.1 was first built). The mod now carries **fourteen** own colour channels (thirteen categories plus one for surveyed plants) instead of thirteen; every other colour is unchanged and the 2.0 design (own channels, no writes into the game's outline states or colour blocks) is untouched. Both new colours are channel-mode features: on the old fallback path (`ChannelMode=0`) digipicks / credits fall back to the misc blue, and devices share the door's state (magenta since the 2026-09-28 colour revision; white before that). **Fixed the same day:** the loose credit sticks you pick up for money stayed **cyan** and never turned yellow — they are not "misc" items at all: the game stores them as **flora** records (`Loot_CredStick_Small / Common / Rare`, records 0x3CC32C / 0x3CC325 / 0x3CC32A), so the mod had been treating them as planet targets (cyan, run through the surveyed / not-surveyed logic). They are now recognised by record id inside the flora branch as well and join the yellow category.
 
@@ -260,6 +266,24 @@ Built with **SFSE** and **CommonLibSF**. Huge thanks to their authors and to eve
   **植物 / 矿脉 / 气泉 / 液池（原版青色脉冲 = 未扫描；扫描完成后 = 原版绿 ——
   这四个槽位的颜色 MOD 一个字节都不改；**背不背扫描仪都一样**，见下）**；
   **NPC / 普通目标（原版青 / 亮青 —— 一个字节都不写，1.7.8 起）**；
+- **★★★ 2.0.2（引擎 5.1.0）：两项玩家报告修复（2026-10-17）**（英文 (22) / (23)）——
+  ① **室外矿石 / 植物高亮延迟**（2026-10-15）：室外环内 cell 是分片遍历的，旧实现每轮只用
+  当前这一片的候选重建待办 ⇒ 上一片发现的目标在轮换后直接失去处理机会；每轮的
+  `MaxTargets` 又在检查 3D 模型**之前**就选满 ⇒ 模型还没流式加载的引用白白吃掉预算；
+  「恢复丢失描边」的复检下标窗口也可能与分片锁相。现在：任一片发现的目标**跨片保活**
+  （引用计数、逐轮复核距离 / 删除 / 类别 / 活人排除 / 搜空 / FOV / 扫描仪让位 / 颜色；
+  超距、失效、换场景即淘汰）、去重、**按距离排序后才取 3D**（无模型 = 不占名额、不扣预算，
+  模型就绪后下一轮即重试）；挂载 / 换色 / 重申共用一个每轮预算，并为修复保留份额、公平轮转
+  ⇒ 不再等下一片。日志新增 `discovery (订正 R19)`。
+  ② **展示柜 / 武器架拿空后仍高亮**（2026-10-17）：快速面板的打开 / 拿放事件过去只处理
+  「已经在逐帧观察表里」的目标 —— 表只有 12 项、满了就丢新目标，而且没有按距离淘汰；
+  切换到别的架子又会清掉尚未完成的空箱确认，重复打开同一目标还会重置计时（判空需要
+  连续有效读空 3000 毫秒）⇒ 连续检查几个已空的架子总是把确认取消掉。现在事件只带地址 /
+  FormID / 时间，主线程按引擎自己的记录查询解析，并复核地址、REFR / CONT 类型、删除 / 禁用、
+  parentCell 和距离；表满时替换最久未交互项，被动扫描挤不掉正在交互的目标；空箱计时独立，
+  切换 / 重开不再取消，只有拿走 / 放入或读到内容才取消；读不出来只暂停计时（保持亮，保守），
+  仍需打开后连续有效读空满 3000 毫秒才判空。已确认拿空的 FormID 粘性照旧跨场景生效。
+  ★ 两项修复**都没有新增 INI 键**；颜色 / 14 条通道 / ESM / Papyrus 一字未动。
 - **★★★ 2.0.1（引擎 5.1.0）：配色需求更新版（2026-09-28）** ——
   **黄 = 开锁器 / 信用币**（新增类别：三条记录按 FormID 识别 —— `Digipick` 0xA /
   `Credits` 0xF / `FFNeonZ03_Credits` 0xA7312，离线取证显示它们没有专用关键词；

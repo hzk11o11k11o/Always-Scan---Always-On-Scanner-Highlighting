@@ -3,7 +3,45 @@
  Always-on scanner highlighting for Starfield
 ========================================================================
 
-Version  : 2.0.1  (plugin build 5.1.0)
+Version  : 2.0.2  (plugin build 5.1.0)
+           2.0.2 = two fixes, both from player reports (no new INI keys):
+             * fixed (2026-10-15): ores, plants and other outdoor targets could
+               take seconds to get their outline - or keep losing it - while you
+               moved through an area. The surrounding cells are walked in
+               slices (a fraction of each cell per pass); targets found in a
+               slice lost their pending work as soon as the slice rotated on,
+               the per-pass target cap was filled before the model check (a
+               reference whose 3D had not streamed in yet burned the budget),
+               and the "restore the outline" pass could lock onto the same
+               slice again and again. Targets found in any slice are now kept
+               for a short while (re-checked every pass for distance,
+               deletion, category, NPC / looted / field-of-view / scanner
+               hand-off and colour; dropped when they leave the radius or the
+               scene changes), are sorted by distance before their 3D is
+               fetched (no model = no slot, no budget) and are retried on the
+               next pass once the model is ready. Mounting, recolouring and
+               re-asserting an outline now share one budget with a reserved
+               share for repairs, so an object no longer waits for a later
+               slice. New debug line `discovery (订正 R19): nearby=...`.
+             * fixed (2026-10-17): weapon cases, weapon racks and helmet /
+               backpack displays you had just looted empty kept their outline
+               when you checked several of them in a row. Two reasons: the
+               fast-loot panel events were only processed for targets that were
+               already inside the mod's 12-entry per-frame watch table (a full
+               table silently dropped the new case, and old entries were never
+               dropped), and switching to another case - or opening the same
+               one again - cancelled the pending "empty" confirmation (which
+               needs 3 s of continuous empty reads). The events are now
+               resolved on the main thread by record id (address, record type,
+               deleted / disabled state, cell and distance are re-checked), a
+               full table replaces its oldest interaction instead of dropping
+               the new case, and switching cases or re-opening one no longer
+               cancels the pending confirmation. A case needs 3000 ms of
+               continuous valid empty reads after it was opened; an unreadable
+               read pauses that clock instead of counting as empty, and taking
+               or putting an item (or seeing contents) cancels the verdict.
+               Confirmed-empty verdicts stay remembered by record id across
+               scene changes.
            2.0.1 = colour layout update (one category added):
              * NEW - digipicks and credits are their own category now and are
                highlighted YELLOW (they used to be plain "misc" blue). The

@@ -455,7 +455,11 @@ if (-not $SkipDeploy) {
     #     ⑤ `仍在攒样本` 行换新口径（胜场 / 反证 / 不同引用 / 弱票 / 形状坏 / 中性）+
     #     末轮样本 `st=候选A/候选B` 分档字母。核对脚本 `tools/re/check_dll_r18.py`；
     #     完整证据链 / 改动表 / 验收判据见 docs/57。
-    Set-Content -LiteralPath (Join-Path $modRoot 'meta.ini') -Value "[General]`nmodid=18268`nversion=2.0.1`ncomment=Always-on scanner highlighting (SFSE)" -Encoding UTF8
+    #   ★★★★★★★ 2026-10-17 发布版 2.0.2（用户通知：**发布版号 → 2.0.2**；DLL build 仍 5.1.0）：
+    #     R19 室外高亮延迟（跨片候选保留 / 模型就绪过滤 / 公平修复）+ R20 展示柜
+    #     拿空仍高亮（事件改主线程按 FormID 解析、观察表替换与独立判空计时）。
+    #     详细记录见 docs/99 顶部两段；颜色 / 通道数（14）/ ESM / Papyrus / 有效配置未变。
+    Set-Content -LiteralPath (Join-Path $modRoot 'meta.ini') -Value "[General]`nmodid=18268`nversion=2.0.2`ncomment=Always-on scanner highlighting (SFSE)" -Encoding UTF8
 
     Get-ChildItem -LiteralPath $modRoot -Recurse -File | ForEach-Object {
         Write-Host ("  {0}  ({1} bytes)" -f $_.FullName.Substring($modRoot.Length + 1), $_.Length)
