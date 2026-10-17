@@ -36,7 +36,7 @@ out/backup-*/
 out/tmp/
 
 # out/ 下其余都是「逆向/调试中间产物」（反汇编 dump、字符串 dump …），
-# 含 out/tests/ 中回归测试生成的 C++ / obj / exe，可由 tools/re 脚本重跑，不入库
+# 含 out/tests/ 中高亮调度、展示架判空回归生成的 C++ / obj / exe，可由 tools/re 脚本重跑，不入库
 out/
 
 # Nexus 发布包（可由 tools/package-nexus.ps1 随时重新生成）

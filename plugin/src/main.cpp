@@ -527,6 +527,8 @@ SFSE_PLUGIN_LOAD(const SFSE::LoadInterface* a_sfse)
 		SFSE::GetSFSEVersion());
 	REX::INFO("订正 R19：室外高亮调度修复（跨片保留附近引用；无3D不占目标名额/挂载预算；"
 			  "模型变化逐轮检测、公平优先修复；版本号不变）");
+	REX::INFO("订正 R20：空展示架高亮修复（搜刮事件按引用身份接入、交互目标优先观察；"
+			  "切换目标保留空箱确认，见到物品立即取消；版本号不变）");
 
 	if (auto* messaging = SFSE::GetMessagingInterface()) {
 		messaging->RegisterListener(OnMessage);

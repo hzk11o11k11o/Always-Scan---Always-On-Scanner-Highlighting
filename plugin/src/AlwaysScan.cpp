@@ -2374,23 +2374,17 @@ namespace SAS
 			};
 			struct DisplayCaseVerdict
 			{
+				std::uint32_t refFid       = 0;
 				std::uint8_t  lastKnown    = 0;
 				std::uint64_t lastTpSerial = 0;
 				// ★ v4.13
 				DcSnap        snap{};
 				std::uint64_t quickOpenMs      = 0;
+				std::uint64_t noContentOpenMs  = 0;
 				bool          sawTakeEvt       = false;
 				std::uint64_t emptySinceMs     = 0;
 				std::uint32_t evtLogs          = 0;   // 该 ref 已写的事件日志条数（限流）
-				// ★ v4.14：**这一段打开期里读到过内容**（打开时清零、读到「有东西」时置位）
-				//   —— 兜底判据必须要有它：否则「面板刚打开、投影还没建立」的那一瞬
-				//   （关闭状态库存本来就空）会被当成「连续读到空」⇒ 误判拿空。
-				//   实测证据见常量区「v4.13」尾部的 v4.14 段（2026-09-19 那一局的
-				//   `display case emptied (兜底…)` 就是它误判出来的）。
-				//   ★★★ 订正 R15（v5.3）：它也是**空箱判据**的另一半 —— 反过来用：
-				//   `sawContentInSession == false` + `quickOpenMs != 0`（打开过）
-				//   ⇒ 打开后一直无内容 ⇒ 本来就空的展示柜 ⇒ 判空（见
-				//   `DisplayCaseReadsEmpty` 判据 ④ 与 docs/54）。
+				// 本段或历史尚未确认拿空的占用证据；新段从 lastKnown 恢复，不能因重开遗忘。
 				bool          sawContentInSession = false;
 			};
 			std::unordered_map<const RE::TESObjectREFR*, DisplayCaseVerdict> displayCaseVerdict;
@@ -2503,7 +2497,8 @@ namespace SAS
 			//   每帧读一次它的库存 ⇒ 把「拿空 ⇒ 立刻关掉」的观测窗口从 200ms 缩到 1 帧。
 			struct DcWatch
 			{
-				const RE::TESObjectREFR* ref      = nullptr;
+				RE::NiPointer<const RE::TESObjectREFR> ref;
+				std::uint64_t           lastEventMs = 0;
 				std::uint32_t           miss      = 0;  // 连续形状不对的帧数（到上限就踢）
 				int                     lastLoot  = -2;  // 上一帧的 loot（-2 = 还没有基线）
 				bool                    lastTp    = false;  // 上一帧见到投影条目没有
@@ -4070,12 +4065,16 @@ namespace SAS
 					return RE::BSEventNotifyControl::kContinue;
 				}
 				std::uint64_t refPtr = 0;
-				if (!SafeReadMem(&a_event, &refPtr, sizeof(refPtr))) {
+				std::uint32_t refFid = 0;
+				if (!SafeReadMem(&a_event, &refPtr, sizeof(refPtr)) || !LooksLikeLiveRef(refPtr) ||
+					!SafeReadMem(reinterpret_cast<const void*>(refPtr + kOffFormID), &refFid, sizeof(refFid)) ||
+					refFid == 0) {
 					g_lootEvtBad.fetch_add(1, std::memory_order_relaxed);
 					return RE::BSEventNotifyControl::kContinue;
 				}
 				LootEvtRec rec{};
 				rec.kind   = static_cast<std::uint8_t>(LootEvtKind::kQuickOpen);
+				rec.refFid = refFid;
 				rec.refPtr = refPtr;
 				rec.ms     = NowMs();
 				PushLootEvt(rec);
@@ -6811,14 +6810,21 @@ namespace SAS
 		//   绝不会崩 —— 换场景时也会清）。
 		State::DisplayCaseVerdict& DisplayCaseVerdictFor(const RE::TESObjectREFR* a_ref)
 		{
+			const auto fid = a_ref ? a_ref->GetFormID() : 0;
 			auto it = g_state.displayCaseVerdict.find(a_ref);
 			if (it != g_state.displayCaseVerdict.end()) {
+				if (it->second.refFid != fid) {
+					it->second = {};
+					it->second.refFid = fid;
+				}
 				return it->second;
 			}
 			if (g_state.displayCaseVerdict.size() >= kDisplayCaseVerdictMax) {
 				g_state.displayCaseVerdict.clear();
 			}
-			return g_state.displayCaseVerdict.emplace(a_ref, State::DisplayCaseVerdict{}).first->second;
+			auto& ds = g_state.displayCaseVerdict.emplace(a_ref, State::DisplayCaseVerdict{}).first->second;
+			ds.refFid = fid;
+			return ds;
 		}
 
 		// ★ v4.10：展示柜读到「有东西」时更新状态：记「有东西」+ 刷新「这一段打开期」。
@@ -6842,6 +6848,7 @@ namespace SAS
 			ds.lastKnown = 1;
 			// ★ v4.14：这一段打开期里确实读到过内容（兜底判据的前置证据，见字段注释）
 			ds.sawContentInSession = true;
+			ds.noContentOpenMs = 0;
 			if (a_sawTemporary) {
 				ds.lastTpSerial = g_state.containerUiSerial;
 			}
@@ -6921,8 +6928,11 @@ namespace SAS
 			if (it == g_state.displayCaseVerdict.end()) {
 				return kDcEmptyNone;  // 从没见过它的投影 ⇒ 未知 ⇒ 照常亮
 			}
-			const auto& ds  = it->second;
-			const auto  now = a_nowMs ? a_nowMs : NowMs();
+			const auto& ds = it->second;
+			if (!a_ref || ds.refFid != a_ref->GetFormID()) {
+				return kDcEmptyNone;
+			}
+			const auto now = a_nowMs ? a_nowMs : NowMs();
 			if (ds.lastKnown == 2) {
 				return kDcEmptySticky;  // ① 粘性：已确认拿空（关掉后仍保持熄灭）
 			}
@@ -6940,19 +6950,10 @@ namespace SAS
 				(now - ds.emptySinceMs) >= kDcEmptyConfirmMs) {
 				return kDcEmptyFallback;
 			}
-			// ④ ★★★ 订正 R15：空箱判据（完整推导见 Config::displayCaseEmptyNoContentMs 与 docs/54）
-			//   · `quickOpenMs != 0`  = 快速面板**为用户打开过**（有证据才判，绝不猜）；
-			//   · `!sawContentInSession` = 打开后**一直没见到内容**（有内容必有投影，
-			//     投影建立只需 0.4~0.7 秒 << N）；见到过 ⇒ 交给记账 / ③，绝不在这里灭；
-			//   · `!sawTakeEvt`       = 没收到过拿走事件（收到过 ⇒ 箱里曾有东西 ⇒ 同上）；
-			//   · `emptySinceMs != 0 && >= quickOpenMs` = 当前处于「连续读到空」，
-			//     且空窗口起点在打开之后（防拿旧状态当依据）；
-			//   · `now - quickOpenMs >= N` = 从打开起已观察满 N 毫秒（默认 2000ms）。
-			//   ★ 唯一的误灭面（有内容 + 打开后 <0.7s 就关掉）已在 Config 注释如实记录。
-			if (g_cfg.displayCaseEmptyNoContentMs > 0 && ds.quickOpenMs != 0 &&
-				!ds.sawTakeEvt && !ds.sawContentInSession &&
-				ds.emptySinceMs != 0 && ds.emptySinceMs >= ds.quickOpenMs &&
-				now - ds.quickOpenMs >= static_cast<std::uint64_t>(g_cfg.displayCaseEmptyNoContentMs)) {
+			if (g_cfg.displayCaseEmptyNoContentMs > 0 && ds.noContentOpenMs != 0 &&
+				!ds.sawTakeEvt && !ds.sawContentInSession && ds.lastKnown == 0 &&
+				ds.emptySinceMs >= ds.noContentOpenMs && now >= ds.emptySinceMs &&
+				now - ds.emptySinceMs >= static_cast<std::uint64_t>(g_cfg.displayCaseEmptyNoContentMs)) {
 				return kDcEmptyNoContent;
 			}
 			return kDcEmptyNone;
@@ -7008,21 +7009,38 @@ namespace SAS
 		// 快速面板打开 ⇒ 给该 ref 记 `quickOpenMs`，并把**别的** ref 的会话清掉
 		//   （同一时刻只有一个搜刮面板）⇒ 兜底判据只在「就是它」时才可能生效。
 		// ================================================================
-		const RE::TESObjectREFR* FindWatchedRefByFid(std::uint32_t a_fid, std::size_t* a_outIdx = nullptr)
+		void DcWatchAdd(const RE::TESObjectREFR* a_ref, float a_distSq, std::uint64_t a_eventMs = 0);
+
+		RE::NiPointer<const RE::TESObjectREFR> ResolveDisplayCaseEvent(const LootEvtRec& a_rec)
 		{
-			if (a_fid == 0) {
-				return nullptr;
+			if (a_rec.refFid == 0 || !g_cfg.skipEmptyLoot || !g_cfg.skipDisplayCaseEmpty ||
+				!g_cfg.displayCaseUiEmpty) {
+				return {};
 			}
-			for (std::size_t i = 0; i < g_state.dcWatchCount; ++i) {
-				const auto* ref = g_state.dcWatch[i].ref;
-				if (ref && ref->GetFormID() == a_fid) {
-					if (a_outIdx) {
-						*a_outIdx = i;
-					}
-					return ref;
-				}
+			auto* form = RE::TESForm::LookupByID(a_rec.refFid);
+			if (!form || form->GetFormType() != RE::FormType::kREFR) {
+				return {};
 			}
-			return nullptr;
+			auto* ref = static_cast<RE::TESObjectREFR*>(form);
+			if ((a_rec.refPtr != 0 && a_rec.refPtr != reinterpret_cast<std::uint64_t>(ref)) ||
+				!LooksLikeLiveRef(reinterpret_cast<std::uint64_t>(ref)) ||
+				ref->IsDeleted() || ref->IsDisabled() || ref->IsPlayerRef() || !ref->parentCell) {
+				return {};
+			}
+			const auto* base = ref->data.objectReference.get();
+			if (!base || base->GetFormType() != RE::FormType::kCONT || !IsDisplayCaseBase(base)) {
+				return {};
+			}
+			auto* player = RE::PlayerCharacter::GetSingleton();
+			if (!player || !player->parentCell) {
+				return {};
+			}
+			const float radius = std::min(kDcWatchRadiusMeters, g_cfg.radiusMeters) * g_cfg.unitsPerMeter;
+			const float d2 = ref->data.location.GetSquaredDistance(player->GetPosition());
+			if (!std::isfinite(d2) || d2 > radius * radius) {
+				return {};
+			}
+			return RE::NiPointer<const RE::TESObjectREFR>{ ref };
 		}
 
 		// 事件日志限流（上限 cfg.lootEventLogMax；返回 true = 可以打这一条）。
@@ -7057,72 +7075,85 @@ namespace SAS
 			if (n > 0) {
 				++g_state.lootMemoSerial;
 			}
-			if (!g_cfg.containerLootEvents) {
-				return;  // 功能关着：**照旧把队列排空**（否则它会一直涨），只是不判决
+			if (n == 0 || !g_cfg.containerLootEvents || g_state.loadingNow || g_state.loadingSeen) {
+				return;
 			}
 			for (std::size_t i = 0; i < n; ++i) {
 				const auto& rec = local[i];
+				auto heldRef = ResolveDisplayCaseEvent(rec);
+				const auto* ref = heldRef.get();
 				if (rec.kind == static_cast<std::uint8_t>(LootEvtKind::kQuickOpen)) {
-					// ---- 快速搜刮面板打开：per-ref 的「面板开着」会话 ----
-					const auto* ref = reinterpret_cast<const RE::TESObjectREFR*>(rec.refPtr);
-					g_state.quickOpenLastMs  = a_nowMs;
-					std::uint32_t fid        = 0;
-					bool          matched    = false;
-					for (std::size_t k = 0; k < g_state.dcWatchCount; ++k) {
-						if (g_state.dcWatch[k].ref == ref) {
-							fid     = ref->GetFormID();
-							matched = true;
-							break;
+					g_state.quickOpenLastMs = a_nowMs;
+					g_state.quickOpenLastFid = rec.refFid;
+					for (auto& [r, ds] : g_state.displayCaseVerdict) {
+						if (r != ref) {
+							ds.quickOpenMs = 0;
 						}
 					}
-					if (matched) {
-						// 同一时刻只有一个面板 ⇒ 先清掉别的 ref 的会话
-						for (auto& [r, ds] : g_state.displayCaseVerdict) {
-							if (r != ref && ds.quickOpenMs != 0) {
-								ds.quickOpenMs         = 0;
-								ds.sawTakeEvt          = false;
-								ds.emptySinceMs        = 0;
-								ds.sawContentInSession = false;  // ★ v4.14
+					if (ref) {
+						DcWatchAdd(ref, 0.0f, a_nowMs);
+						auto& ds = DisplayCaseVerdictFor(ref);
+						if (ds.quickOpenMs == 0 || a_nowMs - ds.quickOpenMs > kQuickOpenSessionMs) {
+							ds.quickOpenMs = a_nowMs;
+							ds.sawTakeEvt = false;
+							ds.sawContentInSession = ds.lastKnown == 1;
+							if (ds.noContentOpenMs == 0) {
+								ds.emptySinceMs = 0;
+								if (ds.lastKnown == 0) {
+									ds.noContentOpenMs = a_nowMs;
+								}
 							}
 						}
-						auto& ds        = DisplayCaseVerdictFor(ref);
-						ds.quickOpenMs  = a_nowMs;
-						ds.sawTakeEvt   = false;
-						ds.emptySinceMs = 0;
-						// ★ v4.14：新会话 = 还没见过内容（打开瞬间投影可能尚未建立，
-						//   关闭状态的库存本来就空 ⇒ 没有这条就会把「打开瞬间」误判成拿空）
-						ds.sawContentInSession = false;
 						++g_state.quickOpenMatched;
-						g_state.quickOpenLastFid = fid;
 						if (ds.evtLogs < kLootEvtPerRefLogMax && LootEvtMayLog()) {
 							++ds.evtLogs;
-							REX::INFO("loot event (quick open): ref={:08X} 的快速搜刮面板打开了"
-									  "（在逐帧观察表里）-> 兜底判据就绪：这一段打开期里只要收不到"
-									  "「拿走」事件、且连续读到空 ≥ {}ms 就判拿空",
-								fid, kDcEmptyConfirmMs);
+							REX::INFO("loot event (quick open): ref={:08X} -> 已按展示容器身份接入；"
+									  "空箱确认={}ms pending={}；见过内容={}；旧兜底={}",
+								rec.refFid, g_cfg.displayCaseEmptyNoContentMs,
+								ds.noContentOpenMs != 0, ds.sawContentInSession,
+								g_cfg.displayCaseQuickOpenEmpty);
 						}
 					} else {
 						++g_state.quickOpenUnmatched;
 						if (LootEvtMayLog()) {
-							REX::INFO("loot event (quick open): 面板为引用 0x{:X} 打开，但它不在逐帧观察表里"
-									  "（不在附近 / 不是展示柜 / 表满）-> 这一条不参与判决",
-								static_cast<unsigned long long>(rec.refPtr));
+							REX::INFO("loot event (quick open): ref={:08X} ptr=0x{:X} -> 跳过"
+									  "（非展示容器 / 超距 / 引用已失效 / 判空关闭；不受观察表容量限制）",
+								rec.refFid, static_cast<unsigned long long>(rec.refPtr));
 						}
 					}
 					continue;
 				}
 
-				// ---- 物品进出容器（take / put）----
 				const bool isTake = (rec.kind == static_cast<std::uint8_t>(LootEvtKind::kTake));
-				const auto* ref   = FindWatchedRefByFid(rec.refFid);
 				if (!ref) {
+					if (!isTake && rec.count > 0) {
+						DcStickyFidErase(rec.refFid);
+						for (auto& [r, ds] : g_state.displayCaseVerdict) {
+							if (ds.refFid == rec.refFid) {
+								ds = {};
+								ds.refFid = rec.refFid;
+								ds.lastKnown = 1;
+								ds.sawContentInSession = true;
+							}
+						}
+					}
 					++g_state.lootEvtUnmatched;
-					continue;  // 与我们无关的容器（世界里随时都有物品流动）
+					continue;
 				}
+				if (rec.count == 0) {
+					continue;
+				}
+				DcWatchAdd(ref, 0.0f, a_nowMs);
 				++g_state.lootEvtMatches;
 				auto& ds = DisplayCaseVerdictFor(ref);
+				ds.noContentOpenMs = 0;
+				ds.emptySinceMs = 0;
 				if (isTake) {
-					ds.sawTakeEvt = true;  // 有拿走事件 ⇒ 兜底判据让位（只信记账）
+					ds.sawTakeEvt = true;
+					ds.sawContentInSession = true;
+					if (ds.lastKnown == 0) {
+						ds.lastKnown = 1;
+					}
 					if (!ds.snap.valid) {
 						// 还没读到过内容快照 ⇒ 记不了账（最坏 = 这一轮不判拿空）
 						if (ds.evtLogs < kLootEvtPerRefLogMax && LootEvtMayLog()) {
@@ -7202,6 +7233,8 @@ namespace SAS
 							dcStickyErased ? "·撤销跨场景粘性 ★ 订正 R17" : "",
 							rec.refFid, rec.baseFid, rec.count);
 					}
+					ds.lastKnown = 1;
+					ds.sawContentInSession = true;
 					if (ds.evtLogs < kLootEvtPerRefLogMax && LootEvtMayLog()) {
 						++ds.evtLogs;
 						REX::INFO("loot event (put): ref={:08X} base={:08X} x{} -> 已加账（快照 {} 条）",
@@ -7219,31 +7252,47 @@ namespace SAS
 		//   ③ DcTrace / DcUiProbe：投影出现 / 消失 + 界面状态的取证日志，
 		//      以及「界面标志为 false 却看到投影」时的自愈学习 + 菜单快照。
 		// ================================================================
-		void DcWatchAdd(const RE::TESObjectREFR* a_ref, float a_distSq)
+		void DcWatchAdd(const RE::TESObjectREFR* a_ref, float a_distSq, std::uint64_t a_eventMs)
 		{
 			if (!g_cfg.displayCaseFrameWatch || !a_ref) {
 				return;
 			}
-			// ★ 注意：`a_distSq` 是**游戏单位²**（与 ContProbe / LootProbe 同一口径），
-			//   换算成米要乘 `unitsPerMeter`。
-			const float maxD = kDcWatchRadiusMeters * g_cfg.unitsPerMeter;
-			if (a_distSq > maxD * maxD) {
+			const float maxD = std::min(kDcWatchRadiusMeters, g_cfg.radiusMeters) * g_cfg.unitsPerMeter;
+			if (!std::isfinite(a_distSq) || a_distSq > maxD * maxD) {
 				return;
 			}
 			for (std::size_t i = 0; i < g_state.dcWatchCount; ++i) {
-				if (g_state.dcWatch[i].ref == a_ref) {
-					g_state.dcWatch[i].miss = 0;
+				auto& w = g_state.dcWatch[i];
+				if (w.ref.get() == a_ref) {
+					w.miss = 0;
+					w.lastEventMs = std::max(w.lastEventMs, a_eventMs);
 					return;
 				}
 			}
-			if (g_state.dcWatchCount >= kDcWatchMax) {
-				return;  // 表满就不再收（12 个近距离展示柜够用；满了说明站在展示柜堆里）
+			std::size_t slot = g_state.dcWatchCount;
+			if (slot == kDcWatchMax) {
+				if (a_eventMs == 0) {
+					return;
+				}
+				slot = 0;
+				for (std::size_t i = 1; i < g_state.dcWatchCount; ++i) {
+					if (g_state.dcWatch[i].lastEventMs < g_state.dcWatch[slot].lastEventMs) {
+						slot = i;
+					}
+				}
+			} else {
+				++g_state.dcWatchCount;
 			}
-			auto& w = g_state.dcWatch[g_state.dcWatchCount++];
-			w.ref      = a_ref;
-			w.miss     = 0;
-			w.lastLoot = -2;
-			w.lastTp   = false;
+			auto& w = g_state.dcWatch[slot];
+			if (const auto it = g_state.displayCaseVerdict.find(w.ref.get()); it != g_state.displayCaseVerdict.end()) {
+				it->second.emptySinceMs = 0;
+			}
+			if (const auto it = g_state.displayCaseVerdict.find(a_ref); it != g_state.displayCaseVerdict.end()) {
+				it->second.emptySinceMs = 0;
+			}
+			w = {};
+			w.ref.reset(a_ref);
+			w.lastEventMs = a_eventMs;
 		}
 
 		// 投影出现 / 消失的追踪日志（诊断主力，条数受 `DisplayCaseTraceMax` 限制）。
@@ -7257,21 +7306,22 @@ namespace SAS
 				return;
 			}
 			++g_state.dcTraceCount;
-			std::uint32_t qo = 0, take = 0, snapN = 0;
+			std::uint32_t qo = 0, take = 0, snapN = 0, pending = 0;
 			std::uint64_t emptyMs = 0;
 			if (const auto it = g_state.displayCaseVerdict.find(a_ref); it != g_state.displayCaseVerdict.end()) {
 				qo      = it->second.quickOpenMs ? 1 : 0;
 				take    = it->second.sawTakeEvt ? 1 : 0;
 				snapN   = it->second.snap.count;
+				pending = it->second.noContentOpenMs ? 1 : 0;
 				emptyMs = it->second.emptySinceMs ? (NowMs() - it->second.emptySinceMs) : 0;
 			}
 			REX::INFO("display case trace: ref={:08X} loot={} tp={} ui={}(ev={} serial={}) "
-					  "qo={} take={} snap={} emptyMs={} -> {}",
+					  "qo={} take={} snap={} pending={} emptyMs={} -> {}",
 				a_ref ? a_ref->GetFormID() : 0, a_loot, a_sawTp ? 1 : 0,
 				g_state.containerUiOpen ? 1 : 0, g_state.menuEvtOpen.load() ? 1 : 0,
-				g_state.containerUiSerial, qo, take, snapN, emptyMs,
+				g_state.containerUiSerial, qo, take, snapN, pending, emptyMs,
 				a_sawTp ? "投影出现（搜刮面板正开着）"
-						: (a_loot == 0 ? "投影消失（判「拿空」看 qo/take/emptyMs；都不是 ⇒ 内容未知）" : "内容有东西"));
+						: (a_loot == 0 ? "读到空（结合记账/pending/emptyMs判决）" : "库存读取结果"));
 		}
 
 		// 「看到投影，可我们的界面标志还是 false」⇒ 取证 +（可选）自愈学习。
@@ -7363,29 +7413,45 @@ namespace SAS
 		// ★ v4.11：逐帧观察（Tick 每帧调；表是空的时几乎零成本）。
 		void DcTickWatch()
 		{
-			if (!g_cfg.displayCaseFrameWatch || g_state.dcWatchCount == 0 || g_invOff == 0) {
+			if (!g_cfg.displayCaseFrameWatch || !g_cfg.skipEmptyLoot || !g_cfg.skipDisplayCaseEmpty ||
+				!g_cfg.displayCaseUiEmpty || g_state.dcWatchCount == 0 || g_invOff == 0 ||
+				g_state.loadingNow || g_state.loadingSeen) {
 				return;
 			}
-			// ★ v4.15：载入 / 换场景期间*不碰旧世界的引用*（docs/15 §4 —— 崩溃 B 就是
-			//   在这里读到「已经被释放、内存被别的数据复用」的引用）。
-			//   这里用的是上一帧的值（`loadingNow` 在 Tick 里稍后才刷新）：只当优化，
-			//   真正的安全由下面的 LooksLikeLiveRef 兜底。
-			if (g_state.loadingNow) {
+			auto* player = RE::PlayerCharacter::GetSingleton();
+			if (!player || !player->parentCell) {
 				return;
 			}
+			const auto origin = player->GetPosition();
+			const float radius = std::min(kDcWatchRadiusMeters, g_cfg.radiusMeters) * g_cfg.unitsPerMeter;
 			++g_state.dcWatchFrames;
 			for (std::size_t i = 0; i < g_state.dcWatchCount;) {
 				auto& w = g_state.dcWatch[i];
-				// 形状校验（★ v4.15 加强）：不再只看「能不能读」，而是「**还像不像一个
-				// 活着的引用对象**」—— 可读 + vtable 在游戏映像内 + formType ∈ {REFR,ACHR}。
-				//   崩溃 B 的现场里那块内存**是可读的**（堆内存还 mapped），旧判据一律放行，
-				//   于是 `*(ref+0xA0)` 读出一串垃圾（0x1A486）当库存指针用 ⇒ AV。
-				const bool ok = w.ref && LooksLikeLiveRef(reinterpret_cast<std::uint64_t>(w.ref));
-				if (!ok) {
-					if (++w.miss >= kDcWatchMissMax) {
-						g_state.dcWatch[i] = g_state.dcWatch[--g_state.dcWatchCount];
-						continue;  // 踢掉，重新看同一个下标
+				const auto* ref = w.ref.get();
+				const bool ok = ref && LooksLikeLiveRef(reinterpret_cast<std::uint64_t>(ref));
+				bool remove = false;
+				if (ok) {
+					const float d2 = ref->data.location.GetSquaredDistance(origin);
+					remove = ref->IsDeleted() || ref->IsDisabled() || !ref->parentCell ||
+						!std::isfinite(d2) || d2 > radius * radius;
+				} else {
+					if (const auto it = g_state.displayCaseVerdict.find(ref); it != g_state.displayCaseVerdict.end()) {
+						it->second.emptySinceMs = 0;
 					}
+					remove = ++w.miss >= kDcWatchMissMax;
+				}
+				if (remove) {
+					if (const auto it = g_state.displayCaseVerdict.find(ref); it != g_state.displayCaseVerdict.end()) {
+						it->second.emptySinceMs = 0;
+					}
+					const auto last = --g_state.dcWatchCount;
+					if (i != last) {
+						g_state.dcWatch[i] = std::move(g_state.dcWatch[last]);
+					}
+					g_state.dcWatch[last] = {};
+					continue;
+				}
+				if (!ok) {
 					++i;
 					continue;
 				}
@@ -7393,11 +7459,10 @@ namespace SAS
 				bool      sawTp = false;
 				DcSnapOut snap{};
 				// ★ v4.13：逐帧读的时候顺便刷**内容快照**（记账判据的基准）。
-				const int loot = RefLootState(w.ref, &sawTp, &snap);
+				const int loot = RefLootState(ref, &sawTp, &snap);
 				const int prev = w.lastLoot;
 				const auto now = NowMs();
-				auto&      ds  = DisplayCaseVerdictFor(w.ref);
-				// ★ v4.13：「连续读到空」的计时（兜底判据要求 ≥ kDcEmptyConfirmMs）
+				auto& ds = DisplayCaseVerdictFor(ref);
 				if (loot == 0) {
 					if (ds.emptySinceMs == 0) {
 						ds.emptySinceMs = now;
@@ -7406,29 +7471,22 @@ namespace SAS
 					ds.emptySinceMs = 0;
 				}
 				if (loot == 1) {
-					// 「有东西」：投影刚出现（`tp=1`）或数量变化时才留痕
 					if (prev != 1 || (sawTp && !w.lastTp)) {
-						DcTrace(w.ref, loot, sawTp);
+						DcTrace(ref, loot, sawTp);
 					}
-					NoteDisplayCaseOccupied(w.ref, sawTp, &snap);
-				} else {
-					// 空（刚变空 / 一直空）：每帧都按判据问一次 —— v4.13 的兜底判据
-					//   与 ★ 订正 R15 的空箱判据都需要「持续一段时间」才成立，
-					//   只在跳变那一帧问会漏掉它们。
-					//   ★ 订正 R15：判决返回**原因码**（不再用「quickOpenMs && !sawTakeEvt」
-					//   猜原因 —— 那会把空箱判据记成旧兜底）。
-					const int dcWhy = DisplayCaseReadsEmpty(w.ref, now);
+					NoteDisplayCaseOccupied(ref, sawTp, &snap);
+				} else if (loot == 0) {
+					const int dcWhy = DisplayCaseReadsEmpty(ref, now);
 					if (dcWhy != kDcEmptyNone) {
-						if (prev != 0) {
-							DcTrace(w.ref, loot, false);
+						if (ds.lastKnown != 2) {
+							DcTrace(ref, loot, false);
 							++g_state.displayCaseEmptiedFrame;
 						}
-						MarkDisplayCaseEmptied(w.ref, DcEmptyReasonText(dcWhy), dcWhy);
+						MarkDisplayCaseEmptied(ref, DcEmptyReasonText(dcWhy), dcWhy);
 					} else if (prev == 1) {
-						// 投影消失但判不出「拿空」⇒ 内容未知（关掉了 / 信号没接上）
-						DcTrace(w.ref, loot, false);
+						DcTrace(ref, loot, false);
 						if (!g_state.containerUiOpen) {
-							DcUiProbe(w.ref);  // 取证 +（可选）自愈学习
+							DcUiProbe(ref);
 						}
 					}
 				}
@@ -7724,6 +7782,7 @@ namespace SAS
 			// ★ v4.11：逐帧观察表里存的也是「旧世界」的引用 ⇒ 一起作废
 			//   （不清的话，指针被回收后再读就是野指针；虽然每帧都有 IsReadable 兜底，
 			//    但这里清掉才是干净的）。
+			g_state.dcWatch = {};
 			g_state.dcWatchCount = 0;
 			g_state.dcUiProbeLastMs = 0;
 			// ★★★ v4.25 / v4.26：换场景 / 读档 ⇒ 「星球目标是否已扫描」的判据作废
@@ -13004,6 +13063,9 @@ namespace SAS
 						//      实测就是这样）⇒ 打菜单快照 + 尝试自愈学习（见常量区「v4.11」）。
 						if (displayCase) {
 							DcWatchAdd(ref, d2);
+							if (loot != 0) {
+								DisplayCaseVerdictFor(ref).emptySinceMs = 0;
+							}
 							// 只有「真的看到了投影条目」（`tp`）才做界面取证 —— 否则关着的
 							// 武器箱每轮都会触发一次菜单快照（60 次 IsMenuOpen），既浪费
 							// 又会刷日志。逐帧观察那边也有一条同样的取证入口。
