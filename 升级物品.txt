@@ -1,0 +1,25 @@
+Accuracy upgrade (Ranged) - player.additem 003197DF <amount>
+
+Aim Speed Upgrade (Ranged) - player.additem 003197E7 <amount>
+
+Ammo Capacity Upgrade (Ranged) - player.additem 003197E5 <amount>
+
+Attack Speed Upgrade (melee) - player.additem 003197DB <amount>
+
+Damage Upgrade (Melee) - player.additem 003197DE <amount>
+
+Damage Upgrade (Ranged) - player.additem 003197E2 <amount>
+
+Fire Rate Upgrade (Ranged) - player.additem 003197E4 <amount>
+
+Range Upgrade (Ranged) - player.additem 003197DC <amount>
+
+Recoil Upgrade (Ranged) - player.additem 003197E1 <amount>
+
+Reload speed Upgrade (Ranged) - player.additem 003197E6 <amount>
+
+EM Resistance Upgrade - player.additem 003197E3 <amount>
+
+Energy Resistance Upgrade - player.additem 003197DD <amount>
+
+Physical Resistance Upgrade - player.additem 003197E0 <amount>

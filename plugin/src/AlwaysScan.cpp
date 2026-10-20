@@ -996,6 +996,8 @@ namespace SAS
 			// ★★★ 2026-09-28（需求 `颜色分类.md`）：**黄 = 开锁器 + 信用币**。
 			//   从「杂项」里拆出来的第 7 个「物品子类」：
 			//     · 判据 = base FormID（3 条，见常量区 kFormIDDigipick…）；
+			//       ★ 2026-10-20 追加：「升级物品」13 条（MISC，FormID 连续
+			//       0x3197DB~0x3197E7，见常量区 kFormIDUpgradeModFirst）同属此组；
 			//     · 通道模式（默认）下有自己的通道 ⇒ **黄 #FFE100**；
 			//     · 旧路径（ChannelMode=0 / 通道自动回退）里**没有空闲槽位**可用
 			//       （2/3/6/9/10 已占满、0/1/4/5/7/8 归还引擎）⇒ 退回 state 2 +
@@ -1055,6 +1057,7 @@ namespace SAS
 		constexpr std::uint32_t kMiscKwProbeMax   = 6;      // `misc kw probe:` 每会话最多几条
 		// ================================================================
 		// ★★★ 2026-09-28：「黄」组（开锁器 / 信用条 / 信用币）的 **6 个** FormID
+		//   ＋ 2026-10-20 追加的「升级物品」**13 个** FormID（见本段末尾 ⑦）
 		// ----------------------------------------------------------------
 		// 需求 = `颜色分类.md`：「黄：开锁器、信用条」+「杂项还是原版扫描仪的颜色
 		//   （除了开锁器、信用币）」⇒ 这几类要从「杂项 / 植物」里拆出来单独一色。
@@ -1094,6 +1097,28 @@ namespace SAS
 		constexpr std::uint32_t kFormIDCredStickSmall  = 0x003CC32C; // 信用条：Loot_CredStick_Small
 		constexpr std::uint32_t kFormIDCredStickCommon = 0x003CC325; // 信用条：Loot_CredStick_Common
 		constexpr std::uint32_t kFormIDCredStickRare   = 0x003CC32A; // 信用条：Loot_CredStick_Rare
+		// ---- ⑦ ★★★ 2026-10-20：「升级物品」13 条（用户清单 `升级物品.txt`）也归黄组 ----
+		//   离线取证（`tools/re/esm_find_by_fid.py` 一次查 13 个 FormID，**13/13 命中**）：
+		//   全是 Starfield.esm 的 **MISC**，EDID 统一前缀 `Y2_miscMod_statUpgrade_`，
+		//   且 **FormID 连续**（0x003197DB ~ 0x003197E7，区间内没有别的记录）：
+		//     0x003197DB AttackSpeed_melee   0x003197DC Range_ranged
+		//     0x003197DD Eng_armor           0x003197DE Damage_melee
+		//     0x003197DF Accuracy_ranged     0x003197E0 Phys_armor
+		//     0x003197E1 Recoil_ranged       0x003197E2 Damage_ranged
+		//     0x003197E3 EM_armor            0x003197E4 FireRate_ranged
+		//     0x003197E5 MagSize_ranged      0x003197E6 ReloadSpeed_ranged
+		//     0x003197E7 AimSpeed_ranged
+		//   · 它们不带 `ResourceType*` 关键词 ⇒ 原版判据落到「杂项（蓝）」；
+		//   · 判据 = 一次区间比较（13 次整数比较能省就省，且比枚举 switch 短）；
+		//   · 与开锁器 / 信用币**同一个类别** ⇒ 同通道、同色 #FFE100，
+		//     INI 的 `ColorPickCredit` / `EnablePickCredit` 一并管到它们。
+		constexpr std::uint32_t kFormIDUpgradeModFirst = 0x003197DB; // Y2_miscMod_statUpgrade_AttackSpeed_melee
+		constexpr std::uint32_t kFormIDUpgradeModLast  = 0x003197E7; // Y2_miscMod_statUpgrade_AimSpeed_ranged
+
+		constexpr bool IsUpgradeModFormID(std::uint32_t a_formID)
+		{
+			return a_formID >= kFormIDUpgradeModFirst && a_formID <= kFormIDUpgradeModLast;
+		}
 		// ★★ v4.22：自检的**正样本池**（资源 MISC 物品；任一「拿得到且命中」即算通过）。
 		//   为什么不是一个样本：**实测 0x5556E（InorgCommonIron）整局 `LookupByID` 都是
 		//   null**（用户那一局 121 次尝试全是 `iron=0`，而 Digipick / Credits 一次就拿到；
@@ -5516,6 +5541,10 @@ namespace SAS
 				//   FormID 判；证据与常量见 `kFormIDDigipick` 那一组）。
 				//   ★ 顺序放在资源判据**之前**：一次整数比较，最省；
 				//     且这三个 FormID 本来就不带 ResourceType* ⇒ 先后无歧义。
+				// ★★★ 2026-10-20：「升级物品」13 条（`升级物品.txt`，MISC + EDID
+				//   前缀 `Y2_miscMod_statUpgrade_`，FormID 连续 0x3197DB~0x3197E7）
+				//   ⇒ 与开锁器 / 信用币**同类别**（黄 #FFE100，见常量区
+				//   `kFormIDUpgradeModFirst` 那一段取证）。
 				switch (a_base->GetFormID()) {
 				case kFormIDDigipick:
 				case kFormIDCredits:
@@ -5523,6 +5552,18 @@ namespace SAS
 					return static_cast<int>(Category::kLootPickCredit);
 				default:
 					break;
+				}
+				//   ★ 注意：不能在这里写 `const auto id = …` —— case 标签之后声明变量
+				//     会触发 C2360（初始化被后续 case 跳过）；只在命中分支里多取一次。
+				if (IsUpgradeModFormID(a_base->GetFormID())) {
+					// 会话内第一条 = 「黄组 / 升级物品真的被认出来」的最快证据。
+					if (g_state.pickCreditFirstHit == 0) {
+						g_state.pickCreditFirstHit = a_base->GetFormID();
+						REX::INFO("pickcredit: 首个黄组命中 base=0x{:08X}（升级物品 "
+								  "Y2_miscMod_statUpgrade_*）-> 黄组生效（通道色 #FFE100）",
+							g_state.pickCreditFirstHit);
+					}
+					return static_cast<int>(Category::kLootPickCredit);
 				}
 				if (IsResourceBase(a_base)) {
 					// ★ v4.22：世界里**首个**命中 —— 「资源分类真的在干活」的最快证据

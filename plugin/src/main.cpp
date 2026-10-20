@@ -529,6 +529,14 @@ SFSE_PLUGIN_LOAD(const SFSE::LoadInterface* a_sfse)
 			  "模型变化逐轮检测、公平优先修复；版本号不变）");
 	REX::INFO("订正 R20：空展示架高亮修复（搜刮事件按引用身份接入、交互目标优先观察；"
 			  "切换目标保留空箱确认，见到物品立即取消；版本号不变）");
+	// ★★★ 2026-10-20（用户需求：`升级物品.txt`）：**「升级物品」13 条归黄组**
+	//   —— 用户清单里的武器 / 护甲升级模块（`Y2_miscMod_statUpgrade_*`）原本是
+	//   MISC ⇒ 落到「杂项（原版蓝）」；现在与开锁器 / 信用条 / 信用币同类别
+	//   ⇒ 同通道、同色 **#FFE100**（INI `ColorPickCredit` / `EnablePickCredit` 一并管）。
+	//   离线取证 = `tools/re/esm_find_by_fid.py` 查 13 个 FormID：13/13 命中
+	//   Starfield.esm 的 MISC，FormID **连续** 0x003197DB~0x003197E7（见 docs/58）。
+	REX::INFO("2026-10-20 配色补充：「升级物品」13 条（Y2_miscMod_statUpgrade_*，MISC "
+			  "0x3197DB~0x3197E7）归入黄组 #FFE100（与开锁器 / 信用币同色；版本号不变）");
 
 	if (auto* messaging = SFSE::GetMessagingInterface()) {
 		messaging->RegisterListener(OnMessage);
