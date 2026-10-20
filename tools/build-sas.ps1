@@ -459,7 +459,12 @@ if (-not $SkipDeploy) {
     #     R19 室外高亮延迟（跨片候选保留 / 模型就绪过滤 / 公平修复）+ R20 展示柜
     #     拿空仍高亮（事件改主线程按 FormID 解析、观察表替换与独立判空计时）。
     #     详细记录见 docs/99 顶部两段；颜色 / 通道数（14）/ ESM / Papyrus / 有效配置未变。
-    Set-Content -LiteralPath (Join-Path $modRoot 'meta.ini') -Value "[General]`nmodid=18268`nversion=2.0.2`ncomment=Always-on scanner highlighting (SFSE)" -Encoding UTF8
+    #   ★★★★★★★★ 2026-10-20 发布版 2.0.3（用户通知：**发布版号 → 2.0.3**；DLL build 仍 5.1.0）：
+    #     配色补充（应玩家要求）——「升级物品」13 件（`Y2_miscMod_statUpgrade_*`，MISC，
+    #     FormID 连续 0x3197DB~0x3197E7）从杂项蓝改为黄组 #FFE100（与开锁器 / 信用币 /
+    #     信用条同类别同通道）。无新 INI 键；颜色值 / 14 条通道 / ESM / Papyrus / 判空与
+    #     交互逻辑未变。详细记录见 docs/58 与 docs/99 顶部段。
+    Set-Content -LiteralPath (Join-Path $modRoot 'meta.ini') -Value "[General]`nmodid=18268`nversion=2.0.3`ncomment=Always-on scanner highlighting (SFSE)" -Encoding UTF8
 
     Get-ChildItem -LiteralPath $modRoot -Recurse -File | ForEach-Object {
         Write-Host ("  {0}  ({1} bytes)" -f $_.FullName.Substring($modRoot.Length + 1), $_.Length)

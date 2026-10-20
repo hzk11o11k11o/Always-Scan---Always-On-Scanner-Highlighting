@@ -1,6 +1,6 @@
 # Always Scan — Always-On Scanner Highlighting (SFSE)
 
-**Nexus Mods:** <https://www.nexusmods.com/starfield/mods/18268> · **Release:** 2.0.2 (plugin build 5.1.0)
+**Nexus Mods:** <https://www.nexusmods.com/starfield/mods/18268> · **Release:** 2.0.3 (plugin build 5.1.0)
 
 Keep the vanilla scanner highlight on at all times — no need to hold the handheld scanner up. Every object inside a configurable radius (default **50 m**, not just the centre circle) is outlined using the game's own outline system, colour-coded by category.
 
@@ -18,7 +18,7 @@ An SFSE plugin for **Starfield 1.16.244.0**.
   | Weapons / throwables + spacesuits / helmets / packs / clothing | **red** |
   | Notes + resources | **purple** |
   | Ammo & aid + computers / terminals / buttons | **green** (the game's own) |
-  | Digipicks + credits | **yellow** (since 2.0.1; they used to be misc blue) |
+  | Digipicks + credits + stat upgrades | **yellow** (since 2.0.1; they used to be misc blue. The thirteen gear stat upgrades joined in 2.0.3) |
   | Misc items | **blue** (the game's own) |
   | Containers + bodies / corpses | **orange** |
   | Doors | **magenta** (since the 2026-09-28 colour revision; computers / buttons were grouped with doors only in the first two revisions of that day) |
@@ -91,7 +91,7 @@ tr/            localization tooling & workspace used while researching third-par
 crash-reports/ crash-dump analysis notes
 ```
 
-Versioning: the Nexus release version (currently **2.0.2**) and the plugin's internal build number (currently **5.1.0**) are bumped manually, per release.
+Versioning: the Nexus release version (currently **2.0.3**) and the plugin's internal build number (currently **5.1.0**) are bumped manually, per release.
 
 ## Credits
 

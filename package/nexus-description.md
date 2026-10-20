@@ -19,10 +19,10 @@
 | --- | --- |
 | **Mod name** | `Always Scan - Always-On Scanner Highlighting (SFSE)` |
 | **Summary**（约 250 字符以内） | `Keep the scanner highlight on at all times. No need to hold the handheld scanner: everything inside a configurable radius gets the vanilla outline, color-coded by category. Full-radius highlighting, one toggle hotkey, fully configurable via INI. SFSE plugin.` |
-| **Version** | `2.0.2`（引擎 build 5.1.0；Nexus 上的 1.0 → … → 2.0 → 2.0.1 → **2.0.2**。★ 2026-10-17 **2.0.2 = 两项玩家报告修复**：**室外矿石 / 植物的高亮延迟**（跨片候选保留、模型就绪后才占名额、修复预算公平轮转）、**展示柜 / 武器架拿空后仍高亮**（快速面板事件改在主线程按 FormID 解析、满表替换最久未交互项、判空计时独立于切换）；无新 INI 键，颜色 / 14 条通道 / ESM / Papyrus 未变。★ 2026-09-28 **2.0.1 = 配色需求更新版**：**黄 = 开锁器 / 信用币（新增类别）**、**品红 = 门**、**电脑 / 按钮等可互动物品（设备）退回 2.0 = 原版绿（与弹药 / 救援同色）** —— 自建通道 13 → 14，公开版日志仍默认完全关闭；★ 同日三轮配色修订：白 → 品红 #FF3BD4（选色：313° 落在「紫 269° → 红 0°」空档正中，与紫 / 红各拉开 ~44° / ~47°），最终定稿把「电脑 / 按钮」放回 2.0 的原版绿（第一 / 二轮曾与门同色：白 → 品红）。★ 同日再补一项修复：**地上的「信用条」其实是 FLOR 记录**（`Loot_CredStick_*`），以前被当成「植物 / 星球目标」画青色 ⇒ 现已并入黄组（英文 (17) / 中文 ⑰）。★ 2026-10-03 **再补一项修复：空的展示柜（EMPTY 版 / 已拿空的武器箱）打开确认没东西后也会熄灭** —— 原先「拿空即灭」的三条判据都要求「曾见内容」，本来就空的箱子一条都命不中 ⇒ 永久亮（英文 (18) / 中文 ⑱）。★ 同日**再补一项（行为修复）：机器人搜刮拿空后仍高亮（偶发）** —— 机器人的**手臂炮**是身体部件（无模型虚拟武器、面板不显示 / 拿不走），但数据里**漏标**了 Non-Playable ⇒ 判空把它们算作「有东西」；现已忽略这类虚拟武器（离线穷举**全部 14 条**：12 条 `crModelA_*` + 2 条虚拟武器），新 INI 键 `SkipBuiltinLoot`（默认 1）（英文 (19) / 中文 ⑲）。★ 同日**再补一项（行为修复）：展示柜「已确认拿空」跨场景粘性** —— 治「武器箱/武器柜似乎在玩家远离后，又会重新亮起」（粘性原先只存在指针键判决表里、换场景 / 引用重建即丢；现改为额外登记 **FormID 键**粘性表：过门 / 快速旅行 / 换 cell 后再回来**保持熄灭**，放回东西 / 再读到内容即自愈），同一轮把空箱判据确认窗口 2000 → **3000 毫秒**（日志实证投影可晚到 2.13 秒）（英文 (20) / 中文 ⑳）。2.0 的 16 项修复见英文 Version history (1)~(16) 与中文 ①~⑮） |
+| **Version** | `2.0.3`（引擎 build 5.1.0；Nexus 上的 1.0 → … → 2.0 → 2.0.1 → 2.0.2 → **2.0.3**。★ 2026-10-20 **2.0.3 = 配色补充（应玩家要求）**：**「升级物品」13 件改黄**（攻击速度 / 伤害 / 射程 / 精度 / 后坐力 / 射速 / 弹匣 / 装填 / 瞄准速度升级 + 三项抗性升级；数据里都是普通 MISC、没有专用关键词，FormID 连续 `0x3197DB~0x3197E7`）—— 以前落在杂项蓝，现按 FormID 归入开锁器 / 信用币那一组 **#FFE100**；无新 INI 键，颜色值 / 14 条通道 / ESM / Papyrus 未变（英文 (24) / 中文 ㉔）。★ 2026-10-17 **2.0.2 = 两项玩家报告修复**：**室外矿石 / 植物的高亮延迟**（跨片候选保留、模型就绪后才占名额、修复预算公平轮转）、**展示柜 / 武器架拿空后仍高亮**（快速面板事件改在主线程按 FormID 解析、满表替换最久未交互项、判空计时独立于切换）；无新 INI 键，颜色 / 14 条通道 / ESM / Papyrus 未变。★ 2026-09-28 **2.0.1 = 配色需求更新版**：**黄 = 开锁器 / 信用币（新增类别）**、**品红 = 门**、**电脑 / 按钮等可互动物品（设备）退回 2.0 = 原版绿（与弹药 / 救援同色）** —— 自建通道 13 → 14，公开版日志仍默认完全关闭；★ 同日三轮配色修订：白 → 品红 #FF3BD4（选色：313° 落在「紫 269° → 红 0°」空档正中，与紫 / 红各拉开 ~44° / ~47°），最终定稿把「电脑 / 按钮」放回 2.0 的原版绿（第一 / 二轮曾与门同色：白 → 品红）。★ 同日再补一项修复：**地上的「信用条」其实是 FLOR 记录**（`Loot_CredStick_*`），以前被当成「植物 / 星球目标」画青色 ⇒ 现已并入黄组（英文 (17) / 中文 ⑰）。★ 2026-10-03 **再补一项修复：空的展示柜（EMPTY 版 / 已拿空的武器箱）打开确认没东西后也会熄灭** —— 原先「拿空即灭」的三条判据都要求「曾见内容」，本来就空的箱子一条都命不中 ⇒ 永久亮（英文 (18) / 中文 ⑱）。★ 同日**再补一项（行为修复）：机器人搜刮拿空后仍高亮（偶发）** —— 机器人的**手臂炮**是身体部件（无模型虚拟武器、面板不显示 / 拿不走），但数据里**漏标**了 Non-Playable ⇒ 判空把它们算作「有东西」；现已忽略这类虚拟武器（离线穷举**全部 14 条**：12 条 `crModelA_*` + 2 条虚拟武器），新 INI 键 `SkipBuiltinLoot`（默认 1）（英文 (19) / 中文 ⑲）。★ 同日**再补一项（行为修复）：展示柜「已确认拿空」跨场景粘性** —— 治「武器箱/武器柜似乎在玩家远离后，又会重新亮起」（粘性原先只存在指针键判决表里、换场景 / 引用重建即丢；现改为额外登记 **FormID 键**粘性表：过门 / 快速旅行 / 换 cell 后再回来**保持熄灭**，放回东西 / 再读到内容即自愈），同一轮把空箱判据确认窗口 2000 → **3000 毫秒**（日志实证投影可晚到 2.13 秒）（英文 (20) / 中文 ⑳）。2.0 的 16 项修复见英文 Version history (1)~(16) 与中文 ①~⑮） |
 | **Category** | `Gameplay`（Alternate suggestion: `Items and Objects - Gameplay`） |
 | **Requirements（依赖）** | `Starfield Script Extender (SFSE) 0.2.21+`、`(1.16.244.0) SFSE Address Library`、游戏版本 `1.16.244.0` |
-| **主文件（Main file）** | `StarfieldAlwaysScan-2.0.2.zip` |
+| **主文件（Main file）** | `StarfieldAlwaysScan-2.0.3.zip` |
 | **Permissions** | 允许转载需注明出处？建议：**不得重新上传（No re-uploading）**；允许个人修改（源码已含 Papyrus 部分） |
 
 ---
@@ -183,9 +183,13 @@ At startup the log prints the active config and whether the native outline funct
 
 ### Version history
 
-*(This release is **2.0.2** — the build number inside the plugin is 5.1.0. The list below uses the plugin's internal build numbers where an older release is concerned.)*
+*(This release is **2.0.3** — the build number inside the plugin is 5.1.0. The list below uses the plugin's internal build numbers where an older release is concerned.)*
+
+- **2.0.3** *(plugin build 5.1.0)* — **Colour addition (requested): the thirteen "stat upgrade" items are now yellow — the same colour as digipicks and credits.** These are the consumables you apply to a weapon or a suit to raise its stats (attack speed, damage, range, accuracy, recoil, fire rate, ammo capacity, reload speed, aim speed, plus the three resistance upgrades). In the game's data they are ordinary "misc" items with no keyword of their own, so they used to be outlined in the plain misc blue. They are recognised by record id now (the thirteen records are consecutive, `0x003197DB`..`0x003197E7`) and join the existing digipick / credit category, so `EnablePickCredit=0` turns them off together with it. **No new INI keys**; no colour value, the fourteen channels, the ESM, Papyrus or the loot checks are touched. Details in (24) below.
 
 - **2.0.2** *(plugin build 5.1.0)* — **Two more fixes, both from player reports: outdoor targets that took too long to light up, and display cases / weapon racks you had already looted empty lighting up again while you checked several of them in a row.** No new INI keys; the colours (fourteen channels), the ESM, Papyrus and every INI option are unchanged. Details in (22) and (23) below.
+
+**(24) "Make these items the same colour as digipicks."** (requested 2026-10-20, with a list of thirteen items) The list — Attack Speed (melee), Damage (melee), Damage / Range / Accuracy / Recoil / Fire Rate / Ammo Capacity / Reload Speed / Aim Speed (ranged), and the physical / energy / EM resistance upgrades — is the "stat upgrade" set you apply to gear. An offline pass over the game's files confirmed all thirteen are **MISC** records (`Y2_miscMod_statUpgrade_*`), with **consecutive** record ids `0x003197DB`..`0x003197E7` (no other record in that range), no flags and **no dedicated keyword** — which is exactly why they were classified as plain misc items and drawn in the misc blue: there was nothing to recognise them by except the record id. The mod's classification now checks that id range first in the misc branch (before the "is this a resource?" keyword check) and routes them into the yellow category, so they get the same channel and the same colour as digipicks, credits and the loose credit sticks. One log line reports the first hit (`pickcredit: 首个黄组命中 base=…`), and the existing `pickcredit=` counter in the stats line counts them. No new INI key: the yellow category already has `EnablePickCredit` / `ColorPickCredit` / `AlphaPickCredit`, and turning the category off turns these thirteen items off with it (they do **not** fall back to the misc blue).
 
 **(22) "Ores and plants outdoors take a while to get highlighted — or light up late while I move."** (reported 2026-10-15) Outdoors the mod walks the cells around you in slices (a fraction of each cell per pass, so a whole area can be covered without one long stall). But the list of targets to handle was rebuilt from scratch every pass with only the current slice, so anything found in a slice lost its pending work when the rotation moved on; the per-pass target cap was filled **before** the 3D model check, so references whose model had not streamed in yet burned the budget while drawable objects waited; and the "restore a lost outline" pass looked at only a fixed window of the candidate list, which could keep landing on the same slice. In practice, moving through an area full of ore / plants, a target could wait for several rotations, and freshly streamed targets stayed late. Targets found in any slice are now kept alive across slices (reference-counted, re-validated every pass for distance, deletion, category, NPC exclusion, looted state, field of view, scanner hand-off and colour; dropped when they leave the radius, are invalidated or the scene resets), de-duplicated, and sorted by distance **before** their 3D is fetched — no model means no target slot and no mount budget, and the next pass retries as soon as the model is ready. Mounting, recolouring and re-asserting an outline now share one per-pass budget, with a share reserved for repairs and a fair rotation, so an object never waits for the slice to come round again. Everything else — colours, categories, loot checks — is unchanged; the log line `discovery (订正 R19)` reports the cross-slice cache.
 
@@ -266,6 +270,20 @@ Built with **SFSE** and **CommonLibSF**. Huge thanks to their authors and to eve
   **植物 / 矿脉 / 气泉 / 液池（原版青色脉冲 = 未扫描；扫描完成后 = 原版绿 ——
   这四个槽位的颜色 MOD 一个字节都不改；**背不背扫描仪都一样**，见下）**；
   **NPC / 普通目标（原版青 / 亮青 —— 一个字节都不写，1.7.8 起）**；
+- **★★★ 2.0.3（引擎 5.1.0）：配色补充 —— 「升级物品」13 件改黄（2026-10-20，应玩家要求）**（英文 (24)）——
+  ① 这 13 件就是给装备加属性的消耗品（攻击速度 / 伤害 / 射程 / 精度 / 后坐力 / 射速 /
+  弹匣 / 装填 / 瞄准速度升级 + 物理 / 能量 / 电磁抗性升级）；离线取证：全在 `Starfield.esm`
+  的 **MISC** 段（`Y2_miscMod_statUpgrade_*`），FormID **连续** `0x003197DB~0x003197E7`
+  （区间内没有别的记录）、无记录标记、**没有专用关键词** ⇒ 旧判据只能把它们当普通杂项，
+  于是画成杂项蓝。
+  ② 现在分类链在**杂项分支的最前面**先做一次 FormID 区间判定（在「是不是资源」的关键词
+  判定之前），命中即归入**黄组**（与开锁器 / 信用币 / 地上的信用条同一个类别、同一条通道、
+  同一个颜色 **#FFE100**）。
+  ③ ★ 日志：首命中打一行 `pickcredit: 首个黄组命中 base=0x…（升级物品 Y2_miscMod_statUpgrade_*）`，
+  统计行的 `pickcredit=` 计数会把它们算进去。
+  ④ ★ **没有新增 INI 键**：黄组本来就有 `EnablePickCredit` / `ColorPickCredit` /
+  `AlphaPickCredit`；把黄组关掉，这 13 件**一起关**（不会退回杂项蓝）。
+  ⑤ 颜色值 / 14 条通道 / 槽位分配 / ESM / Papyrus / 判空与交互逻辑一字未动。
 - **★★★ 2.0.2（引擎 5.1.0）：两项玩家报告修复（2026-10-17）**（英文 (22) / (23)）——
   ① **室外矿石 / 植物高亮延迟**（2026-10-15）：室外环内 cell 是分片遍历的，旧实现每轮只用
   当前这一片的候选重建待办 ⇒ 上一片发现的目标在轮换后直接失去处理机会；每轮的

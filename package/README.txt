@@ -3,7 +3,19 @@
  Always-on scanner highlighting for Starfield
 ========================================================================
 
-Version  : 2.0.2  (plugin build 5.1.0)
+Version  : 2.0.3  (plugin build 5.1.0)
+           2.0.3 = one colour addition, requested (no new INI keys):
+             * added (2026-10-20): the thirteen "stat upgrade" items you apply
+               to your gear (Attack Speed / Damage / Range / Accuracy / Recoil /
+               Fire Rate / Ammo Capacity / Reload Speed / Aim Speed upgrades,
+               plus the three resistance upgrades) are now highlighted
+               YELLOW, the same colour as digipicks and credits. They are
+               ordinary "misc" items in the game's data with no keyword of
+               their own, so they used to fall into the plain misc blue; they
+               are recognised by record id now (the thirteen records are
+               consecutive, 0x003197DB..0x003197E7). Nothing to configure -
+               they join the existing digipick / credit category, so turning
+               that category off (`EnablePickCredit=0`) turns these off too.
            2.0.2 = two fixes, both from player reports (no new INI keys):
              * fixed (2026-10-15): ores, plants and other outdoor targets could
                take seconds to get their outline - or keep losing it - while you
